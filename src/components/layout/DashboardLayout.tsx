@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { logout, getCurrentUser } from "@/lib/storage";
+import { useAuth } from "@/hooks/useAuth";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
@@ -26,10 +26,10 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const user = getCurrentUser();
+  const { creator, signOut } = useAuth();
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await signOut();
     navigate("/");
   };
 
@@ -109,14 +109,14 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
         {/* User section */}
         <div className="border-t border-border pt-6 mt-6">
-          {user && (
+          {creator && (
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center text-primary-foreground font-semibold">
-                {user.name.charAt(0).toUpperCase()}
+                {creator.name.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-medium truncate">{user.name}</p>
-                <p className="text-sm text-muted-foreground truncate">@{user.username}</p>
+                <p className="font-medium truncate">{creator.name}</p>
+                <p className="text-sm text-muted-foreground truncate">@{creator.username}</p>
               </div>
             </div>
           )}

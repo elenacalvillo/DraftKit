@@ -3,37 +3,98 @@ import { motion } from "framer-motion";
 import { Info } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { CollabCalendar } from "@/components/calendar/CollabCalendar";
-import { getCurrentUser, getAvailability, saveAvailability, getRequests } from "@/lib/storage";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 export default function Availability() {
   const navigate = useNavigate();
-  const user = getCurrentUser();
+  const { user, creator, loading } = useAuth();
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [blockedDates, setBlockedDates] = useState<string[]>([]);
   const [bookedDates, setBookedDates] = useState<string[]>([]);
+  const [availabilityId, setAvailabilityId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user) {
+    if (!loading && !user) {
       navigate("/login");
       return;
     }
 
-    const avail = getAvailability(user.username);
-    if (avail) {
-      setAvailableDates(avail.availableDates);
-      setBlockedDates(avail.blockedDates);
+    if (!loading && user && !creator) {
+      navigate("/signup");
+      return;
     }
 
-    const reqs = getRequests(user.username);
-    setBookedDates(
-      reqs.filter((r) => r.status === "approved").map((r) => r.requestedDate)
-    );
-  }, [user, navigate]);
+    if (creator) {
+      fetchData();
+    }
+  }, [user, creator, loading, navigate]);
+
+  const fetchData = async () => {
+    if (!creator) return;
+
+    // Fetch availability
+    const { data: availData } = await supabase
+      .from('availability')
+      .select('*')
+      .eq('creator_id', creator.id)
+      .maybeSingle();
+
+    if (availData) {
+      setAvailabilityId(availData.id);
+      setAvailableDates(availData.available_dates || []);
+      setBlockedDates(availData.blocked_dates || []);
+    }
+
+    // Fetch booked dates from requests
+    const { data: reqData } = await supabase
+      .from('collab_requests')
+      .select('requested_date')
+      .eq('creator_id', creator.id)
+      .eq('status', 'approved');
+
+    if (reqData) {
+      setBookedDates(reqData.map((r) => r.requested_date));
+    }
+  };
+
+  const saveAvailability = async (newAvailable: string[], newBlocked: string[]) => {
+    if (!creator) return;
+
+    if (availabilityId) {
+      // Update existing
+      await supabase
+        .from('availability')
+        .update({
+          available_dates: newAvailable,
+          blocked_dates: newBlocked,
+        })
+        .eq('id', availabilityId);
+    } else {
+      // Create new
+      const { data } = await supabase
+        .from('availability')
+        .insert({
+          creator_id: creator.id,
+          available_dates: newAvailable,
+          blocked_dates: newBlocked,
+          recurring_days: [],
+        })
+        .select()
+        .single();
+
+      if (data) {
+        setAvailabilityId(data.id);
+      }
+    }
+
+    toast.success("Availability updated");
+  };
 
   const handleToggleAvailable = (date: string) => {
-    if (!user) return;
+    if (!creator) return;
 
     let newAvailable: string[];
     let newBlocked = blockedDates;
@@ -47,19 +108,11 @@ export default function Availability() {
 
     setAvailableDates(newAvailable);
     setBlockedDates(newBlocked);
-
-    saveAvailability({
-      username: user.username,
-      availableDates: newAvailable,
-      blockedDates: newBlocked,
-      recurringDays: [],
-    });
-
-    toast.success("Availability updated");
+    saveAvailability(newAvailable, newBlocked);
   };
 
   const handleToggleBlocked = (date: string) => {
-    if (!user) return;
+    if (!creator) return;
 
     let newBlocked: string[];
     let newAvailable = availableDates;
@@ -73,18 +126,20 @@ export default function Availability() {
 
     setBlockedDates(newBlocked);
     setAvailableDates(newAvailable);
-
-    saveAvailability({
-      username: user.username,
-      availableDates: newAvailable,
-      blockedDates: newBlocked,
-      recurringDays: [],
-    });
-
-    toast.success("Availability updated");
+    saveAvailability(newAvailable, newBlocked);
   };
 
-  if (!user) return null;
+  if (loading || !creator) {
+    return (
+      <div className="min-h-screen gradient-bg flex items-center justify-center">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full"
+        />
+      </div>
+    );
+  }
 
   return (
     <DashboardLayout>

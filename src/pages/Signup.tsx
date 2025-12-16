@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -19,24 +19,27 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { CollabCalendar } from "@/components/calendar/CollabCalendar";
-import {
-  isUsernameTaken,
-  saveCreator,
-  setCurrentUser,
-  saveAvailability,
-  generateId,
-  Creator,
-} from "@/lib/storage";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { signupStep1Schema, signupStep2Schema } from "@/lib/validations";
 import { toast } from "sonner";
 
 type Step = 1 | 2 | 3 | 4;
 
+interface CreatorData {
+  id: string;
+  username: string;
+  name: string;
+}
+
 export default function Signup() {
   const navigate = useNavigate();
+  const { user, creator, loading, signUp, refreshCreator } = useAuth();
   const [currentStep, setCurrentStep] = useState<Step>(1);
   const [isLoading, setIsLoading] = useState(false);
-  const [createdUser, setCreatedUser] = useState<Creator | null>(null);
+  const [createdUser, setCreatedUser] = useState<CreatorData | null>(null);
   const [availableDates, setAvailableDates] = useState<string[]>([]);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [formData, setFormData] = useState({
     email: "",
@@ -47,6 +50,12 @@ export default function Signup() {
     welcomeMessage: "",
   });
 
+  useEffect(() => {
+    if (!loading && user && creator) {
+      navigate("/dashboard");
+    }
+  }, [user, creator, loading, navigate]);
+
   const steps = [
     { number: 1, title: "Account" },
     { number: 2, title: "Profile" },
@@ -56,39 +65,115 @@ export default function Signup() {
 
   const handleStep1 = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrors({});
+    
+    // Validate inputs
+    const result = signupStep1Schema.safeParse({
+      email: formData.email,
+      password: formData.password,
+    });
+    
+    if (!result.success) {
+      const fieldErrors: Record<string, string> = {};
+      result.error.errors.forEach((err) => {
+        const field = err.path[0] as string;
+        fieldErrors[field] = err.message;
+      });
+      setErrors(fieldErrors);
+      return;
+    }
+
     setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    const { error, data } = await signUp(formData.email, formData.password);
+
+    if (error) {
+      if (error.message.includes('already registered')) {
+        toast.error("An account with this email already exists. Please sign in.");
+      } else {
+        toast.error(error.message);
+      }
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(false);
     setCurrentStep(2);
   };
 
   const handleStep2 = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    setErrors({});
+    
+    // Validate inputs
+    const result = signupStep2Schema.safeParse({
+      name: formData.name,
+      username: formData.username,
+      substackUrl: formData.substackUrl,
+      welcomeMessage: formData.welcomeMessage || undefined,
+    });
+    
+    if (!result.success) {
+      const fieldErrors: Record<string, string> = {};
+      result.error.errors.forEach((err) => {
+        const field = err.path[0] as string;
+        fieldErrors[field] = err.message;
+      });
+      setErrors(fieldErrors);
+      return;
+    }
 
-    // Check username
-    if (isUsernameTaken(formData.username)) {
-      toast.error("Username is already taken. Please choose another.");
+    setIsLoading(true);
+
+    // Get current session
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session?.user) {
+      toast.error("Session expired. Please sign in again.");
+      navigate("/login");
+      return;
+    }
+
+    // Check if username is taken
+    const { data: existingUser } = await supabase
+      .from('creators')
+      .select('username')
+      .eq('username', formData.username)
+      .maybeSingle();
+
+    if (existingUser) {
+      setErrors({ username: "Username is already taken" });
       setIsLoading(false);
       return;
     }
 
-    // Create user
-    const newUser: Creator = {
-      id: generateId(),
-      username: formData.username,
-      name: formData.name,
-      email: formData.email,
-      substackUrl: formData.substackUrl,
-      bio: "",
-      welcomeMessage: formData.welcomeMessage || `Hi! I'm ${formData.name}. Let's collaborate!`,
-      createdAt: new Date().toISOString(),
-    };
+    // Create creator profile
+    const { data: newCreator, error } = await supabase
+      .from('creators')
+      .insert({
+        user_id: session.user.id,
+        username: formData.username,
+        name: formData.name,
+        email: formData.email,
+        substack_url: formData.substackUrl,
+        welcome_message: formData.welcomeMessage || `Hi! I'm ${formData.name}. Let's collaborate!`,
+      })
+      .select()
+      .single();
 
-    saveCreator(newUser);
-    setCreatedUser(newUser);
-    setCurrentUser(newUser);
+    if (error) {
+      toast.error("Failed to create profile. Please try again.");
+      setIsLoading(false);
+      return;
+    }
+
+    setCreatedUser({
+      id: newCreator.id,
+      username: newCreator.username,
+      name: newCreator.name,
+    });
+    
+    await refreshCreator();
     setIsLoading(false);
     setCurrentStep(3);
   };
@@ -101,14 +186,25 @@ export default function Signup() {
     }
   };
 
-  const handleStep3 = () => {
+  const handleStep3 = async () => {
     if (createdUser) {
-      saveAvailability({
-        username: createdUser.username,
-        availableDates,
-        blockedDates: [],
-        recurringDays: [],
-      });
+      setIsLoading(true);
+      
+      // Save availability
+      const { error } = await supabase
+        .from('availability')
+        .insert({
+          creator_id: createdUser.id,
+          available_dates: availableDates,
+          blocked_dates: [],
+          recurring_days: [],
+        });
+
+      if (error) {
+        toast.error("Failed to save availability");
+      }
+      
+      setIsLoading(false);
     }
     setCurrentStep(4);
   };
@@ -121,6 +217,18 @@ export default function Signup() {
       toast.success("Link copied to clipboard!");
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen gradient-bg flex items-center justify-center">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen gradient-bg flex items-center justify-center p-6">
@@ -245,6 +353,9 @@ export default function Signup() {
                       placeholder="you@example.com"
                       className="h-12"
                     />
+                    {errors.email && (
+                      <p className="text-sm text-destructive">{errors.email}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -264,6 +375,9 @@ export default function Signup() {
                       placeholder="••••••••"
                       className="h-12"
                     />
+                    {errors.password && (
+                      <p className="text-sm text-destructive">{errors.password}</p>
+                    )}
                   </div>
 
                   <Button
@@ -328,6 +442,9 @@ export default function Signup() {
                       placeholder="Your name"
                       className="h-12"
                     />
+                    {errors.name && (
+                      <p className="text-sm text-destructive">{errors.name}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -350,6 +467,9 @@ export default function Signup() {
                         className="h-12 pl-[135px]"
                       />
                     </div>
+                    {errors.username && (
+                      <p className="text-sm text-destructive">{errors.username}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -368,6 +488,9 @@ export default function Signup() {
                       placeholder="https://yourname.substack.com"
                       className="h-12"
                     />
+                    {errors.substackUrl && (
+                      <p className="text-sm text-destructive">{errors.substackUrl}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -384,6 +507,9 @@ export default function Signup() {
                       placeholder="This will be shown on your public page..."
                       rows={3}
                     />
+                    {errors.welcomeMessage && (
+                      <p className="text-sm text-destructive">{errors.welcomeMessage}</p>
+                    )}
                   </div>
 
                   <div className="flex gap-3">
@@ -452,6 +578,7 @@ export default function Signup() {
                     variant="ghost"
                     size="lg"
                     onClick={handleStep3}
+                    disabled={isLoading}
                   >
                     Skip for now
                   </Button>
@@ -460,9 +587,20 @@ export default function Signup() {
                     size="lg"
                     className="flex-1"
                     onClick={handleStep3}
+                    disabled={isLoading}
                   >
-                    Continue
-                    <ArrowRight className="w-4 h-4 ml-2" />
+                    {isLoading ? (
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        className="w-5 h-5 border-2 border-primary-foreground border-t-transparent rounded-full"
+                      />
+                    ) : (
+                      <>
+                        Continue
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </>
+                    )}
                   </Button>
                 </div>
               </motion.div>
@@ -492,25 +630,29 @@ export default function Signup() {
 
                 <div className="bg-muted/50 rounded-xl p-4 mb-6">
                   <p className="text-sm text-muted-foreground mb-2">Your public link</p>
-                  <div className="flex items-center gap-2">
-                    <code className="flex-1 p-3 bg-background rounded-lg font-mono text-sm truncate">
-                      {window.location.origin}/{createdUser.username}
-                    </code>
-                    <Button variant="outline" size="icon" onClick={handleCopyLink}>
-                      <Copy className="w-4 h-4" />
-                    </Button>
-                  </div>
+                  <p className="font-mono text-lg font-medium break-all">
+                    {window.location.origin}/{createdUser.username}
+                  </p>
                 </div>
 
-                <div className="flex flex-col gap-3">
-                  <Button variant="hero" size="lg" asChild>
-                    <Link to="/dashboard">Go to Dashboard</Link>
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="flex-1"
+                    onClick={handleCopyLink}
+                  >
+                    <Copy className="w-4 h-4 mr-2" />
+                    Copy Link
                   </Button>
-                  <Button variant="ghost" asChild>
-                    <Link to={`/${createdUser.username}`} target="_blank">
-                      Preview Your Page
-                      <ExternalLink className="w-4 h-4 ml-2" />
-                    </Link>
+                  <Button
+                    variant="hero"
+                    size="lg"
+                    className="flex-1"
+                    onClick={() => navigate("/dashboard")}
+                  >
+                    Go to Dashboard
+                    <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                 </div>
               </motion.div>

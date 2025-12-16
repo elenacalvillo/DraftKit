@@ -4,77 +4,122 @@ import { Inbox } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { RequestCard } from "@/components/requests/RequestCard";
 import { Button } from "@/components/ui/button";
-import {
-  getCurrentUser,
-  getRequests,
-  saveRequest,
-  getAvailability,
-  saveAvailability,
-  CollabRequest,
-} from "@/lib/storage";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+
+interface CollabRequest {
+  id: string;
+  creator_id: string;
+  requester_name: string;
+  requester_email: string;
+  requester_substack_url: string | null;
+  message: string | null;
+  requested_date: string;
+  status: string;
+  created_at: string;
+}
 
 type FilterTab = "all" | "pending" | "approved" | "declined";
 
 export default function Requests() {
   const navigate = useNavigate();
-  const user = getCurrentUser();
+  const { user, creator, loading } = useAuth();
   const [requests, setRequests] = useState<CollabRequest[]>([]);
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
 
   useEffect(() => {
-    if (!user) {
+    if (!loading && !user) {
       navigate("/login");
       return;
     }
 
-    const reqs = getRequests(user.username);
-    setRequests(reqs.sort((a, b) => 
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    ));
-  }, [user, navigate]);
+    if (!loading && user && !creator) {
+      navigate("/signup");
+      return;
+    }
 
-  const handleApprove = (id: string) => {
-    if (!user) return;
+    if (creator) {
+      fetchRequests();
+    }
+  }, [user, creator, loading, navigate]);
+
+  const fetchRequests = async () => {
+    if (!creator) return;
+
+    const { data } = await supabase
+      .from('collab_requests')
+      .select('*')
+      .eq('creator_id', creator.id)
+      .order('created_at', { ascending: false });
+
+    if (data) {
+      setRequests(data);
+    }
+  };
+
+  const handleApprove = async (id: string) => {
+    if (!creator) return;
 
     const request = requests.find((r) => r.id === id);
     if (!request) return;
 
-    const updatedRequest = { ...request, status: "approved" as const };
-    saveRequest(updatedRequest);
+    const { error } = await supabase
+      .from('collab_requests')
+      .update({ status: 'approved' })
+      .eq('id', id);
 
-    // Update availability - remove the date from available and add to booked
-    const avail = getAvailability(user.username);
-    if (avail) {
-      saveAvailability({
-        ...avail,
-        availableDates: avail.availableDates.filter(
-          (d) => d !== request.requestedDate
-        ),
-      });
+    if (error) {
+      toast.error("Failed to approve request");
+      return;
+    }
+
+    // Update availability - remove the date from available
+    const { data: availData } = await supabase
+      .from('availability')
+      .select('*')
+      .eq('creator_id', creator.id)
+      .maybeSingle();
+
+    if (availData) {
+      await supabase
+        .from('availability')
+        .update({
+          available_dates: (availData.available_dates || []).filter(
+            (d: string) => d !== request.requested_date
+          ),
+        })
+        .eq('id', availData.id);
     }
 
     setRequests(
-      requests.map((r) => (r.id === id ? updatedRequest : r))
+      requests.map((r) => (r.id === id ? { ...r, status: 'approved' } : r))
     );
 
-    toast.success(`Collaboration with ${request.requesterName} approved!`);
+    toast.success(`Collaboration with ${request.requester_name} approved!`);
   };
 
-  const handleDecline = (id: string) => {
+  const handleDecline = async (id: string) => {
     const request = requests.find((r) => r.id === id);
     if (!request) return;
 
-    const updatedRequest = { ...request, status: "declined" as const };
-    saveRequest(updatedRequest);
+    const { error } = await supabase
+      .from('collab_requests')
+      .update({ status: 'declined' })
+      .eq('id', id);
+
+    if (error) {
+      toast.error("Failed to decline request");
+      return;
+    }
 
     setRequests(
-      requests.map((r) => (r.id === id ? updatedRequest : r))
+      requests.map((r) => (r.id === id ? { ...r, status: 'declined' } : r))
     );
 
-    toast.info(`Request from ${request.requesterName} declined`);
+    toast.info(`Request from ${request.requester_name} declined`);
   };
 
   const filteredRequests = requests.filter((r) => {
@@ -89,7 +134,30 @@ export default function Requests() {
     { value: "declined", label: "Declined", count: requests.filter((r) => r.status === "declined").length },
   ];
 
-  if (!user) return null;
+  if (loading || !creator) {
+    return (
+      <div className="min-h-screen gradient-bg flex items-center justify-center">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full"
+        />
+      </div>
+    );
+  }
+
+  // Map requests to the format expected by RequestCard
+  const mappedRequests = filteredRequests.map((r) => ({
+    id: r.id,
+    creatorUsername: creator.username,
+    requesterName: r.requester_name,
+    requesterEmail: r.requester_email,
+    requesterSubstackUrl: r.requester_substack_url || '',
+    message: r.message || '',
+    requestedDate: r.requested_date,
+    status: r.status as 'pending' | 'approved' | 'declined',
+    createdAt: r.created_at,
+  }));
 
   return (
     <DashboardLayout>
@@ -145,7 +213,7 @@ export default function Requests() {
 
         {/* Request cards */}
         <AnimatePresence mode="popLayout">
-          {filteredRequests.length === 0 ? (
+          {mappedRequests.length === 0 ? (
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -159,13 +227,13 @@ export default function Requests() {
               </p>
               <div className="mt-6 p-4 bg-muted/50 rounded-xl inline-block">
                 <code className="text-sm text-primary">
-                  collabflow.com/{user.username}
+                  collabflow.com/{creator.username}
                 </code>
               </div>
             </motion.div>
           ) : (
             <div className="grid gap-6">
-              {filteredRequests.map((request, index) => (
+              {mappedRequests.map((request, index) => (
                 <motion.div
                   key={request.id}
                   initial={{ opacity: 0, y: 20 }}

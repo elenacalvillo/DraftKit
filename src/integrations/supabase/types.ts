@@ -14,7 +14,124 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      availability: {
+        Row: {
+          available_dates: string[] | null
+          blocked_dates: string[] | null
+          creator_id: string
+          id: string
+          recurring_days: number[] | null
+          updated_at: string
+        }
+        Insert: {
+          available_dates?: string[] | null
+          blocked_dates?: string[] | null
+          creator_id: string
+          id?: string
+          recurring_days?: number[] | null
+          updated_at?: string
+        }
+        Update: {
+          available_dates?: string[] | null
+          blocked_dates?: string[] | null
+          creator_id?: string
+          id?: string
+          recurring_days?: number[] | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "availability_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: true
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      collab_requests: {
+        Row: {
+          created_at: string
+          creator_id: string
+          id: string
+          message: string | null
+          requested_date: string
+          requester_email: string
+          requester_name: string
+          requester_substack_url: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          creator_id: string
+          id?: string
+          message?: string | null
+          requested_date: string
+          requester_email: string
+          requester_name: string
+          requester_substack_url?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          creator_id?: string
+          id?: string
+          message?: string | null
+          requested_date?: string
+          requester_email?: string
+          requester_name?: string
+          requester_substack_url?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collab_requests_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      creators: {
+        Row: {
+          bio: string | null
+          created_at: string
+          email: string
+          id: string
+          name: string
+          substack_url: string | null
+          updated_at: string
+          user_id: string
+          username: string
+          welcome_message: string | null
+        }
+        Insert: {
+          bio?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          name: string
+          substack_url?: string | null
+          updated_at?: string
+          user_id: string
+          username: string
+          welcome_message?: string | null
+        }
+        Update: {
+          bio?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+          substack_url?: string | null
+          updated_at?: string
+          user_id?: string
+          username?: string
+          welcome_message?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

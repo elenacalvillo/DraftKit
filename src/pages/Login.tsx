@@ -1,42 +1,78 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Mail, Lock, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getAllCreators, setCurrentUser } from "@/lib/storage";
+import { useAuth } from "@/hooks/useAuth";
+import { loginSchema } from "@/lib/validations";
 import { toast } from "sonner";
 
 export default function Login() {
   const navigate = useNavigate();
+  const { signIn, user, creator, loading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+
+  useEffect(() => {
+    if (!loading && user && creator) {
+      navigate("/dashboard");
+    }
+  }, [user, creator, loading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-
-    // Simulate network delay
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    // Simple auth - find user by email (no real password check for demo)
-    const creators = getAllCreators();
-    const user = creators.find((c) => c.email === formData.email);
-
-    if (user) {
-      setCurrentUser(user);
-      toast.success(`Welcome back, ${user.name}!`);
-      navigate("/dashboard");
-    } else {
-      toast.error("No account found with this email. Please sign up.");
+    setErrors({});
+    
+    // Validate inputs
+    const result = loginSchema.safeParse(formData);
+    if (!result.success) {
+      const fieldErrors: { email?: string; password?: string } = {};
+      result.error.errors.forEach((err) => {
+        const field = err.path[0] as string;
+        fieldErrors[field as keyof typeof fieldErrors] = err.message;
+      });
+      setErrors(fieldErrors);
+      return;
     }
 
+    setIsLoading(true);
+
+    const { error } = await signIn(formData.email, formData.password);
+
+    if (error) {
+      if (error.message.includes('Invalid login credentials')) {
+        toast.error("Invalid email or password. Please try again.");
+      } else if (error.message.includes('Email not confirmed')) {
+        toast.error("Please verify your email before signing in.");
+      } else {
+        toast.error(error.message);
+      }
+      setIsLoading(false);
+      return;
+    }
+
+    toast.success("Welcome back!");
+    navigate("/dashboard");
     setIsLoading(false);
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen gradient-bg flex items-center justify-center">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen gradient-bg flex items-center justify-center p-6">
@@ -101,6 +137,9 @@ export default function Login() {
                 placeholder="you@example.com"
                 className="h-12"
               />
+              {errors.email && (
+                <p className="text-sm text-destructive">{errors.email}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -119,6 +158,9 @@ export default function Login() {
                 placeholder="••••••••"
                 className="h-12"
               />
+              {errors.password && (
+                <p className="text-sm text-destructive">{errors.password}</p>
+              )}
             </div>
 
             <Button
