@@ -148,7 +148,13 @@ export default function PublicBooking() {
       });
 
     if (error) {
-      toast.error("Failed to submit request. Please try again.");
+      // Handle unique constraint violation (race condition - date was just booked)
+      if (error.code === '23505') {
+        toast.error("This date has just been booked. Please select another date.");
+        setSelectedDate(null);
+      } else {
+        toast.error("Failed to submit request. Please try again.");
+      }
       setIsSubmitting(false);
       return;
     }
