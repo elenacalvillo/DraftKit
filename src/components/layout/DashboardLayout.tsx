@@ -1,0 +1,158 @@
+import { useState } from "react";
+import { motion } from "framer-motion";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import {
+  Calendar,
+  LayoutDashboard,
+  MessageSquare,
+  Settings,
+  Sparkles,
+  LogOut,
+  Menu,
+  X,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { logout, getCurrentUser } from "@/lib/storage";
+
+const navItems = [
+  { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+  { icon: Calendar, label: "Availability", path: "/dashboard/availability" },
+  { icon: MessageSquare, label: "Requests", path: "/dashboard/requests" },
+  { icon: Settings, label: "Settings", path: "/dashboard/settings" },
+];
+
+export function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const user = getCurrentUser();
+
+  const handleLogout = () => {
+    logout();
+    navigate("/");
+  };
+
+  return (
+    <div className="min-h-screen gradient-bg">
+      {/* Mobile header */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 px-4 py-3 glass-card rounded-none border-x-0 border-t-0">
+        <div className="flex items-center justify-between">
+          <Link to="/dashboard" className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
+              <Sparkles className="w-4 h-4 text-primary-foreground" />
+            </div>
+            <span className="text-lg font-bold gradient-text">CollabFlow</span>
+          </Link>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          >
+            {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </Button>
+        </div>
+      </div>
+
+      {/* Sidebar */}
+      <motion.aside
+        initial={false}
+        animate={{
+          x: isSidebarOpen ? 0 : "-100%",
+        }}
+        className={cn(
+          "fixed top-0 left-0 bottom-0 w-64 z-40 glass-card rounded-none border-y-0 border-l-0 p-6 flex flex-col",
+          "lg:translate-x-0 lg:transform-none"
+        )}
+      >
+        {/* Logo */}
+        <Link to="/dashboard" className="flex items-center gap-2 mb-10">
+          <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-glow">
+            <Sparkles className="w-5 h-5 text-primary-foreground" />
+          </div>
+          <span className="text-xl font-bold gradient-text">CollabFlow</span>
+        </Link>
+
+        {/* Navigation */}
+        <nav className="flex-1 space-y-2">
+          {navItems.map((item) => {
+            const isActive = location.pathname === item.path;
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                onClick={() => setIsSidebarOpen(false)}
+              >
+                <motion.div
+                  whileHover={{ x: 4 }}
+                  whileTap={{ scale: 0.98 }}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-3 rounded-xl transition-colors",
+                    isActive
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  )}
+                >
+                  <item.icon className="w-5 h-5" />
+                  <span>{item.label}</span>
+                  {isActive && (
+                    <motion.div
+                      layoutId="activeNav"
+                      className="absolute left-0 w-1 h-8 rounded-r-full bg-primary"
+                    />
+                  )}
+                </motion.div>
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* User section */}
+        <div className="border-t border-border pt-6 mt-6">
+          {user && (
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center text-primary-foreground font-semibold">
+                {user.name.charAt(0).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium truncate">{user.name}</p>
+                <p className="text-sm text-muted-foreground truncate">@{user.username}</p>
+              </div>
+            </div>
+          )}
+          <Button
+            variant="ghost"
+            className="w-full justify-start text-muted-foreground hover:text-destructive"
+            onClick={handleLogout}
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            Sign Out
+          </Button>
+        </div>
+      </motion.aside>
+
+      {/* Mobile overlay */}
+      {isSidebarOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => setIsSidebarOpen(false)}
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-30 lg:hidden"
+        />
+      )}
+
+      {/* Main content */}
+      <main className="lg:ml-64 min-h-screen pt-16 lg:pt-0">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="p-6 lg:p-10"
+        >
+          {children}
+        </motion.div>
+      </main>
+    </div>
+  );
+}
