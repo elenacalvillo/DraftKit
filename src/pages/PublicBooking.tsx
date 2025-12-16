@@ -53,9 +53,9 @@ export default function PublicBooking() {
 
     setIsLoading(true);
 
-    // Fetch creator
+    // Fetch creator from public view (excludes sensitive data like email)
     const { data: creatorData, error } = await supabase
-      .from('creators')
+      .from('public_creator_profiles')
       .select('id, username, name, substack_url, welcome_message')
       .eq('username', username)
       .maybeSingle();

@@ -47,6 +47,13 @@ export type Database = {
             referencedRelation: "creators"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "availability_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: true
+            referencedRelation: "public_creator_profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       collab_requests: {
@@ -89,6 +96,13 @@ export type Database = {
             columns: ["creator_id"]
             isOneToOne: false
             referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collab_requests_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "public_creator_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -134,7 +148,36 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      public_creator_profiles: {
+        Row: {
+          bio: string | null
+          created_at: string | null
+          id: string | null
+          name: string | null
+          substack_url: string | null
+          username: string | null
+          welcome_message: string | null
+        }
+        Insert: {
+          bio?: string | null
+          created_at?: string | null
+          id?: string | null
+          name?: string | null
+          substack_url?: string | null
+          username?: string | null
+          welcome_message?: string | null
+        }
+        Update: {
+          bio?: string | null
+          created_at?: string | null
+          id?: string | null
+          name?: string | null
+          substack_url?: string | null
+          username?: string | null
+          welcome_message?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never
