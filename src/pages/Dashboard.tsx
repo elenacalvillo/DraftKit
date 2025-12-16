@@ -3,38 +3,75 @@ import { motion } from "framer-motion";
 import { Calendar, Clock, MessageSquare, Users } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { CollabCalendar } from "@/components/calendar/CollabCalendar";
-import { getCurrentUser, getAvailability, getRequests, CollabRequest } from "@/lib/storage";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+
+interface CollabRequest {
+  id: string;
+  requester_name: string;
+  requester_email: string;
+  requested_date: string;
+  status: string;
+  created_at: string;
+}
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const user = getCurrentUser();
+  const { user, creator, loading } = useAuth();
   const [availability, setAvailability] = useState<string[]>([]);
   const [requests, setRequests] = useState<CollabRequest[]>([]);
   const [bookedDates, setBookedDates] = useState<string[]>([]);
 
   useEffect(() => {
-    if (!user) {
+    if (!loading && !user) {
       navigate("/login");
       return;
     }
 
-    const avail = getAvailability(user.username);
-    if (avail) {
-      setAvailability(avail.availableDates);
+    if (!loading && user && !creator) {
+      navigate("/signup");
+      return;
     }
 
-    const reqs = getRequests(user.username);
-    setRequests(reqs);
-    setBookedDates(
-      reqs.filter((r) => r.status === "approved").map((r) => r.requestedDate)
-    );
-  }, [user, navigate]);
+    if (creator) {
+      fetchData();
+    }
+  }, [user, creator, loading, navigate]);
+
+  const fetchData = async () => {
+    if (!creator) return;
+
+    // Fetch availability
+    const { data: availData } = await supabase
+      .from('availability')
+      .select('*')
+      .eq('creator_id', creator.id)
+      .maybeSingle();
+
+    if (availData) {
+      setAvailability(availData.available_dates || []);
+    }
+
+    // Fetch requests
+    const { data: reqData } = await supabase
+      .from('collab_requests')
+      .select('*')
+      .eq('creator_id', creator.id)
+      .order('created_at', { ascending: false });
+
+    if (reqData) {
+      setRequests(reqData);
+      setBookedDates(
+        reqData.filter((r) => r.status === "approved").map((r) => r.requested_date)
+      );
+    }
+  };
 
   const pendingCount = requests.filter((r) => r.status === "pending").length;
   const approvedCount = requests.filter((r) => r.status === "approved").length;
   const thisMonthCollabs = requests.filter((r) => {
-    const date = new Date(r.requestedDate);
+    const date = new Date(r.requested_date);
     const now = new Date();
     return (
       r.status === "approved" &&
@@ -67,7 +104,17 @@ export default function Dashboard() {
     },
   ];
 
-  if (!user) return null;
+  if (loading || !creator) {
+    return (
+      <div className="min-h-screen gradient-bg flex items-center justify-center">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full"
+        />
+      </div>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -79,7 +126,7 @@ export default function Dashboard() {
           className="mb-10"
         >
           <h1 className="text-3xl font-bold mb-2">
-            Welcome back, <span className="gradient-text">{user.name}</span>
+            Welcome back, <span className="gradient-text">{creator.name}</span>
           </h1>
           <p className="text-muted-foreground">
             Here's what's happening with your collaborations
@@ -158,12 +205,12 @@ export default function Dashboard() {
                     onClick={() => navigate("/dashboard/requests")}
                   >
                     <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center text-primary-foreground font-semibold text-sm">
-                      {request.requesterName.charAt(0).toUpperCase()}
+                      {request.requester_name.charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{request.requesterName}</p>
+                      <p className="font-medium truncate">{request.requester_name}</p>
                       <p className="text-sm text-muted-foreground truncate">
-                        {new Date(request.requestedDate).toLocaleDateString()}
+                        {new Date(request.requested_date).toLocaleDateString()}
                       </p>
                     </div>
                     <span

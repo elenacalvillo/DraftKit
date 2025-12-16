@@ -7,8 +7,22 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { CollabCalendar } from "@/components/calendar/CollabCalendar";
-import { getCreator, getAvailability, getRequests, createRequest, Creator, Availability } from "@/lib/storage";
+import { supabase } from "@/integrations/supabase/client";
+import { bookingFormSchema } from "@/lib/validations";
 import { toast } from "sonner";
+
+interface Creator {
+  id: string;
+  username: string;
+  name: string;
+  substack_url: string | null;
+  welcome_message: string | null;
+}
+
+interface Availability {
+  available_dates: string[];
+  blocked_dates: string[];
+}
 
 export default function PublicBooking() {
   const { username } = useParams<{ username: string }>();
@@ -19,6 +33,8 @@ export default function PublicBooking() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [formData, setFormData] = useState({
     name: "",
@@ -29,23 +45,56 @@ export default function PublicBooking() {
 
   useEffect(() => {
     if (!username) return;
+    fetchCreatorData();
+  }, [username]);
 
-    const creatorData = getCreator(username);
-    if (!creatorData) {
+  const fetchCreatorData = async () => {
+    if (!username) return;
+
+    setIsLoading(true);
+
+    // Fetch creator
+    const { data: creatorData, error } = await supabase
+      .from('creators')
+      .select('id, username, name, substack_url, welcome_message')
+      .eq('username', username)
+      .maybeSingle();
+
+    if (error || !creatorData) {
       setNotFound(true);
+      setIsLoading(false);
       return;
     }
 
     setCreator(creatorData);
 
-    const availData = getAvailability(username);
-    setAvailability(availData);
+    // Fetch availability
+    const { data: availData } = await supabase
+      .from('availability')
+      .select('available_dates, blocked_dates')
+      .eq('creator_id', creatorData.id)
+      .maybeSingle();
 
-    const requests = getRequests(username);
-    setBookedDates(
-      requests.filter((r) => r.status === "approved").map((r) => r.requestedDate)
-    );
-  }, [username]);
+    if (availData) {
+      setAvailability({
+        available_dates: availData.available_dates || [],
+        blocked_dates: availData.blocked_dates || [],
+      });
+    }
+
+    // Fetch booked dates (approved or pending requests)
+    const { data: reqData } = await supabase
+      .from('collab_requests')
+      .select('requested_date')
+      .eq('creator_id', creatorData.id)
+      .neq('status', 'declined');
+
+    if (reqData) {
+      setBookedDates(reqData.map((r) => r.requested_date));
+    }
+
+    setIsLoading(false);
+  };
 
   const handleDateSelect = (date: string) => {
     setSelectedDate(date);
@@ -53,15 +102,32 @@ export default function PublicBooking() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedDate || !username) return;
+    if (!selectedDate || !username || !creator) return;
+
+    setErrors({});
+
+    // Validate inputs
+    const result = bookingFormSchema.safeParse(formData);
+    if (!result.success) {
+      const fieldErrors: Record<string, string> = {};
+      result.error.errors.forEach((err) => {
+        const field = err.path[0] as string;
+        fieldErrors[field] = err.message;
+      });
+      setErrors(fieldErrors);
+      return;
+    }
 
     // Check if date is still available
-    const currentRequests = getRequests(username);
-    const isDateTaken = currentRequests.some(
-      (r) => r.requestedDate === selectedDate && r.status !== "declined"
-    );
+    const { data: existingRequest } = await supabase
+      .from('collab_requests')
+      .select('id')
+      .eq('creator_id', creator.id)
+      .eq('requested_date', selectedDate)
+      .neq('status', 'declined')
+      .maybeSingle();
 
-    if (isDateTaken) {
+    if (existingRequest) {
       toast.error("This date has just been booked. Please select another date.");
       setSelectedDate(null);
       return;
@@ -69,16 +135,23 @@ export default function PublicBooking() {
 
     setIsSubmitting(true);
 
-    // Simulate network delay for better UX
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    const { error } = await supabase
+      .from('collab_requests')
+      .insert({
+        creator_id: creator.id,
+        requester_name: formData.name.trim(),
+        requester_email: formData.email.trim(),
+        requester_substack_url: formData.substackUrl.trim(),
+        message: formData.message.trim() || null,
+        requested_date: selectedDate,
+        status: 'pending',
+      });
 
-    createRequest(username, {
-      requesterName: formData.name,
-      requesterEmail: formData.email,
-      requesterSubstackUrl: formData.substackUrl,
-      message: formData.message,
-      requestedDate: selectedDate,
-    });
+    if (error) {
+      toast.error("Failed to submit request. Please try again.");
+      setIsSubmitting(false);
+      return;
+    }
 
     setIsSubmitting(false);
     setIsSuccess(true);
@@ -94,6 +167,18 @@ export default function PublicBooking() {
       year: "numeric",
     });
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen gradient-bg flex items-center justify-center">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full"
+        />
+      </div>
+    );
+  }
 
   if (notFound) {
     return (
@@ -119,15 +204,7 @@ export default function PublicBooking() {
   }
 
   if (!creator) {
-    return (
-      <div className="min-h-screen gradient-bg flex items-center justify-center">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-          className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full"
-        />
-      </div>
-    );
+    return null;
   }
 
   return (
@@ -188,9 +265,9 @@ export default function PublicBooking() {
             </span>
           </div>
           <h1 className="text-4xl font-bold mb-4">{creator.name}</h1>
-          {creator.substackUrl && (
+          {creator.substack_url && (
             <a
-              href={creator.substackUrl}
+              href={creator.substack_url}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 text-primary hover:underline mb-4"
@@ -199,9 +276,9 @@ export default function PublicBooking() {
               View Substack
             </a>
           )}
-          {creator.welcomeMessage && (
+          {creator.welcome_message && (
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              {creator.welcomeMessage}
+              {creator.welcome_message}
             </p>
           )}
         </motion.div>
@@ -290,6 +367,9 @@ export default function PublicBooking() {
                         placeholder="John Doe"
                         className="h-12"
                       />
+                      {errors.name && (
+                        <p className="text-sm text-destructive">{errors.name}</p>
+                      )}
                     </div>
 
                     <div className="space-y-2">
@@ -308,6 +388,9 @@ export default function PublicBooking() {
                         placeholder="john@example.com"
                         className="h-12"
                       />
+                      {errors.email && (
+                        <p className="text-sm text-destructive">{errors.email}</p>
+                      )}
                     </div>
                   </div>
 
@@ -327,6 +410,9 @@ export default function PublicBooking() {
                       placeholder="https://yourname.substack.com"
                       className="h-12"
                     />
+                    {errors.substackUrl && (
+                      <p className="text-sm text-destructive">{errors.substackUrl}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -343,6 +429,9 @@ export default function PublicBooking() {
                       placeholder="Tell them about the collaboration you have in mind..."
                       rows={4}
                     />
+                    {errors.message && (
+                      <p className="text-sm text-destructive">{errors.message}</p>
+                    )}
                   </div>
 
                   <Button
@@ -382,13 +471,13 @@ export default function PublicBooking() {
                 </div>
 
                 <CollabCalendar
-                  availableDates={availability?.availableDates || []}
+                  availableDates={availability?.available_dates || []}
                   bookedDates={bookedDates}
-                  blockedDates={availability?.blockedDates || []}
+                  blockedDates={availability?.blocked_dates || []}
                   onDateSelect={handleDateSelect}
                 />
 
-                {availability?.availableDates?.length === 0 && (
+                {availability?.available_dates?.length === 0 && (
                   <div className="text-center mt-6 p-6 bg-muted/50 rounded-xl">
                     <Calendar className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
                     <p className="text-muted-foreground">
