@@ -19,6 +19,20 @@ export default function Login() {
   });
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
 
+  // Check for OAuth errors in URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get('error');
+    const errorDescription = params.get('error_description');
+    
+    if (error) {
+      const message = errorDescription || error;
+      toast.error(`Google sign-in failed: ${message.replace(/_/g, ' ')}`);
+      // Clean up URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
   useEffect(() => {
     if (!loading && user && creator) {
       navigate("/dashboard");

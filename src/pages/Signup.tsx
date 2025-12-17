@@ -50,6 +50,20 @@ export default function Signup() {
     welcomeMessage: "",
   });
 
+  // Check for OAuth errors in URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get('error');
+    const errorDescription = params.get('error_description');
+    
+    if (error) {
+      const message = errorDescription || error;
+      toast.error(`Google sign-in failed: ${message.replace(/_/g, ' ')}`);
+      // Clean up URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
   useEffect(() => {
     if (!loading && user) {
       // If user exists but no creator profile, go to step 2
