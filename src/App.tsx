@@ -12,6 +12,7 @@ import Availability from "./pages/Availability";
 import Requests from "./pages/Requests";
 import Settings from "./pages/Settings";
 import PublicBooking from "./pages/PublicBooking";
+import Demo from "./pages/Demo";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/demo" element={<Demo />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/dashboard/availability" element={<Availability />} />
             <Route path="/dashboard/requests" element={<Requests />} />

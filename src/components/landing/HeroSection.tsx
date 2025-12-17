@@ -77,15 +77,15 @@ export function HeroSection() {
             transition={{ duration: 0.6, delay: 0.3 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-20"
           >
-            <Button variant="hero" size="xl" asChild>
-              <Link to="/signup">
+            <Link to="/signup">
+              <Button variant="hero" size="xl">
                 Start Organizing Collaborations
                 <ArrowRight className="w-5 h-5 ml-2" />
-              </Link>
-            </Button>
-            <Button variant="glass" size="lg" asChild>
-              <Link to="/demo">See How It Works</Link>
-            </Button>
+              </Button>
+            </Link>
+            <Link to="/demo">
+              <Button variant="glass" size="lg">See How It Works</Button>
+            </Link>
           </motion.div>
 
           {/* Feature Cards */}
