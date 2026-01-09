@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Calendar, Check, ExternalLink, Sparkles, Mail, User, MessageSquare } from "lucide-react";
+import { ArrowLeft, Calendar, Check, ExternalLink, Sparkles, Mail, User, MessageSquare, Lightbulb, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,6 +10,7 @@ import { CollabCalendar } from "@/components/calendar/CollabCalendar";
 import { supabase } from "@/integrations/supabase/client";
 import { bookingFormSchema } from "@/lib/validations";
 import { toast } from "sonner";
+import { analyzeCollabMatch, type CollabSuggestion, type CollabMatchResult } from "@/lib/api/collab-match";
 
 interface Creator {
   id: string;
@@ -35,6 +36,11 @@ export default function PublicBooking() {
   const [notFound, setNotFound] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // AI Match state
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [matchResult, setMatchResult] = useState<CollabMatchResult | null>(null);
+  const [hasAnalyzed, setHasAnalyzed] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -98,6 +104,42 @@ export default function PublicBooking() {
 
   const handleDateSelect = (date: string) => {
     setSelectedDate(date);
+  };
+
+  const handleAnalyzeMatch = async () => {
+    if (!formData.substackUrl || !creator?.substack_url) {
+      toast.error("Both you and the creator need Substack URLs to analyze a match");
+      return;
+    }
+
+    // Basic URL validation
+    try {
+      new URL(formData.substackUrl);
+    } catch {
+      toast.error("Please enter a valid Substack URL");
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setMatchResult(null);
+
+    try {
+      const result = await analyzeCollabMatch(creator.substack_url, formData.substackUrl);
+      setMatchResult(result);
+      setHasAnalyzed(true);
+      toast.success("Found collaboration ideas!");
+    } catch (error) {
+      console.error("Analysis error:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to analyze match. Please try again.");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleUseSuggestion = (suggestion: CollabSuggestion) => {
+    const newMessage = `I'd love to collaborate on: "${suggestion.topic}"\n\n${suggestion.description}\n\nFormat: ${suggestion.format}`;
+    setFormData({ ...formData, message: newMessage });
+    toast.success("Suggestion added to your message!");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -327,6 +369,8 @@ export default function PublicBooking() {
                     setIsSuccess(false);
                     setSelectedDate(null);
                     setFormData({ name: "", email: "", substackUrl: "", message: "" });
+                    setMatchResult(null);
+                    setHasAnalyzed(false);
                   }}
                 >
                   Request Another Date
@@ -405,21 +449,126 @@ export default function PublicBooking() {
                       <ExternalLink className="w-4 h-4" />
                       Your Substack URL
                     </Label>
-                    <Input
-                      id="substackUrl"
-                      type="url"
-                      required
-                      value={formData.substackUrl}
-                      onChange={(e) =>
-                        setFormData({ ...formData, substackUrl: e.target.value })
-                      }
-                      placeholder="https://yourname.substack.com"
-                      className="h-12"
-                    />
+                    <div className="flex gap-2">
+                      <Input
+                        id="substackUrl"
+                        type="url"
+                        required
+                        value={formData.substackUrl}
+                        onChange={(e) => {
+                          setFormData({ ...formData, substackUrl: e.target.value });
+                          // Reset analysis when URL changes
+                          if (hasAnalyzed) {
+                            setMatchResult(null);
+                            setHasAnalyzed(false);
+                          }
+                        }}
+                        placeholder="https://yourname.substack.com"
+                        className="h-12 flex-1"
+                      />
+                      {creator.substack_url && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="lg"
+                          onClick={handleAnalyzeMatch}
+                          disabled={isAnalyzing || !formData.substackUrl}
+                          className="shrink-0"
+                        >
+                          {isAnalyzing ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <>
+                              <Sparkles className="w-4 h-4 mr-2" />
+                              Find Ideas
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </div>
                     {errors.substackUrl && (
                       <p className="text-sm text-destructive">{errors.substackUrl}</p>
                     )}
                   </div>
+
+                  {/* AI Match Suggestions */}
+                  <AnimatePresence>
+                    {isAnalyzing && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="p-6 rounded-xl bg-primary/5 border border-primary/20">
+                          <div className="flex items-center gap-3">
+                            <motion.div
+                              animate={{ rotate: 360 }}
+                              transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                            >
+                              <Sparkles className="w-5 h-5 text-primary" />
+                            </motion.div>
+                            <div>
+                              <p className="font-medium">Analyzing your newsletters...</p>
+                              <p className="text-sm text-muted-foreground">Finding collaboration ideas based on your writing styles</p>
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {matchResult && matchResult.suggestions.length > 0 && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="space-y-4"
+                      >
+                        <div className="flex items-center gap-2 text-sm font-medium text-primary">
+                          <Lightbulb className="w-4 h-4" />
+                          AI Collaboration Ideas
+                        </div>
+                        
+                        <div className="grid gap-3">
+                          {matchResult.suggestions.map((suggestion, index) => (
+                            <motion.div
+                              key={index}
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: index * 0.1 }}
+                              className="p-4 rounded-xl bg-accent/30 border border-accent/50 hover:border-primary/30 transition-colors"
+                            >
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="font-semibold mb-1">"{suggestion.topic}"</h4>
+                                  <p className="text-sm text-muted-foreground mb-2">
+                                    {suggestion.description}
+                                  </p>
+                                  <div className="flex flex-wrap gap-2">
+                                    <span className="inline-flex items-center px-2 py-1 rounded-md bg-primary/10 text-xs font-medium text-primary">
+                                      {suggestion.format}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mt-2 italic">
+                                    {suggestion.whyItWorks}
+                                  </p>
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleUseSuggestion(suggestion)}
+                                  className="shrink-0"
+                                >
+                                  Use This
+                                </Button>
+                              </div>
+                            </motion.div>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
                   <div className="space-y-2">
                     <Label htmlFor="message" className="flex items-center gap-2">
