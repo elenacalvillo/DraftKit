@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Calendar, Clock, MessageSquare, Users } from "lucide-react";
+import { Calendar, Clock, Copy, ExternalLink, MessageSquare, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { CollabCalendar } from "@/components/calendar/CollabCalendar";
 import { useAuth } from "@/hooks/useAuth";
@@ -123,7 +125,7 @@ export default function Dashboard() {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-10"
+          className="mb-6"
         >
           <h1 className="text-3xl font-bold mb-2">
             Welcome back, <span className="gradient-text">{creator.name}</span>
@@ -131,6 +133,46 @@ export default function Dashboard() {
           <p className="text-muted-foreground">
             Here's what's happening with your collaborations
           </p>
+        </motion.div>
+
+        {/* Share Your Link Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="glass-card p-6 mb-8"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="font-semibold mb-1 flex items-center gap-2">
+                <ExternalLink className="w-4 h-4 text-primary" />
+                Your Public Booking Link
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Share this with potential collaborators to let them book time with you
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="px-4 py-2 bg-muted rounded-lg font-mono text-sm truncate max-w-[200px] sm:max-w-none">
+                {window.location.origin}/{creator.username}
+              </div>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => {
+                  navigator.clipboard.writeText(`${window.location.origin}/${creator.username}`);
+                  toast.success("Link copied to clipboard!");
+                }}
+              >
+                <Copy className="w-4 h-4" />
+              </Button>
+              <Button asChild size="icon">
+                <a href={`/${creator.username}`} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+              </Button>
+            </div>
+          </div>
         </motion.div>
 
         {/* Stats */}
@@ -165,11 +207,32 @@ export default function Dashboard() {
             transition={{ delay: 0.3 }}
             className="lg:col-span-2"
           >
-            <h2 className="text-xl font-semibold mb-4">Your Schedule</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">Your Schedule</h2>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => navigate('/dashboard/availability')}
+              >
+                Edit Availability
+              </Button>
+            </div>
             <CollabCalendar
               availableDates={availability}
               bookedDates={bookedDates}
             />
+            {availability.length === 0 && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="mt-4 p-4 rounded-lg bg-accent/10 border border-accent/20"
+              >
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-medium text-foreground">No availability set yet.</span>{" "}
+                  Click "Edit Availability" to mark dates when you're free to collaborate.
+                </p>
+              </motion.div>
+            )}
           </motion.div>
 
           {/* Recent requests */}
