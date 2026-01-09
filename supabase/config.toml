@@ -1,1 +1,4 @@
 project_id = "cbgchxesngdsvkevbqwh"
+
+[functions.analyze-collab-match]
+verify_jwt = false
