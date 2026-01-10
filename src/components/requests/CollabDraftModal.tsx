@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { CollabDraft } from "@/lib/storage";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 interface CollabDraftModalProps {
   open: boolean;
@@ -31,6 +32,7 @@ export function CollabDraftModal({
   onRegenerate,
 }: CollabDraftModalProps) {
   const [copied, setCopied] = useState(false);
+  const { trackEvent } = useAnalytics();
 
   const copyToClipboard = () => {
     if (!draft) return;
@@ -56,6 +58,10 @@ Estimated Read Time: ${draft.estimatedReadTime}`;
     navigator.clipboard.writeText(text);
     setCopied(true);
     toast.success("Draft copied to clipboard!");
+    
+    // Track draft copy event
+    trackEvent("draft_copied", { draft_title: draft.title });
+    
     setTimeout(() => setCopied(false), 2000);
   };
 

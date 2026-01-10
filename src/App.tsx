@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
+import { FeedbackWidget } from "@/components/feedback/FeedbackWidget";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -15,6 +16,7 @@ import Requests from "./pages/Requests";
 import Settings from "./pages/Settings";
 import PublicBooking from "./pages/PublicBooking";
 import Demo from "./pages/Demo";
+import AdminAnalytics from "./pages/AdminAnalytics";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -25,6 +27,7 @@ const App = () => (
       <AuthProvider>
         <Toaster />
         <Sonner />
+        <FeedbackWidget />
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Landing />} />
@@ -37,6 +40,7 @@ const App = () => (
             <Route path="/dashboard/availability" element={<Availability />} />
             <Route path="/dashboard/requests" element={<Requests />} />
             <Route path="/dashboard/settings" element={<Settings />} />
+            <Route path="/admin/analytics" element={<AdminAnalytics />} />
             <Route path="/:username" element={<PublicBooking />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

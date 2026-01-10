@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, Calendar, Check, ExternalLink, Sparkles, Mail, User, MessageSquare, Lightbulb, Loader2 } from "lucide-react";
@@ -11,7 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { bookingFormSchema } from "@/lib/validations";
 import { toast } from "sonner";
 import { analyzeCollabMatch, type CollabSuggestion, type CollabMatchResult } from "@/lib/api/collab-match";
-
+import { useAnalytics } from "@/hooks/useAnalytics";
 interface Creator {
   id: string;
   username: string;
@@ -29,6 +29,9 @@ interface Availability {
 
 export default function PublicBooking() {
   const { username } = useParams<{ username: string }>();
+  const { trackEvent } = useAnalytics();
+  const hasTrackedPageView = useRef(false);
+  
   const [creator, setCreator] = useState<Creator | null>(null);
   const [availability, setAvailability] = useState<Availability | null>(null);
   const [bookedDates, setBookedDates] = useState<string[]>([]);
@@ -51,6 +54,13 @@ export default function PublicBooking() {
     substackUrl: "",
     message: "",
   });
+
+  // Track booking link clicked
+  useEffect(() => {
+    if (!username || hasTrackedPageView.current) return;
+    hasTrackedPageView.current = true;
+    trackEvent("booking_link_clicked", { creator_username: username });
+  }, [username, trackEvent]);
 
   useEffect(() => {
     if (!username) return;
@@ -229,6 +239,12 @@ export default function PublicBooking() {
     setIsSubmitting(false);
     setIsSuccess(true);
     toast.success("Request sent successfully!");
+    
+    // Track booking submitted
+    trackEvent("booking_submitted", { 
+      creator_username: username,
+      has_date: !isFlexibleDate && !!selectedDate,
+    });
   };
 
   const formatSelectedDate = (dateStr: string) => {

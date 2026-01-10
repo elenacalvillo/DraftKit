@@ -20,6 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { CollabCalendar } from "@/components/calendar/CollabCalendar";
 import { useAuth } from "@/hooks/useAuth";
+import { useAnalytics } from "@/hooks/useAnalytics";
 import { supabase } from "@/integrations/supabase/client";
 import { signupStep1Schema, signupStep2Schema } from "@/lib/validations";
 import { toast } from "sonner";
@@ -35,6 +36,7 @@ interface CreatorData {
 export default function Signup() {
   const navigate = useNavigate();
   const { user, creator, loading, signUp, signInWithGoogle, refreshCreator } = useAuth();
+  const { trackEvent } = useAnalytics();
   const [currentStep, setCurrentStep] = useState<Step>(1);
   const [isLoading, setIsLoading] = useState(false);
   const [createdUser, setCreatedUser] = useState<CreatorData | null>(null);
@@ -208,6 +210,9 @@ export default function Signup() {
     await refreshCreator();
     setIsLoading(false);
     setCurrentStep(3);
+    
+    // Track signup
+    trackEvent("user_signup", { username: newCreator.username });
   };
 
   const handleToggleAvailable = (date: string) => {
