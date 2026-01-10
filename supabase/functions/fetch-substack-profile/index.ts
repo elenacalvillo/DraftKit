@@ -106,36 +106,78 @@ function extractProfileData(html: string): SubstackProfile {
 }
 
 serve(async (req) => {
+  console.log("=== fetch-substack-profile invoked ===");
+  
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
+    console.log("Handling CORS preflight");
     return new Response(null, { headers: corsHeaders });
   }
   
   try {
-    const { substackUrl } = await req.json();
+    const body = await req.json();
+    console.log("Request body:", JSON.stringify(body));
+    
+    const { substackUrl } = body;
     
     if (!substackUrl) {
+      console.error("Missing substackUrl in request");
       return new Response(
-        JSON.stringify({ error: "substackUrl is required" }),
+        JSON.stringify({ error: "substackUrl is required", imageUrl: null, publicationName: null, tagline: null }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
     
     const normalizedUrl = normalizeSubstackUrl(substackUrl);
-    console.log(`Fetching Substack profile from: ${normalizedUrl}`);
+    console.log(`Normalized URL: ${normalizedUrl}`);
     
-    const response = await fetch(normalizedUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; CollabBot/1.0)",
-        "Accept": "text/html",
-      },
-    });
+    // Add timeout to prevent hanging
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
     
-    if (!response.ok) {
-      console.error(`Failed to fetch Substack page: ${response.status}`);
+    try {
+      const response = await fetch(normalizedUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; CollabBot/1.0)",
+          "Accept": "text/html,application/xhtml+xml",
+        },
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      
+      console.log(`Fetch response status: ${response.status}`);
+      
+      if (!response.ok) {
+        console.error(`Failed to fetch Substack page: ${response.status} ${response.statusText}`);
+        return new Response(
+          JSON.stringify({ 
+            error: `Failed to fetch: ${response.status}`,
+            imageUrl: null,
+            publicationName: null,
+            tagline: null,
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      const html = await response.text();
+      console.log(`Fetched HTML length: ${html.length} characters`);
+      
+      const profileData = extractProfileData(html);
+      console.log(`Extracted profile data:`, JSON.stringify(profileData));
+      
+      return new Response(
+        JSON.stringify(profileData),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      const fetchErrorMessage = fetchError instanceof Error ? fetchError.message : "Fetch failed";
+      console.error(`Fetch error: ${fetchErrorMessage}`);
       return new Response(
         JSON.stringify({ 
-          error: "Failed to fetch Substack page",
+          error: fetchErrorMessage,
           imageUrl: null,
           publicationName: null,
           tagline: null,
@@ -144,19 +186,9 @@ serve(async (req) => {
       );
     }
     
-    const html = await response.text();
-    const profileData = extractProfileData(html);
-    
-    console.log(`Extracted profile data:`, profileData);
-    
-    return new Response(
-      JSON.stringify(profileData),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-    
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    console.error("Error fetching Substack profile:", errorMessage);
+    console.error("Error in fetch-substack-profile:", errorMessage);
     return new Response(
       JSON.stringify({ 
         error: errorMessage,

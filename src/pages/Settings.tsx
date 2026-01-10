@@ -68,6 +68,25 @@ export default function Settings() {
 
     setIsSaving(true);
 
+    // Fetch profile image from Substack if newsletter URL is provided
+    let profileImageUrl: string | null = (creator as any).profile_image_url || null;
+    if (formData.newsletterUrl) {
+      try {
+        const { data: profileData, error: profileError } = await supabase.functions.invoke(
+          "fetch-substack-profile",
+          { body: { substackUrl: formData.newsletterUrl } }
+        );
+        
+        if (!profileError && profileData?.imageUrl) {
+          profileImageUrl = profileData.imageUrl;
+        } else {
+          console.log("Could not fetch profile image:", profileError || "No image found");
+        }
+      } catch (e) {
+        console.log("Error fetching profile image:", e);
+      }
+    }
+
     const { error } = await supabase
       .from('creators')
       .update({
@@ -76,6 +95,7 @@ export default function Settings() {
         substack_url: formData.substackUrl || null,
         newsletter_url: formData.newsletterUrl,
         welcome_message: formData.welcomeMessage || null,
+        profile_image_url: profileImageUrl,
       })
       .eq('id', creator.id);
 
