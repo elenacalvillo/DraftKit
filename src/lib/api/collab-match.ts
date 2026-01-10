@@ -7,10 +7,22 @@ export interface CollabSuggestion {
   whyItWorks: string;
 }
 
+export interface ArticleSource {
+  title: string;
+  author?: string | null;
+  relevance: string;
+}
+
+export interface SourcesUsed {
+  creatorArticles: ArticleSource[];
+  visitorArticles: ArticleSource[];
+}
+
 export interface CollabMatchResult {
   suggestions: CollabSuggestion[];
   creatorThemes: string[];
   visitorThemes: string[];
+  sourcesUsed?: SourcesUsed | null;
 }
 
 export async function analyzeCollabMatch(

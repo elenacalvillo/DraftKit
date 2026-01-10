@@ -9,6 +9,20 @@ const corsHeaders = {
 interface RSSPost {
   title: string;
   description: string;
+  author: string | null;
+  pubDate: string | null;
+  link: string | null;
+}
+
+interface ArticleSource {
+  title: string;
+  author: string | null;
+  relevance: string;
+}
+
+interface SourcesUsed {
+  creatorArticles: ArticleSource[];
+  visitorArticles: ArticleSource[];
 }
 
 interface CollabSuggestion {
@@ -18,9 +32,30 @@ interface CollabSuggestion {
   whyItWorks: string;
 }
 
-// Parse RSS XML and extract post titles and descriptions
-function parseRSS(xml: string): RSSPost[] {
+// Extract feed-level author from RSS XML
+function extractFeedAuthor(xml: string): string | null {
+  // Try various author tag patterns at feed level
+  const patterns = [
+    /<channel>[\s\S]*?<dc:creator><!\[CDATA\[(.*?)\]\]><\/dc:creator>/,
+    /<channel>[\s\S]*?<dc:creator>(.*?)<\/dc:creator>/,
+    /<channel>[\s\S]*?<author>(.*?)<\/author>/,
+    /<channel>[\s\S]*?<webMaster>(.*?)<\/webMaster>/,
+    /<channel>[\s\S]*?<managingEditor>(.*?)<\/managingEditor>/,
+  ];
+  
+  for (const pattern of patterns) {
+    const match = xml.match(pattern);
+    if (match && match[1]) {
+      return match[1].trim();
+    }
+  }
+  return null;
+}
+
+// Parse RSS XML and extract post titles, descriptions, and authors
+function parseRSS(xml: string): { posts: RSSPost[]; feedAuthor: string | null } {
   const posts: RSSPost[] = [];
+  const feedAuthor = extractFeedAuthor(xml);
   
   // Extract items using regex (Deno edge runtime doesn't have DOMParser for XML)
   const itemRegex = /<item>([\s\S]*?)<\/item>/g;
@@ -43,12 +78,60 @@ function parseRSS(xml: string): RSSPost[] {
       description = description.substring(0, 500) + "...";
     }
     
+    // Extract item-level author (falls back to feed author)
+    const authorMatch = item.match(/<dc:creator><!\[CDATA\[(.*?)\]\]><\/dc:creator>/) ||
+                        item.match(/<dc:creator>(.*?)<\/dc:creator>/) ||
+                        item.match(/<author>(.*?)<\/author>/);
+    const author = authorMatch ? authorMatch[1].trim() : feedAuthor;
+    
+    // Extract publication date
+    const pubDateMatch = item.match(/<pubDate>(.*?)<\/pubDate>/);
+    const pubDate = pubDateMatch ? pubDateMatch[1].trim() : null;
+    
+    // Extract link
+    const linkMatch = item.match(/<link>(.*?)<\/link>/);
+    const link = linkMatch ? linkMatch[1].trim() : null;
+    
     if (title) {
-      posts.push({ title, description });
+      posts.push({ title, description, author, pubDate, link });
     }
   }
   
-  return posts;
+  return { posts, feedAuthor };
+}
+
+// Normalize a name for comparison (lowercase, remove special chars)
+function normalizeName(name: string | null): string {
+  if (!name) return "";
+  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+// Filter posts to only include those by the expected author
+function filterByAuthor(posts: RSSPost[], expectedAuthor: string | null): RSSPost[] {
+  // If no expected author or no posts have author info, return all
+  if (!expectedAuthor || !posts.some(p => p.author)) {
+    return posts;
+  }
+  
+  const normalizedExpected = normalizeName(expectedAuthor);
+  
+  const filtered = posts.filter(p => {
+    if (!p.author) return true; // Include if no author specified on item
+    const normalizedAuthor = normalizeName(p.author);
+    // Fuzzy match: check if either contains the other
+    return normalizedAuthor.includes(normalizedExpected) || 
+           normalizedExpected.includes(normalizedAuthor);
+  });
+  
+  // If filtering removes too many posts (less than 2), return originals
+  // This handles edge cases where author detection isn't reliable
+  if (filtered.length < 2 && posts.length >= 2) {
+    console.log(`Author filtering too aggressive, keeping all ${posts.length} posts`);
+    return posts;
+  }
+  
+  console.log(`Filtered from ${posts.length} to ${filtered.length} posts by author: ${expectedAuthor}`);
+  return filtered;
 }
 
 // Convert Substack URL to RSS feed URL
@@ -172,10 +255,20 @@ serve(async (req) => {
       visitorResponse.text(),
     ]);
 
-    const creatorPosts = parseRSS(creatorXML);
-    const visitorPosts = parseRSS(visitorXML);
+    // Parse RSS with author extraction
+    const creatorParsed = parseRSS(creatorXML);
+    const visitorParsed = parseRSS(visitorXML);
+    
+    // Filter posts to only those by the feed owner
+    const creatorPosts = filterByAuthor(creatorParsed.posts, creatorParsed.feedAuthor);
+    const visitorPosts = filterByAuthor(visitorParsed.posts, visitorParsed.feedAuthor);
 
-    console.log("Parsed posts:", { creatorPosts: creatorPosts.length, visitorPosts: visitorPosts.length });
+    console.log("Parsed posts:", { 
+      creatorPosts: creatorPosts.length, 
+      creatorFeedAuthor: creatorParsed.feedAuthor,
+      visitorPosts: visitorPosts.length,
+      visitorFeedAuthor: visitorParsed.feedAuthor
+    });
 
     if (creatorPosts.length === 0) {
       return new Response(
@@ -191,14 +284,18 @@ serve(async (req) => {
       );
     }
 
-    // Build prompt for AI analysis
+    // Build prompt for AI analysis with author attribution
     const prompt = `You are analyzing two Substack newsletters to suggest collaboration topics.
 
-CREATOR'S RECENT POSTS:
-${creatorPosts.map((p, i) => `${i + 1}. "${p.title}"\n   ${p.description}`).join("\n\n")}
+IMPORTANT: Only analyze articles ACTUALLY WRITTEN BY the newsletter owner. 
+If you see guest posts or collaborations from other authors, IGNORE THEM.
+Pay attention to the author field for each article.
 
-VISITOR'S RECENT POSTS:
-${visitorPosts.map((p, i) => `${i + 1}. "${p.title}"\n   ${p.description}`).join("\n\n")}
+CREATOR'S RECENT POSTS (Owner: ${creatorParsed.feedAuthor || "Unknown"}):
+${creatorPosts.map((p, i) => `${i + 1}. "${p.title}"${p.author ? ` [by ${p.author}]` : ""}\n   ${p.description}`).join("\n\n")}
+
+VISITOR'S RECENT POSTS (Owner: ${visitorParsed.feedAuthor || "Unknown"}):
+${visitorPosts.map((p, i) => `${i + 1}. "${p.title}"${p.author ? ` [by ${p.author}]` : ""}\n   ${p.description}`).join("\n\n")}
 
 Based on the themes, topics, and writing styles of both newsletters, suggest 3-5 compelling collaboration ideas that would appeal to both audiences. Focus on:
 1. Overlapping interests or complementary perspectives
@@ -209,7 +306,9 @@ For each suggestion, provide:
 - A catchy topic title
 - A brief description of what the collaboration could cover
 - The format (e.g., "Interview conversation", "Co-written essay", "Point/Counterpoint debate", "Joint deep-dive")
-- Why this collaboration would work well based on their writing`;
+- Why this collaboration would work well based on their writing
+
+Also list which specific articles you based each suggestion on for transparency.`;
 
     // Call Lovable AI with tool calling for structured output
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -221,7 +320,7 @@ For each suggestion, provide:
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
         messages: [
-          { role: "system", content: "You are an expert at finding collaboration opportunities between content creators. Suggest creative, specific collaboration ideas based on their actual content." },
+          { role: "system", content: "You are an expert at finding collaboration opportunities between content creators. Suggest creative, specific collaboration ideas based on their actual content. Always cite which articles informed your suggestions." },
           { role: "user", content: prompt },
         ],
         tools: [
@@ -229,7 +328,7 @@ For each suggestion, provide:
             type: "function",
             function: {
               name: "suggest_collaborations",
-              description: "Return 3-5 collaboration topic suggestions based on both newsletters",
+              description: "Return 3-5 collaboration topic suggestions based on both newsletters with source attribution",
               parameters: {
                 type: "object",
                 properties: {
@@ -257,8 +356,44 @@ For each suggestion, provide:
                     items: { type: "string" },
                     description: "3-5 main themes from the visitor's newsletter",
                   },
+                  sourcesUsed: {
+                    type: "object",
+                    properties: {
+                      creatorArticles: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            title: { type: "string", description: "Article title" },
+                            author: { type: "string", description: "Article author (if known)" },
+                            relevance: { type: "string", description: "Why this article was used for suggestions" },
+                          },
+                          required: ["title", "relevance"],
+                          additionalProperties: false,
+                        },
+                        description: "Articles from the creator's newsletter used to form suggestions",
+                      },
+                      visitorArticles: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            title: { type: "string", description: "Article title" },
+                            author: { type: "string", description: "Article author (if known)" },
+                            relevance: { type: "string", description: "Why this article was used for suggestions" },
+                          },
+                          required: ["title", "relevance"],
+                          additionalProperties: false,
+                        },
+                        description: "Articles from the visitor's newsletter used to form suggestions",
+                      },
+                    },
+                    required: ["creatorArticles", "visitorArticles"],
+                    additionalProperties: false,
+                    description: "Source articles used to generate the suggestions for transparency",
+                  },
                 },
-                required: ["suggestions", "creatorThemes", "visitorThemes"],
+                required: ["suggestions", "creatorThemes", "visitorThemes", "sourcesUsed"],
                 additionalProperties: false,
               },
             },
@@ -305,6 +440,7 @@ For each suggestion, provide:
         suggestions: result.suggestions || [],
         creatorThemes: result.creatorThemes || [],
         visitorThemes: result.visitorThemes || [],
+        sourcesUsed: result.sourcesUsed || null,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
