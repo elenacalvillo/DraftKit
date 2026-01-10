@@ -51,10 +51,31 @@ function parseRSS(xml: string): RSSPost[] {
 }
 
 // Convert Substack URL to RSS feed URL
+// Handles both profile format (substack.com/@username) and newsletter format (username.substack.com)
 function toRSSUrl(substackUrl: string): string {
   let url = substackUrl.trim();
   // Remove trailing slash
   url = url.replace(/\/+$/, "");
+  
+  // Handle profile format: substack.com/@username or www.substack.com/@username
+  const profileMatch = url.match(/(?:www\.)?substack\.com\/@([a-zA-Z0-9_-]+)/i);
+  if (profileMatch) {
+    // Convert to newsletter format
+    url = `https://${profileMatch[1]}.substack.com`;
+    console.log(`Converted profile URL to newsletter format: ${url}`);
+  }
+  
+  // Handle cases where user entered just the username part
+  if (!url.includes('.') && !url.includes('/')) {
+    url = `https://${url}.substack.com`;
+    console.log(`Converted username to newsletter format: ${url}`);
+  }
+  
+  // Ensure https://
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    url = 'https://' + url;
+  }
+  
   // Add /feed if not present
   if (!url.endsWith("/feed")) {
     url = url + "/feed";
@@ -96,15 +117,21 @@ serve(async (req) => {
     ]);
 
     if (!creatorResponse.ok) {
+      console.error(`Creator RSS fetch failed: ${creatorResponse.status} for URL: ${creatorRSSUrl}`);
       return new Response(
-        JSON.stringify({ error: "Could not fetch creator's Substack. Make sure the URL is correct." }),
+        JSON.stringify({ 
+          error: `Could not fetch creator's Substack (${creatorResponse.status}). The URL format should be like "username.substack.com". Profile URLs like "substack.com/@username" are also supported.`
+        }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     if (!visitorResponse.ok) {
+      console.error(`Visitor RSS fetch failed: ${visitorResponse.status} for URL: ${visitorRSSUrl}`);
       return new Response(
-        JSON.stringify({ error: "Could not fetch your Substack. Make sure the URL is correct and your Substack is public." }),
+        JSON.stringify({ 
+          error: `Could not fetch your Substack (${visitorResponse.status}). Use format "yourname.substack.com" or "substack.com/@yourname". Make sure your Substack is public.`
+        }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

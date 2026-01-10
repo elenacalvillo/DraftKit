@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface CollabCalendarProps {
   availableDates?: string[];
@@ -23,7 +24,30 @@ export function CollabCalendar({
   onToggleAvailable,
   onToggleBlocked,
 }: CollabCalendarProps) {
-  const [currentDate, setCurrentDate] = useState(new Date());
+  // Calculate the first available month
+  const firstAvailableDate = useMemo(() => {
+    if (availableDates.length === 0) return null;
+    const sortedDates = [...availableDates].sort();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Find first available date that's not in the past
+    for (const dateStr of sortedDates) {
+      const date = new Date(dateStr);
+      if (date >= today) {
+        return date;
+      }
+    }
+    return null;
+  }, [availableDates]);
+
+  // Initialize to first available month or current month
+  const [currentDate, setCurrentDate] = useState(() => {
+    if (firstAvailableDate && !isEditable) {
+      return new Date(firstAvailableDate.getFullYear(), firstAvailableDate.getMonth(), 1);
+    }
+    return new Date();
+  });
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const year = currentDate.getFullYear();
@@ -41,12 +65,25 @@ export function CollabCalendar({
 
   const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+  // Check if current month has any available dates
+  const currentMonthHasAvailability = useMemo(() => {
+    const monthStart = `${year}-${String(month + 1).padStart(2, "0")}-01`;
+    const monthEnd = `${year}-${String(month + 1).padStart(2, "0")}-${daysInMonth}`;
+    return availableDates.some(date => date >= monthStart && date <= monthEnd);
+  }, [availableDates, year, month, daysInMonth]);
+
   const prevMonth = () => {
     setCurrentDate(new Date(year, month - 1, 1));
   };
 
   const nextMonth = () => {
     setCurrentDate(new Date(year, month + 1, 1));
+  };
+
+  const jumpToAvailability = () => {
+    if (firstAvailableDate) {
+      setCurrentDate(new Date(firstAvailableDate.getFullYear(), firstAvailableDate.getMonth(), 1));
+    }
   };
 
   const formatDate = (day: number) => {
@@ -84,6 +121,19 @@ export function CollabCalendar({
       if (status === "available") {
         setSelectedDate(dateStr);
         onDateSelect?.(dateStr);
+      } else if (status !== "booked") {
+        // Show helpful feedback when clicking unavailable dates
+        if (firstAvailableDate) {
+          const availMonth = monthNames[firstAvailableDate.getMonth()];
+          toast.info(`No availability on this date. Check ${availMonth} for available dates.`, {
+            action: {
+              label: `Go to ${availMonth}`,
+              onClick: jumpToAvailability,
+            },
+          });
+        } else {
+          toast.info("This creator hasn't set any available dates yet.");
+        }
       }
     }
   };
@@ -132,6 +182,33 @@ export function CollabCalendar({
 
   return (
     <div className="glass-card p-6">
+      {/* Availability banner - show when current month has no availability */}
+      {!isEditable && !currentMonthHasAvailability && firstAvailableDate && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-4 p-3 bg-primary/10 rounded-xl flex items-center justify-between gap-3"
+        >
+          <div className="flex items-center gap-2 text-sm">
+            <CalendarDays className="w-4 h-4 text-primary" />
+            <span>
+              Next available dates are in{" "}
+              <span className="font-medium text-primary">
+                {monthNames[firstAvailableDate.getMonth()]} {firstAvailableDate.getFullYear()}
+              </span>
+            </span>
+          </div>
+          <Button 
+            size="sm" 
+            variant="ghost" 
+            onClick={jumpToAvailability}
+            className="shrink-0 text-primary hover:text-primary"
+          >
+            Jump there →
+          </Button>
+        </motion.div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <Button variant="ghost" size="icon" onClick={prevMonth}>

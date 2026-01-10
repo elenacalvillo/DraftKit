@@ -227,6 +227,9 @@ export default function Settings() {
               {errors.substackUrl && (
                 <p className="text-sm text-destructive">{errors.substackUrl}</p>
               )}
+              <p className="text-xs text-muted-foreground">
+                Use format: yourname.substack.com or substack.com/@yourname
+              </p>
             </div>
 
             <div className="space-y-2">
