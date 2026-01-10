@@ -87,6 +87,37 @@ serve(async (req) => {
   }
 
   try {
+    // --- AUTHENTICATION CHECK ---
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(
+        JSON.stringify({ error: "Authentication required" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    // Create client with user's auth token to validate JWT
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const { data: { user }, error: userError } = await supabaseAuth.auth.getUser();
+    
+    if (userError || !user) {
+      console.error("Auth error:", userError);
+      return new Response(
+        JSON.stringify({ error: "Invalid authentication" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const userId = user.id;
+    // --- END AUTHENTICATION CHECK ---
+
     const { requestId } = await req.json();
 
     if (!requestId) {
@@ -96,8 +127,7 @@ serve(async (req) => {
       );
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    // Use service role for database operations
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Fetch the collaboration request with creator info
@@ -109,7 +139,8 @@ serve(async (req) => {
           id,
           name,
           substack_url,
-          newsletter_url
+          newsletter_url,
+          user_id
         )
       `)
       .eq("id", requestId)
@@ -121,6 +152,18 @@ serve(async (req) => {
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // --- AUTHORIZATION CHECK ---
+    // Only the creator who owns the request can generate drafts
+    const creatorUserId = request.creators?.user_id;
+    if (creatorUserId !== userId) {
+      console.error(`Unauthorized: user ${userId} tried to access request owned by ${creatorUserId}`);
+      return new Response(
+        JSON.stringify({ error: "You do not have permission to generate drafts for this request" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    // --- END AUTHORIZATION CHECK ---
 
     const creatorUrl = request.creators?.substack_url || request.creators?.newsletter_url;
     const requesterUrl = request.requester_substack_url;
@@ -250,19 +293,17 @@ Generate a collaboration draft that:
     });
 
     if (!aiResponse.ok) {
-      if (aiResponse.status === 429) {
+      // Log detailed error server-side, return generic message to client
+      const errorText = await aiResponse.text();
+      console.error("AI service error:", aiResponse.status, errorText);
+      
+      if (aiResponse.status === 429 || aiResponse.status === 402) {
         return new Response(
-          JSON.stringify({ error: "Rate limit exceeded, please try again later" }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({ error: "Service temporarily unavailable. Please try again later." }),
+          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      if (aiResponse.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "AI credits exhausted, please add credits" }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      console.error("AI error:", await aiResponse.text());
+      
       return new Response(
         JSON.stringify({ error: "Failed to generate draft" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -301,7 +342,7 @@ Generate a collaboration draft that:
   } catch (error) {
     console.error("Error:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({ error: "An unexpected error occurred" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

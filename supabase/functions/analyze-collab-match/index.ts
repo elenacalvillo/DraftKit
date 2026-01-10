@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -89,6 +90,33 @@ serve(async (req) => {
   }
 
   try {
+    // --- OPTIONAL AUTHENTICATION ---
+    // This function is used during public booking, so auth is optional.
+    // When auth is present, we validate it. When absent, we allow the request
+    // but could implement stricter rate limiting in future.
+    const authHeader = req.headers.get("Authorization");
+    let userId: string | null = null;
+    
+    if (authHeader?.startsWith("Bearer ")) {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+      
+      const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (!userError && user) {
+        userId = user.id;
+        console.log(`Authenticated user: ${userId}`);
+      }
+    }
+    
+    // Log for monitoring (can be used for rate limiting in future)
+    console.log(`Request from ${userId ? `user ${userId}` : 'unauthenticated visitor'}`);
+    // --- END OPTIONAL AUTHENTICATION ---
+
     const { creatorSubstackUrl, visitorSubstackUrl } = await req.json();
 
     if (!creatorSubstackUrl || !visitorSubstackUrl) {
@@ -100,7 +128,10 @@ serve(async (req) => {
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+      return new Response(
+        JSON.stringify({ error: "AI service not configured" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Fetch both RSS feeds in parallel
@@ -120,7 +151,7 @@ serve(async (req) => {
       console.error(`Creator RSS fetch failed: ${creatorResponse.status} for URL: ${creatorRSSUrl}`);
       return new Response(
         JSON.stringify({ 
-          error: `Could not fetch creator's Substack (${creatorResponse.status}). The URL format should be like "username.substack.com". Profile URLs like "substack.com/@username" are also supported.`
+          error: `Could not fetch creator's newsletter. Please check the URL format.`
         }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -130,7 +161,7 @@ serve(async (req) => {
       console.error(`Visitor RSS fetch failed: ${visitorResponse.status} for URL: ${visitorRSSUrl}`);
       return new Response(
         JSON.stringify({ 
-          error: `Could not fetch your Substack (${visitorResponse.status}). Use format "yourname.substack.com" or "substack.com/@yourname". Make sure your Substack is public.`
+          error: `Could not fetch your newsletter. Please check the URL and ensure it's public.`
         }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -148,14 +179,14 @@ serve(async (req) => {
 
     if (creatorPosts.length === 0) {
       return new Response(
-        JSON.stringify({ error: "No posts found on creator's Substack. They may not have published anything yet." }),
+        JSON.stringify({ error: "No posts found on creator's newsletter." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     if (visitorPosts.length === 0) {
       return new Response(
-        JSON.stringify({ error: "No posts found on your Substack. Make sure you have published posts." }),
+        JSON.stringify({ error: "No posts found on your newsletter." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -238,30 +269,33 @@ For each suggestion, provide:
     });
 
     if (!aiResponse.ok) {
-      if (aiResponse.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "AI service is busy. Please try again in a moment." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      if (aiResponse.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "AI service unavailable. Please try again later." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
+      // Log detailed error server-side, return generic message to client
       const errorText = await aiResponse.text();
-      console.error("AI gateway error:", aiResponse.status, errorText);
-      throw new Error("AI analysis failed");
+      console.error("AI service error:", aiResponse.status, errorText);
+      
+      if (aiResponse.status === 429 || aiResponse.status === 402) {
+        return new Response(
+          JSON.stringify({ error: "Service temporarily unavailable. Please try again later." }),
+          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      return new Response(
+        JSON.stringify({ error: "Analysis failed. Please try again." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const aiData = await aiResponse.json();
-    console.log("AI response:", JSON.stringify(aiData, null, 2));
+    console.log("AI response received successfully");
 
     // Extract tool call result
     const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall?.function?.arguments) {
-      throw new Error("Invalid AI response format");
+      return new Response(
+        JSON.stringify({ error: "Analysis failed. Please try again." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const result = JSON.parse(toolCall.function.arguments);
@@ -277,7 +311,7 @@ For each suggestion, provide:
   } catch (error) {
     console.error("analyze-collab-match error:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "An unexpected error occurred" }),
+      JSON.stringify({ error: "An unexpected error occurred" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

@@ -164,6 +164,17 @@ serve(async (req) => {
   }
   
   try {
+    // --- OPTIONAL AUTHENTICATION ---
+    // This function is used during public booking for profile image fetching.
+    // Auth is optional - we log for monitoring but don't require it.
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      console.log("Request has auth token (authenticated user)");
+    } else {
+      console.log("Request from unauthenticated visitor");
+    }
+    // --- END OPTIONAL AUTHENTICATION ---
+    
     const body = await req.json();
     console.log("Request body:", JSON.stringify(body));
     
@@ -198,10 +209,10 @@ serve(async (req) => {
       console.log(`Fetch response status: ${response.status}`);
       
       if (!response.ok) {
-        console.error(`Failed to fetch Substack page: ${response.status} ${response.statusText}`);
+        console.error(`Failed to fetch Substack page: ${response.status}`);
         return new Response(
           JSON.stringify({ 
-            error: `Failed to fetch: ${response.status}`,
+            error: "Failed to fetch profile",
             imageUrl: null,
             publicationName: null,
             tagline: null,
@@ -226,11 +237,10 @@ serve(async (req) => {
       );
     } catch (fetchError) {
       clearTimeout(timeoutId);
-      const fetchErrorMessage = fetchError instanceof Error ? fetchError.message : "Fetch failed";
-      console.error(`Fetch error: ${fetchErrorMessage}`);
+      console.error("Fetch error:", fetchError instanceof Error ? fetchError.message : "Unknown error");
       return new Response(
         JSON.stringify({ 
-          error: fetchErrorMessage,
+          error: "Failed to fetch profile",
           imageUrl: null,
           publicationName: null,
           tagline: null,
@@ -240,11 +250,10 @@ serve(async (req) => {
     }
     
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    console.error("Error in fetch-substack-profile:", errorMessage);
+    console.error("Error in fetch-substack-profile:", error instanceof Error ? error.message : "Unknown error");
     return new Response(
       JSON.stringify({ 
-        error: errorMessage,
+        error: "An unexpected error occurred",
         imageUrl: null,
         publicationName: null,
         tagline: null,
