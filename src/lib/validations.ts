@@ -31,6 +31,21 @@ export const substackUrlSchema = z.string()
   .refine(
     (url) => url.includes('substack.com') || url.includes('.substack.'),
     { message: "Must be a valid Substack URL" }
+  )
+  .optional()
+  .or(z.literal(''));
+
+// Newsletter URL - required for AI analysis (format: username.substack.com)
+export const newsletterUrlSchema = z.string()
+  .trim()
+  .min(1, { message: "Newsletter URL is required for AI collaboration suggestions" })
+  .refine(
+    (url) => {
+      // Accept formats: username.substack.com, https://username.substack.com
+      const cleanUrl = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+      return /^[a-z0-9-]+\.substack\.com$/i.test(cleanUrl);
+    },
+    { message: "Must be your newsletter URL (e.g., yourname.substack.com)" }
   );
 
 export const messageSchema = z.string()
@@ -57,7 +72,8 @@ export const signupStep1Schema = z.object({
 export const signupStep2Schema = z.object({
   name: nameSchema,
   username: usernameSchema,
-  substackUrl: substackUrlSchema,
+  substackUrl: substackUrlSchema.optional().or(z.literal('')),
+  newsletterUrl: newsletterUrlSchema,
   welcomeMessage: welcomeMessageSchema,
 });
 
@@ -79,6 +95,7 @@ export const bookingFormSchema = z.object({
 export const settingsSchema = z.object({
   name: nameSchema,
   bio: bioSchema,
-  substackUrl: substackUrlSchema,
+  substackUrl: substackUrlSchema.optional().or(z.literal('')),
+  newsletterUrl: newsletterUrlSchema,
   welcomeMessage: welcomeMessageSchema,
 });

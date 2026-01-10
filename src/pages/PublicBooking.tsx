@@ -17,6 +17,7 @@ interface Creator {
   username: string;
   name: string;
   substack_url: string | null;
+  newsletter_url: string | null;
   welcome_message: string | null;
 }
 
@@ -63,7 +64,7 @@ export default function PublicBooking() {
     // Fetch creator from public view (excludes sensitive data like email)
     const { data: creatorData, error } = await supabase
       .from('public_creator_profiles')
-      .select('id, username, name, substack_url, welcome_message')
+      .select('id, username, name, substack_url, newsletter_url, welcome_message')
       .eq('username', username)
       .maybeSingle();
 
@@ -108,8 +109,10 @@ export default function PublicBooking() {
   };
 
   const handleAnalyzeMatch = async () => {
-    if (!formData.substackUrl || !creator?.substack_url) {
-      toast.error("Both you and the creator need Substack URLs to analyze a match");
+    // Use newsletter_url for AI analysis (falls back to substack_url if not set)
+    const creatorNewsletterUrl = creator?.newsletter_url || creator?.substack_url;
+    if (!formData.substackUrl || !creatorNewsletterUrl) {
+      toast.error("Both you and the creator need newsletter URLs to analyze a match");
       return;
     }
 
@@ -125,7 +128,8 @@ export default function PublicBooking() {
     setMatchResult(null);
 
     try {
-      const result = await analyzeCollabMatch(creator.substack_url, formData.substackUrl);
+      const creatorNewsletterUrl = creator.newsletter_url || creator.substack_url;
+      const result = await analyzeCollabMatch(creatorNewsletterUrl!, formData.substackUrl);
       setMatchResult(result);
       setHasAnalyzed(true);
       toast.success("Found collaboration ideas!");
@@ -478,12 +482,12 @@ export default function PublicBooking() {
                   <div className="space-y-2">
                     <Label htmlFor="substackUrl" className="flex items-center gap-2">
                       <ExternalLink className="w-4 h-4" />
-                      Your Substack URL
+                      Your Newsletter URL <span className="text-destructive">*</span>
                     </Label>
                     <div className="flex gap-2">
                       <Input
                         id="substackUrl"
-                        type="url"
+                        type="text"
                         required
                         value={formData.substackUrl}
                         onChange={(e) => {
@@ -494,10 +498,10 @@ export default function PublicBooking() {
                             setHasAnalyzed(false);
                           }
                         }}
-                        placeholder="https://yourname.substack.com"
+                        placeholder="yourname.substack.com"
                         className="h-12 flex-1"
                       />
-                      {creator.substack_url && (
+                      {(creator.newsletter_url || creator.substack_url) && (
                         <Button
                           type="button"
                           variant="outline"
@@ -520,6 +524,9 @@ export default function PublicBooking() {
                     {errors.substackUrl && (
                       <p className="text-sm text-destructive">{errors.substackUrl}</p>
                     )}
+                    <p className="text-xs text-muted-foreground">
+                      Your newsletter URL for AI-powered collaboration ideas (e.g., yourname.substack.com)
+                    </p>
                   </div>
 
                   {/* AI Match Suggestions */}
