@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Calendar, ExternalLink, Mail, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,8 @@ interface RequestCardProps {
 }
 
 export function RequestCard({ request, onApprove, onDecline }: RequestCardProps) {
+  const [imageError, setImageError] = useState(false);
+  
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return null;
     const date = new Date(dateStr);
@@ -28,6 +31,8 @@ export function RequestCard({ request, onApprove, onDecline }: RequestCardProps)
     declined: "bg-destructive/10 text-destructive border-destructive/20",
   };
 
+  const showImage = request.requesterProfileImageUrl && !imageError;
+
   return (
     <motion.div
       layout
@@ -40,9 +45,18 @@ export function RequestCard({ request, onApprove, onDecline }: RequestCardProps)
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center text-primary-foreground font-semibold">
-            {request.requesterName.charAt(0).toUpperCase()}
-          </div>
+          {showImage ? (
+            <img
+              src={request.requesterProfileImageUrl!}
+              alt={request.requesterName}
+              className="w-10 h-10 rounded-full object-cover border-2 border-primary/20"
+              onError={() => setImageError(true)}
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center text-primary-foreground font-semibold">
+              {request.requesterName.charAt(0).toUpperCase()}
+            </div>
+          )}
           <div>
             <h3 className="font-semibold">{request.requesterName}</h3>
             <a

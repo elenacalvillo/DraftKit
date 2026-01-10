@@ -180,6 +180,22 @@ export default function PublicBooking() {
 
     setIsSubmitting(true);
 
+    // Fetch requester's Substack profile image
+    let requesterProfileImageUrl: string | null = null;
+    try {
+      const { data: profileData, error: profileError } = await supabase.functions.invoke(
+        "fetch-substack-profile",
+        { body: { substackUrl: formData.substackUrl.trim() } }
+      );
+      
+      if (!profileError && profileData?.imageUrl) {
+        requesterProfileImageUrl = profileData.imageUrl;
+      }
+    } catch (e) {
+      // Continue without profile image - it's not critical
+      console.log("Could not fetch requester profile image:", e);
+    }
+
     const { error } = await supabase
       .from('collab_requests')
       .insert({
@@ -187,6 +203,7 @@ export default function PublicBooking() {
         requester_name: formData.name.trim(),
         requester_email: formData.email.trim(),
         requester_substack_url: formData.substackUrl.trim(),
+        requester_profile_image_url: requesterProfileImageUrl,
         message: formData.message.trim() || null,
         requested_date: isFlexibleDate ? null : selectedDate,
         status: 'pending',

@@ -65,6 +65,7 @@ export type Database = {
           requested_date: string | null
           requester_email: string
           requester_name: string
+          requester_profile_image_url: string | null
           requester_substack_url: string | null
           status: string
         }
@@ -76,6 +77,7 @@ export type Database = {
           requested_date?: string | null
           requester_email: string
           requester_name: string
+          requester_profile_image_url?: string | null
           requester_substack_url?: string | null
           status?: string
         }
@@ -87,6 +89,7 @@ export type Database = {
           requested_date?: string | null
           requester_email?: string
           requester_name?: string
+          requester_profile_image_url?: string | null
           requester_substack_url?: string | null
           status?: string
         }

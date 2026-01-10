@@ -16,6 +16,7 @@ interface CollabRequest {
   requester_name: string;
   requester_email: string;
   requester_substack_url: string | null;
+  requester_profile_image_url: string | null;
   message: string | null;
   requested_date: string;
   status: string;
@@ -153,6 +154,7 @@ export default function Requests() {
     requesterName: r.requester_name,
     requesterEmail: r.requester_email,
     requesterSubstackUrl: r.requester_substack_url || '',
+    requesterProfileImageUrl: r.requester_profile_image_url,
     message: r.message || '',
     requestedDate: r.requested_date,
     status: r.status as 'pending' | 'approved' | 'declined',
