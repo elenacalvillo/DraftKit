@@ -7,6 +7,7 @@ import { RequestCard } from "@/components/requests/RequestCard";
 import { CollabDraft } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import { useAnalytics } from "@/hooks/useAnalytics";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -33,6 +34,7 @@ type FilterTab = "all" | "pending" | "approved" | "declined";
 export default function Requests() {
   const navigate = useNavigate();
   const { user, creator, loading } = useAuth();
+  const { trackEvent } = useAnalytics();
   const [requests, setRequests] = useState<DbCollabRequest[]>([]);
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
 
@@ -110,6 +112,9 @@ export default function Requests() {
     toast.success(`Collaboration with ${request.requester_name} approved!`, {
       description: "Click 'Generate Draft' to create an AI collaboration outline.",
     });
+
+    // Track approval
+    trackEvent("collab_approved", { request_id: id });
   };
 
   const handleDecline = async (id: string) => {
@@ -131,6 +136,9 @@ export default function Requests() {
     );
 
     toast.info(`Request from ${request.requester_name} declined`);
+
+    // Track decline
+    trackEvent("collab_declined", { request_id: id });
   };
 
   const handleDraftGenerated = (id: string, draft: CollabDraft) => {

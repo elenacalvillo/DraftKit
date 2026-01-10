@@ -8,6 +8,7 @@ import { CollabDraftModal } from "./CollabDraftModal";
 import { SendMessageModal } from "./SendMessageModal";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 const extractSubstackName = (url: string | null | undefined): string => {
   if (!url) return "Unknown Substack";
@@ -31,6 +32,7 @@ interface RequestCardProps {
 }
 
 export function RequestCard({ request, creatorEmail, onApprove, onDecline, onDraftGenerated }: RequestCardProps) {
+  const { trackEvent } = useAnalytics();
   const [imageError, setImageError] = useState(false);
   const [showDraftModal, setShowDraftModal] = useState(false);
   const [showMessageModal, setShowMessageModal] = useState(false);
@@ -73,6 +75,9 @@ export function RequestCard({ request, creatorEmail, onApprove, onDecline, onDra
         setLocalDraft(data.draft);
         onDraftGenerated?.(request.id, data.draft);
         toast.success("Collaboration draft generated!");
+        
+        // Track draft generation
+        trackEvent("draft_generated", { request_id: request.id });
       }
     } catch (error) {
       console.error("Failed to generate draft:", error);
