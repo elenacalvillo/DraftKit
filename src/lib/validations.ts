@@ -35,8 +35,8 @@ export const substackUrlSchema = z.string()
 
 export const messageSchema = z.string()
   .trim()
-  .max(1000, { message: "Message must be less than 1000 characters" })
-  .optional();
+  .min(10, { message: "Please write a message (at least 10 characters)" })
+  .max(1000, { message: "Message must be less than 1000 characters" });
 
 export const bioSchema = z.string()
   .trim()

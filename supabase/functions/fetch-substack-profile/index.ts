@@ -40,39 +40,46 @@ function extractProfileData(html: string): SubstackProfile {
     tagline: null,
   };
   
-  // Try to extract the publication cover photo or author photo
-  // Pattern 1: publication-cover-photo class
-  const coverPhotoMatch = html.match(/<img[^>]+class="[^"]*publication-cover-photo[^"]*"[^>]+src="([^"]+)"/i);
-  if (coverPhotoMatch) {
-    result.imageUrl = coverPhotoMatch[1];
+  // Pattern 1: twitter:image meta tag (most reliable for profile images)
+  const twitterImageMatch = html.match(/<meta[^>]+name="twitter:image"[^>]+content="([^"]+)"/i) ||
+                           html.match(/<meta[^>]+content="([^"]+)"[^>]+name="twitter:image"/i);
+  if (twitterImageMatch) {
+    result.imageUrl = twitterImageMatch[1];
+    console.log("Found image via twitter:image meta tag");
   }
   
-  // Pattern 2: Look for src before class in img tag
+  // Pattern 2: og:image meta tag (usually the publication logo/cover)
   if (!result.imageUrl) {
-    const altCoverMatch = html.match(/<img[^>]+src="([^"]+)"[^>]+class="[^"]*publication-cover-photo[^"]*"/i);
-    if (altCoverMatch) {
-      result.imageUrl = altCoverMatch[1];
-    }
-  }
-  
-  // Pattern 3: og:image meta tag (usually the publication logo/cover)
-  if (!result.imageUrl) {
-    const ogImageMatch = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i);
+    const ogImageMatch = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i) ||
+                        html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:image"/i);
     if (ogImageMatch) {
       result.imageUrl = ogImageMatch[1];
+      console.log("Found image via og:image meta tag");
     }
   }
   
-  // Pattern 4: Alternative og:image format
+  // Pattern 3: publication-cover-photo class
   if (!result.imageUrl) {
-    const ogImageAlt = html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:image"/i);
-    if (ogImageAlt) {
-      result.imageUrl = ogImageAlt[1];
+    const coverPhotoMatch = html.match(/<img[^>]+class="[^"]*publication-cover-photo[^"]*"[^>]+src="([^"]+)"/i) ||
+                           html.match(/<img[^>]+src="([^"]+)"[^>]+class="[^"]*publication-cover-photo[^"]*"/i);
+    if (coverPhotoMatch) {
+      result.imageUrl = coverPhotoMatch[1];
+      console.log("Found image via publication-cover-photo class");
+    }
+  }
+  
+  // Pattern 4: Look for image in JSON-LD structured data
+  if (!result.imageUrl) {
+    const jsonLdMatch = html.match(/"image"\s*:\s*"(https:\/\/[^"]+)"/i);
+    if (jsonLdMatch && jsonLdMatch[1].includes("substack")) {
+      result.imageUrl = jsonLdMatch[1];
+      console.log("Found image via JSON-LD");
     }
   }
   
   // Extract publication name from og:site_name or title
-  const siteNameMatch = html.match(/<meta[^>]+property="og:site_name"[^>]+content="([^"]+)"/i);
+  const siteNameMatch = html.match(/<meta[^>]+property="og:site_name"[^>]+content="([^"]+)"/i) ||
+                       html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:site_name"/i);
   if (siteNameMatch) {
     result.publicationName = siteNameMatch[1];
   } else {
@@ -83,11 +90,13 @@ function extractProfileData(html: string): SubstackProfile {
   }
   
   // Extract tagline/description
-  const descMatch = html.match(/<meta[^>]+name="description"[^>]+content="([^"]+)"/i);
+  const descMatch = html.match(/<meta[^>]+name="description"[^>]+content="([^"]+)"/i) ||
+                   html.match(/<meta[^>]+content="([^"]+)"[^>]+name="description"/i);
   if (descMatch) {
     result.tagline = descMatch[1];
   } else {
-    const ogDescMatch = html.match(/<meta[^>]+property="og:description"[^>]+content="([^"]+)"/i);
+    const ogDescMatch = html.match(/<meta[^>]+property="og:description"[^>]+content="([^"]+)"/i) ||
+                       html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:description"/i);
     if (ogDescMatch) {
       result.tagline = ogDescMatch[1];
     }
