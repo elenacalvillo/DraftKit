@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Inbox } from "lucide-react";
+import { Inbox, ArrowLeft } from "lucide-react";
+import { Link } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { RequestCard } from "@/components/requests/RequestCard";
 import { CollabDraft } from "@/lib/storage";
@@ -181,6 +182,15 @@ export default function Requests() {
   return (
     <DashboardLayout>
       <div className="max-w-4xl mx-auto">
+        {/* Back link */}
+        <Link
+          to="/dashboard"
+          className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Back to Dashboard</span>
+        </Link>
+
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
