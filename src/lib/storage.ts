@@ -24,6 +24,7 @@ export interface CollabRequest {
   requesterName: string;
   requesterEmail: string;
   requesterSubstackUrl: string;
+  requesterProfileImageUrl?: string | null;
   message: string;
   requestedDate: string | null;
   status: 'pending' | 'approved' | 'declined';
