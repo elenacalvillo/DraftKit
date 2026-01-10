@@ -2,3 +2,9 @@ project_id = "cbgchxesngdsvkevbqwh"
 
 [functions.analyze-collab-match]
 verify_jwt = false
+
+[functions.generate-collab-draft]
+verify_jwt = false
+
+[functions.fetch-substack-profile]
+verify_jwt = false

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Inbox } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { RequestCard } from "@/components/requests/RequestCard";
+import { CollabDraft } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,7 +11,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-interface CollabRequest {
+interface DbCollabRequest {
   id: string;
   creator_id: string;
   requester_name: string;
@@ -21,6 +22,9 @@ interface CollabRequest {
   requested_date: string;
   status: string;
   created_at: string;
+  ai_draft: unknown;
+  approved_at: string | null;
+  creator_notes: string | null;
 }
 
 type FilterTab = "all" | "pending" | "approved" | "declined";
@@ -28,7 +32,7 @@ type FilterTab = "all" | "pending" | "approved" | "declined";
 export default function Requests() {
   const navigate = useNavigate();
   const { user, creator, loading } = useAuth();
-  const [requests, setRequests] = useState<CollabRequest[]>([]);
+  const [requests, setRequests] = useState<DbCollabRequest[]>([]);
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
 
   useEffect(() => {
@@ -57,7 +61,7 @@ export default function Requests() {
       .order('created_at', { ascending: false });
 
     if (data) {
-      setRequests(data);
+      setRequests(data as DbCollabRequest[]);
     }
   };
 
@@ -69,7 +73,10 @@ export default function Requests() {
 
     const { error } = await supabase
       .from('collab_requests')
-      .update({ status: 'approved' })
+      .update({ 
+        status: 'approved',
+        approved_at: new Date().toISOString()
+      })
       .eq('id', id);
 
     if (error) {
@@ -96,10 +103,12 @@ export default function Requests() {
     }
 
     setRequests(
-      requests.map((r) => (r.id === id ? { ...r, status: 'approved' } : r))
+      requests.map((r) => (r.id === id ? { ...r, status: 'approved', approved_at: new Date().toISOString() } : r))
     );
 
-    toast.success(`Collaboration with ${request.requester_name} approved!`);
+    toast.success(`Collaboration with ${request.requester_name} approved!`, {
+      description: "Click 'Generate Draft' to create an AI collaboration outline.",
+    });
   };
 
   const handleDecline = async (id: string) => {
@@ -121,6 +130,12 @@ export default function Requests() {
     );
 
     toast.info(`Request from ${request.requester_name} declined`);
+  };
+
+  const handleDraftGenerated = (id: string, draft: CollabDraft) => {
+    setRequests(
+      requests.map((r) => (r.id === id ? { ...r, ai_draft: draft } : r))
+    );
   };
 
   const filteredRequests = requests.filter((r) => {
@@ -159,6 +174,8 @@ export default function Requests() {
     requestedDate: r.requested_date,
     status: r.status as 'pending' | 'approved' | 'declined',
     createdAt: r.created_at,
+    aiDraft: r.ai_draft as CollabDraft | null,
+    approvedAt: r.approved_at,
   }));
 
   return (
@@ -244,8 +261,10 @@ export default function Requests() {
                 >
                   <RequestCard
                     request={request}
+                    creatorEmail={creator.email}
                     onApprove={handleApprove}
                     onDecline={handleDecline}
+                    onDraftGenerated={handleDraftGenerated}
                   />
                 </motion.div>
               ))}

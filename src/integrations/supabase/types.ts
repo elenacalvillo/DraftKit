@@ -58,8 +58,11 @@ export type Database = {
       }
       collab_requests: {
         Row: {
+          ai_draft: Json | null
+          approved_at: string | null
           created_at: string
           creator_id: string
+          creator_notes: string | null
           id: string
           message: string | null
           requested_date: string | null
@@ -70,8 +73,11 @@ export type Database = {
           status: string
         }
         Insert: {
+          ai_draft?: Json | null
+          approved_at?: string | null
           created_at?: string
           creator_id: string
+          creator_notes?: string | null
           id?: string
           message?: string | null
           requested_date?: string | null
@@ -82,8 +88,11 @@ export type Database = {
           status?: string
         }
         Update: {
+          ai_draft?: Json | null
+          approved_at?: string | null
           created_at?: string
           creator_id?: string
+          creator_notes?: string | null
           id?: string
           message?: string | null
           requested_date?: string | null
@@ -105,6 +114,80 @@ export type Database = {
             foreignKeyName: "collab_requests_creator_id_fkey"
             columns: ["creator_id"]
             isOneToOne: false
+            referencedRelation: "public_creator_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      collaboration_messages: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          request_id: string
+          sender_email: string
+          sender_type: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          request_id: string
+          sender_email: string
+          sender_type: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          request_id?: string
+          sender_email?: string
+          sender_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collaboration_messages_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "collab_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      creator_writing_samples: {
+        Row: {
+          creator_id: string
+          id: string
+          sample_posts: Json | null
+          tone_profile: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          creator_id: string
+          id?: string
+          sample_posts?: Json | null
+          tone_profile?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          creator_id?: string
+          id?: string
+          sample_posts?: Json | null
+          tone_profile?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creator_writing_samples_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: true
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creator_writing_samples_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: true
             referencedRelation: "public_creator_profiles"
             referencedColumns: ["id"]
           },
