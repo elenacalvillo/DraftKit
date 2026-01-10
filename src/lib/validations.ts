@@ -1,5 +1,30 @@
 import { z } from 'zod';
 
+// Helper to validate Substack URL formats
+function isValidSubstackUrl(input: string): boolean {
+  const trimmed = input.trim();
+  if (!trimmed) return false;
+  
+  // Clean the URL for validation
+  const cleanUrl = trimmed
+    .replace(/^https?:\/\//, '')  // Remove protocol
+    .replace(/\/+$/, '')           // Remove trailing slashes
+    .replace(/\/.*$/, '');         // Remove any path
+  
+  // Pattern 1: username.substack.com
+  if (/^[a-z0-9][a-z0-9-]*\.substack\.com$/i.test(cleanUrl)) {
+    return true;
+  }
+  
+  // Pattern 2: substack.com/@username (profile URL)
+  const withPath = trimmed.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+  if (/^substack\.com\/@[a-z0-9_-]+$/i.test(withPath)) {
+    return true;
+  }
+  
+  return false;
+}
+
 export const emailSchema = z.string()
   .trim()
   .email({ message: "Invalid email address" })
@@ -25,27 +50,35 @@ export const urlSchema = z.string()
   .url({ message: "Invalid URL format" })
   .max(500, { message: "URL must be less than 500 characters" });
 
-export const substackUrlSchema = z.string()
+// Substack URL - REQUIRED (for booking form)
+export const substackUrlRequiredSchema = z.string()
   .trim()
-  .url({ message: "Invalid URL format" })
+  .min(1, { message: "Newsletter URL is required" })
   .refine(
-    (url) => url.includes('substack.com') || url.includes('.substack.'),
-    { message: "Must be a valid Substack URL" }
+    isValidSubstackUrl,
+    { message: "Enter your Substack URL (e.g., yourname.substack.com)" }
+  );
+
+// Substack URL - OPTIONAL (for settings/profile)
+export const substackUrlOptionalSchema = z.string()
+  .trim()
+  .refine(
+    (val) => val === '' || isValidSubstackUrl(val),
+    { message: "Must be a valid Substack URL (e.g., yourname.substack.com)" }
   )
   .optional()
   .or(z.literal(''));
+
+// Legacy alias for backwards compatibility
+export const substackUrlSchema = substackUrlOptionalSchema;
 
 // Newsletter URL - required for AI analysis (format: username.substack.com)
 export const newsletterUrlSchema = z.string()
   .trim()
   .min(1, { message: "Newsletter URL is required for AI collaboration suggestions" })
   .refine(
-    (url) => {
-      // Accept formats: username.substack.com, https://username.substack.com
-      const cleanUrl = url.replace(/^https?:\/\//, '').replace(/\/$/, '');
-      return /^[a-z0-9-]+\.substack\.com$/i.test(cleanUrl);
-    },
-    { message: "Must be your newsletter URL (e.g., yourname.substack.com)" }
+    isValidSubstackUrl,
+    { message: "Enter your newsletter URL (e.g., yourname.substack.com)" }
   );
 
 export const messageSchema = z.string()
@@ -87,7 +120,7 @@ export const loginSchema = z.object({
 export const bookingFormSchema = z.object({
   name: nameSchema,
   email: emailSchema,
-  substackUrl: substackUrlSchema,
+  substackUrl: substackUrlRequiredSchema,
   message: messageSchema,
 });
 
