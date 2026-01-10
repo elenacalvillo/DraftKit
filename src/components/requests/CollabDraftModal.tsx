@@ -108,6 +108,9 @@ Estimated Read Time: ${draft.estimatedReadTime}`;
             <p className="text-muted-foreground text-center">
               Analyzing both newsletters and generating a collaboration draft...
             </p>
+            <p className="text-xs text-muted-foreground/60 text-center">
+              This may take up to 30 seconds
+            </p>
           </div>
         ) : draft ? (
           <motion.div
