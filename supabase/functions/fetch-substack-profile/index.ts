@@ -14,13 +14,17 @@ interface SubstackProfile {
 function normalizeSubstackUrl(url: string): string {
   let normalized = url.trim().replace(/\/+$/, "");
   
-  // Handle profile format: substack.com/@username
+  // Handle profile format: substack.com/@username - keep as-is (personal profile page)
   const profileMatch = normalized.match(/substack\.com\/@([a-zA-Z0-9_-]+)/i);
   if (profileMatch) {
-    normalized = `https://${profileMatch[1]}.substack.com`;
+    // Personal profile URLs should stay as substack.com/@username
+    if (!normalized.startsWith("http")) {
+      normalized = `https://${normalized}`;
+    }
+    return normalized;
   }
   
-  // Handle just username
+  // Handle just username (assume publication subdomain)
   if (!normalized.includes(".") && !normalized.includes("/")) {
     normalized = `https://${normalized}.substack.com`;
   }
