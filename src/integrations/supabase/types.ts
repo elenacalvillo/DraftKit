@@ -117,6 +117,7 @@ export type Database = {
           email: string
           id: string
           name: string
+          newsletter_url: string | null
           substack_url: string | null
           updated_at: string
           user_id: string
@@ -129,6 +130,7 @@ export type Database = {
           email: string
           id?: string
           name: string
+          newsletter_url?: string | null
           substack_url?: string | null
           updated_at?: string
           user_id: string
@@ -141,6 +143,7 @@ export type Database = {
           email?: string
           id?: string
           name?: string
+          newsletter_url?: string | null
           substack_url?: string | null
           updated_at?: string
           user_id?: string
@@ -157,6 +160,7 @@ export type Database = {
           created_at: string | null
           id: string | null
           name: string | null
+          newsletter_url: string | null
           substack_url: string | null
           username: string | null
           welcome_message: string | null
@@ -166,6 +170,7 @@ export type Database = {
           created_at?: string | null
           id?: string | null
           name?: string | null
+          newsletter_url?: string | null
           substack_url?: string | null
           username?: string | null
           welcome_message?: string | null
@@ -175,6 +180,7 @@ export type Database = {
           created_at?: string | null
           id?: string | null
           name?: string | null
+          newsletter_url?: string | null
           substack_url?: string | null
           username?: string | null
           welcome_message?: string | null

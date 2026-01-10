@@ -47,6 +47,7 @@ export default function Signup() {
     name: "",
     username: "",
     substackUrl: "",
+    newsletterUrl: "",
     welcomeMessage: "",
   });
 
@@ -138,7 +139,8 @@ export default function Signup() {
     const result = signupStep2Schema.safeParse({
       name: formData.name,
       username: formData.username,
-      substackUrl: formData.substackUrl,
+      substackUrl: formData.substackUrl || undefined,
+      newsletterUrl: formData.newsletterUrl,
       welcomeMessage: formData.welcomeMessage || undefined,
     });
     
@@ -184,7 +186,8 @@ export default function Signup() {
         username: formData.username,
         name: formData.name,
         email: formData.email,
-        substack_url: formData.substackUrl,
+        substack_url: formData.substackUrl || null,
+        newsletter_url: formData.newsletterUrl,
         welcome_message: formData.welcomeMessage || `Hi! I'm ${formData.name}. Let's collaborate!`,
       })
       .select()
@@ -542,24 +545,50 @@ export default function Signup() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="substackUrl" className="flex items-center gap-2">
+                    <Label htmlFor="newsletterUrl" className="flex items-center gap-2">
                       <ExternalLink className="w-4 h-4" />
-                      Substack URL
+                      Your Newsletter URL <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="newsletterUrl"
+                      type="text"
+                      required
+                      value={formData.newsletterUrl}
+                      onChange={(e) =>
+                        setFormData({ ...formData, newsletterUrl: e.target.value })
+                      }
+                      placeholder="yourname.substack.com"
+                      className="h-12"
+                    />
+                    {errors.newsletterUrl && (
+                      <p className="text-sm text-destructive">{errors.newsletterUrl}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Required for AI collaboration suggestions. Use format: yourname.substack.com
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="substackUrl" className="flex items-center gap-2">
+                      <User className="w-4 h-4" />
+                      Substack Profile (Optional)
                     </Label>
                     <Input
                       id="substackUrl"
                       type="url"
-                      required
                       value={formData.substackUrl}
                       onChange={(e) =>
                         setFormData({ ...formData, substackUrl: e.target.value })
                       }
-                      placeholder="https://yourname.substack.com"
+                      placeholder="substack.com/@yourname"
                       className="h-12"
                     />
                     {errors.substackUrl && (
                       <p className="text-sm text-destructive">{errors.substackUrl}</p>
                     )}
+                    <p className="text-xs text-muted-foreground">
+                      Your author profile page (for display on your public page)
+                    </p>
                   </div>
 
                   <div className="space-y-2">

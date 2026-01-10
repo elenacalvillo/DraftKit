@@ -22,6 +22,7 @@ export default function Settings() {
     name: "",
     bio: "",
     substackUrl: "",
+    newsletterUrl: "",
     welcomeMessage: "",
   });
 
@@ -41,6 +42,7 @@ export default function Settings() {
         name: creator.name,
         bio: creator.bio || "",
         substackUrl: creator.substack_url || "",
+        newsletterUrl: (creator as any).newsletter_url || "",
         welcomeMessage: creator.welcome_message || "",
       });
     }
@@ -70,7 +72,8 @@ export default function Settings() {
       .update({
         name: formData.name,
         bio: formData.bio || null,
-        substack_url: formData.substackUrl,
+        substack_url: formData.substackUrl || null,
+        newsletter_url: formData.newsletterUrl,
         welcome_message: formData.welcomeMessage || null,
       })
       .eq('id', creator.id);
@@ -215,20 +218,38 @@ export default function Settings() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="substackUrl">Substack URL</Label>
+              <Label htmlFor="newsletterUrl">Newsletter URL <span className="text-destructive">*</span></Label>
+              <Input
+                id="newsletterUrl"
+                value={formData.newsletterUrl}
+                onChange={(e) =>
+                  setFormData({ ...formData, newsletterUrl: e.target.value })
+                }
+                placeholder="yourname.substack.com"
+              />
+              {errors.newsletterUrl && (
+                <p className="text-sm text-destructive">{errors.newsletterUrl}</p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Required for AI collaboration suggestions (e.g., yourname.substack.com)
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="substackUrl">Substack Profile (Optional)</Label>
               <Input
                 id="substackUrl"
                 value={formData.substackUrl}
                 onChange={(e) =>
                   setFormData({ ...formData, substackUrl: e.target.value })
                 }
-                placeholder="https://yourname.substack.com"
+                placeholder="substack.com/@yourname"
               />
               {errors.substackUrl && (
                 <p className="text-sm text-destructive">{errors.substackUrl}</p>
               )}
               <p className="text-xs text-muted-foreground">
-                Use format: yourname.substack.com or substack.com/@yourname
+                Your author profile page (for display)
               </p>
             </div>
 
