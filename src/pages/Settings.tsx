@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Copy, ExternalLink, Check, AlertTriangle } from "lucide-react";
+import { Copy, ExternalLink, Check, AlertTriangle, ArrowLeft } from "lucide-react";
+import { Link } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -139,6 +140,15 @@ export default function Settings() {
   return (
     <DashboardLayout>
       <div className="max-w-2xl mx-auto">
+        {/* Back link */}
+        <Link
+          to="/dashboard"
+          className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Back to Dashboard</span>
+        </Link>
+
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}

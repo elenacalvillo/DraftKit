@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
@@ -15,6 +15,23 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 
+const useIsDesktop = () => {
+  const [isDesktop, setIsDesktop] = useState(
+    typeof window !== "undefined" ? window.innerWidth >= 1280 : false
+  );
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(min-width: 1280px)");
+    const handleChange = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    
+    setIsDesktop(mediaQuery.matches);
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }, []);
+
+  return isDesktop;
+};
+
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
   { icon: Calendar, label: "Availability", path: "/dashboard/availability" },
@@ -27,6 +44,16 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { creator, signOut } = useAuth();
+  const isDesktop = useIsDesktop();
+
+  // Close sidebar on route change (mobile/tablet)
+  useEffect(() => {
+    if (!isDesktop) {
+      setIsSidebarOpen(false);
+    }
+  }, [location.pathname, isDesktop]);
+
+  const sidebarVisible = isDesktop || isSidebarOpen;
 
   const handleLogout = async () => {
     await signOut();
@@ -58,12 +85,10 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       <motion.aside
         initial={false}
         animate={{
-          x: isSidebarOpen ? 0 : "-100%",
+          x: sidebarVisible ? 0 : "-100%",
         }}
-        className={cn(
-          "fixed top-0 left-0 bottom-0 w-64 z-40 glass-card rounded-none border-y-0 border-l-0 p-6 flex flex-col",
-          "xl:translate-x-0 xl:transform-none"
-        )}
+        transition={{ type: "spring", damping: 25, stiffness: 300 }}
+        className="fixed top-0 left-0 bottom-0 w-64 z-40 glass-card rounded-none border-y-0 border-l-0 p-6 flex flex-col"
       >
         {/* Logo */}
         <Link to="/dashboard" className="flex items-center gap-2 mb-10">
@@ -81,13 +106,13 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.path}
                 to={item.path}
-                onClick={() => setIsSidebarOpen(false)}
+                onClick={() => !isDesktop && setIsSidebarOpen(false)}
               >
                 <motion.div
                   whileHover={{ x: 4 }}
                   whileTap={{ scale: 0.98 }}
                   className={cn(
-                    "flex items-center gap-3 px-4 py-3 rounded-xl transition-colors",
+                    "relative flex items-center gap-3 px-4 py-3 rounded-xl transition-colors",
                     isActive
                       ? "bg-primary/10 text-primary font-medium"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -98,7 +123,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                   {isActive && (
                     <motion.div
                       layoutId="activeNav"
-                      className="absolute left-0 w-1 h-8 rounded-r-full bg-primary"
+                      className="absolute left-0 w-1 h-8 rounded-r-full bg-primary pointer-events-none"
                     />
                   )}
                 </motion.div>
@@ -143,7 +168,10 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Main content */}
-      <main className="xl:ml-64 min-h-screen pt-16 xl:pt-0">
+      <main className={cn(
+        "min-h-screen pt-16 xl:pt-0 transition-[margin-left] duration-300",
+        isDesktop && "ml-64"
+      )}>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
