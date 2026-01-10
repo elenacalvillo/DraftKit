@@ -32,10 +32,13 @@ const useIsDesktop = () => {
   return isDesktop;
 };
 
+import { Send } from "lucide-react";
+
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
   { icon: Calendar, label: "Availability", path: "/dashboard/availability" },
   { icon: MessageSquare, label: "Requests", path: "/dashboard/requests" },
+  { icon: Send, label: "Sent Requests", path: "/dashboard/my-requests" },
   { icon: Settings, label: "Settings", path: "/dashboard/settings" },
 ];
 

@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Calendar, Check, ExternalLink, Sparkles, Mail, User, MessageSquare, Lightbulb, Loader2 } from "lucide-react";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import { ArrowLeft, ArrowRight, Calendar, Check, ExternalLink, Sparkles, Mail, User, MessageSquare, Lightbulb, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -29,6 +29,7 @@ interface Availability {
 
 export default function PublicBooking() {
   const { username } = useParams<{ username: string }>();
+  const navigate = useNavigate();
   const { trackEvent } = useAnalytics();
   const hasTrackedPageView = useRef(false);
   
@@ -419,19 +420,52 @@ export default function PublicBooking() {
                   )}
                   . They'll be in touch soon.
                 </p>
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setIsSuccess(false);
-                    setSelectedDate(null);
-                    setIsFlexibleDate(false);
-                    setFormData({ name: "", email: "", substackUrl: "", message: "" });
-                    setMatchResult(null);
-                    setHasAnalyzed(false);
-                  }}
+
+                {/* Account creation CTA */}
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="mt-8 p-6 rounded-xl bg-primary/5 border border-primary/20 max-w-md mx-auto"
                 >
-                  Request Another Date
-                </Button>
+                  <div className="flex items-center justify-center gap-2 mb-3">
+                    <Sparkles className="w-5 h-5 text-primary" />
+                    <h3 className="font-semibold">Want to track this collaboration?</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Create your free CollabFlow account to track all your requests, 
+                    get notified of responses, and receive collaborations from other creators.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                    <Button
+                      onClick={() => {
+                        const params = new URLSearchParams({
+                          email: formData.email,
+                          name: formData.name,
+                          substack: formData.substackUrl || '',
+                        });
+                        navigate(`/signup?${params.toString()}`);
+                      }}
+                      className="gradient-primary"
+                    >
+                      Create Account
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        setIsSuccess(false);
+                        setSelectedDate(null);
+                        setIsFlexibleDate(false);
+                        setFormData({ name: "", email: "", substackUrl: "", message: "" });
+                        setMatchResult(null);
+                        setHasAnalyzed(false);
+                      }}
+                    >
+                      Maybe Later
+                    </Button>
+                  </div>
+                </motion.div>
               </motion.div>
             ) : selectedDate || isFlexibleDate ? (
               <motion.div
