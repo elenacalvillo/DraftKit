@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Mail, Lock, Sparkles } from "lucide-react";
+import { ArrowLeft, Mail, Lock, Sparkles, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +18,8 @@ export default function Login() {
     password: "",
   });
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [shake, setShake] = useState(false);
 
   // Check for OAuth errors in URL
   useEffect(() => {
@@ -42,6 +44,7 @@ export default function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
+    setAuthError(null);
     
     // Validate inputs
     const result = loginSchema.safeParse(formData);
@@ -60,13 +63,19 @@ export default function Login() {
     const { error } = await signIn(formData.email, formData.password);
 
     if (error) {
+      let errorMessage = "An error occurred. Please try again.";
       if (error.message.includes('Invalid login credentials')) {
-        toast.error("Invalid email or password. Please try again.");
+        errorMessage = "Invalid email or password. Please try again.";
       } else if (error.message.includes('Email not confirmed')) {
-        toast.error("Please verify your email before signing in.");
+        errorMessage = "Please verify your email before signing in.";
       } else {
-        toast.error(error.message);
+        errorMessage = error.message;
       }
+      
+      setAuthError(errorMessage);
+      toast.error(errorMessage);
+      setShake(true);
+      setTimeout(() => setShake(false), 500);
       setIsLoading(false);
       return;
     }
@@ -143,7 +152,7 @@ export default function Login() {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className={`space-y-6 ${shake ? 'animate-shake' : ''}`}>
             <div className="space-y-2">
               <Label htmlFor="email" className="flex items-center gap-2">
                 <Mail className="w-4 h-4" />
@@ -154,9 +163,10 @@ export default function Login() {
                 type="email"
                 required
                 value={formData.email}
-                onChange={(e) =>
-                  setFormData({ ...formData, email: e.target.value })
-                }
+                onChange={(e) => {
+                  setFormData({ ...formData, email: e.target.value });
+                  setAuthError(null);
+                }}
                 placeholder="you@example.com"
                 className="h-12"
               />
@@ -175,9 +185,10 @@ export default function Login() {
                 type="password"
                 required
                 value={formData.password}
-                onChange={(e) =>
-                  setFormData({ ...formData, password: e.target.value })
-                }
+                onChange={(e) => {
+                  setFormData({ ...formData, password: e.target.value });
+                  setAuthError(null);
+                }}
                 placeholder="••••••••"
                 className="h-12"
               />
@@ -185,6 +196,14 @@ export default function Login() {
                 <p className="text-sm text-destructive">{errors.password}</p>
               )}
             </div>
+
+            {/* Inline Auth Error */}
+            {authError && (
+              <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                {authError}
+              </div>
+            )}
 
             <Button
               type="submit"
