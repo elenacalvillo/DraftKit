@@ -36,7 +36,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen gradient-bg">
       {/* Mobile header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 px-4 py-3 glass-card rounded-none border-x-0 border-t-0">
+      <div className="xl:hidden fixed top-0 left-0 right-0 z-50 px-4 py-3 glass-card rounded-none border-x-0 border-t-0">
         <div className="flex items-center justify-between">
           <Link to="/dashboard" className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
@@ -62,7 +62,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         }}
         className={cn(
           "fixed top-0 left-0 bottom-0 w-64 z-40 glass-card rounded-none border-y-0 border-l-0 p-6 flex flex-col",
-          "lg:translate-x-0 lg:transform-none"
+          "xl:translate-x-0 xl:transform-none"
         )}
       >
         {/* Logo */}
@@ -138,17 +138,17 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={() => setIsSidebarOpen(false)}
-          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-30 lg:hidden"
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-30 xl:hidden"
         />
       )}
 
       {/* Main content */}
-      <main className="lg:ml-64 min-h-screen pt-16 lg:pt-0">
+      <main className="xl:ml-64 min-h-screen pt-16 xl:pt-0">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className="p-6 lg:p-10"
+          className="p-6 xl:p-10"
         >
           {children}
         </motion.div>

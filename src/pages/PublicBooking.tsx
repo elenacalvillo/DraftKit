@@ -31,6 +31,7 @@ export default function PublicBooking() {
   const [availability, setAvailability] = useState<Availability | null>(null);
   const [bookedDates, setBookedDates] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [isFlexibleDate, setIsFlexibleDate] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [notFound, setNotFound] = useState(false);
@@ -144,7 +145,7 @@ export default function PublicBooking() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedDate || !username || !creator) return;
+    if ((!selectedDate && !isFlexibleDate) || !username || !creator) return;
 
     setErrors({});
 
@@ -160,19 +161,21 @@ export default function PublicBooking() {
       return;
     }
 
-    // Check if date is still available
-    const { data: existingRequest } = await supabase
-      .from('collab_requests')
-      .select('id')
-      .eq('creator_id', creator.id)
-      .eq('requested_date', selectedDate)
-      .neq('status', 'declined')
-      .maybeSingle();
+    // Check if date is still available (only if specific date selected)
+    if (selectedDate && !isFlexibleDate) {
+      const { data: existingRequest } = await supabase
+        .from('collab_requests')
+        .select('id')
+        .eq('creator_id', creator.id)
+        .eq('requested_date', selectedDate)
+        .neq('status', 'declined')
+        .maybeSingle();
 
-    if (existingRequest) {
-      toast.error("This date has just been booked. Please select another date.");
-      setSelectedDate(null);
-      return;
+      if (existingRequest) {
+        toast.error("This date has just been booked. Please select another date.");
+        setSelectedDate(null);
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -185,7 +188,7 @@ export default function PublicBooking() {
         requester_email: formData.email.trim(),
         requester_substack_url: formData.substackUrl.trim(),
         message: formData.message.trim() || null,
-        requested_date: selectedDate,
+        requested_date: isFlexibleDate ? null : selectedDate,
         status: 'pending',
       });
 
@@ -357,10 +360,17 @@ export default function PublicBooking() {
                 </motion.div>
                 <h2 className="text-2xl font-bold mb-2">Request Sent!</h2>
                 <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                  {creator.name} has received your collaboration request for{" "}
-                  <span className="font-medium text-foreground">
-                    {formatSelectedDate(selectedDate!)}
-                  </span>
+                  {creator.name} has received your collaboration request
+                  {selectedDate && !isFlexibleDate ? (
+                    <>
+                      {" "}for{" "}
+                      <span className="font-medium text-foreground">
+                        {formatSelectedDate(selectedDate)}
+                      </span>
+                    </>
+                  ) : (
+                    " with flexible timing"
+                  )}
                   . They'll be in touch soon.
                 </p>
                 <Button
@@ -368,6 +378,7 @@ export default function PublicBooking() {
                   onClick={() => {
                     setIsSuccess(false);
                     setSelectedDate(null);
+                    setIsFlexibleDate(false);
                     setFormData({ name: "", email: "", substackUrl: "", message: "" });
                     setMatchResult(null);
                     setHasAnalyzed(false);
@@ -376,7 +387,7 @@ export default function PublicBooking() {
                   Request Another Date
                 </Button>
               </motion.div>
-            ) : selectedDate ? (
+            ) : selectedDate || isFlexibleDate ? (
               <motion.div
                 key="form"
                 initial={{ opacity: 0, x: 20 }}
@@ -384,7 +395,10 @@ export default function PublicBooking() {
                 exit={{ opacity: 0, x: -20 }}
               >
                 <button
-                  onClick={() => setSelectedDate(null)}
+                  onClick={() => {
+                    setSelectedDate(null);
+                    setIsFlexibleDate(false);
+                  }}
                   className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6 transition-colors"
                 >
                   <ArrowLeft className="w-4 h-4" />
@@ -395,7 +409,7 @@ export default function PublicBooking() {
                   <div className="inline-flex items-center gap-3 px-4 py-3 bg-primary/10 rounded-xl">
                     <Calendar className="w-5 h-5 text-primary" />
                     <span className="font-medium">
-                      {formatSelectedDate(selectedDate)}
+                      {isFlexibleDate ? "Flexible - Let's discuss timing" : formatSelectedDate(selectedDate!)}
                     </span>
                   </div>
                 </div>
@@ -632,15 +646,26 @@ export default function PublicBooking() {
                   onDateSelect={handleDateSelect}
                 />
 
-                {availability?.available_dates?.length === 0 && (
-                  <div className="text-center mt-6 p-6 bg-muted/50 rounded-xl">
-                    <Calendar className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-                    <p className="text-muted-foreground">
-                      {creator.name} hasn't set any available dates yet.
-                      <br />
-                      Check back later!
+                {(!availability?.available_dates || availability.available_dates.length === 0) && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="text-center mt-6 p-8 bg-accent/20 border border-accent/30 rounded-xl"
+                  >
+                    <Calendar className="w-12 h-12 text-primary/50 mx-auto mb-4" />
+                    <h3 className="font-semibold text-lg mb-2">Flexible Scheduling</h3>
+                    <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
+                      {creator.name} hasn't set specific dates yet, but you can still send a collaboration request!
                     </p>
-                  </div>
+                    <Button 
+                      variant="gradient" 
+                      size="lg"
+                      onClick={() => setIsFlexibleDate(true)}
+                    >
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      Request with Flexible Date
+                    </Button>
+                  </motion.div>
                 )}
               </motion.div>
             )}
