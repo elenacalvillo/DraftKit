@@ -11,7 +11,8 @@ interface RequestCardProps {
 }
 
 export function RequestCard({ request, onApprove, onDecline }: RequestCardProps) {
-  const formatDate = (dateStr: string) => {
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return null;
     const date = new Date(dateStr);
     return date.toLocaleDateString("en-US", {
       weekday: "short",
@@ -69,7 +70,12 @@ export function RequestCard({ request, onApprove, onDecline }: RequestCardProps)
       <div className="space-y-3 mb-4">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Calendar className="w-4 h-4" />
-          <span>Requested: {formatDate(request.requestedDate)}</span>
+          <span>
+            {request.requestedDate 
+              ? `Requested: ${formatDate(request.requestedDate)}`
+              : "Flexible - To be scheduled"
+            }
+          </span>
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Mail className="w-4 h-4" />

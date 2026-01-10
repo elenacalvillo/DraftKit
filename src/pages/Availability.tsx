@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Info } from "lucide-react";
+import { ArrowLeft, Check, Info } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { CollabCalendar } from "@/components/calendar/CollabCalendar";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 
 export default function Availability() {
   const navigate = useNavigate();
@@ -144,12 +145,27 @@ export default function Availability() {
   return (
     <DashboardLayout>
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
+        {/* Header with back button */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           className="mb-10"
         >
+          <div className="flex items-center justify-between mb-4">
+            <Link
+              to="/dashboard"
+              className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span className="text-sm">Back to Dashboard</span>
+            </Link>
+            <Button variant="gradient" size="sm" asChild>
+              <Link to="/dashboard">
+                <Check className="w-4 h-4 mr-2" />
+                Done
+              </Link>
+            </Button>
+          </div>
           <h1 className="text-3xl font-bold mb-2">
             <span className="gradient-text">Availability</span>
           </h1>

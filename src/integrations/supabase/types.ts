@@ -62,7 +62,7 @@ export type Database = {
           creator_id: string
           id: string
           message: string | null
-          requested_date: string
+          requested_date: string | null
           requester_email: string
           requester_name: string
           requester_substack_url: string | null
@@ -73,7 +73,7 @@ export type Database = {
           creator_id: string
           id?: string
           message?: string | null
-          requested_date: string
+          requested_date?: string | null
           requester_email: string
           requester_name: string
           requester_substack_url?: string | null
@@ -84,7 +84,7 @@ export type Database = {
           creator_id?: string
           id?: string
           message?: string | null
-          requested_date?: string
+          requested_date?: string | null
           requester_email?: string
           requester_name?: string
           requester_substack_url?: string | null
