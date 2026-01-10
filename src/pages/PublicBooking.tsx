@@ -19,6 +19,7 @@ interface Creator {
   substack_url: string | null;
   newsletter_url: string | null;
   welcome_message: string | null;
+  profile_image_url: string | null;
 }
 
 interface Availability {
@@ -64,7 +65,7 @@ export default function PublicBooking() {
     // Fetch creator from public view (excludes sensitive data like email)
     const { data: creatorData, error } = await supabase
       .from('public_creator_profiles')
-      .select('id, username, name, substack_url, newsletter_url, welcome_message')
+      .select('id, username, name, substack_url, newsletter_url, welcome_message, profile_image_url')
       .eq('username', username)
       .maybeSingle();
 
@@ -331,11 +332,19 @@ export default function PublicBooking() {
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-12"
         >
-          <div className="w-20 h-20 rounded-full gradient-primary mx-auto mb-6 flex items-center justify-center shadow-glow">
-            <span className="text-3xl font-bold text-primary-foreground">
-              {creator.name.charAt(0).toUpperCase()}
-            </span>
-          </div>
+          {creator.profile_image_url ? (
+            <img 
+              src={creator.profile_image_url} 
+              alt={creator.name}
+              className="w-20 h-20 rounded-full mx-auto mb-6 object-cover shadow-glow ring-4 ring-primary/20"
+            />
+          ) : (
+            <div className="w-20 h-20 rounded-full gradient-primary mx-auto mb-6 flex items-center justify-center shadow-glow">
+              <span className="text-3xl font-bold text-primary-foreground">
+                {creator.name.charAt(0).toUpperCase()}
+              </span>
+            </div>
+          )}
           <h1 className="text-4xl font-bold mb-4">{creator.name}</h1>
           {creator.substack_url && (
             <a

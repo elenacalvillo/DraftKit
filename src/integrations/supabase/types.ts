@@ -201,6 +201,7 @@ export type Database = {
           id: string
           name: string
           newsletter_url: string | null
+          profile_image_url: string | null
           substack_url: string | null
           updated_at: string
           user_id: string
@@ -214,6 +215,7 @@ export type Database = {
           id?: string
           name: string
           newsletter_url?: string | null
+          profile_image_url?: string | null
           substack_url?: string | null
           updated_at?: string
           user_id: string
@@ -227,6 +229,7 @@ export type Database = {
           id?: string
           name?: string
           newsletter_url?: string | null
+          profile_image_url?: string | null
           substack_url?: string | null
           updated_at?: string
           user_id?: string
@@ -244,6 +247,7 @@ export type Database = {
           id: string | null
           name: string | null
           newsletter_url: string | null
+          profile_image_url: string | null
           substack_url: string | null
           username: string | null
           welcome_message: string | null
@@ -254,6 +258,7 @@ export type Database = {
           id?: string | null
           name?: string | null
           newsletter_url?: string | null
+          profile_image_url?: string | null
           substack_url?: string | null
           username?: string | null
           welcome_message?: string | null
@@ -264,6 +269,7 @@ export type Database = {
           id?: string | null
           name?: string | null
           newsletter_url?: string | null
+          profile_image_url?: string | null
           substack_url?: string | null
           username?: string | null
           welcome_message?: string | null
