@@ -18,6 +18,21 @@ export interface Availability {
   recurringDays: number[]; // 0-6 for Sunday-Saturday
 }
 
+export interface CollabDraft {
+  title: string;
+  hook: string;
+  outline: {
+    section: string;
+    contributor: "creator" | "requester" | "both";
+    description: string;
+    suggestedLength: string;
+  }[];
+  talkingPoints: string[];
+  suggestedFormat: string;
+  toneNotes: string;
+  estimatedReadTime: string;
+}
+
 export interface CollabRequest {
   id: string;
   creatorUsername: string;
@@ -29,6 +44,8 @@ export interface CollabRequest {
   requestedDate: string | null;
   status: 'pending' | 'approved' | 'declined';
   createdAt: string;
+  aiDraft?: CollabDraft | null;
+  approvedAt?: string | null;
 }
 
 const STORAGE_KEYS = {
