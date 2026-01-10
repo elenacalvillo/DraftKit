@@ -17,6 +17,7 @@ import Settings from "./pages/Settings";
 import PublicBooking from "./pages/PublicBooking";
 import Demo from "./pages/Demo";
 import AdminAnalytics from "./pages/AdminAnalytics";
+import MyRequests from "./pages/MyRequests";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -39,6 +40,7 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/dashboard/availability" element={<Availability />} />
             <Route path="/dashboard/requests" element={<Requests />} />
+            <Route path="/dashboard/my-requests" element={<MyRequests />} />
             <Route path="/dashboard/settings" element={<Settings />} />
             <Route path="/admin/analytics" element={<AdminAnalytics />} />
             <Route path="/:username" element={<PublicBooking />} />

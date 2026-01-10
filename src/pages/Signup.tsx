@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowRight,
@@ -35,6 +35,7 @@ interface CreatorData {
 
 export default function Signup() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, creator, loading, signUp, refreshCreator } = useAuth();
   const { trackEvent } = useAnalytics();
   const [currentStep, setCurrentStep] = useState<Step>(1);
@@ -43,12 +44,18 @@ export default function Signup() {
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Check if coming from a collab request submission
+  const prefillEmail = searchParams.get('email') || '';
+  const prefillName = searchParams.get('name') || '';
+  const prefillSubstack = searchParams.get('substack') || '';
+  const isFromCollabRequest = Boolean(prefillEmail || prefillName);
+
   const [formData, setFormData] = useState({
-    email: "",
+    email: prefillEmail,
     password: "",
-    name: "",
+    name: prefillName,
     username: "",
-    substackUrl: "",
+    substackUrl: prefillSubstack,
     newsletterUrl: "",
     welcomeMessage: "",
   });
@@ -346,8 +353,17 @@ export default function Signup() {
                   </div>
                   <h1 className="text-2xl font-bold">Create Account</h1>
                   <p className="text-muted-foreground mt-1">
-                    Start organizing your collaborations
+                    {isFromCollabRequest 
+                      ? "Complete your signup to track your collaboration request"
+                      : "Start organizing your collaborations"
+                    }
                   </p>
+                  {isFromCollabRequest && (
+                    <div className="mt-3 inline-flex items-center gap-2 text-sm text-primary bg-primary/10 px-3 py-1.5 rounded-full">
+                      <Check className="w-3.5 h-3.5" />
+                      Your request was submitted successfully
+                    </div>
+                  )}
                 </div>
 
                 <form onSubmit={handleStep1} className="space-y-6">
