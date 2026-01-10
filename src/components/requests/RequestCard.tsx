@@ -65,8 +65,21 @@ export function RequestCard({ request, creatorEmail, onApprove, onDecline, onDra
     setShowDraftModal(true);
 
     try {
+      // Get current session to ensure we have a valid token
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        toast.error("Your session has expired. Please log in again.");
+        setShowDraftModal(false);
+        setIsGeneratingDraft(false);
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke("generate-collab-draft", {
         body: { requestId: request.id },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
       });
 
       if (error) throw error;
@@ -79,9 +92,15 @@ export function RequestCard({ request, creatorEmail, onApprove, onDecline, onDra
         // Track draft generation
         trackEvent("draft_generated", { request_id: request.id });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to generate draft:", error);
-      toast.error("Failed to generate draft. Please try again.");
+      
+      // Handle specific auth errors
+      if (error?.message?.includes('401') || error?.message?.includes('auth') || error?.message?.includes('Unauthorized')) {
+        toast.error("Authentication failed. Please refresh the page and try again.");
+      } else {
+        toast.error("Failed to generate draft. Please try again.");
+      }
       setShowDraftModal(false);
     } finally {
       setIsGeneratingDraft(false);
