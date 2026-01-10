@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Copy, ExternalLink, Check, AlertTriangle, ArrowLeft } from "lucide-react";
+import { Copy, ExternalLink, Check, AlertTriangle, ArrowLeft, RefreshCw, User } from "lucide-react";
 import { Link } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,8 @@ export default function Settings() {
   const { user, creator, loading, refreshCreator, signOut } = useAuth();
   const [copied, setCopied] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isFetchingImage, setIsFetchingImage] = useState(false);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState({
     name: "",
@@ -46,8 +48,37 @@ export default function Settings() {
         newsletterUrl: (creator as any).newsletter_url || "",
         welcomeMessage: creator.welcome_message || "",
       });
+      setPreviewImageUrl((creator as any).profile_image_url || null);
     }
   }, [user, creator, loading, navigate]);
+
+  const handleFetchProfileImage = async () => {
+    if (!formData.newsletterUrl) {
+      toast.error("Enter a newsletter URL first");
+      return;
+    }
+
+    setIsFetchingImage(true);
+    try {
+      const { data: profileData, error: profileError } = await supabase.functions.invoke(
+        "fetch-substack-profile",
+        { body: { substackUrl: formData.newsletterUrl } }
+      );
+      
+      if (!profileError && profileData?.imageUrl) {
+        setPreviewImageUrl(profileData.imageUrl);
+        toast.success("Profile image fetched!");
+      } else {
+        toast.error("Could not fetch profile image");
+        console.log("Could not fetch profile image:", profileError || "No image found");
+      }
+    } catch (e) {
+      toast.error("Error fetching profile image");
+      console.log("Error fetching profile image:", e);
+    } finally {
+      setIsFetchingImage(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!creator) return;
@@ -68,9 +99,9 @@ export default function Settings() {
 
     setIsSaving(true);
 
-    // Fetch profile image from Substack if newsletter URL is provided
-    let profileImageUrl: string | null = (creator as any).profile_image_url || null;
-    if (formData.newsletterUrl) {
+    // Use the preview image URL (already fetched) or fetch if not available
+    let profileImageUrl = previewImageUrl;
+    if (!profileImageUrl && formData.newsletterUrl) {
       try {
         const { data: profileData, error: profileError } = await supabase.functions.invoke(
           "fetch-substack-profile",
@@ -79,8 +110,7 @@ export default function Settings() {
         
         if (!profileError && profileData?.imageUrl) {
           profileImageUrl = profileData.imageUrl;
-        } else {
-          console.log("Could not fetch profile image:", profileError || "No image found");
+          setPreviewImageUrl(profileImageUrl);
         }
       } catch (e) {
         console.log("Error fetching profile image:", e);
@@ -218,6 +248,45 @@ export default function Settings() {
           className="glass-card p-6 mb-6"
         >
           <h2 className="text-lg font-semibold mb-6">Profile</h2>
+          
+          {/* Profile Image Preview */}
+          <div className="flex items-center gap-4 mb-6 p-4 bg-muted/50 rounded-xl">
+            {previewImageUrl ? (
+              <img 
+                src={previewImageUrl} 
+                alt="Profile preview"
+                className="w-16 h-16 rounded-full object-cover ring-2 ring-primary/20"
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                <User className="w-8 h-8 text-muted-foreground" />
+              </div>
+            )}
+            <div className="flex-1">
+              <p className="text-sm font-medium mb-1">Profile Image</p>
+              <p className="text-xs text-muted-foreground mb-2">
+                {previewImageUrl ? "Fetched from your Substack" : "Enter your newsletter URL and click refresh"}
+              </p>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={handleFetchProfileImage}
+                disabled={isFetchingImage || !formData.newsletterUrl}
+              >
+                {isFetchingImage ? (
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    className="w-4 h-4 border-2 border-foreground border-t-transparent rounded-full mr-2"
+                  />
+                ) : (
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                )}
+                {isFetchingImage ? "Fetching..." : "Fetch from Substack"}
+              </Button>
+            </div>
+          </div>
+
           <div className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="name">Display Name</Label>
