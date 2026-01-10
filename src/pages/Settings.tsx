@@ -53,8 +53,8 @@ export default function Settings() {
   }, [user, creator, loading, navigate]);
 
   const handleFetchProfileImage = async () => {
-    if (!formData.newsletterUrl) {
-      toast.error("Enter a newsletter URL first");
+    if (!formData.substackUrl) {
+      toast.error("Enter your Substack profile URL first (e.g., substack.com/@yourname)");
       return;
     }
 
@@ -62,7 +62,7 @@ export default function Settings() {
     try {
       const { data: profileData, error: profileError } = await supabase.functions.invoke(
         "fetch-substack-profile",
-        { body: { substackUrl: formData.newsletterUrl } }
+        { body: { substackUrl: formData.substackUrl } }
       );
       
       if (!profileError && profileData?.imageUrl) {
@@ -101,11 +101,11 @@ export default function Settings() {
 
     // Use the preview image URL (already fetched) or fetch if not available
     let profileImageUrl = previewImageUrl;
-    if (!profileImageUrl && formData.newsletterUrl) {
+    if (!profileImageUrl && formData.substackUrl) {
       try {
         const { data: profileData, error: profileError } = await supabase.functions.invoke(
           "fetch-substack-profile",
-          { body: { substackUrl: formData.newsletterUrl } }
+          { body: { substackUrl: formData.substackUrl } }
         );
         
         if (!profileError && profileData?.imageUrl) {
@@ -265,13 +265,13 @@ export default function Settings() {
             <div className="flex-1">
               <p className="text-sm font-medium mb-1">Profile Image</p>
               <p className="text-xs text-muted-foreground mb-2">
-                {previewImageUrl ? "Fetched from your Substack" : "Enter your newsletter URL and click refresh"}
+                {previewImageUrl ? "Fetched from your Substack profile" : "Enter your Substack profile URL below and click refresh"}
               </p>
               <Button 
                 variant="outline" 
                 size="sm"
                 onClick={handleFetchProfileImage}
-                disabled={isFetchingImage || !formData.newsletterUrl}
+                disabled={isFetchingImage || !formData.substackUrl}
               >
                 {isFetchingImage ? (
                   <motion.div
@@ -335,7 +335,7 @@ export default function Settings() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="substackUrl">Substack Profile (Optional)</Label>
+              <Label htmlFor="substackUrl">Your Substack Profile</Label>
               <Input
                 id="substackUrl"
                 value={formData.substackUrl}
@@ -348,7 +348,7 @@ export default function Settings() {
                 <p className="text-sm text-destructive">{errors.substackUrl}</p>
               )}
               <p className="text-xs text-muted-foreground">
-                Your author profile page (for display)
+                Your personal profile page (used for your profile image)
               </p>
             </div>
 
