@@ -9,6 +9,9 @@ const corsHeaders = {
 interface RSSPost {
   title: string;
   description: string;
+  author: string | null;
+  pubDate: string | null;
+  link: string | null;
 }
 
 interface CollabDraft {
@@ -24,10 +27,35 @@ interface CollabDraft {
   suggestedFormat: string;
   toneNotes: string;
   estimatedReadTime: string;
+  sourcesUsed?: {
+    creatorArticles: string[];
+    requesterArticles: string[];
+    keyInsightsExtracted: string[];
+  };
 }
 
-function parseRSS(xml: string): RSSPost[] {
+// Extract feed-level author from RSS XML
+function extractFeedAuthor(xml: string): string | null {
+  const patterns = [
+    /<channel>[\s\S]*?<dc:creator><!\[CDATA\[(.*?)\]\]><\/dc:creator>/,
+    /<channel>[\s\S]*?<dc:creator>(.*?)<\/dc:creator>/,
+    /<channel>[\s\S]*?<author>(.*?)<\/author>/,
+    /<channel>[\s\S]*?<webMaster>(.*?)<\/webMaster>/,
+    /<channel>[\s\S]*?<managingEditor>(.*?)<\/managingEditor>/,
+  ];
+  
+  for (const pattern of patterns) {
+    const match = xml.match(pattern);
+    if (match && match[1]) {
+      return match[1].trim();
+    }
+  }
+  return null;
+}
+
+function parseRSS(xml: string): { posts: RSSPost[]; feedAuthor: string | null } {
   const posts: RSSPost[] = [];
+  const feedAuthor = extractFeedAuthor(xml);
   const itemRegex = /<item>([\s\S]*?)<\/item>/g;
   let match;
 
@@ -43,11 +71,56 @@ function parseRSS(xml: string): RSSPost[] {
       if (description.length > 500) {
         description = description.substring(0, 500) + "...";
       }
-      posts.push({ title, description });
+      
+      // Extract item-level author (falls back to feed author)
+      const authorMatch = item.match(/<dc:creator><!\[CDATA\[(.*?)\]\]><\/dc:creator>/) ||
+                          item.match(/<dc:creator>(.*?)<\/dc:creator>/) ||
+                          item.match(/<author>(.*?)<\/author>/);
+      const author = authorMatch ? authorMatch[1].trim() : feedAuthor;
+      
+      // Extract publication date
+      const pubDateMatch = item.match(/<pubDate>(.*?)<\/pubDate>/);
+      const pubDate = pubDateMatch ? pubDateMatch[1].trim() : null;
+      
+      // Extract link
+      const linkMatch = item.match(/<link>(.*?)<\/link>/);
+      const link = linkMatch ? linkMatch[1].trim() : null;
+      
+      posts.push({ title, description, author, pubDate, link });
     }
   }
 
-  return posts;
+  return { posts, feedAuthor };
+}
+
+// Normalize a name for comparison
+function normalizeName(name: string | null): string {
+  if (!name) return "";
+  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+// Filter posts to only include those by the expected author
+function filterByAuthor(posts: RSSPost[], expectedAuthor: string | null): RSSPost[] {
+  if (!expectedAuthor || !posts.some(p => p.author)) {
+    return posts;
+  }
+  
+  const normalizedExpected = normalizeName(expectedAuthor);
+  
+  const filtered = posts.filter(p => {
+    if (!p.author) return true;
+    const normalizedAuthor = normalizeName(p.author);
+    return normalizedAuthor.includes(normalizedExpected) || 
+           normalizedExpected.includes(normalizedAuthor);
+  });
+  
+  if (filtered.length < 2 && posts.length >= 2) {
+    console.log(`Author filtering too aggressive, keeping all ${posts.length} posts`);
+    return posts;
+  }
+  
+  console.log(`Filtered from ${posts.length} to ${filtered.length} posts by author: ${expectedAuthor}`);
+  return filtered;
 }
 
 function toRSSUrl(substackUrl: string): string {
@@ -167,10 +240,14 @@ serve(async (req) => {
 
     const creatorUrl = request.creators?.substack_url || request.creators?.newsletter_url;
     const requesterUrl = request.requester_substack_url;
+    const creatorName = request.creators?.name || "Creator";
+    const requesterName = request.requester_name;
 
-    // Fetch posts from both newsletters
+    // Fetch posts from both newsletters with author filtering
     let creatorPosts: RSSPost[] = [];
     let requesterPosts: RSSPost[] = [];
+    let creatorFeedAuthor: string | null = null;
+    let requesterFeedAuthor: string | null = null;
 
     if (creatorUrl) {
       try {
@@ -180,7 +257,10 @@ serve(async (req) => {
         });
         if (response.ok) {
           const xml = await response.text();
-          creatorPosts = parseRSS(xml);
+          const parsed = parseRSS(xml);
+          creatorFeedAuthor = parsed.feedAuthor;
+          creatorPosts = filterByAuthor(parsed.posts, parsed.feedAuthor);
+          console.log(`Creator posts: ${creatorPosts.length} (author: ${creatorFeedAuthor})`);
         }
       } catch (e) {
         console.error("Failed to fetch creator RSS:", e);
@@ -195,25 +275,29 @@ serve(async (req) => {
         });
         if (response.ok) {
           const xml = await response.text();
-          requesterPosts = parseRSS(xml);
+          const parsed = parseRSS(xml);
+          requesterFeedAuthor = parsed.feedAuthor;
+          requesterPosts = filterByAuthor(parsed.posts, parsed.feedAuthor);
+          console.log(`Requester posts: ${requesterPosts.length} (author: ${requesterFeedAuthor})`);
         }
       } catch (e) {
         console.error("Failed to fetch requester RSS:", e);
       }
     }
 
-    // Build the prompt for AI
-    const creatorName = request.creators?.name || "Creator";
-    const requesterName = request.requester_name;
+    // Build the prompt for AI with author attribution
     const collabMessage = request.message || "General collaboration";
 
     const prompt = `You are helping two newsletter creators plan a collaboration. Generate a detailed collaboration draft.
 
-CREATOR (Host): ${creatorName}
-${creatorPosts.length > 0 ? `Recent posts:\n${creatorPosts.map((p, i) => `${i + 1}. "${p.title}": ${p.description}`).join("\n")}` : "No posts available"}
+IMPORTANT: Only use articles ACTUALLY WRITTEN BY each person. Ignore guest posts or collaborations from other authors.
+Pay attention to the author field for each article.
 
-COLLABORATOR (Guest): ${requesterName}
-${requesterPosts.length > 0 ? `Recent posts:\n${requesterPosts.map((p, i) => `${i + 1}. "${p.title}": ${p.description}`).join("\n")}` : "No posts available"}
+CREATOR (Host): ${creatorName} ${creatorFeedAuthor ? `(Feed Owner: ${creatorFeedAuthor})` : ""}
+${creatorPosts.length > 0 ? `Recent posts:\n${creatorPosts.map((p, i) => `${i + 1}. "${p.title}"${p.author ? ` [by ${p.author}]` : ""}: ${p.description}`).join("\n")}` : "No posts available"}
+
+COLLABORATOR (Guest): ${requesterName} ${requesterFeedAuthor ? `(Feed Owner: ${requesterFeedAuthor})` : ""}
+${requesterPosts.length > 0 ? `Recent posts:\n${requesterPosts.map((p, i) => `${i + 1}. "${p.title}"${p.author ? ` [by ${p.author}]` : ""}: ${p.description}`).join("\n")}` : "No posts available"}
 
 COLLABORATION REQUEST MESSAGE:
 "${collabMessage}"
@@ -227,7 +311,8 @@ Generate a collaboration draft that:
 4. Lists 4-6 talking points they should cover
 5. Suggests the best format (interview, co-write, point/counterpoint, etc.)
 6. Provides tone notes to help the guest match the host's style
-7. Estimates read time`;
+7. Estimates read time
+8. Lists which specific articles you used to inform the draft`;
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
@@ -246,7 +331,7 @@ Generate a collaboration draft that:
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
         messages: [
-          { role: "system", content: "You are an expert newsletter collaboration consultant. Generate structured collaboration drafts." },
+          { role: "system", content: "You are an expert newsletter collaboration consultant. Generate structured collaboration drafts. Always cite which articles informed your suggestions." },
           { role: "user", content: prompt },
         ],
         tools: [
@@ -254,7 +339,7 @@ Generate a collaboration draft that:
             type: "function",
             function: {
               name: "create_collab_draft",
-              description: "Create a structured collaboration draft for two newsletter creators",
+              description: "Create a structured collaboration draft for two newsletter creators with source attribution",
               parameters: {
                 type: "object",
                 properties: {
@@ -282,8 +367,31 @@ Generate a collaboration draft that:
                   suggestedFormat: { type: "string", description: "Recommended format (interview, co-write, etc.)" },
                   toneNotes: { type: "string", description: "Notes to help the guest match the host's writing style" },
                   estimatedReadTime: { type: "string", description: "Estimated read time for the final piece" },
+                  sourcesUsed: {
+                    type: "object",
+                    properties: {
+                      creatorArticles: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "Titles of creator's articles used to inform the draft",
+                      },
+                      requesterArticles: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "Titles of requester's articles used to inform the draft",
+                      },
+                      keyInsightsExtracted: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "Key insights extracted from the articles that shaped the draft",
+                      },
+                    },
+                    required: ["creatorArticles", "requesterArticles", "keyInsightsExtracted"],
+                    additionalProperties: false,
+                    description: "Source articles used to generate the draft for transparency",
+                  },
                 },
-                required: ["title", "hook", "outline", "talkingPoints", "suggestedFormat", "toneNotes", "estimatedReadTime"],
+                required: ["title", "hook", "outline", "talkingPoints", "suggestedFormat", "toneNotes", "estimatedReadTime", "sourcesUsed"],
               },
             },
           },
