@@ -1,9 +1,24 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Calendar, ExternalLink, Mail, User } from "lucide-react";
+import { Calendar, ExternalLink, Mail, Link as LinkIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CollabRequest } from "@/lib/storage";
 import { cn } from "@/lib/utils";
+
+const extractSubstackName = (url: string | null | undefined): string => {
+  if (!url) return "Unknown Substack";
+  try {
+    const urlObj = new URL(url);
+    // Handle substack.com subdomains (e.g., karozieminski.substack.com)
+    if (urlObj.hostname.endsWith('.substack.com')) {
+      return urlObj.hostname.replace('.substack.com', '');
+    }
+    // Handle custom domains
+    return urlObj.hostname;
+  } catch {
+    return url;
+  }
+};
 
 interface RequestCardProps {
   request: CollabRequest;
@@ -57,17 +72,23 @@ export function RequestCard({ request, onApprove, onDecline }: RequestCardProps)
               {request.requesterName.charAt(0).toUpperCase()}
             </div>
           )}
-          <div>
+          <div className="min-w-0 flex-1">
             <h3 className="font-semibold">{request.requesterName}</h3>
-            <a
-              href={request.requesterSubstackUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-primary hover:underline flex items-center gap-1"
-            >
-              View Substack
-              <ExternalLink className="w-3 h-3" />
-            </a>
+            {request.requesterSubstackUrl ? (
+              <a
+                href={request.requesterSubstackUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-primary hover:underline flex items-center gap-1 truncate"
+                title={request.requesterSubstackUrl}
+              >
+                <LinkIcon className="w-3 h-3 flex-shrink-0" />
+                <span className="truncate">{extractSubstackName(request.requesterSubstackUrl)}.substack.com</span>
+                <ExternalLink className="w-3 h-3 flex-shrink-0" />
+              </a>
+            ) : (
+              <span className="text-sm text-muted-foreground">No Substack provided</span>
+            )}
           </div>
         </div>
         <span
