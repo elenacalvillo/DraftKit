@@ -1,6 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useCallback } from "react";
+
+// Add collab_cancelled to AnalyticsEventType
 import { Json } from "@/integrations/supabase/types";
 
 export type AnalyticsEventType =
@@ -12,6 +14,7 @@ export type AnalyticsEventType =
   | "user_signup"
   | "collab_approved"
   | "collab_declined"
+  | "collab_cancelled"
   // New events for funnel analytics
   | "analyze_collab_match_invoked"
   | "ai_match_suggestion_selected"

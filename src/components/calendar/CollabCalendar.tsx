@@ -235,7 +235,7 @@ export function CollabCalendar({
         {dayNames.map((name) => (
           <div
             key={name}
-            className="h-10 flex items-center justify-center text-sm font-medium text-muted-foreground"
+            className="h-10 w-12 flex items-center justify-center text-sm font-medium text-muted-foreground"
           >
             {name}
           </div>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Calendar, ExternalLink, Mail, Link as LinkIcon, Sparkles, MessageSquare, FileText } from "lucide-react";
+import { Calendar, ExternalLink, Mail, Link as LinkIcon, Sparkles, MessageSquare, FileText, XCircle, Ban } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CollabRequest, CollabDraft } from "@/lib/storage";
 import { cn } from "@/lib/utils";
@@ -28,10 +28,11 @@ interface RequestCardProps {
   creatorEmail?: string;
   onApprove?: (id: string) => void;
   onDecline?: (id: string) => void;
+  onCancel?: (id: string) => void;
   onDraftGenerated?: (id: string, draft: CollabDraft) => void;
 }
 
-export function RequestCard({ request, creatorEmail, onApprove, onDecline, onDraftGenerated }: RequestCardProps) {
+export function RequestCard({ request, creatorEmail, onApprove, onDecline, onCancel, onDraftGenerated }: RequestCardProps) {
   const { trackEvent } = useAnalytics();
   const [imageError, setImageError] = useState(false);
   const [showDraftModal, setShowDraftModal] = useState(false);
@@ -52,10 +53,11 @@ export function RequestCard({ request, creatorEmail, onApprove, onDecline, onDra
     });
   };
 
-  const statusColors = {
+  const statusColors: Record<string, string> = {
     pending: "bg-accent/10 text-accent border-accent/20",
     approved: "bg-success/10 text-success border-success/20",
     declined: "bg-destructive/10 text-destructive border-destructive/20",
+    cancelled: "bg-muted text-muted-foreground border-muted-foreground/20",
   };
 
   const showImage = request.requesterProfileImageUrl && !imageError;
@@ -251,6 +253,23 @@ export function RequestCard({ request, creatorEmail, onApprove, onDecline, onDra
               <MessageSquare className="w-4 h-4 mr-2" />
               Message
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onCancel?.(request.id)}
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30"
+            >
+              <XCircle className="w-4 h-4 mr-1" />
+              Cancel
+            </Button>
+          </div>
+        )}
+
+        {/* Cancelled status indicator */}
+        {request.status === "cancelled" && (
+          <div className="flex items-center gap-2 text-muted-foreground bg-muted/50 rounded-lg p-3">
+            <Ban className="w-4 h-4" />
+            <span className="text-sm">This collaboration was cancelled. The date has been restored to available.</span>
           </div>
         )}
       </motion.div>
