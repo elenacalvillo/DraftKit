@@ -5,6 +5,85 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// ============= RATE LIMITING =============
+// Simple in-memory rate limiter with sliding window
+// Limits: 20 requests/hour for unauthenticated, 100/hour for authenticated
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const UNAUTH_RATE_LIMIT = 20;
+const AUTH_RATE_LIMIT = 100;
+
+interface RateLimitEntry {
+  requests: number[];
+  lastCleanup: number;
+}
+
+const rateLimitStore = new Map<string, RateLimitEntry>();
+
+function getRateLimitKey(ip: string, userId: string | null): string {
+  return userId ? `user:${userId}` : `ip:${ip}`;
+}
+
+function cleanupOldRequests(entry: RateLimitEntry): void {
+  const now = Date.now();
+  const windowStart = now - RATE_LIMIT_WINDOW_MS;
+  entry.requests = entry.requests.filter(timestamp => timestamp > windowStart);
+  entry.lastCleanup = now;
+}
+
+function checkRateLimit(key: string, limit: number): { allowed: boolean; remaining: number; resetIn: number } {
+  const now = Date.now();
+  let entry = rateLimitStore.get(key);
+  
+  if (!entry) {
+    entry = { requests: [], lastCleanup: now };
+    rateLimitStore.set(key, entry);
+  }
+  
+  // Cleanup old requests periodically
+  if (now - entry.lastCleanup > 60000) { // Cleanup every minute
+    cleanupOldRequests(entry);
+  }
+  
+  const windowStart = now - RATE_LIMIT_WINDOW_MS;
+  const recentRequests = entry.requests.filter(t => t > windowStart);
+  
+  if (recentRequests.length >= limit) {
+    const oldestRequest = Math.min(...recentRequests);
+    const resetIn = Math.ceil((oldestRequest + RATE_LIMIT_WINDOW_MS - now) / 1000);
+    return { allowed: false, remaining: 0, resetIn };
+  }
+  
+  // Record this request
+  entry.requests = [...recentRequests, now];
+  
+  return { 
+    allowed: true, 
+    remaining: limit - entry.requests.length,
+    resetIn: Math.ceil(RATE_LIMIT_WINDOW_MS / 1000)
+  };
+}
+
+function getClientIP(req: Request): string {
+  // Try various headers that might contain the real client IP
+  const forwarded = req.headers.get("x-forwarded-for");
+  if (forwarded) {
+    return forwarded.split(",")[0].trim();
+  }
+  
+  const realIP = req.headers.get("x-real-ip");
+  if (realIP) {
+    return realIP;
+  }
+  
+  const cfIP = req.headers.get("cf-connecting-ip");
+  if (cfIP) {
+    return cfIP;
+  }
+  
+  return "unknown";
+}
+// ============= END RATE LIMITING =============
+
 interface SubstackProfile {
   imageUrl: string | null;
   publicationName: string | null;
@@ -164,16 +243,51 @@ serve(async (req) => {
   }
   
   try {
+    // Get client IP for rate limiting
+    const clientIP = getClientIP(req);
+    
     // --- OPTIONAL AUTHENTICATION ---
     // This function is used during public booking for profile image fetching.
-    // Auth is optional - we log for monitoring but don't require it.
+    // Auth is optional - we apply stricter rate limits for unauthenticated requests.
     const authHeader = req.headers.get("Authorization");
-    if (authHeader?.startsWith("Bearer ")) {
+    const isAuthenticated = authHeader?.startsWith("Bearer ");
+    
+    if (isAuthenticated) {
       console.log("Request has auth token (authenticated user)");
     } else {
       console.log("Request from unauthenticated visitor");
     }
-    // --- END OPTIONAL AUTHENTICATION ---
+    
+    // --- RATE LIMITING ---
+    const rateLimitKey = getRateLimitKey(clientIP, isAuthenticated ? "auth" : null);
+    const rateLimit = isAuthenticated ? AUTH_RATE_LIMIT : UNAUTH_RATE_LIMIT;
+    const rateLimitResult = checkRateLimit(rateLimitKey, rateLimit);
+    
+    if (!rateLimitResult.allowed) {
+      console.warn(`Rate limit exceeded for ${rateLimitKey}`);
+      return new Response(
+        JSON.stringify({ 
+          error: "Too many requests. Please try again later.",
+          imageUrl: null,
+          publicationName: null,
+          tagline: null,
+          retryAfter: rateLimitResult.resetIn
+        }),
+        { 
+          status: 429, 
+          headers: { 
+            ...corsHeaders, 
+            "Content-Type": "application/json",
+            "Retry-After": rateLimitResult.resetIn.toString(),
+            "X-RateLimit-Remaining": "0",
+            "X-RateLimit-Reset": rateLimitResult.resetIn.toString()
+          } 
+        }
+      );
+    }
+    
+    console.log(`Rate limit check passed. Remaining: ${rateLimitResult.remaining}/${rateLimit}`);
+    // --- END RATE LIMITING ---
     
     const body = await req.json();
     console.log("Request body:", JSON.stringify(body));
