@@ -44,7 +44,7 @@ export function HeroSection() {
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary mb-8"
           >
             <Sparkles className="w-4 h-4" />
-            <span className="text-sm font-medium">The future of creator collaboration</span>
+            <span className="text-sm font-medium">Scheduling + AI Content Ideas</span>
           </motion.div>
 
           {/* Headline */}
@@ -52,11 +52,11 @@ export function HeroSection() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-5xl md:text-7xl font-bold tracking-tight mb-6"
+            className="text-4xl md:text-6xl font-bold tracking-tight mb-6"
           >
-            Schedule Collabs
+            The smarter way to schedule
             <br />
-            <span className="gradient-text">Effortlessly</span>
+            <span className="gradient-text">Substack collaborations</span>
           </motion.h1>
 
           {/* Subheadline */}
@@ -66,8 +66,8 @@ export function HeroSection() {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="text-xl text-muted-foreground max-w-2xl mx-auto mb-12"
           >
-            The beautiful way to manage collaboration requests. Share your availability, 
-            receive requests, and connect with creators — all in one delightful experience.
+            Stop the back-and-forth emails. Sync your schedules and get AI-powered 
+            article ideas based on your actual newsletter content—all in one link.
           </motion.p>
 
           {/* CTA Buttons */}
@@ -79,7 +79,7 @@ export function HeroSection() {
           >
             <Link to="/signup">
               <Button variant="hero" size="xl">
-                Start Organizing Collaborations
+                Create Your Booking Page
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
             </Link>
@@ -109,8 +109,8 @@ export function HeroSection() {
             />
             <FeatureCard
               icon={<Sparkles className="w-6 h-6" />}
-              title="Your Public Page"
-              description="Share a stunning booking page that matches your brand"
+              title="AI Content Matchmaking"
+              description="Get AI-powered topic suggestions based on both creators' newsletter content"
               delay={0.7}
             />
           </motion.div>

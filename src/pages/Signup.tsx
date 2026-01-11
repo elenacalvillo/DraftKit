@@ -13,12 +13,14 @@ import {
   Calendar,
   MessageSquare,
   Copy,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { CollabCalendar } from "@/components/calendar/CollabCalendar";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/useAuth";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { supabase } from "@/integrations/supabase/client";
@@ -58,6 +60,7 @@ export default function Signup() {
     substackUrl: prefillSubstack,
     newsletterUrl: "",
     welcomeMessage: "",
+    joinDirectory: false,
   });
 
   useEffect(() => {
@@ -175,6 +178,7 @@ export default function Signup() {
         substack_url: formData.substackUrl || null,
         newsletter_url: formData.newsletterUrl,
         welcome_message: formData.welcomeMessage || `Hi! I'm ${formData.name}. Let's collaborate!`,
+        join_directory_waitlist: formData.joinDirectory,
       })
       .select()
       .single();
@@ -566,6 +570,27 @@ export default function Signup() {
                     {errors.welcomeMessage && (
                       <p className="text-sm text-destructive">{errors.welcomeMessage}</p>
                     )}
+                  </div>
+
+                  {/* Join Directory Waitlist */}
+                  <div className="flex items-start gap-3 p-4 rounded-lg bg-primary/5 border border-primary/10">
+                    <Checkbox
+                      id="joinDirectory"
+                      checked={formData.joinDirectory}
+                      onCheckedChange={(checked) =>
+                        setFormData({ ...formData, joinDirectory: checked as boolean })
+                      }
+                      className="mt-0.5"
+                    />
+                    <div className="grid gap-1.5 leading-none">
+                      <Label htmlFor="joinDirectory" className="cursor-pointer flex items-center gap-2">
+                        <Users className="w-4 h-4 text-primary" />
+                        Join the Creator Directory (Coming Soon)
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Be discoverable by other Substack creators looking for collaboration partners
+                      </p>
+                    </div>
                   </div>
 
                   <div className="flex gap-3">
