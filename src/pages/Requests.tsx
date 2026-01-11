@@ -29,7 +29,7 @@ interface DbCollabRequest {
   creator_notes: string | null;
 }
 
-type FilterTab = "all" | "pending" | "approved" | "declined";
+type FilterTab = "all" | "pending" | "approved" | "declined" | "cancelled";
 
 export default function Requests() {
   const navigate = useNavigate();
@@ -141,6 +141,51 @@ export default function Requests() {
     trackEvent("collab_declined", { request_id: id });
   };
 
+  const handleCancel = async (id: string) => {
+    if (!creator) return;
+
+    const request = requests.find((r) => r.id === id);
+    if (!request) return;
+
+    const { error } = await supabase
+      .from('collab_requests')
+      .update({ status: 'cancelled' })
+      .eq('id', id);
+
+    if (error) {
+      toast.error("Failed to cancel collaboration");
+      return;
+    }
+
+    // Restore the date to available_dates
+    if (request.requested_date) {
+      const { data: availData } = await supabase
+        .from('availability')
+        .select('*')
+        .eq('creator_id', creator.id)
+        .maybeSingle();
+
+      if (availData) {
+        const currentAvailable = availData.available_dates || [];
+        if (!currentAvailable.includes(request.requested_date)) {
+          await supabase
+            .from('availability')
+            .update({
+              available_dates: [...currentAvailable, request.requested_date],
+            })
+            .eq('id', availData.id);
+        }
+      }
+    }
+
+    setRequests(
+      requests.map((r) => (r.id === id ? { ...r, status: 'cancelled' } : r))
+    );
+
+    toast.success(`Collaboration cancelled.${request.requested_date ? ' Date restored to available.' : ''}`);
+    trackEvent("collab_cancelled", { request_id: id });
+  };
+
   const handleDraftGenerated = (id: string, draft: CollabDraft) => {
     setRequests(
       requests.map((r) => (r.id === id ? { ...r, ai_draft: draft } : r))
@@ -157,6 +202,7 @@ export default function Requests() {
     { value: "pending", label: "Pending", count: requests.filter((r) => r.status === "pending").length },
     { value: "approved", label: "Approved", count: requests.filter((r) => r.status === "approved").length },
     { value: "declined", label: "Declined", count: requests.filter((r) => r.status === "declined").length },
+    { value: "cancelled", label: "Cancelled", count: requests.filter((r) => r.status === "cancelled").length },
   ];
 
   if (loading || !creator) {
@@ -181,7 +227,7 @@ export default function Requests() {
     requesterProfileImageUrl: r.requester_profile_image_url,
     message: r.message || '',
     requestedDate: r.requested_date,
-    status: r.status as 'pending' | 'approved' | 'declined',
+    status: r.status as 'pending' | 'approved' | 'declined' | 'cancelled',
     createdAt: r.created_at,
     aiDraft: r.ai_draft as CollabDraft | null,
     approvedAt: r.approved_at,
@@ -282,6 +328,7 @@ export default function Requests() {
                     creatorEmail={creator.email}
                     onApprove={handleApprove}
                     onDecline={handleDecline}
+                    onCancel={handleCancel}
                     onDraftGenerated={handleDraftGenerated}
                   />
                 </motion.div>

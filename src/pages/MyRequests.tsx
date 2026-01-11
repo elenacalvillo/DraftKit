@@ -33,6 +33,7 @@ const statusVariants: Record<string, { label: string; variant: 'default' | 'seco
   pending: { label: 'Pending', variant: 'secondary' },
   approved: { label: 'Approved', variant: 'default' },
   declined: { label: 'Declined', variant: 'destructive' },
+  cancelled: { label: 'Cancelled', variant: 'outline' },
 };
 
 export default function MyRequests() {

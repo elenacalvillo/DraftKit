@@ -42,7 +42,7 @@ export interface CollabRequest {
   requesterProfileImageUrl?: string | null;
   message: string;
   requestedDate: string | null;
-  status: 'pending' | 'approved' | 'declined';
+  status: 'pending' | 'approved' | 'declined' | 'cancelled';
   createdAt: string;
   aiDraft?: CollabDraft | null;
   approvedAt?: string | null;
