@@ -14,6 +14,10 @@ import {
   CheckCircle,
   XCircle,
   Sparkles,
+  RefreshCw,
+  Zap,
+  Target,
+  ArrowDown,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -30,11 +34,12 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { AreaChart, Area, XAxis, YAxis } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { useAdmin } from "@/hooks/useAdmin";
-import { format, subDays, startOfDay, parseISO } from "date-fns";
+import { format, subDays, parseISO } from "date-fns";
 import { Json } from "@/integrations/supabase/types";
+import { cn } from "@/lib/utils";
 
 interface AnalyticsEvent {
   id: string;
@@ -57,6 +62,15 @@ interface UserFeedback {
 interface DailyMetric {
   date: string;
   events: number;
+}
+
+interface FunnelStep {
+  name: string;
+  count: number;
+  percentage: number;
+  conversionFromPrevious: number;
+  icon: React.ReactNode;
+  color: string;
 }
 
 export default function AdminAnalytics() {
@@ -131,35 +145,120 @@ export default function AdminAnalytics() {
     setIsLoading(false);
   };
 
-  // Calculate metrics
+  // Helper to safely extract event_data properties
+  const getEventData = (event: AnalyticsEvent): Record<string, unknown> => {
+    if (typeof event.event_data === 'object' && event.event_data !== null && !Array.isArray(event.event_data)) {
+      return event.event_data as Record<string, unknown>;
+    }
+    return {};
+  };
+
+  // Calculate core funnel metrics
+  const bookingClicks = events.filter((e) => e.event_type === "booking_link_clicked").length;
+  const analyzeMatchInvoked = events.filter((e) => e.event_type === "analyze_collab_match_invoked").length;
+  const bookingSubmits = events.filter((e) => e.event_type === "booking_submitted").length;
   const draftGenerated = events.filter((e) => e.event_type === "draft_generated").length;
   const draftCopied = events.filter((e) => e.event_type === "draft_copied").length;
-  const draftToCopyRatio = draftGenerated > 0 ? ((draftCopied / draftGenerated) * 100).toFixed(1) : "0";
-  
-  const bookingClicks = events.filter((e) => e.event_type === "booking_link_clicked").length;
-  const bookingSubmits = events.filter((e) => e.event_type === "booking_submitted").length;
-  const conversionRate = bookingClicks > 0 ? ((bookingSubmits / bookingClicks) * 100).toFixed(1) : "0";
-  
-  const staleDrafts = draftGenerated - draftCopied;
-  const staleRate = draftGenerated > 0 ? ((staleDrafts / draftGenerated) * 100).toFixed(1) : "0";
-
+  const draftRegenRequested = events.filter((e) => e.event_type === "draft_regeneration_requested").length;
+  const aiSuggestionSelected = events.filter((e) => e.event_type === "ai_match_suggestion_selected").length;
+  const userSignups = events.filter((e) => e.event_type === "user_signup").length;
   const collabApproved = events.filter((e) => e.event_type === "collab_approved").length;
   const collabDeclined = events.filter((e) => e.event_type === "collab_declined").length;
-  const userSignups = events.filter((e) => e.event_type === "user_signup").length;
 
-  // Feedback by type
-  const feedbackByType = feedback.reduce((acc, fb) => {
-    acc[fb.feedback_type] = (acc[fb.feedback_type] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  // Calculate AI Attachment Rate: % of bookings that used AI-suggested topics
+  const bookingsWithAiSuggestion = events.filter((e) => {
+    if (e.event_type !== "booking_submitted") return false;
+    const data = getEventData(e);
+    return data.used_ai_suggestion === true;
+  }).length;
+  const aiAttachmentRate = bookingSubmits > 0 ? ((bookingsWithAiSuggestion / bookingSubmits) * 100) : 0;
 
-  const feedbackPieData = Object.entries(feedbackByType).map(([name, value]) => ({
-    name: name.charAt(0).toUpperCase() + name.slice(1),
-    value,
-  }));
+  // Calculate Draft Acceptance Rate (DAR): draft_copied / draft_generated
+  const draftAcceptanceRate = draftGenerated > 0 ? ((draftCopied / draftGenerated) * 100) : 0;
+  const darNeedsAction = draftAcceptanceRate < 30 && draftGenerated > 0;
 
-  const COLORS = ["hsl(265, 89%, 58%)", "hsl(25, 95%, 63%)", "hsl(152, 69%, 45%)", "hsl(210, 90%, 65%)"];
+  // Calculate Regeneration Rate
+  const regenerationRate = draftGenerated > 0 ? ((draftRegenRequested / draftGenerated) * 100) : 0;
+  const regenNeedsAction = regenerationRate > 50 && draftGenerated > 0;
 
+  // Calculate Guest-to-User Conversion
+  // Match booking_submitted emails with subsequent user_signup
+  const bookingEmails = events
+    .filter((e) => e.event_type === "booking_submitted")
+    .map((e) => {
+      const data = getEventData(e);
+      return data.requester_email as string | undefined;
+    })
+    .filter(Boolean);
+  const guestConversionRate = bookingSubmits > 0 ? ((userSignups / bookingSubmits) * 100) : 0;
+  const guestConversionNeedsAction = guestConversionRate < 5 && bookingSubmits >= 10;
+
+  // Calculate Average Session Duration
+  const sessionsWithDuration = events
+    .filter((e) => e.event_type === "booking_submitted")
+    .map((e) => {
+      const data = getEventData(e);
+      return data.session_duration_ms as number | undefined;
+    })
+    .filter((d): d is number => typeof d === "number" && d > 0);
+  
+  const avgSessionDurationMs = sessionsWithDuration.length > 0 
+    ? sessionsWithDuration.reduce((sum, d) => sum + d, 0) / sessionsWithDuration.length 
+    : 0;
+  
+  const formatDuration = (ms: number) => {
+    if (ms === 0) return "N/A";
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+  };
+
+  // Build funnel steps
+  const funnelSteps: FunnelStep[] = [
+    {
+      name: "Link Clicks",
+      count: bookingClicks,
+      percentage: 100,
+      conversionFromPrevious: 100,
+      icon: <Target className="w-4 h-4" />,
+      color: "bg-primary",
+    },
+    {
+      name: "AI Match Invoked",
+      count: analyzeMatchInvoked,
+      percentage: bookingClicks > 0 ? (analyzeMatchInvoked / bookingClicks) * 100 : 0,
+      conversionFromPrevious: bookingClicks > 0 ? (analyzeMatchInvoked / bookingClicks) * 100 : 0,
+      icon: <Sparkles className="w-4 h-4" />,
+      color: "bg-accent",
+    },
+    {
+      name: "Bookings Submitted",
+      count: bookingSubmits,
+      percentage: bookingClicks > 0 ? (bookingSubmits / bookingClicks) * 100 : 0,
+      conversionFromPrevious: analyzeMatchInvoked > 0 ? (bookingSubmits / analyzeMatchInvoked) * 100 : (bookingClicks > 0 ? (bookingSubmits / bookingClicks) * 100 : 0),
+      icon: <CheckCircle className="w-4 h-4" />,
+      color: "bg-success",
+    },
+    {
+      name: "Drafts Generated",
+      count: draftGenerated,
+      percentage: bookingClicks > 0 ? (draftGenerated / bookingClicks) * 100 : 0,
+      conversionFromPrevious: bookingSubmits > 0 ? (draftGenerated / bookingSubmits) * 100 : 0,
+      icon: <Zap className="w-4 h-4" />,
+      color: "bg-primary",
+    },
+    {
+      name: "Drafts Copied",
+      count: draftCopied,
+      percentage: bookingClicks > 0 ? (draftCopied / bookingClicks) * 100 : 0,
+      conversionFromPrevious: draftGenerated > 0 ? (draftCopied / draftGenerated) * 100 : 0,
+      icon: <Copy className="w-4 h-4" />,
+      color: "bg-success",
+    },
+  ];
+
+  // Feedback metrics
   const avgRating = feedback.filter((f) => f.rating).reduce((sum, f) => sum + (f.rating || 0), 0) / 
     (feedback.filter((f) => f.rating).length || 1);
 
@@ -205,33 +304,47 @@ export default function AdminAnalytics() {
             <h1 className="text-3xl font-bold">Admin Analytics</h1>
           </div>
           <p className="text-muted-foreground">
-            Track key metrics and user feedback to measure success
+            Track key metrics, funnel performance, and user feedback
           </p>
         </motion.div>
 
-        {/* Key Metrics */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {/* Key Metrics Row 1 - Core Rates */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {/* Draft Acceptance Rate (DAR) */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
           >
-            <Card className="glass-card">
+            <Card className={cn("glass-card", darNeedsAction && "ring-2 ring-destructive/50")}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <Copy className="w-4 h-4" />
-                  Draft-to-Copy Ratio
+                  Draft Acceptance Rate
+                  {darNeedsAction && (
+                    <Badge variant="destructive" className="ml-auto text-xs">
+                      Action Needed
+                    </Badge>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-primary">{draftToCopyRatio}%</div>
+                <div className={cn("text-3xl font-bold", darNeedsAction ? "text-destructive" : "text-primary")}>
+                  {draftAcceptanceRate.toFixed(1)}%
+                </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   {draftCopied} of {draftGenerated} drafts copied
                 </p>
+                {darNeedsAction && (
+                  <p className="text-xs text-destructive mt-2">
+                    Below 30% threshold - improve draft quality
+                  </p>
+                )}
               </CardContent>
             </Card>
           </motion.div>
 
+          {/* AI Attachment Rate */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -240,12 +353,120 @@ export default function AdminAnalytics() {
             <Card className="glass-card">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4" />
-                  Collaborator Conversion
+                  <Sparkles className="w-4 h-4" />
+                  AI Attachment Rate
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-success">{conversionRate}%</div>
+                <div className="text-3xl font-bold text-accent">{aiAttachmentRate.toFixed(1)}%</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {bookingsWithAiSuggestion} of {bookingSubmits} bookings used AI ideas
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Regeneration Rate */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+          >
+            <Card className={cn("glass-card", regenNeedsAction && "ring-2 ring-accent/50")}>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <RefreshCw className="w-4 h-4" />
+                  Regeneration Rate
+                  {regenNeedsAction && (
+                    <Badge className="ml-auto text-xs bg-accent/20 text-accent border-accent/30">
+                      High
+                    </Badge>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={cn("text-3xl font-bold", regenNeedsAction ? "text-accent" : "text-foreground")}>
+                  {regenerationRate.toFixed(1)}%
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {draftRegenRequested} regenerations of {draftGenerated} drafts
+                </p>
+                {regenNeedsAction && (
+                  <p className="text-xs text-accent mt-2">
+                    Above 50% - prompt quality may need work
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Guest-to-User Conversion */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            <Card className={cn("glass-card", guestConversionNeedsAction && "ring-2 ring-yellow-500/50")}>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  Guest Conversion
+                  {guestConversionNeedsAction && (
+                    <Badge className="ml-auto text-xs bg-yellow-500/20 text-yellow-600 border-yellow-500/30">
+                      Low
+                    </Badge>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-success">{guestConversionRate.toFixed(1)}%</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {userSignups} signups from {bookingSubmits} guests
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+
+        {/* Key Metrics Row 2 - Secondary */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+          >
+            <Card className="glass-card">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  Avg Session Duration
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold">{formatDuration(avgSessionDurationMs)}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  From link click to booking
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+          >
+            <Card className="glass-card">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4" />
+                  Booking Conversion
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-success">
+                  {bookingClicks > 0 ? ((bookingSubmits / bookingClicks) * 100).toFixed(1) : "0"}%
+                </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   {bookingSubmits} of {bookingClicks} link clicks converted
                 </p>
@@ -256,19 +477,19 @@ export default function AdminAnalytics() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
+            transition={{ delay: 0.7 }}
           >
             <Card className="glass-card">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4" />
-                  Draft Stale Rate
+                  <Target className="w-4 h-4" />
+                  AI Suggestions Used
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-accent">{staleRate}%</div>
+                <div className="text-3xl font-bold text-primary">{aiSuggestionSelected}</div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {staleDrafts} drafts never copied
+                  Topics selected from AI matches
                 </p>
               </CardContent>
             </Card>
@@ -277,7 +498,7 @@ export default function AdminAnalytics() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
+            transition={{ delay: 0.8 }}
           >
             <Card className="glass-card">
               <CardHeader className="pb-2">
@@ -302,7 +523,7 @@ export default function AdminAnalytics() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
+            transition={{ delay: 0.9 }}
           >
             <Card className="glass-card">
               <CardHeader>
@@ -341,66 +562,110 @@ export default function AdminAnalytics() {
             </Card>
           </motion.div>
 
-          {/* Collaboration Funnel */}
+          {/* 5-Step Collaboration Funnel */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
+            transition={{ delay: 1.0 }}
           >
             <Card className="glass-card">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Sparkles className="w-5 h-5" />
-                  Collaboration Funnel
+                  Collaboration Funnel (5-Step)
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Link Clicks</span>
-                    <Badge variant="secondary">{bookingClicks}</Badge>
-                  </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-primary" style={{ width: "100%" }} />
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Submissions</span>
-                    <Badge variant="secondary">{bookingSubmits}</Badge>
-                  </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-accent"
-                      style={{ width: `${bookingClicks > 0 ? (bookingSubmits / bookingClicks) * 100 : 0}%` }}
-                    />
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground flex items-center gap-2">
-                      <CheckCircle className="w-4 h-4 text-success" />
-                      Approved
-                    </span>
-                    <Badge className="bg-success/10 text-success border-success/20">{collabApproved}</Badge>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground flex items-center gap-2">
-                      <XCircle className="w-4 h-4 text-destructive" />
-                      Declined
-                    </span>
-                    <Badge className="bg-destructive/10 text-destructive border-destructive/20">{collabDeclined}</Badge>
-                  </div>
+                <div className="space-y-3">
+                  {funnelSteps.map((step, index) => (
+                    <div key={step.name}>
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">{step.icon}</span>
+                          <span className="text-sm font-medium">{step.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary">{step.count}</Badge>
+                          {index > 0 && (
+                            <span className="text-xs text-muted-foreground">
+                              ({step.conversionFromPrevious.toFixed(0)}%)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="h-2 bg-muted rounded-full overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${step.percentage}%` }}
+                          transition={{ duration: 0.8, delay: index * 0.1 }}
+                          className={step.color}
+                        />
+                      </div>
+                      {index < funnelSteps.length - 1 && (
+                        <div className="flex justify-center py-1">
+                          <ArrowDown className="w-3 h-3 text-muted-foreground/50" />
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
           </motion.div>
         </div>
 
+        {/* Collab Outcomes */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.1 }}
+          className="mb-8"
+        >
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle className="w-5 h-5" />
+                Collaboration Outcomes
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center p-4 rounded-lg bg-muted/30">
+                  <div className="text-2xl font-bold text-success">{collabApproved}</div>
+                  <div className="text-sm text-muted-foreground flex items-center justify-center gap-1">
+                    <CheckCircle className="w-3 h-3" />
+                    Approved
+                  </div>
+                </div>
+                <div className="text-center p-4 rounded-lg bg-muted/30">
+                  <div className="text-2xl font-bold text-destructive">{collabDeclined}</div>
+                  <div className="text-sm text-muted-foreground flex items-center justify-center gap-1">
+                    <XCircle className="w-3 h-3" />
+                    Declined
+                  </div>
+                </div>
+                <div className="text-center p-4 rounded-lg bg-muted/30">
+                  <div className="text-2xl font-bold">
+                    {collabApproved + collabDeclined > 0 
+                      ? ((collabApproved / (collabApproved + collabDeclined)) * 100).toFixed(0)
+                      : 0}%
+                  </div>
+                  <div className="text-sm text-muted-foreground">Approval Rate</div>
+                </div>
+                <div className="text-center p-4 rounded-lg bg-muted/30">
+                  <div className="text-2xl font-bold text-primary">{bookingSubmits - collabApproved - collabDeclined}</div>
+                  <div className="text-sm text-muted-foreground">Pending</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
         {/* Feedback Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7 }}
+          transition={{ delay: 1.2 }}
         >
           <Card className="glass-card">
             <CardHeader>

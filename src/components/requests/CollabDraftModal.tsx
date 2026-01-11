@@ -218,7 +218,13 @@ Estimated Read Time: ${draft.estimatedReadTime}`;
                 )}
               </Button>
               {onRegenerate && (
-                <Button variant="outline" onClick={onRegenerate}>
+                <Button variant="outline" onClick={() => {
+                  // Track regeneration request
+                  trackEvent("draft_regeneration_requested", { 
+                    draft_title: draft?.title 
+                  });
+                  onRegenerate();
+                }}>
                   <RefreshCw className="w-4 h-4 mr-2" />
                   Regenerate
                 </Button>
