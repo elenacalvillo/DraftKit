@@ -55,7 +55,7 @@ export function CollabCalendar({
 
   const firstDayOfMonth = new Date(year, month, 1);
   const lastDayOfMonth = new Date(year, month + 1, 0);
-  const startingDay = firstDayOfMonth.getDay();
+  const startingDay = (firstDayOfMonth.getDay() + 6) % 7; // Monday = 0
   const daysInMonth = lastDayOfMonth.getDate();
 
   const monthNames = [
@@ -63,7 +63,7 @@ export function CollabCalendar({
     "July", "August", "September", "October", "November", "December"
   ];
 
-  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
   // Check if current month has any available dates
   const currentMonthHasAvailability = useMemo(() => {
