@@ -232,6 +232,7 @@ export type Database = {
           created_at: string
           email: string
           id: string
+          join_directory_waitlist: boolean | null
           name: string
           newsletter_url: string | null
           profile_image_url: string | null
@@ -246,6 +247,7 @@ export type Database = {
           created_at?: string
           email: string
           id?: string
+          join_directory_waitlist?: boolean | null
           name: string
           newsletter_url?: string | null
           profile_image_url?: string | null
@@ -260,6 +262,7 @@ export type Database = {
           created_at?: string
           email?: string
           id?: string
+          join_directory_waitlist?: boolean | null
           name?: string
           newsletter_url?: string | null
           profile_image_url?: string | null
