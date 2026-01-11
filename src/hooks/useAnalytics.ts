@@ -11,7 +11,11 @@ export type AnalyticsEventType =
   | "draft_copied"
   | "user_signup"
   | "collab_approved"
-  | "collab_declined";
+  | "collab_declined"
+  // New events for funnel analytics
+  | "analyze_collab_match_invoked"
+  | "ai_match_suggestion_selected"
+  | "draft_regeneration_requested";
 
 function getOrCreateSessionId(): string {
   let sessionId = sessionStorage.getItem("collabflow_session_id");

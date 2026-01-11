@@ -56,10 +56,14 @@ export default function PublicBooking() {
     message: "",
   });
 
-  // Track booking link clicked
+  // Track booking link clicked and store session start time
   useEffect(() => {
     if (!username || hasTrackedPageView.current) return;
     hasTrackedPageView.current = true;
+    
+    // Store session start time for duration tracking
+    sessionStorage.setItem("booking_session_start", Date.now().toString());
+    
     trackEvent("booking_link_clicked", { creator_username: username });
   }, [username, trackEvent]);
 
@@ -139,6 +143,12 @@ export default function PublicBooking() {
     setIsAnalyzing(true);
     setMatchResult(null);
 
+    // Track AI match analysis invoked
+    trackEvent("analyze_collab_match_invoked", {
+      creator_username: username,
+      visitor_url: formData.substackUrl,
+    });
+
     try {
       const creatorNewsletterUrl = creator.newsletter_url || creator.substack_url;
       const result = await analyzeCollabMatch(creatorNewsletterUrl!, formData.substackUrl);
@@ -154,6 +164,13 @@ export default function PublicBooking() {
   };
 
   const handleUseSuggestion = (suggestion: CollabSuggestion) => {
+    // Track AI suggestion selection
+    trackEvent("ai_match_suggestion_selected", {
+      topic: suggestion.topic,
+      format: suggestion.format,
+      creator_username: username,
+    });
+    
     const newMessage = `I'd love to collaborate on: "${suggestion.topic}"\n\n${suggestion.description}\n\nFormat: ${suggestion.format}`;
     setFormData({ ...formData, message: newMessage });
     toast.success("Suggestion added to your message!");
@@ -241,10 +258,19 @@ export default function PublicBooking() {
     setIsSuccess(true);
     toast.success("Request sent successfully!");
     
-    // Track booking submitted
+    // Calculate session duration
+    const sessionStart = sessionStorage.getItem("booking_session_start");
+    const sessionDurationMs = sessionStart ? Date.now() - parseInt(sessionStart) : null;
+    
+    // Detect if user used an AI suggestion (message contains the AI-generated format)
+    const usedAiSuggestion = hasAnalyzed && formData.message.includes("I'd love to collaborate on:");
+    
+    // Track booking submitted with enhanced data
     trackEvent("booking_submitted", { 
       creator_username: username,
       has_date: !isFlexibleDate && !!selectedDate,
+      used_ai_suggestion: usedAiSuggestion,
+      session_duration_ms: sessionDurationMs,
     });
   };
 
