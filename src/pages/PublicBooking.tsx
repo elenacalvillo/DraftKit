@@ -106,12 +106,11 @@ export default function PublicBooking() {
       });
     }
 
-    // Fetch booked dates (approved or pending requests)
+    // Fetch booked dates from public view (accessible to anonymous users)
     const { data: reqData } = await supabase
-      .from('collab_requests')
+      .from('public_booked_dates')
       .select('requested_date')
-      .eq('creator_id', creatorData.id)
-      .neq('status', 'declined');
+      .eq('creator_id', creatorData.id);
 
     if (reqData) {
       setBookedDates(reqData.map((r) => r.requested_date));
@@ -194,14 +193,13 @@ export default function PublicBooking() {
       return;
     }
 
-    // Check if date is still available (only if specific date selected)
+    // Check if date is still available using public view (only if specific date selected)
     if (selectedDate && !isFlexibleDate) {
       const { data: existingRequest } = await supabase
-        .from('collab_requests')
-        .select('id')
+        .from('public_booked_dates')
+        .select('requested_date')
         .eq('creator_id', creator.id)
         .eq('requested_date', selectedDate)
-        .neq('status', 'declined')
         .maybeSingle();
 
       if (existingRequest) {
