@@ -107,16 +107,43 @@ export default function PublicBooking() {
     }
 
     // Fetch booked dates from public view (accessible to anonymous users)
+    await fetchBookedDates(creatorData.id);
+
+    setIsLoading(false);
+
+    // Subscribe to real-time updates for collab_requests
+    const channel = supabase
+      .channel('public-booked-dates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'collab_requests',
+          filter: `creator_id=eq.${creatorData.id}`,
+        },
+        () => {
+          // Refetch booked dates when requests change
+          fetchBookedDates(creatorData.id);
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription on unmount
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  };
+
+  const fetchBookedDates = async (creatorId: string) => {
     const { data: reqData } = await supabase
       .from('public_booked_dates')
       .select('requested_date')
-      .eq('creator_id', creatorData.id);
+      .eq('creator_id', creatorId);
 
     if (reqData) {
-      setBookedDates(reqData.map((r) => r.requested_date));
+      setBookedDates(reqData.map((r) => r.requested_date).filter(Boolean) as string[]);
     }
-
-    setIsLoading(false);
   };
 
   const handleDateSelect = (date: string) => {

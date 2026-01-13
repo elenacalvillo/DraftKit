@@ -295,8 +295,15 @@ serve(async (req) => {
 
     const prompt = `You are helping two newsletter creators plan a collaboration. Generate a detailed collaboration draft.
 
+CRITICAL: The COLLABORATION REQUEST MESSAGE below is the PRIMARY DIRECTION for this draft. The requester has already proposed specific topics, formats, or ideas. Your draft MUST directly incorporate their suggestions:
+- If they proposed a specific topic/title → Use it as the basis for the collaboration title
+- If they suggested a format (interview, essay, crossover, etc.) → Use their suggested format exactly
+- If they outlined themes or angles → Structure the outline around their themes
+- If they described roles for each person → Honor those role assignments
+
+Do NOT ignore, heavily reinterpret, or replace their ideas with your own. BUILD UPON their suggestions using the article context below.
+
 IMPORTANT: Only use articles ACTUALLY WRITTEN BY each person. Ignore guest posts or collaborations from other authors.
-Pay attention to the author field for each article.
 
 CREATOR (Host): ${creatorName} ${creatorFeedAuthor ? `(Feed Owner: ${creatorFeedAuthor})` : ""}
 ${creatorPosts.length > 0 ? `Recent posts:\n${creatorPosts.map((p, i) => `${i + 1}. "${p.title}"${p.author ? ` [by ${p.author}]` : ""}: ${p.description}`).join("\n")}` : "No posts available"}
@@ -304,17 +311,18 @@ ${creatorPosts.length > 0 ? `Recent posts:\n${creatorPosts.map((p, i) => `${i + 
 COLLABORATOR (Guest): ${requesterName} ${requesterFeedAuthor ? `(Feed Owner: ${requesterFeedAuthor})` : ""}
 ${requesterPosts.length > 0 ? `Recent posts:\n${requesterPosts.map((p, i) => `${i + 1}. "${p.title}"${p.author ? ` [by ${p.author}]` : ""}: ${p.description}`).join("\n")}` : "No posts available"}
 
-COLLABORATION REQUEST MESSAGE:
+===== COLLABORATION REQUEST MESSAGE (PRIMARY DIRECTION - FOLLOW THIS CLOSELY) =====
 "${collabMessage}"
+==================================================================================
 
 ${request.requested_date ? `SCHEDULED DATE: ${request.requested_date}` : "DATE: To be scheduled"}
 
 Generate a collaboration draft that:
-1. Creates a compelling title that would work for both audiences
-2. Writes an opening hook in the host's writing style (based on their posts)
-3. Outlines 4-5 sections with clear ownership (creator, requester, or both)
-4. Lists 4-6 talking points they should cover
-5. Suggests the best format (interview, co-write, point/counterpoint, etc.)
+1. Uses the requester's proposed topic/title as the foundation (adapt but don't replace it)
+2. Uses the requester's suggested format if specified, otherwise suggest the best fit
+3. Writes an opening hook in the host's writing style (based on their posts)
+4. Outlines 4-5 sections following the requester's suggested structure/themes if provided
+5. Lists 4-6 talking points that align with the requester's proposed angles
 6. Provides tone notes to help the guest match the host's style
 7. Estimates read time
 8. Lists which specific articles you used to inform the draft`;

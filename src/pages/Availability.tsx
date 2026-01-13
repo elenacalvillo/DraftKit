@@ -30,6 +30,28 @@ export default function Availability() {
 
     if (creator) {
       fetchData();
+
+      // Subscribe to real-time updates for collab_requests
+      const channel = supabase
+        .channel('availability-booked-dates')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'collab_requests',
+            filter: `creator_id=eq.${creator.id}`,
+          },
+          () => {
+            // Refetch booked dates when requests change
+            fetchBookedDates();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
   }, [user, creator, loading, navigate]);
 
@@ -49,7 +71,12 @@ export default function Availability() {
       setBlockedDates(availData.blocked_dates || []);
     }
 
-    // Fetch booked dates from requests
+    await fetchBookedDates();
+  };
+
+  const fetchBookedDates = async () => {
+    if (!creator) return;
+    
     const { data: reqData } = await supabase
       .from('collab_requests')
       .select('requested_date')
@@ -57,7 +84,7 @@ export default function Availability() {
       .eq('status', 'approved');
 
     if (reqData) {
-      setBookedDates(reqData.map((r) => r.requested_date));
+      setBookedDates(reqData.map((r) => r.requested_date).filter(Boolean) as string[]);
     }
   };
 
