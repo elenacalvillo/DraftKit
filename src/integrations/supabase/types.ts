@@ -330,6 +330,39 @@ export type Database = {
       }
     }
     Views: {
+      public_booked_dates: {
+        Row: {
+          creator_id: string | null
+          requested_date: string | null
+          status: string | null
+        }
+        Insert: {
+          creator_id?: string | null
+          requested_date?: string | null
+          status?: string | null
+        }
+        Update: {
+          creator_id?: string | null
+          requested_date?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collab_requests_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collab_requests_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "public_creator_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       public_creator_profiles: {
         Row: {
           bio: string | null
