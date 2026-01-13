@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Calendar, Check, ExternalLink, Sparkles, Mail, User, MessageSquare, Lightbulb, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Calendar, Check, ExternalLink, Sparkles, Mail, User, MessageSquare, Lightbulb, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -48,6 +48,7 @@ export default function PublicBooking() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [matchResult, setMatchResult] = useState<CollabMatchResult | null>(null);
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -151,17 +152,43 @@ export default function PublicBooking() {
   };
 
   const handleAnalyzeMatch = async () => {
+    // Clear previous error state
+    setAnalysisError(null);
+    
     // Use newsletter_url for AI analysis (falls back to substack_url if not set)
     const creatorNewsletterUrl = creator?.newsletter_url || creator?.substack_url;
     if (!formData.substackUrl || !creatorNewsletterUrl) {
-      toast.error("Both you and the creator need newsletter URLs to analyze a match");
+      const errorMsg = !formData.substackUrl 
+        ? "Please enter your newsletter URL first"
+        : "This creator hasn't linked their newsletter yet";
+      setAnalysisError(errorMsg);
+      toast.error(errorMsg);
       return;
     }
 
     // Basic URL validation
+    const trimmedUrl = formData.substackUrl.trim();
+    let validUrl: URL;
     try {
-      new URL(formData.substackUrl);
+      // Check if it's a bare domain (missing protocol)
+      if (!trimmedUrl.startsWith('http://') && !trimmedUrl.startsWith('https://')) {
+        validUrl = new URL(`https://${trimmedUrl}`);
+      } else {
+        validUrl = new URL(trimmedUrl);
+      }
     } catch {
+      setAnalysisError("Please enter a valid URL (e.g., yourname.substack.com)");
+      toast.error("Please enter a valid newsletter URL");
+      return;
+    }
+
+    // Validate URL format looks like a newsletter
+    const hostname = validUrl.hostname.toLowerCase();
+    const isSubstackUrl = hostname.endsWith('.substack.com') || hostname === 'substack.com';
+    const hasValidPath = validUrl.pathname.length > 1 || isSubstackUrl;
+    
+    if (!isSubstackUrl && !hasValidPath) {
+      setAnalysisError("Please enter a valid Substack URL (e.g., yourname.substack.com)");
       toast.error("Please enter a valid Substack URL");
       return;
     }
@@ -178,12 +205,33 @@ export default function PublicBooking() {
     try {
       const creatorNewsletterUrl = creator.newsletter_url || creator.substack_url;
       const result = await analyzeCollabMatch(creatorNewsletterUrl!, formData.substackUrl);
+      
+      // Handle empty suggestions case
+      if (!result.suggestions || result.suggestions.length === 0) {
+        setAnalysisError("No collaboration ideas found yet. This can happen if there's not enough content overlap between your newsletters. Try again later or proceed with your own idea!");
+        setHasAnalyzed(true);
+        return;
+      }
+      
       setMatchResult(result);
       setHasAnalyzed(true);
       toast.success("Found collaboration ideas!");
     } catch (error) {
       console.error("Analysis error:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to analyze match. Please try again.");
+      const errorMessage = error instanceof Error ? error.message : "Failed to analyze match";
+      
+      // Provide more helpful error messages
+      let userFriendlyError = errorMessage;
+      if (errorMessage.includes("rate limit") || errorMessage.includes("Rate limit")) {
+        userFriendlyError = "Too many requests. Please wait a moment and try again.";
+      } else if (errorMessage.includes("RSS") || errorMessage.includes("feed")) {
+        userFriendlyError = "Couldn't access your newsletter feed. Make sure your Substack URL is correct and your newsletter is public.";
+      } else if (errorMessage.includes("No posts") || errorMessage.includes("no posts")) {
+        userFriendlyError = "Your newsletter doesn't have enough published posts yet for AI analysis.";
+      }
+      
+      setAnalysisError(userFriendlyError);
+      toast.error(userFriendlyError);
     } finally {
       setIsAnalyzing(false);
     }
@@ -511,6 +559,7 @@ export default function PublicBooking() {
                         setFormData({ name: "", email: "", substackUrl: "", message: "" });
                         setMatchResult(null);
                         setHasAnalyzed(false);
+                        setAnalysisError(null);
                       }}
                     >
                       Maybe Later
@@ -600,12 +649,13 @@ export default function PublicBooking() {
                         type="text"
                         required
                         value={formData.substackUrl}
-                        onChange={(e) => {
+                      onChange={(e) => {
                           setFormData({ ...formData, substackUrl: e.target.value });
                           // Reset analysis when URL changes
-                          if (hasAnalyzed) {
+                          if (hasAnalyzed || analysisError) {
                             setMatchResult(null);
                             setHasAnalyzed(false);
+                            setAnalysisError(null);
                           }
                         }}
                         placeholder="yourname.substack.com"
@@ -637,7 +687,50 @@ export default function PublicBooking() {
                     <p className="text-xs text-muted-foreground">
                       Your newsletter URL for AI-powered collaboration ideas (e.g., yourname.substack.com)
                     </p>
+                    
+                    {/* Show message when creator hasn't linked newsletter */}
+                    {!creator.newsletter_url && !creator.substack_url && (
+                      <p className="text-xs text-muted-foreground/70 flex items-center gap-1.5 mt-1">
+                        <AlertCircle className="w-3 h-3" />
+                        AI matching unavailable — {creator.name} hasn't linked their newsletter yet
+                      </p>
+                    )}
                   </div>
+
+                  {/* AI Analysis Error Display */}
+                  <AnimatePresence>
+                    {analysisError && !isAnalyzing && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/30">
+                          <div className="flex items-start gap-3">
+                            <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-destructive">Couldn't find ideas</p>
+                              <p className="text-sm text-muted-foreground mt-1">{analysisError}</p>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="mt-2 h-8 px-3"
+                                onClick={() => {
+                                  setAnalysisError(null);
+                                  handleAnalyzeMatch();
+                                }}
+                              >
+                                <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+                                Try Again
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
                   {/* AI Match Suggestions */}
                   <AnimatePresence>
