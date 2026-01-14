@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { ArrowRight, Calendar, Users, Sparkles } from "lucide-react";
+import { ArrowRight, Calendar, Users, BookOpen, Heart } from "lucide-react";
 
 export function HeroSection() {
   return (
@@ -43,8 +43,8 @@ export function HeroSection() {
             transition={{ duration: 0.5 }}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary mb-8"
           >
-            <Sparkles className="w-4 h-4" />
-            <span className="text-sm font-medium">Scheduling + AI Content Ideas</span>
+            <Heart className="w-4 h-4" />
+            <span className="text-sm font-medium">Built for creators who care about connection</span>
           </motion.div>
 
           {/* Headline */}
@@ -54,9 +54,9 @@ export function HeroSection() {
             transition={{ duration: 0.6, delay: 0.1 }}
             className="text-4xl md:text-6xl font-bold tracking-tight mb-6"
           >
-            The smarter way to schedule
+            Start better conversations
             <br />
-            <span className="gradient-text">Substack collaborations</span>
+            <span className="gradient-text">with fellow creators</span>
           </motion.h1>
 
           {/* Subheadline */}
@@ -66,8 +66,8 @@ export function HeroSection() {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="text-xl text-muted-foreground max-w-2xl mx-auto mb-12"
           >
-            Stop the back-and-forth emails. Sync your schedules and get AI-powered 
-            article ideas based on your actual newsletter content—all in one link.
+            Let AI handle the prep work so you can focus on the connection. Share one link, 
+            sync schedules, and show up to every conversation with ideas worth discussing.
           </motion.p>
 
           {/* CTA Buttons */}
@@ -97,20 +97,20 @@ export function HeroSection() {
           >
             <FeatureCard
               icon={<Calendar className="w-6 h-6" />}
-              title="Visual Calendar"
-              description="Set your availability with a beautiful, interactive calendar interface"
+              title="Your Calendar, Your Rules"
+              description="Control when you're open to new connections with a simple, beautiful interface"
               delay={0.5}
             />
             <FeatureCard
               icon={<Users className="w-6 h-6" />}
-              title="Manage Requests"
-              description="Review, approve, or decline collaboration requests with ease"
+              title="Personal Pitches Only"
+              description="Every request includes a space for collaborators to share their 'why'—no cold DMs"
               delay={0.6}
             />
             <FeatureCard
-              icon={<Sparkles className="w-6 h-6" />}
-              title="AI Content Matchmaking"
-              description="Get AI-powered topic suggestions based on both creators' newsletter content"
+              icon={<BookOpen className="w-6 h-6" />}
+              title="Show Up Prepared"
+              description="Our AI reads both newsletters to surface the common ground you'll actually love discussing"
               delay={0.7}
             />
           </motion.div>

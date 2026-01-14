@@ -1,21 +1,21 @@
 import { motion } from "framer-motion";
-import { Link2, CalendarCheck, Lightbulb } from "lucide-react";
+import { Link2, CalendarCheck, MessageSquareText } from "lucide-react";
 
 const steps = [
   {
     icon: <Link2 className="w-6 h-6" />,
     title: "Share Your Link",
-    description: "Create your profile and get a personalized booking page (collabstack.app/yourname)",
+    description: "Create your profile with a personal welcome message and get your booking page (collabstack.app/yourname)",
   },
   {
     icon: <CalendarCheck className="w-6 h-6" />,
     title: "Guests Pick a Date",
-    description: "Collaborators see your calendar and request available dates",
+    description: "Collaborators see your availability and share why they want to connect—on their terms",
   },
   {
-    icon: <Lightbulb className="w-6 h-6" />,
-    title: "AI Suggests Topics",
-    description: "Both newsletters are analyzed to generate perfect collaboration ideas",
+    icon: <MessageSquareText className="w-6 h-6" />,
+    title: "Prep Your Conversation",
+    description: "Get AI-curated talking points based on what you both write about—so you can skip the small talk",
   },
 ];
 
@@ -32,7 +32,7 @@ export function HowItWorksSection() {
         >
           <h2 className="text-3xl md:text-4xl font-bold mb-4">How It Works</h2>
           <p className="text-muted-foreground text-lg max-w-xl mx-auto">
-            From link to collaboration in three simple steps
+            From first hello to meaningful conversation in three simple steps
           </p>
         </motion.div>
 
