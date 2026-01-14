@@ -13,6 +13,8 @@ import { normalizeSubstackUrl } from "@/lib/substack-url";
 import { toast } from "sonner";
 import { analyzeCollabMatch, type CollabSuggestion, type CollabMatchResult } from "@/lib/api/collab-match";
 import { useAnalytics } from "@/hooks/useAnalytics";
+import { useAuth } from "@/hooks/useAuth";
+
 interface Creator {
   id: string;
   username: string;
@@ -32,6 +34,7 @@ export default function PublicBooking() {
   const { username } = useParams<{ username: string }>();
   const navigate = useNavigate();
   const { trackEvent } = useAnalytics();
+  const { user } = useAuth();
   const hasTrackedPageView = useRef(false);
   
   const [creator, setCreator] = useState<Creator | null>(null);
@@ -73,6 +76,29 @@ export default function PublicBooking() {
     if (!username) return;
     fetchCreatorData();
   }, [username]);
+
+  // Pre-fill form for logged-in users with their creator profile
+  useEffect(() => {
+    if (!user) return;
+    
+    const fetchUserProfile = async () => {
+      const { data: creatorProfile } = await supabase
+        .from('creators')
+        .select('name, email, substack_url')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      if (creatorProfile) {
+        setFormData(prev => ({
+          ...prev,
+          name: creatorProfile.name || prev.name,
+          email: creatorProfile.email || prev.email,
+          substackUrl: creatorProfile.substack_url || prev.substackUrl,
+        }));
+      }
+    };
+    fetchUserProfile();
+  }, [user]);
 
   const fetchCreatorData = async () => {
     if (!username) return;
@@ -297,6 +323,7 @@ export default function PublicBooking() {
         message: formData.message.trim() || null,
         requested_date: isFlexibleDate ? null : selectedDate,
         status: 'pending',
+        requester_user_id: user?.id || null,
       });
 
     if (error) {
