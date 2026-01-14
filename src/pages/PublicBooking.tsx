@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { CollabCalendar } from "@/components/calendar/CollabCalendar";
 import { supabase } from "@/integrations/supabase/client";
 import { bookingFormSchema } from "@/lib/validations";
+import { normalizeSubstackUrl } from "@/lib/substack-url";
 import { toast } from "sonner";
 import { analyzeCollabMatch, type CollabSuggestion, type CollabMatchResult } from "@/lib/api/collab-match";
 import { useAnalytics } from "@/hooks/useAnalytics";
@@ -166,32 +167,16 @@ export default function PublicBooking() {
       return;
     }
 
-    // Basic URL validation
-    const trimmedUrl = formData.substackUrl.trim();
-    let validUrl: URL;
-    try {
-      // Check if it's a bare domain (missing protocol)
-      if (!trimmedUrl.startsWith('http://') && !trimmedUrl.startsWith('https://')) {
-        validUrl = new URL(`https://${trimmedUrl}`);
-      } else {
-        validUrl = new URL(trimmedUrl);
-      }
-    } catch {
-      setAnalysisError("Please enter a valid URL (e.g., yourname.substack.com)");
-      toast.error("Please enter a valid newsletter URL");
+    // Normalize the Substack URL (handles mobile share links, profile URLs, etc.)
+    const normalizedResult = normalizeSubstackUrl(formData.substackUrl);
+    
+    if (!normalizedResult.isValid || !normalizedResult.normalized) {
+      setAnalysisError(normalizedResult.error || "Please enter a valid Substack URL (e.g., yourname.substack.com)");
+      toast.error(normalizedResult.error || "Please enter a valid Substack URL");
       return;
     }
 
-    // Validate URL format looks like a newsletter
-    const hostname = validUrl.hostname.toLowerCase();
-    const isSubstackUrl = hostname.endsWith('.substack.com') || hostname === 'substack.com';
-    const hasValidPath = validUrl.pathname.length > 1 || isSubstackUrl;
-    
-    if (!isSubstackUrl && !hasValidPath) {
-      setAnalysisError("Please enter a valid Substack URL (e.g., yourname.substack.com)");
-      toast.error("Please enter a valid Substack URL");
-      return;
-    }
+    console.log(`Normalized Substack URL: ${formData.substackUrl} → ${normalizedResult.normalized}`);
 
     setIsAnalyzing(true);
     setMatchResult(null);
@@ -199,12 +184,11 @@ export default function PublicBooking() {
     // Track AI match analysis invoked
     trackEvent("analyze_collab_match_invoked", {
       creator_username: username,
-      visitor_url: formData.substackUrl,
+      visitor_url: normalizedResult.normalized,
     });
 
     try {
-      const creatorNewsletterUrl = creator.newsletter_url || creator.substack_url;
-      const result = await analyzeCollabMatch(creatorNewsletterUrl!, formData.substackUrl);
+      const result = await analyzeCollabMatch(creatorNewsletterUrl!, normalizedResult.normalized);
       
       // Handle empty suggestions case
       if (!result.suggestions || result.suggestions.length === 0) {

@@ -214,35 +214,49 @@ function filterByAuthor(posts: RSSPost[], expectedAuthor: string | null): RSSPos
 }
 
 // Convert Substack URL to RSS feed URL
-// Handles both profile format (substack.com/@username) and newsletter format (username.substack.com)
+// Handles all Substack URL formats including mobile share links
 function toRSSUrl(substackUrl: string): string {
   let url = substackUrl.trim();
-  // Remove trailing slash
+  
+  // Remove query parameters and hash fragments first (handles mobile share UTM params)
+  url = url.replace(/[?#].*$/, "");
+  
+  // Remove trailing slashes
   url = url.replace(/\/+$/, "");
   
-  // Handle profile format: substack.com/@username or www.substack.com/@username
-  const profileMatch = url.match(/(?:www\.)?substack\.com\/@([a-zA-Z0-9_-]+)/i);
-  if (profileMatch) {
-    // Convert to newsletter format
-    url = `https://${profileMatch[1]}.substack.com`;
-    console.log(`Converted profile URL to newsletter format: ${url}`);
-  }
+  // Remove protocol for pattern matching
+  const withoutProtocol = url.replace(/^https?:\/\//, "");
   
-  // Handle cases where user entered just the username part
-  if (!url.includes('.') && !url.includes('/')) {
-    url = `https://${url}.substack.com`;
-    console.log(`Converted username to newsletter format: ${url}`);
+  // Pattern 1: open.substack.com/pub/username (Mobile share format)
+  const mobileMatch = withoutProtocol.match(/^open\.substack\.com\/pub\/([a-zA-Z0-9_-]+)/i);
+  if (mobileMatch) {
+    url = `https://${mobileMatch[1].toLowerCase()}.substack.com`;
+    console.log(`Converted mobile share URL to newsletter format: ${url}`);
   }
-  
-  // Ensure https://
-  if (!url.startsWith('http://') && !url.startsWith('https://')) {
-    url = 'https://' + url;
+  // Pattern 2: substack.com/@username (Profile format)
+  else {
+    const profileMatch = withoutProtocol.match(/^(?:www\.)?substack\.com\/@([a-zA-Z0-9_-]+)/i);
+    if (profileMatch) {
+      url = `https://${profileMatch[1].toLowerCase()}.substack.com`;
+      console.log(`Converted profile URL to newsletter format: ${url}`);
+    }
+    // Pattern 3: Just username (no dots or slashes)
+    else if (!withoutProtocol.includes('.') && !withoutProtocol.includes('/')) {
+      url = `https://${withoutProtocol.toLowerCase()}.substack.com`;
+      console.log(`Converted username to newsletter format: ${url}`);
+    }
+    // Standard format or custom domain - ensure https://
+    else if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://' + url;
+    }
   }
   
   // Add /feed if not present
   if (!url.endsWith("/feed")) {
     url = url + "/feed";
   }
+  
+  console.log(`Final RSS URL: ${url}`);
   return url;
 }
 
