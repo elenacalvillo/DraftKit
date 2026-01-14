@@ -1,29 +1,5 @@
 import { z } from 'zod';
-
-// Helper to validate Substack URL formats
-function isValidSubstackUrl(input: string): boolean {
-  const trimmed = input.trim();
-  if (!trimmed) return false;
-  
-  // Clean the URL for validation
-  const cleanUrl = trimmed
-    .replace(/^https?:\/\//, '')  // Remove protocol
-    .replace(/\/+$/, '')           // Remove trailing slashes
-    .replace(/\/.*$/, '');         // Remove any path
-  
-  // Pattern 1: username.substack.com
-  if (/^[a-z0-9][a-z0-9-]*\.substack\.com$/i.test(cleanUrl)) {
-    return true;
-  }
-  
-  // Pattern 2: substack.com/@username (profile URL)
-  const withPath = trimmed.replace(/^https?:\/\//, '').replace(/\/+$/, '');
-  if (/^substack\.com\/@[a-z0-9_-]+$/i.test(withPath)) {
-    return true;
-  }
-  
-  return false;
-}
+import { isValidSubstackUrl } from './substack-url';
 
 export const emailSchema = z.string()
   .trim()
