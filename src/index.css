@@ -12,10 +12,10 @@
     --background: 39 33% 97%;
     --foreground: 35 27% 13%;
 
-    --card: 40 30% 99%;
+    --card: 0 0% 100%;
     --card-foreground: 35 27% 13%;
 
-    --popover: 40 30% 99%;
+    --popover: 0 0% 100%;
     --popover-foreground: 35 27% 13%;
 
     --primary: 8 65% 65%;
@@ -45,7 +45,7 @@
     --gradient-card: linear-gradient(135deg, hsl(40 30% 99% / 0.9) 0%, hsl(35 25% 98% / 0.8) 100%);
     --gradient-accent: linear-gradient(135deg, hsl(24 58% 60%) 0%, hsl(28 55% 55%) 100%);
     
-    --glass-bg: hsl(40 30% 99% / 0.7);
+    --glass-bg: hsl(0 0% 100% / 0.85);
     --glass-border: hsl(35 18% 88% / 0.5);
     --glass-shadow: 0 8px 32px hsl(8 30% 30% / 0.1);
     
@@ -56,7 +56,7 @@
     --booked: 8 65% 65%;
     --blocked: 35 10% 70%;
 
-    --sidebar-background: 40 30% 99%;
+    --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 35 27% 25%;
     --sidebar-primary: 8 65% 65%;
     --sidebar-primary-foreground: 0 0% 100%;
