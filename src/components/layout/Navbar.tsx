@@ -17,7 +17,7 @@ export function Navbar() {
             <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center group-hover:shadow-glow transition-shadow duration-300">
               <Sparkles className="w-4 h-4 text-primary-foreground" />
             </div>
-            <span className="text-xl font-bold gradient-text">CollabFlow</span>
+            <span className="text-xl font-bold gradient-text">CollabStack</span>
           </Link>
 
           <div className="flex items-center gap-3">

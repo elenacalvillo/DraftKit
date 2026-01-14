@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useState } from "react";
-import { Calendar, Sparkles, Users, Check, Clock, ArrowRight } from "lucide-react";
+import { Calendar, BookOpen, Users, Check, Clock, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -14,9 +14,9 @@ const features = [
     status: "live" as const,
   },
   {
-    icon: <Sparkles className="w-5 h-5" />,
-    title: "AI Content Matchmaking",
-    description: "RSS-based topic suggestions powered by AI analysis",
+    icon: <BookOpen className="w-5 h-5" />,
+    title: "AI Conversation Prep",
+    description: "Curated talking points based on what you both write—not generated content, just research done for you",
     status: "live" as const,
   },
   {

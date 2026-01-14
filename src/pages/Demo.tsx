@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { ArrowRight, Calendar, Users, CheckCircle, Sparkles } from "lucide-react";
+import { ArrowRight, Calendar, Users, CheckCircle, Heart } from "lucide-react";
 
 export default function Demo() {
   return (
@@ -10,7 +10,7 @@ export default function Demo() {
       <header className="fixed top-0 left-0 right-0 z-50 glass-card border-0 border-b">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link to="/" className="text-xl font-bold gradient-text">
-            CollabFlow
+            CollabStack
           </Link>
           <div className="flex items-center gap-4">
             <Button variant="ghost" asChild>
@@ -32,10 +32,10 @@ export default function Demo() {
             className="text-center mb-16"
           >
             <h1 className="text-4xl md:text-5xl font-bold mb-4">
-              How <span className="gradient-text">CollabFlow</span> Works
+              How <span className="gradient-text">CollabStack</span> Works
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              A simple, beautiful way to manage collaboration requests with fellow creators.
+              A simple, beautiful way to connect with fellow creators—on your terms.
             </p>
           </motion.div>
 
@@ -45,28 +45,28 @@ export default function Demo() {
               number={1}
               icon={<Users className="w-6 h-6" />}
               title="Create Your Profile"
-              description="Sign up and set up your creator profile with your name, bio, and Substack URL. Your unique username becomes your public booking link."
+              description="Sign up and set up your creator profile with your name, bio, and a personal welcome message. Your unique username becomes your public booking link."
               delay={0.1}
             />
             <Step
               number={2}
               icon={<Calendar className="w-6 h-6" />}
               title="Set Your Availability"
-              description="Use our beautiful calendar to mark the dates you're available for collaborations. Block out busy days and set recurring availability."
+              description="Use our beautiful calendar to mark when you're open to new connections. Block out busy days and set recurring availability."
               delay={0.2}
             />
             <Step
               number={3}
-              icon={<Sparkles className="w-6 h-6" />}
+              icon={<Heart className="w-6 h-6" />}
               title="Share Your Link"
-              description="Share your personalized booking page (collabflow.app/yourname) with potential collaborators. They'll see your availability and can request specific dates."
+              description="Share your personalized booking page (collabstack.app/yourname) with potential collaborators. They'll see your availability and can tell you why they want to connect."
               delay={0.3}
             />
             <Step
               number={4}
               icon={<CheckCircle className="w-6 h-6" />}
-              title="Manage Requests"
-              description="Review incoming collaboration requests, approve or decline them, and keep track of all your scheduled collaborations in one place."
+              title="Start the Conversation"
+              description="Review requests, get AI-curated talking points based on both newsletters, and jump straight into meaningful conversations—no small talk needed."
               delay={0.4}
             />
           </div>
@@ -80,7 +80,7 @@ export default function Demo() {
           >
             <Button variant="hero" size="xl" asChild>
               <Link to="/signup">
-                Start Organizing Collaborations
+                Start Building Connections
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Link>
             </Button>
