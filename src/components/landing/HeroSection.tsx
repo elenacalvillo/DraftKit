@@ -54,9 +54,9 @@ export function HeroSection() {
             transition={{ duration: 0.6, delay: 0.1 }}
             className="text-4xl md:text-6xl font-bold tracking-tight mb-6"
           >
-            Start better conversations
+            Build your audience
             <br />
-            <span className="gradient-text">with fellow creators</span>
+            <span className="gradient-text">through shared stories</span>
           </motion.h1>
 
           {/* Subheadline */}
