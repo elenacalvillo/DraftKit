@@ -34,7 +34,7 @@ export function TrackingNotice() {
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
           className="fixed top-0 left-0 right-0 z-50"
         >
-          <div className="bg-gradient-to-r from-accent to-primary text-primary-foreground">
+          <div className="bg-gradient-to-r from-accent to-primary text-white">
             <div className="container mx-auto px-4 py-3">
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3 flex-1">
@@ -54,7 +54,7 @@ export function TrackingNotice() {
                   variant="ghost"
                   size="sm"
                   onClick={handleDismiss}
-                  className="text-primary-foreground hover:bg-primary-foreground/10 h-8 w-8 p-0"
+                  className="text-white hover:bg-white/10 h-8 w-8 p-0"
                 >
                   <X className="w-4 h-4" />
                   <span className="sr-only">Dismiss</span>
