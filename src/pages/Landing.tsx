@@ -2,6 +2,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { HeroSection } from "@/components/landing/HeroSection";
 import { HowItWorksSection } from "@/components/landing/HowItWorksSection";
 import { FeatureRoadmapSection } from "@/components/landing/FeatureRoadmapSection";
+import { Footer } from "@/components/layout/Footer";
 
 export default function Landing() {
   return (
@@ -10,6 +11,7 @@ export default function Landing() {
       <HeroSection />
       <HowItWorksSection />
       <FeatureRoadmapSection />
+      <Footer />
     </div>
   );
 }

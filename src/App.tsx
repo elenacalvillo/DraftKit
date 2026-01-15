@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { FeedbackWidget } from "@/components/feedback/FeedbackWidget";
+import { TrackingNotice } from "@/components/privacy/TrackingNotice";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -18,6 +19,7 @@ import PublicBooking from "./pages/PublicBooking";
 import Demo from "./pages/Demo";
 import AdminAnalytics from "./pages/AdminAnalytics";
 import MyRequests from "./pages/MyRequests";
+import Transparency from "./pages/Transparency";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +28,7 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <AuthProvider>
+        <TrackingNotice />
         <Toaster />
         <Sonner />
         <FeedbackWidget />
@@ -36,6 +39,7 @@ const App = () => (
             <Route path="/signup" element={<Signup />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/transparency" element={<Transparency />} />
             <Route path="/demo" element={<Demo />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/dashboard/availability" element={<Availability />} />

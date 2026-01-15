@@ -14,6 +14,7 @@ import {
   MessageSquare,
   Copy,
   Users,
+  Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -434,7 +435,12 @@ export default function Signup() {
                       </>
                     )}
                   </Button>
-                  </form>
+
+                  <p className="text-center text-xs text-muted-foreground mt-4 flex items-center justify-center gap-1.5">
+                    <Shield className="w-3.5 h-3.5 text-primary/60" />
+                    We respect your privacy. No data selling. No AI training on private drafts.
+                  </p>
+                </form>
 
                 <p className="text-center text-sm text-muted-foreground mt-6">
                   Already have an account?{" "}
