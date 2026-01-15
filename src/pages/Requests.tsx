@@ -65,6 +65,43 @@ export default function Requests() {
 
     if (data) {
       setRequests(data as DbCollabRequest[]);
+      // Auto-refresh stale profile images in the background
+      refreshStaleProfileImages(data as DbCollabRequest[]);
+    }
+  };
+
+  const refreshStaleProfileImages = async (reqs: DbCollabRequest[]) => {
+    // Find requests with invalid/stale profile images
+    const staleRequests = reqs.filter(r => 
+      r.requester_substack_url && 
+      (r.requester_profile_image_url?.includes('subscribe-card') || 
+       r.requester_profile_image_url?.includes('publication_card') ||
+       !r.requester_profile_image_url)
+    );
+
+    if (staleRequests.length === 0) return;
+
+    // Refresh in background without blocking UI
+    for (const request of staleRequests) {
+      try {
+        const { data } = await supabase.functions.invoke('fetch-substack-profile', {
+          body: { substackUrl: request.requester_substack_url }
+        });
+
+        if (data?.imageUrl && !data.imageUrl.includes('subscribe-card') && !data.imageUrl.includes('publication_card')) {
+          await supabase
+            .from('collab_requests')
+            .update({ requester_profile_image_url: data.imageUrl })
+            .eq('id', request.id);
+
+          // Update local state
+          setRequests(prev => prev.map(r => 
+            r.id === request.id ? { ...r, requester_profile_image_url: data.imageUrl } : r
+          ));
+        }
+      } catch (error) {
+        console.error(`Failed to refresh profile for ${request.requester_name}:`, error);
+      }
     }
   };
 
