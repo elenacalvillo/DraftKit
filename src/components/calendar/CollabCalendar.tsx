@@ -4,11 +4,25 @@ import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+export interface BookingInfo {
+  date: string;
+  requesterName: string;
+  requesterProfileImageUrl: string | null;
+}
 
 interface CollabCalendarProps {
   availableDates?: string[];
   bookedDates?: string[];
   blockedDates?: string[];
+  bookingDetails?: BookingInfo[];
   onDateSelect?: (date: string) => void;
   isEditable?: boolean;
   onToggleAvailable?: (date: string) => void;
@@ -19,11 +33,16 @@ export function CollabCalendar({
   availableDates = [],
   bookedDates = [],
   blockedDates = [],
+  bookingDetails = [],
   onDateSelect,
   isEditable = false,
   onToggleAvailable,
   onToggleBlocked,
 }: CollabCalendarProps) {
+  // Helper to get booking info for a date
+  const getBookingInfo = (dateStr: string): BookingInfo | undefined => {
+    return bookingDetails.find(b => b.date === dateStr);
+  };
   // Calculate the first available month
   const firstAvailableDate = useMemo(() => {
     if (availableDates.length === 0) return null;
@@ -150,8 +169,9 @@ export function CollabCalendar({
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const isPast = new Date(year, month, day) < today;
+    const bookingInfo = status === "booked" ? getBookingInfo(dateStr) : undefined;
 
-    days.push(
+    const dayButton = (
       <motion.button
         key={day}
         whileHover={!isPast ? { scale: 1.1 } : {}}
@@ -176,8 +196,52 @@ export function CollabCalendar({
             className="absolute inset-0 rounded-xl bg-available/10 -z-10"
           />
         )}
+        {/* Show mini avatar for booked dates */}
+        {status === "booked" && bookingInfo && (
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            className="absolute -top-1 -right-1 z-10"
+          >
+            <Avatar className="w-5 h-5 border-2 border-background shadow-sm">
+              <AvatarImage src={bookingInfo.requesterProfileImageUrl || undefined} alt={bookingInfo.requesterName} />
+              <AvatarFallback className="text-[8px] bg-booked text-booked-foreground">
+                {bookingInfo.requesterName.slice(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+          </motion.div>
+        )}
       </motion.button>
     );
+
+    // Wrap booked dates with tooltip
+    if (status === "booked" && bookingInfo) {
+      days.push(
+        <TooltipProvider key={day}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              {dayButton}
+            </TooltipTrigger>
+            <TooltipContent side="top" className="p-3">
+              <div className="flex items-center gap-3">
+                <Avatar className="w-10 h-10">
+                  <AvatarImage src={bookingInfo.requesterProfileImageUrl || undefined} alt={bookingInfo.requesterName} />
+                  <AvatarFallback className="bg-booked text-booked-foreground">
+                    {bookingInfo.requesterName.slice(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="font-medium text-sm">{bookingInfo.requesterName}</p>
+                  <p className="text-xs text-muted-foreground">Collaboration booked</p>
+                </div>
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    } else {
+      days.push(dayButton);
+    }
   }
 
   return (
