@@ -1,19 +1,20 @@
 import { motion } from "framer-motion";
-import { Link2, CalendarCheck, MessageSquareText } from "lucide-react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { teamProfiles } from "@/data/team-profiles";
 
 const steps = [
   {
-    icon: <Link2 className="w-6 h-6" />,
+    profile: teamProfiles[0],
     title: "Share Your Link",
     description: "Create your profile with a personal welcome message and get your booking page (collabstack.app/yourname)",
   },
   {
-    icon: <CalendarCheck className="w-6 h-6" />,
+    profile: teamProfiles[1],
     title: "Guests Pick a Date",
     description: "Collaborators see your availability and share why they want to connect—on their terms",
   },
   {
-    icon: <MessageSquareText className="w-6 h-6" />,
+    profile: teamProfiles[2],
     title: "Prep Your Conversation",
     description: "Get AI-curated talking points based on what you both write about—so you can skip the small talk",
   },
@@ -52,10 +53,11 @@ export function HowItWorksSection() {
               )}
               
               <div className="relative z-10 flex flex-col items-center text-center">
-                {/* Step number */}
-                <div className="w-20 h-20 rounded-2xl gradient-primary flex items-center justify-center text-primary-foreground mb-6 shadow-glow">
-                  {step.icon}
-                </div>
+                {/* Profile Avatar */}
+                <Avatar className="w-20 h-20 mb-6 border-3 border-primary/30 shadow-lg ring-4 ring-primary/10">
+                  <AvatarImage src={step.profile.image} alt={step.profile.name} className="object-cover" />
+                  <AvatarFallback className="text-xl font-medium">{step.profile.initials}</AvatarFallback>
+                </Avatar>
                 
                 <span className="text-sm font-medium text-primary mb-2">Step {index + 1}</span>
                 <h3 className="text-xl font-semibold mb-3">{step.title}</h3>
