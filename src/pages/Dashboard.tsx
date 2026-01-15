@@ -13,9 +13,16 @@ interface CollabRequest {
   id: string;
   requester_name: string;
   requester_email: string;
+  requester_profile_image_url: string | null;
   requested_date: string;
   status: string;
   created_at: string;
+}
+
+interface BookingInfo {
+  date: string;
+  requesterName: string;
+  requesterProfileImageUrl: string | null;
 }
 
 export default function Dashboard() {
@@ -24,6 +31,7 @@ export default function Dashboard() {
   const [availability, setAvailability] = useState<string[]>([]);
   const [requests, setRequests] = useState<CollabRequest[]>([]);
   const [bookedDates, setBookedDates] = useState<string[]>([]);
+  const [bookingDetails, setBookingDetails] = useState<BookingInfo[]>([]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -58,14 +66,22 @@ export default function Dashboard() {
     // Fetch requests
     const { data: reqData } = await supabase
       .from('collab_requests')
-      .select('*')
+      .select('id, requester_name, requester_email, requester_profile_image_url, requested_date, status, created_at')
       .eq('creator_id', creator.id)
       .order('created_at', { ascending: false });
 
     if (reqData) {
       setRequests(reqData);
-      setBookedDates(
-        reqData.filter((r) => r.status === "approved").map((r) => r.requested_date)
+      const approvedRequests = reqData.filter((r) => r.status === "approved");
+      setBookedDates(approvedRequests.map((r) => r.requested_date));
+      
+      // Create booking details for calendar avatars
+      setBookingDetails(
+        approvedRequests.map((r) => ({
+          date: r.requested_date,
+          requesterName: r.requester_name,
+          requesterProfileImageUrl: r.requester_profile_image_url,
+        }))
       );
     }
   };
@@ -220,6 +236,7 @@ export default function Dashboard() {
             <CollabCalendar
               availableDates={availability}
               bookedDates={bookedDates}
+              bookingDetails={bookingDetails}
             />
             {availability.length === 0 && (
               <motion.div

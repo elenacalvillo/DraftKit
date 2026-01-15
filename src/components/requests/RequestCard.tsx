@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Calendar, ExternalLink, Mail, Link as LinkIcon, Sparkles, MessageSquare, FileText, XCircle, Ban } from "lucide-react";
+import { Calendar, ExternalLink, Mail, Link as LinkIcon, Sparkles, MessageSquare, FileText, XCircle, Ban, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CollabRequest, CollabDraft } from "@/lib/storage";
 import { cn } from "@/lib/utils";
@@ -30,14 +30,17 @@ interface RequestCardProps {
   onDecline?: (id: string) => void;
   onCancel?: (id: string) => void;
   onDraftGenerated?: (id: string, draft: CollabDraft) => void;
+  onProfileRefreshed?: (id: string, newImageUrl: string) => void;
 }
 
-export function RequestCard({ request, creatorEmail, onApprove, onDecline, onCancel, onDraftGenerated }: RequestCardProps) {
+export function RequestCard({ request, creatorEmail, onApprove, onDecline, onCancel, onDraftGenerated, onProfileRefreshed }: RequestCardProps) {
   const { trackEvent } = useAnalytics();
   const [imageError, setImageError] = useState(false);
   const [showDraftModal, setShowDraftModal] = useState(false);
   const [showMessageModal, setShowMessageModal] = useState(false);
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
+  const [isRefreshingProfile, setIsRefreshingProfile] = useState(false);
+  const [localProfileImage, setLocalProfileImage] = useState<string | null>(request.requesterProfileImageUrl);
   const [localDraft, setLocalDraft] = useState<CollabDraft | null>(
     request.aiDraft as CollabDraft | null
   );
@@ -60,7 +63,7 @@ export function RequestCard({ request, creatorEmail, onApprove, onDecline, onCan
     cancelled: "bg-muted text-muted-foreground border-muted-foreground/20",
   };
 
-  const showImage = request.requesterProfileImageUrl && !imageError;
+  
 
   const generateDraft = async () => {
     setIsGeneratingDraft(true);
@@ -117,6 +120,44 @@ export function RequestCard({ request, creatorEmail, onApprove, onDecline, onCan
     }
   };
 
+  const refreshProfileImage = async () => {
+    if (!request.requesterSubstackUrl) {
+      toast.error("No Substack URL to fetch profile from");
+      return;
+    }
+
+    setIsRefreshingProfile(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('fetch-substack-profile', {
+        body: { substackUrl: request.requesterSubstackUrl }
+      });
+
+      if (error) throw error;
+
+      if (data?.imageUrl) {
+        // Update in database
+        await supabase
+          .from('collab_requests')
+          .update({ requester_profile_image_url: data.imageUrl })
+          .eq('id', request.id);
+
+        setLocalProfileImage(data.imageUrl);
+        setImageError(false);
+        onProfileRefreshed?.(request.id, data.imageUrl);
+        toast.success("Profile image refreshed!");
+      } else {
+        toast.info("No profile image found for this Substack");
+      }
+    } catch (error) {
+      console.error("Failed to refresh profile:", error);
+      toast.error("Failed to refresh profile image");
+    } finally {
+      setIsRefreshingProfile(false);
+    }
+  };
+
+  const showImage = localProfileImage && !imageError;
+
   return (
     <>
       <motion.div
@@ -130,18 +171,33 @@ export function RequestCard({ request, creatorEmail, onApprove, onDecline, onCan
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
-            {showImage ? (
-              <img
-                src={request.requesterProfileImageUrl!}
-                alt={request.requesterName}
-                className="w-10 h-10 rounded-full object-cover border-2 border-primary/20"
-                onError={() => setImageError(true)}
-              />
-            ) : (
-              <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center text-primary-foreground font-semibold">
-                {request.requesterName.charAt(0).toUpperCase()}
-              </div>
-            )}
+            <div className="relative">
+              {showImage ? (
+                <img
+                  src={localProfileImage!}
+                  alt={request.requesterName}
+                  className="w-10 h-10 rounded-full object-cover border-2 border-primary/20"
+                  onError={() => setImageError(true)}
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center text-primary-foreground font-semibold">
+                  {request.requesterName.charAt(0).toUpperCase()}
+                </div>
+              )}
+              {/* Refresh profile button */}
+              {request.requesterSubstackUrl && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-background border border-border shadow-sm hover:bg-muted p-0"
+                  onClick={refreshProfileImage}
+                  disabled={isRefreshingProfile}
+                  title="Refresh profile image"
+                >
+                  <RefreshCw className={cn("w-3 h-3", isRefreshingProfile && "animate-spin")} />
+                </Button>
+              )}
+            </div>
             <div className="min-w-0 flex-1">
               <h3 className="font-semibold">{request.requesterName}</h3>
               {request.requesterSubstackUrl ? (
