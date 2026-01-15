@@ -1,7 +1,9 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { ArrowRight, Calendar, Users, BookOpen, Heart } from "lucide-react";
+import { ArrowRight, Heart } from "lucide-react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { teamProfiles } from "@/data/team-profiles";
 
 export function HeroSection() {
   return (
@@ -96,19 +98,25 @@ export function HeroSection() {
             className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto"
           >
             <FeatureCard
-              icon={<Calendar className="w-6 h-6" />}
+              image={teamProfiles[0].image}
+              name={teamProfiles[0].name}
+              initials={teamProfiles[0].initials}
               title="Your Calendar, Your Rules"
               description="Control when you're open to new connections with a simple, beautiful interface"
               delay={0.5}
             />
             <FeatureCard
-              icon={<Users className="w-6 h-6" />}
+              image={teamProfiles[1].image}
+              name={teamProfiles[1].name}
+              initials={teamProfiles[1].initials}
               title="Personal Pitches Only"
               description="Every request includes a space for collaborators to share their 'why'—no cold DMs"
               delay={0.6}
             />
             <FeatureCard
-              icon={<BookOpen className="w-6 h-6" />}
+              image={teamProfiles[2].image}
+              name={teamProfiles[2].name}
+              initials={teamProfiles[2].initials}
               title="Show Up Prepared"
               description="Our AI reads both newsletters to surface the common ground you'll actually love discussing"
               delay={0.7}
@@ -121,12 +129,16 @@ export function HeroSection() {
 }
 
 function FeatureCard({
-  icon,
+  image,
+  name,
+  initials,
   title,
   description,
   delay,
 }: {
-  icon: React.ReactNode;
+  image: string;
+  name: string;
+  initials: string;
   title: string;
   description: string;
   delay: number;
@@ -139,9 +151,10 @@ function FeatureCard({
       whileHover={{ y: -5 }}
       className="glass-card p-6 hover-lift cursor-default"
     >
-      <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center text-primary-foreground mb-4 mx-auto">
-        {icon}
-      </div>
+      <Avatar className="w-16 h-16 mx-auto mb-4 border-2 border-primary/20 shadow-lg">
+        <AvatarImage src={image} alt={name} className="object-cover" />
+        <AvatarFallback className="text-lg font-medium">{initials}</AvatarFallback>
+      </Avatar>
       <h3 className="text-lg font-semibold mb-2">{title}</h3>
       <p className="text-muted-foreground text-sm">{description}</p>
     </motion.div>
