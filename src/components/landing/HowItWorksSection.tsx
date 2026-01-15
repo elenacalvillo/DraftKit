@@ -4,17 +4,17 @@ import { teamProfiles } from "@/data/team-profiles";
 
 const steps = [
   {
-    profile: teamProfiles[0],
+    profile: teamProfiles[3], // Raghav
     title: "Share Your Link",
     description: "Create your profile with a personal welcome message and get your booking page (collabstack.app/yourname)",
   },
   {
-    profile: teamProfiles[1],
+    profile: teamProfiles[1], // Stef
     title: "Guests Pick a Date",
     description: "Collaborators see your availability and share why they want to connect—on their terms",
   },
   {
-    profile: teamProfiles[2],
+    profile: teamProfiles[2], // Cristina
     title: "Prep Your Conversation",
     description: "Get AI-curated talking points based on what you both write about—so you can skip the small talk",
   },
