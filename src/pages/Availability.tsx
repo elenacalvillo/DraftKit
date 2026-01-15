@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, Check, Info } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { CollabCalendar } from "@/components/calendar/CollabCalendar";
+import { CollabCalendar, BookingInfo } from "@/components/calendar/CollabCalendar";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, Link } from "react-router-dom";
@@ -15,6 +15,7 @@ export default function Availability() {
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [blockedDates, setBlockedDates] = useState<string[]>([]);
   const [bookedDates, setBookedDates] = useState<string[]>([]);
+  const [bookingDetails, setBookingDetails] = useState<BookingInfo[]>([]);
   const [availabilityId, setAvailabilityId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -79,12 +80,22 @@ export default function Availability() {
     
     const { data: reqData } = await supabase
       .from('collab_requests')
-      .select('requested_date')
+      .select('requested_date, requester_name, requester_profile_image_url')
       .eq('creator_id', creator.id)
       .eq('status', 'approved');
 
     if (reqData) {
       setBookedDates(reqData.map((r) => r.requested_date).filter(Boolean) as string[]);
+      
+      // Transform to BookingInfo array
+      const details: BookingInfo[] = reqData
+        .filter(r => r.requested_date)
+        .map(r => ({
+          date: r.requested_date as string,
+          requesterName: r.requester_name,
+          requesterProfileImageUrl: r.requester_profile_image_url,
+        }));
+      setBookingDetails(details);
     }
   };
 
@@ -229,6 +240,7 @@ export default function Availability() {
             availableDates={availableDates}
             blockedDates={blockedDates}
             bookedDates={bookedDates}
+            bookingDetails={bookingDetails}
             isEditable={true}
             onToggleAvailable={handleToggleAvailable}
             onToggleBlocked={handleToggleBlocked}

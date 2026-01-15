@@ -116,6 +116,22 @@ function normalizeSubstackUrl(url: string): string {
   return normalized;
 }
 
+function isValidProfileImage(url: string): boolean {
+  // Reject social cards, subscribe cards, and other non-profile images
+  if (!url) return false;
+  const invalidPatterns = [
+    'subscribe-card',
+    'aspectRatio%3Dlink',
+    'aspectRatio=link',
+    'twitter_name',
+    'og_image',
+    'social',
+    'cover_image',
+    'newsletter_logo',
+  ];
+  return !invalidPatterns.some(pattern => url.toLowerCase().includes(pattern.toLowerCase()));
+}
+
 function extractProfileData(html: string, isProfilePage: boolean): SubstackProfile {
   const result: SubstackProfile = {
     imageUrl: null,
@@ -123,86 +139,121 @@ function extractProfileData(html: string, isProfilePage: boolean): SubstackProfi
     tagline: null,
   };
   
+  // Collect all candidate images first, then pick the best one
+  const candidateImages: { url: string; priority: number; source: string }[] = [];
+  
   if (isProfilePage) {
     // PROFILE PAGE: Look for actual profile photo (not social card)
     console.log("Extracting from profile page - looking for actual profile photo");
     
-    // Pattern 1: S3 bucket URLs (where real profile photos are stored)
-    // These look like: https://substackcdn.com/image/fetch/.../bucketeer-...s3.amazonaws.com/.../image.png
-    const s3ImageMatch = html.match(/src="(https:\/\/substackcdn\.com\/image\/fetch\/[^"]*bucketeer[^"]+)"/i);
-    if (s3ImageMatch) {
-      result.imageUrl = s3ImageMatch[1];
-      console.log("Found profile image via S3 bucket URL");
-    }
-    
-    // Pattern 2: Look for profile photo with square dimensions (profile photos are usually square like 1000x1000)
-    if (!result.imageUrl) {
-      const squareImageMatch = html.match(/src="(https:\/\/substackcdn\.com\/image\/fetch\/[^"]+_\d{3,4}x\d{3,4}\.(?:png|jpg|jpeg)[^"]*)"/i);
-      if (squareImageMatch) {
-        result.imageUrl = squareImageMatch[1];
-        console.log("Found profile image via square dimension pattern");
+    // Pattern 1: S3 bucket URLs with public/images path (highest priority - actual profile photos)
+    const s3PublicImagesMatches = html.matchAll(/src="(https:\/\/substackcdn\.com\/image\/fetch\/[^"]*bucketeer[^"]*public%2Fimages[^"]+)"/gi);
+    for (const match of s3PublicImagesMatches) {
+      if (isValidProfileImage(match[1])) {
+        candidateImages.push({ url: match[1], priority: 1, source: 'S3 public/images' });
       }
     }
     
-    // Pattern 3: Look for user-head-photo or avatar class images
-    if (!result.imageUrl) {
-      const avatarMatch = html.match(/<img[^>]+class="[^"]*(?:user-head|avatar|profile-photo)[^"]*"[^>]+src="([^"]+)"/i) ||
-                         html.match(/<img[^>]+src="([^"]+)"[^>]+class="[^"]*(?:user-head|avatar|profile-photo)[^"]*"/i);
-      if (avatarMatch) {
-        result.imageUrl = avatarMatch[1];
-        console.log("Found profile image via avatar class");
+    // Pattern 2: Any S3 bucket URL (second priority)
+    const s3ImageMatches = html.matchAll(/src="(https:\/\/substackcdn\.com\/image\/fetch\/[^"]*bucketeer[^"]+)"/gi);
+    for (const match of s3ImageMatches) {
+      if (isValidProfileImage(match[1])) {
+        candidateImages.push({ url: match[1], priority: 2, source: 'S3 bucket' });
       }
     }
     
-    // Pattern 4: Look for any image with public/images in the path (Substack profile storage)
-    if (!result.imageUrl) {
-      const publicImagesMatch = html.match(/src="(https:\/\/substackcdn\.com\/image\/fetch\/[^"]*public%2Fimages[^"]+)"/i);
-      if (publicImagesMatch) {
-        result.imageUrl = publicImagesMatch[1];
-        console.log("Found profile image via public/images path");
+    // Pattern 3: Profile photo with square dimensions (profile photos are usually 1000x1000)
+    const squareImageMatches = html.matchAll(/src="(https:\/\/substackcdn\.com\/image\/fetch\/[^"]+_(\d{3,4})x(\d{3,4})\.(?:png|jpg|jpeg)[^"]*)"/gi);
+    for (const match of squareImageMatches) {
+      const width = parseInt(match[2]);
+      const height = parseInt(match[3]);
+      // Only consider if roughly square
+      if (Math.abs(width - height) < 100 && isValidProfileImage(match[1])) {
+        candidateImages.push({ url: match[1], priority: 3, source: 'square dimensions' });
       }
     }
     
-    // Pattern 5: og:image as last resort (but skip if it looks like a subscribe card)
-    if (!result.imageUrl) {
-      const ogImageMatch = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i) ||
-                          html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:image"/i);
-      if (ogImageMatch && !ogImageMatch[1].includes("subscribe-card") && !ogImageMatch[1].includes("aspectRatio%3Dlink")) {
-        result.imageUrl = ogImageMatch[1];
-        console.log("Found profile image via og:image fallback");
+    // Pattern 4: Look for user-head-photo, avatar, or profile-photo class images
+    const avatarPatterns = [
+      /<img[^>]+class="[^"]*(?:user-head|avatar|profile-photo|pencraft-img)[^"]*"[^>]+src="([^"]+)"/gi,
+      /<img[^>]+src="([^"]+)"[^>]+class="[^"]*(?:user-head|avatar|profile-photo|pencraft-img)[^"]*"/gi,
+    ];
+    for (const pattern of avatarPatterns) {
+      const matches = html.matchAll(pattern);
+      for (const match of matches) {
+        if (isValidProfileImage(match[1])) {
+          candidateImages.push({ url: match[1], priority: 4, source: 'avatar class' });
+        }
       }
     }
+    
+    // Pattern 5: Look for any substackcdn image in public/images path
+    const publicImagesMatches = html.matchAll(/src="(https:\/\/substackcdn\.com\/image\/fetch\/[^"]*public%2Fimages[^"]+)"/gi);
+    for (const match of publicImagesMatches) {
+      if (isValidProfileImage(match[1])) {
+        candidateImages.push({ url: match[1], priority: 5, source: 'public/images path' });
+      }
+    }
+    
+    // Pattern 6: substack-post-media images as backup
+    const postMediaMatches = html.matchAll(/src="(https:\/\/substack-post-media\.s3\.amazonaws\.com\/public\/images\/[^"]+)"/gi);
+    for (const match of postMediaMatches) {
+      if (isValidProfileImage(match[1])) {
+        candidateImages.push({ url: match[1], priority: 6, source: 'substack-post-media' });
+      }
+    }
+    
   } else {
-    // PUBLICATION PAGE: Use meta tags for publication logo/cover
-    console.log("Extracting from publication page - using meta tags");
+    // PUBLICATION PAGE: Look for author image first, then fall back to publication logo
+    console.log("Extracting from publication page - looking for author/publication image");
     
-    // Pattern 1: twitter:image meta tag
-    const twitterImageMatch = html.match(/<meta[^>]+name="twitter:image"[^>]+content="([^"]+)"/i) ||
-                             html.match(/<meta[^>]+content="([^"]+)"[^>]+name="twitter:image"/i);
-    if (twitterImageMatch) {
-      result.imageUrl = twitterImageMatch[1];
-      console.log("Found image via twitter:image meta tag");
-    }
-    
-    // Pattern 2: og:image meta tag
-    if (!result.imageUrl) {
-      const ogImageMatch = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i) ||
-                          html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:image"/i);
-      if (ogImageMatch) {
-        result.imageUrl = ogImageMatch[1];
-        console.log("Found image via og:image meta tag");
+    // Pattern 1: Look for author image in the about section or byline
+    const authorPatterns = [
+      /<img[^>]+class="[^"]*(?:author|user-head|avatar|profile)[^"]*"[^>]+src="([^"]+)"/gi,
+      /<img[^>]+src="([^"]+)"[^>]+class="[^"]*(?:author|user-head|avatar|profile)[^"]*"/gi,
+      /<a[^>]+class="[^"]*author[^"]*"[^>]*>[\s\S]*?<img[^>]+src="([^"]+)"/gi,
+    ];
+    for (const pattern of authorPatterns) {
+      const matches = html.matchAll(pattern);
+      for (const match of matches) {
+        if (isValidProfileImage(match[1])) {
+          candidateImages.push({ url: match[1], priority: 1, source: 'author class' });
+        }
       }
     }
     
-    // Pattern 3: publication-cover-photo class
-    if (!result.imageUrl) {
-      const coverPhotoMatch = html.match(/<img[^>]+class="[^"]*publication-cover-photo[^"]*"[^>]+src="([^"]+)"/i) ||
-                             html.match(/<img[^>]+src="([^"]+)"[^>]+class="[^"]*publication-cover-photo[^"]*"/i);
-      if (coverPhotoMatch) {
-        result.imageUrl = coverPhotoMatch[1];
-        console.log("Found image via publication-cover-photo class");
+    // Pattern 2: S3 bucket profile images
+    const s3ImageMatches = html.matchAll(/src="(https:\/\/substackcdn\.com\/image\/fetch\/[^"]*bucketeer[^"]*public%2Fimages[^"]+)"/gi);
+    for (const match of s3ImageMatches) {
+      if (isValidProfileImage(match[1])) {
+        candidateImages.push({ url: match[1], priority: 2, source: 'S3 public/images' });
       }
     }
+    
+    // Pattern 3: substack-post-media images
+    const postMediaMatches = html.matchAll(/src="(https:\/\/substack-post-media\.s3\.amazonaws\.com\/public\/images\/[^"]+)"/gi);
+    for (const match of postMediaMatches) {
+      if (isValidProfileImage(match[1])) {
+        candidateImages.push({ url: match[1], priority: 3, source: 'substack-post-media' });
+      }
+    }
+    
+    // Pattern 4: og:image/twitter:image as fallback (but filter carefully)
+    const ogImageMatch = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i) ||
+                        html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:image"/i);
+    if (ogImageMatch && isValidProfileImage(ogImageMatch[1])) {
+      candidateImages.push({ url: ogImageMatch[1], priority: 10, source: 'og:image fallback' });
+    }
+  }
+  
+  // Sort by priority and pick the best one
+  candidateImages.sort((a, b) => a.priority - b.priority);
+  
+  if (candidateImages.length > 0) {
+    result.imageUrl = candidateImages[0].url;
+    console.log(`Found profile image via ${candidateImages[0].source} (${candidateImages.length} candidates)`);
+  } else {
+    console.log("No valid profile image found");
   }
   
   // Extract publication name from og:site_name or title
