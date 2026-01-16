@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Send, Calendar, Clock, ExternalLink, Inbox, ArrowRight, X, CalendarClock } from 'lucide-react';
+import { Send, Calendar, Clock, ExternalLink, Inbox, ArrowRight, X, CalendarClock, Trash2 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { toast } from 'sonner';
@@ -82,6 +82,7 @@ export default function MyRequests() {
           created_at
         `)
         .eq('requester_user_id', user?.id)
+        .eq('hidden_by_requester', false)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -142,6 +143,23 @@ export default function MyRequests() {
   const handleReschedule = (creatorUsername: string) => {
     navigate(`/${creatorUsername}`);
     toast.info('Please submit a new request with your preferred date');
+  };
+
+  const handleDeleteRequest = async (requestId: string) => {
+    try {
+      const { error } = await supabase
+        .from('collab_requests')
+        .update({ hidden_by_requester: true })
+        .eq('id', requestId);
+
+      if (error) throw error;
+
+      setRequests(prev => prev.filter(r => r.id !== requestId));
+      toast.success('Request deleted');
+    } catch (error) {
+      console.error('Error deleting request:', error);
+      toast.error('Failed to delete request');
+    }
   };
 
   if (authLoading || loading) {
@@ -294,6 +312,22 @@ export default function MyRequests() {
                         >
                           <CalendarClock className="h-4 w-4 mr-1" />
                           Reschedule
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Delete button for cancelled requests */}
+                    {request.status === 'cancelled' && (
+                      <div className="flex gap-2 pt-3 border-t mt-3">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => handleDeleteRequest(request.id)}
+                          className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          title="Dismiss"
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Delete
                         </Button>
                       </div>
                     )}

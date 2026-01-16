@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Calendar, ExternalLink, Mail, Link as LinkIcon, Sparkles, MessageSquare, FileText, XCircle, Ban, Edit2, Check, X } from "lucide-react";
+import { Calendar, ExternalLink, Mail, Link as LinkIcon, Sparkles, MessageSquare, FileText, XCircle, Ban, Edit2, Check, X, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CollabRequest, CollabDraft } from "@/lib/storage";
@@ -21,11 +21,12 @@ interface RequestCardProps {
   onCancel?: (id: string) => void;
   onDraftGenerated?: (id: string, draft: CollabDraft) => void;
   onCollabTypeChanged?: (id: string, newType: string) => void;
+  onDelete?: (id: string) => void;
 }
 
 const COLLAB_STYLE_OPTIONS = ["Virtual Coffee", "Async Drafting", "Interview Style", "Custom"];
 
-export function RequestCard({ request, creatorEmail, creatorCollabStyles, onApprove, onDecline, onCancel, onDraftGenerated, onCollabTypeChanged }: RequestCardProps) {
+export function RequestCard({ request, creatorEmail, creatorCollabStyles, onApprove, onDecline, onCancel, onDraftGenerated, onCollabTypeChanged, onDelete }: RequestCardProps) {
   const { trackEvent } = useAnalytics();
   const [imageError, setImageError] = useState(false);
   const [showDraftModal, setShowDraftModal] = useState(false);
@@ -372,11 +373,24 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, onAppr
           </div>
         )}
 
-        {/* Cancelled status indicator */}
+        {/* Cancelled status indicator with delete option */}
         {request.status === "cancelled" && (
-          <div className="flex items-center gap-2 text-muted-foreground bg-muted/50 rounded-lg p-3">
-            <Ban className="w-4 h-4" />
-            <span className="text-sm">This collaboration was cancelled. The date has been restored to available.</span>
+          <div className="flex items-center justify-between bg-muted/50 rounded-lg p-3">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Ban className="w-4 h-4" />
+              <span className="text-sm">This collaboration was cancelled.</span>
+            </div>
+            {onDelete && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => onDelete(request.id)}
+                className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                title="Dismiss"
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            )}
           </div>
         )}
       </motion.div>

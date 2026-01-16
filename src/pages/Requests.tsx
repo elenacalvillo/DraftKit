@@ -61,6 +61,7 @@ export default function Requests() {
       .from('collab_requests')
       .select('*')
       .eq('creator_id', creator.id)
+      .eq('hidden_by_creator', false)
       .order('created_at', { ascending: false });
 
     if (data) {
@@ -207,6 +208,21 @@ export default function Requests() {
     );
   };
 
+  const handleDelete = async (id: string) => {
+    const { error } = await supabase
+      .from('collab_requests')
+      .update({ hidden_by_creator: true })
+      .eq('id', id);
+
+    if (error) {
+      toast.error("Failed to delete request");
+      return;
+    }
+
+    setRequests(requests.filter(r => r.id !== id));
+    toast.success("Request deleted");
+  };
+
   const filteredRequests = requests.filter((r) => {
     if (activeTab === "all") return true;
     return r.status === activeTab;
@@ -345,6 +361,7 @@ export default function Requests() {
                     onDecline={handleDecline}
                     onCancel={handleCancel}
                     onDraftGenerated={handleDraftGenerated}
+                    onDelete={handleDelete}
                   />
                 </motion.div>
               ))}

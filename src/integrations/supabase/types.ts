@@ -93,6 +93,8 @@ export type Database = {
           created_at: string
           creator_id: string
           creator_notes: string | null
+          hidden_by_creator: boolean
+          hidden_by_requester: boolean
           id: string
           message: string | null
           reminder_sent_at: string | null
@@ -111,6 +113,8 @@ export type Database = {
           created_at?: string
           creator_id: string
           creator_notes?: string | null
+          hidden_by_creator?: boolean
+          hidden_by_requester?: boolean
           id?: string
           message?: string | null
           reminder_sent_at?: string | null
@@ -129,6 +133,8 @@ export type Database = {
           created_at?: string
           creator_id?: string
           creator_notes?: string | null
+          hidden_by_creator?: boolean
+          hidden_by_requester?: boolean
           id?: string
           message?: string | null
           reminder_sent_at?: string | null
