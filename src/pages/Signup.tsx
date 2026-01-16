@@ -168,6 +168,22 @@ export default function Signup() {
       return;
     }
 
+    // Fetch profile image from Substack if URL provided
+    let profileImageUrl = null;
+    if (formData.substackUrl) {
+      try {
+        const { data: profileData } = await supabase.functions.invoke(
+          "fetch-substack-profile",
+          { body: { substackUrl: formData.substackUrl } }
+        );
+        if (profileData?.imageUrl) {
+          profileImageUrl = profileData.imageUrl;
+        }
+      } catch (e) {
+        console.log("Could not fetch profile image during signup:", e);
+      }
+    }
+
     // Create creator profile
     const { data: newCreator, error } = await supabase
       .from('creators')
@@ -180,6 +196,7 @@ export default function Signup() {
         newsletter_url: formData.newsletterUrl,
         welcome_message: formData.welcomeMessage || `Hi! I'm ${formData.name}. Let's collaborate!`,
         join_directory_waitlist: formData.joinDirectory,
+        profile_image_url: profileImageUrl,
       })
       .select()
       .single();
