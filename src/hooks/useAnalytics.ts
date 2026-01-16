@@ -15,6 +15,7 @@ export type AnalyticsEventType =
   | "collab_approved"
   | "collab_declined"
   | "collab_cancelled"
+  | "collab_type_changed"
   // New events for funnel analytics
   | "analyze_collab_match_invoked"
   | "ai_match_suggestion_selected"

@@ -102,6 +102,7 @@ export type Database = {
           requester_profile_image_url: string | null
           requester_substack_url: string | null
           requester_user_id: string | null
+          selected_collab_type: string | null
           status: string
         }
         Insert: {
@@ -119,6 +120,7 @@ export type Database = {
           requester_profile_image_url?: string | null
           requester_substack_url?: string | null
           requester_user_id?: string | null
+          selected_collab_type?: string | null
           status?: string
         }
         Update: {
@@ -136,6 +138,7 @@ export type Database = {
           requester_profile_image_url?: string | null
           requester_substack_url?: string | null
           requester_user_id?: string | null
+          selected_collab_type?: string | null
           status?: string
         }
         Relationships: [

@@ -34,9 +34,10 @@ const corsHeaders = {
 };
 
 interface EmailRequest {
-  type: "request_approved" | "request_declined" | "request_received" | "request_cancelled_by_guest" | "collab_cancelled_by_host" | "new_message" | "collab_reminder";
+  type: "request_approved" | "request_declined" | "request_received" | "request_cancelled_by_guest" | "collab_cancelled_by_host" | "new_message" | "collab_reminder" | "collab_type_changed";
   requestId: string;
   messageContent?: string;
+  newCollabType?: string;
 }
 
 interface CollabDraft {
@@ -58,7 +59,7 @@ serve(async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { type, requestId, messageContent }: EmailRequest = await req.json();
+    const { type, requestId, messageContent, newCollabType }: EmailRequest = await req.json();
 
     if (!type || !requestId) {
       return new Response(
@@ -545,6 +546,66 @@ serve(async (req: Request): Promise<Response> => {
         JSON.stringify({ success: true, message: "Reminder emails sent to both parties" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // Handle collab_type_changed email
+    if (type === "collab_type_changed") {
+      toEmail = requesterEmail;
+      const collabTypeName = newCollabType || request.selected_collab_type || "Updated";
+      emailSubject = `📝 Collaboration type updated with ${creatorName}`;
+      
+      emailHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 32px;">
+            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #8b5cf6, #d946ef); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+              <span style="color: white; font-size: 24px;">📝</span>
+            </div>
+            <h1 style="margin: 0; font-size: 24px; color: #1e293b;">Collaboration Type Updated</h1>
+          </div>
+
+          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterName},</p>
+          
+          <p style="font-size: 16px; margin-bottom: 24px;">
+            <strong>${creatorName}</strong> has updated the collaboration type for your upcoming collaboration${requestedDate ? ` on <strong>${formattedDate}</strong>` : ""}.
+          </p>
+
+          <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #8b5cf6; text-align: center;">
+            <p style="margin: 0 0 8px 0; color: #64748b; font-size: 14px;">New Collaboration Type</p>
+            <p style="margin: 0; font-size: 24px; font-weight: 600; color: #8b5cf6;">${collabTypeName}</p>
+          </div>
+
+          <p style="font-size: 16px; margin-bottom: 24px; color: #475569;">
+            ${collabTypeName === "Virtual Coffee" 
+              ? "This means you'll have a 30-60 minute video call to discuss your collaboration."
+              : collabTypeName === "Async Drafting"
+              ? "This means you'll collaborate asynchronously through shared drafts and written feedback."
+              : collabTypeName === "Interview Style"
+              ? "This means you'll exchange Q&A in a structured interview format."
+              : "Please reach out to the creator for more details on what to expect."
+            }
+          </p>
+
+          <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
+            <p style="margin: 0 0 16px 0; color: #475569;">Have questions about the change?</p>
+            <a href="mailto:${creatorEmail}?subject=Re: Collaboration type update" 
+               style="display: inline-block; background: linear-gradient(135deg, #8b5cf6, #d946ef); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+              Contact ${creatorName}
+            </a>
+          </div>
+
+          <p style="font-size: 14px; color: #64748b; margin-top: 32px;">
+            Happy collaborating!<br>
+            The CollabStack Team
+          </p>
+        </body>
+        </html>
+      `;
     }
 
     if (!toEmail) {
