@@ -29,6 +29,36 @@ export default function Settings() {
     welcomeMessage: "",
   });
 
+  // Auto-fetch profile image if missing
+  const autoFetchProfileImage = async (substackUrl: string) => {
+    if (!substackUrl) return;
+    
+    setIsFetchingImage(true);
+    try {
+      const { data: profileData, error: profileError } = await supabase.functions.invoke(
+        "fetch-substack-profile",
+        { body: { substackUrl } }
+      );
+      
+      if (!profileError && profileData?.imageUrl) {
+        setPreviewImageUrl(profileData.imageUrl);
+        
+        // Also save to database immediately
+        if (creator) {
+          await supabase
+            .from('creators')
+            .update({ profile_image_url: profileData.imageUrl })
+            .eq('id', creator.id);
+          await refreshCreator();
+        }
+      }
+    } catch (e) {
+      console.log("Auto-fetch profile image failed:", e);
+    } finally {
+      setIsFetchingImage(false);
+    }
+  };
+
   useEffect(() => {
     if (!loading && !user) {
       navigate("/login");
@@ -49,6 +79,11 @@ export default function Settings() {
         welcomeMessage: creator.welcome_message || "",
       });
       setPreviewImageUrl((creator as any).profile_image_url || null);
+      
+      // Auto-fetch profile image if missing but substack URL exists
+      if (!(creator as any).profile_image_url && creator.substack_url) {
+        autoFetchProfileImage(creator.substack_url);
+      }
     }
   }, [user, creator, loading, navigate]);
 
