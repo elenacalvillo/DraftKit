@@ -517,6 +517,15 @@ Example:
                 Markdown supported. These guidelines will be sent to collaborators when you approve their request.
               </p>
             </div>
+            
+            <Button 
+              variant="gradient" 
+              onClick={handleSave} 
+              className="w-full mt-6"
+              disabled={isSaving}
+            >
+              {isSaving ? "Saving..." : "Save Playbook Settings"}
+            </Button>
           </div>
         </motion.div>
 
@@ -580,6 +589,15 @@ Example:
                 Coming Soon
               </Button>
             </div>
+            
+            <Button 
+              variant="gradient" 
+              onClick={handleSave} 
+              className="w-full mt-6"
+              disabled={isSaving}
+            >
+              {isSaving ? "Saving..." : "Save Integration Settings"}
+            </Button>
           </div>
         </motion.div>
 
