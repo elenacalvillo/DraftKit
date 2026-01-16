@@ -314,7 +314,7 @@ export default function PublicBooking() {
       console.log("Could not fetch requester profile image:", e);
     }
 
-    const { error } = await supabase
+    const { data: insertedRequest, error } = await supabase
       .from('collab_requests')
       .insert({
         creator_id: creator.id,
@@ -326,7 +326,9 @@ export default function PublicBooking() {
         requested_date: isFlexibleDate ? null : selectedDate,
         status: 'pending',
         requester_user_id: user?.id || null,
-      });
+      })
+      .select('id')
+      .single();
 
     if (error) {
       // Handle unique constraint violation (race condition - date was just booked)
@@ -338,6 +340,19 @@ export default function PublicBooking() {
       }
       setIsSubmitting(false);
       return;
+    }
+
+    // Send email notification to the host (creator)
+    if (insertedRequest?.id) {
+      supabase.functions.invoke('send-collab-email', {
+        body: { 
+          type: 'request_received', 
+          requestId: insertedRequest.id 
+        }
+      }).catch(err => {
+        // Fire-and-forget: don't block the UI, just log errors
+        console.error('Failed to send notification email:', err);
+      });
     }
 
     setIsSubmitting(false);

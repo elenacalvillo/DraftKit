@@ -13,6 +13,7 @@ async function sendEmail(to: string[], subject: string, html: string) {
     },
     body: JSON.stringify({
       from: "CollabStack <onboarding@resend.dev>",
+      reply_to: "hello@elenacalvillo.com",
       to,
       subject,
       html,
