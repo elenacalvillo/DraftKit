@@ -52,6 +52,15 @@ export function SendMessageModal({
 
       if (error) throw error;
 
+      // Send email notification to the guest
+      supabase.functions.invoke('send-collab-email', {
+        body: { 
+          type: 'new_message', 
+          requestId,
+          messageContent: message.trim()
+        }
+      }).catch(err => console.error('Failed to send message email:', err));
+
       toast.success(`Message sent to ${requesterName}!`, {
         description: "They'll receive it at " + requesterEmail,
       });

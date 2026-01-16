@@ -231,6 +231,11 @@ export default function Requests() {
 
     toast.success(`Collaboration cancelled.${request.requested_date ? ' Date restored to available.' : ''}`);
     trackEvent("collab_cancelled", { request_id: id });
+
+    // Notify the guest that the host cancelled their approved collab
+    supabase.functions.invoke('send-collab-email', {
+      body: { type: 'collab_cancelled_by_host', requestId: id }
+    }).catch(err => console.error('Failed to send cancellation email:', err));
   };
 
   const handleDraftGenerated = (id: string, draft: CollabDraft) => {
