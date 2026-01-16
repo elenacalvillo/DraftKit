@@ -131,6 +131,74 @@ function extractFeedAuthor(xml: string): string | null {
   return null;
 }
 
+// Security constants for RSS fetching
+const RSS_FETCH_TIMEOUT_MS = 15000; // 15 second timeout
+const RSS_MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB max
+const RSS_MAX_PARSE_LENGTH = 500 * 1024; // 500KB for regex parsing to prevent ReDoS
+
+// Fetch RSS with timeout and size limit
+async function fetchRSSWithLimits(url: string): Promise<{ ok: boolean; text: string; error?: string }> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), RSS_FETCH_TIMEOUT_MS);
+  
+  try {
+    const response = await fetch(url, { 
+      headers: { "User-Agent": "CollabFlow/1.0" },
+      signal: controller.signal 
+    });
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      return { ok: false, text: "", error: `HTTP ${response.status}` };
+    }
+    
+    // Check content-length header first
+    const contentLength = response.headers.get("content-length");
+    if (contentLength && parseInt(contentLength) > RSS_MAX_SIZE_BYTES) {
+      return { ok: false, text: "", error: "Response too large" };
+    }
+    
+    // Stream response and enforce size limit
+    const reader = response.body?.getReader();
+    if (!reader) {
+      return { ok: false, text: "", error: "No response body" };
+    }
+    
+    const chunks: Uint8Array[] = [];
+    let totalSize = 0;
+    
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      
+      totalSize += value.length;
+      if (totalSize > RSS_MAX_SIZE_BYTES) {
+        reader.cancel();
+        return { ok: false, text: "", error: "Response too large" };
+      }
+      
+      chunks.push(value);
+    }
+    
+    const decoder = new TextDecoder();
+    let text = chunks.map(chunk => decoder.decode(chunk, { stream: true })).join("");
+    
+    // Limit parsing length to prevent ReDoS
+    if (text.length > RSS_MAX_PARSE_LENGTH) {
+      console.log(`Truncating RSS from ${text.length} to ${RSS_MAX_PARSE_LENGTH} chars for safe parsing`);
+      text = text.substring(0, RSS_MAX_PARSE_LENGTH);
+    }
+    
+    return { ok: true, text };
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === "AbortError") {
+      return { ok: false, text: "", error: "Request timeout" };
+    }
+    return { ok: false, text: "", error: error instanceof Error ? error.message : "Unknown error" };
+  }
+}
+
 // Parse RSS XML and extract post titles, descriptions, and authors
 function parseRSS(xml: string): { posts: RSSPost[]; feedAuthor: string | null } {
   const posts: RSSPost[] = [];
@@ -338,7 +406,7 @@ serve(async (req) => {
       );
     }
 
-    // Fetch both RSS feeds in parallel
+    // Fetch both RSS feeds in parallel with security limits
     const [creatorRSSUrl, visitorRSSUrl] = [
       toRSSUrl(creatorSubstackUrl),
       toRSSUrl(visitorSubstackUrl),
@@ -346,13 +414,13 @@ serve(async (req) => {
 
     console.log("Fetching RSS feeds:", { creatorRSSUrl, visitorRSSUrl });
 
-    const [creatorResponse, visitorResponse] = await Promise.all([
-      fetch(creatorRSSUrl, { headers: { "User-Agent": "CollabFlow/1.0" } }),
-      fetch(visitorRSSUrl, { headers: { "User-Agent": "CollabFlow/1.0" } }),
+    const [creatorResult, visitorResult] = await Promise.all([
+      fetchRSSWithLimits(creatorRSSUrl),
+      fetchRSSWithLimits(visitorRSSUrl),
     ]);
 
-    if (!creatorResponse.ok) {
-      console.error(`Creator RSS fetch failed: ${creatorResponse.status} for URL: ${creatorRSSUrl}`);
+    if (!creatorResult.ok) {
+      console.error(`Creator RSS fetch failed: ${creatorResult.error} for URL: ${creatorRSSUrl}`);
       return new Response(
         JSON.stringify({ 
           error: `Could not fetch creator's newsletter. Please check the URL format.`
@@ -361,8 +429,8 @@ serve(async (req) => {
       );
     }
 
-    if (!visitorResponse.ok) {
-      console.error(`Visitor RSS fetch failed: ${visitorResponse.status} for URL: ${visitorRSSUrl}`);
+    if (!visitorResult.ok) {
+      console.error(`Visitor RSS fetch failed: ${visitorResult.error} for URL: ${visitorRSSUrl}`);
       return new Response(
         JSON.stringify({ 
           error: `Could not fetch your newsletter. Please check the URL and ensure it's public.`
@@ -371,10 +439,8 @@ serve(async (req) => {
       );
     }
 
-    const [creatorXML, visitorXML] = await Promise.all([
-      creatorResponse.text(),
-      visitorResponse.text(),
-    ]);
+    const creatorXML = creatorResult.text;
+    const visitorXML = visitorResult.text;
 
     // Parse RSS with author extraction
     const creatorParsed = parseRSS(creatorXML);
