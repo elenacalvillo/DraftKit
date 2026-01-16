@@ -10,19 +10,7 @@ import { SendMessageModal } from "./SendMessageModal";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAnalytics } from "@/hooks/useAnalytics";
-
-const extractSubstackName = (url: string | null | undefined): string => {
-  if (!url) return "Unknown Substack";
-  try {
-    const urlObj = new URL(url);
-    if (urlObj.hostname.endsWith('.substack.com')) {
-      return urlObj.hostname.replace('.substack.com', '');
-    }
-    return urlObj.hostname;
-  } catch {
-    return url;
-  }
-};
+import { extractSubstackUsername, normalizeSubstackUrl } from "@/lib/substack-url";
 
 interface RequestCardProps {
   request: CollabRequest;
@@ -200,14 +188,18 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, onAppr
               <h3 className="font-semibold">{request.requesterName}</h3>
               {request.requesterSubstackUrl ? (
                 <a
-                  href={request.requesterSubstackUrl}
+                  href={normalizeSubstackUrl(request.requesterSubstackUrl).normalized || request.requesterSubstackUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-sm text-primary hover:underline flex items-center gap-1 truncate"
                   title={request.requesterSubstackUrl}
                 >
                   <LinkIcon className="w-3 h-3 flex-shrink-0" />
-                  <span className="truncate">{extractSubstackName(request.requesterSubstackUrl)}.substack.com</span>
+                  <span className="truncate">
+                    {extractSubstackUsername(request.requesterSubstackUrl)
+                      ? `${extractSubstackUsername(request.requesterSubstackUrl)}.substack.com`
+                      : request.requesterSubstackUrl}
+                  </span>
                   <ExternalLink className="w-3 h-3 flex-shrink-0" />
                 </a>
               ) : (
