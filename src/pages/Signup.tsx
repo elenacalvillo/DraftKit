@@ -58,8 +58,8 @@ export default function Signup() {
     password: "",
     name: prefillName,
     username: "",
-    substackUrl: prefillSubstack,
-    newsletterUrl: "",
+    substackUrl: "",  // Profile URL - user enters manually for profile image
+    newsletterUrl: prefillSubstack,  // Pre-fill with publication URL from collab request
     welcomeMessage: "",
     joinDirectory: false,
   });
