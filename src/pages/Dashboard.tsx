@@ -8,6 +8,7 @@ import { CollabCalendar } from "@/components/calendar/CollabCalendar";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import type { Json } from "@/integrations/supabase/types";
 
 interface CollabRequest {
   id: string;
@@ -17,6 +18,7 @@ interface CollabRequest {
   requested_date: string;
   status: string;
   created_at: string;
+  ai_draft: Json | null;
 }
 
 interface BookingInfo {
@@ -71,8 +73,9 @@ export default function Dashboard() {
     // Fetch requests
     const { data: reqData } = await supabase
       .from('collab_requests')
-      .select('id, requester_name, requester_email, requester_profile_image_url, requested_date, status, created_at')
+      .select('id, requester_name, requester_email, requester_profile_image_url, requested_date, status, created_at, ai_draft')
       .eq('creator_id', creator.id)
+      .eq('hidden_by_creator', false)
       .order('created_at', { ascending: false });
 
     if (reqData) {
@@ -92,7 +95,7 @@ export default function Dashboard() {
   };
 
   const pendingCount = requests.filter((r) => r.status === "pending").length;
-  const approvedCount = requests.filter((r) => r.status === "approved").length;
+  const draftsCreatedCount = requests.filter((r) => r.ai_draft !== null).length;
   const thisMonthCollabs = requests.filter((r) => {
     const date = new Date(r.requested_date);
     const now = new Date();
@@ -106,22 +109,28 @@ export default function Dashboard() {
   const stats = [
     {
       icon: Users,
-      label: "Total Collabs",
-      value: approvedCount,
+      label: "Strategic Outlines",
+      subLabel: "AI-powered drafts created",
+      value: draftsCreatedCount,
+      emptyTip: "Review a request to generate your first AI outline",
       color: "text-primary",
       bg: "bg-primary/10",
     },
     {
       icon: Clock,
-      label: "Pending Requests",
+      label: "Open Connections",
+      subLabel: "Waiting for your response",
       value: pendingCount,
+      emptyTip: "Share your link to attract new partners",
       color: "text-accent",
       bg: "bg-accent/10",
     },
     {
       icon: Calendar,
-      label: "This Month",
+      label: "Collaborations This Month",
+      subLabel: "Ready to publish",
       value: thisMonthCollabs,
+      emptyTip: "Time to launch your next partnership!",
       color: "text-success",
       bg: "bg-success/10",
     },
@@ -210,11 +219,17 @@ export default function Dashboard() {
                 <div className={`w-12 h-12 rounded-xl ${stat.bg} flex items-center justify-center`}>
                   <stat.icon className={`w-6 h-6 ${stat.color}`} />
                 </div>
-                <div>
+                <div className="flex-1">
                   <p className="text-3xl font-bold">{stat.value}</p>
-                  <p className="text-sm text-muted-foreground">{stat.label}</p>
+                  <p className="text-sm font-medium text-foreground">{stat.label}</p>
+                  <p className="text-xs text-muted-foreground">{stat.subLabel}</p>
                 </div>
               </div>
+              {stat.value === 0 && (
+                <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border/50">
+                  {stat.emptyTip}
+                </p>
+              )}
             </motion.div>
           ))}
         </div>
