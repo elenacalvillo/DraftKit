@@ -126,6 +126,11 @@ export default function MyRequests() {
         r.id === requestId ? { ...r, status: 'cancelled' } : r
       ));
       toast.success('Request cancelled successfully');
+
+      // Notify the host (creator) that the guest cancelled
+      supabase.functions.invoke('send-collab-email', {
+        body: { type: 'request_cancelled_by_guest', requestId }
+      }).catch(err => console.error('Failed to send cancellation email:', err));
     } catch (error) {
       console.error('Error cancelling request:', error);
       toast.error('Failed to cancel request');

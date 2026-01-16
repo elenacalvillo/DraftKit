@@ -34,8 +34,9 @@ const corsHeaders = {
 };
 
 interface EmailRequest {
-  type: "request_approved" | "request_declined" | "request_received";
+  type: "request_approved" | "request_declined" | "request_received" | "request_cancelled_by_guest" | "collab_cancelled_by_host" | "new_message";
   requestId: string;
+  messageContent?: string;
 }
 
 interface CollabDraft {
@@ -57,7 +58,7 @@ serve(async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { type, requestId }: EmailRequest = await req.json();
+    const { type, requestId, messageContent }: EmailRequest = await req.json();
 
     if (!type || !requestId) {
       return new Response(
@@ -281,6 +282,142 @@ serve(async (req: Request): Promise<Response> => {
             <a href="${baseUrl}/dashboard/requests" 
                style="display: inline-block; background: linear-gradient(135deg, #8b5cf6, #d946ef); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
               View Request
+            </a>
+          </div>
+
+          <p style="font-size: 14px; color: #64748b; margin-top: 32px;">
+            Happy collaborating!<br>
+            The CollabStack Team
+          </p>
+        </body>
+        </html>
+      `;
+    } else if (type === "request_cancelled_by_guest") {
+      // Email to host when guest cancels their pending request
+      toEmail = creatorEmail;
+      emailSubject = `📋 ${requesterName} cancelled their collaboration request`;
+      
+      emailHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 32px;">
+            <div style="width: 48px; height: 48px; background: #f1f5f9; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+              <span style="font-size: 24px;">📋</span>
+            </div>
+            <h1 style="margin: 0; font-size: 24px; color: #1e293b;">Request Cancelled</h1>
+          </div>
+
+          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${creatorName},</p>
+          
+          <p style="font-size: 16px; margin-bottom: 24px;">
+            <strong>${requesterName}</strong> has cancelled their collaboration request${requestedDate ? ` for <strong>${formattedDate}</strong>` : ""}.
+          </p>
+
+          ${requestedDate ? `
+          <div style="background: #ecfdf5; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #10b981;">
+            <p style="margin: 0; color: #065f46;">
+              ✅ <strong>${formattedDate}</strong> is now available again for other collaborations.
+            </p>
+          </div>
+          ` : ""}
+
+          <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
+            <a href="${baseUrl}/dashboard/requests" 
+               style="display: inline-block; background: linear-gradient(135deg, #8b5cf6, #d946ef); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+              View All Requests
+            </a>
+          </div>
+
+          <p style="font-size: 14px; color: #64748b; margin-top: 32px;">
+            The CollabStack Team
+          </p>
+        </body>
+        </html>
+      `;
+    } else if (type === "collab_cancelled_by_host") {
+      // Email to guest when host cancels an approved collaboration
+      toEmail = requesterEmail;
+      emailSubject = `Update: Your collaboration with ${creatorName} has been cancelled`;
+      
+      emailHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 32px;">
+            <div style="width: 48px; height: 48px; background: #fef2f2; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+              <span style="font-size: 24px;">📅</span>
+            </div>
+            <h1 style="margin: 0; font-size: 24px; color: #1e293b;">Collaboration Cancelled</h1>
+          </div>
+
+          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterName},</p>
+          
+          <p style="font-size: 16px; margin-bottom: 24px;">
+            Unfortunately, <strong>${creatorName}</strong> has had to cancel your upcoming collaboration${requestedDate ? ` scheduled for <strong>${formattedDate}</strong>` : ""}.
+          </p>
+          
+          <p style="font-size: 16px; margin-bottom: 24px;">
+            We know this is disappointing, but schedules change. Don't let this discourage you—there are plenty of other amazing creators to collaborate with!
+          </p>
+
+          <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
+            <p style="margin: 0 0 16px 0; color: #475569;">Looking for other collaborators?</p>
+            <a href="${baseUrl}" 
+               style="display: inline-block; background: linear-gradient(135deg, #8b5cf6, #d946ef); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+              Discover More Creators
+            </a>
+          </div>
+
+          <p style="font-size: 14px; color: #64748b; margin-top: 32px;">
+            Best of luck,<br>
+            The CollabStack Team
+          </p>
+        </body>
+        </html>
+      `;
+    } else if (type === "new_message") {
+      // Email to guest when host sends them a message
+      toEmail = requesterEmail;
+      emailSubject = `💬 New message from ${creatorName} about your collaboration`;
+      
+      emailHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 32px;">
+            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #8b5cf6, #d946ef); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+              <span style="color: white; font-size: 24px;">💬</span>
+            </div>
+            <h1 style="margin: 0; font-size: 24px; color: #1e293b;">New Message</h1>
+          </div>
+
+          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterName},</p>
+          
+          <p style="font-size: 16px; margin-bottom: 24px;">
+            <strong>${creatorName}</strong> sent you a message about your collaboration${requestedDate ? ` on <strong>${formattedDate}</strong>` : ""}:
+          </p>
+
+          <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #8b5cf6;">
+            <p style="margin: 0; color: #1e293b; white-space: pre-line; font-size: 16px;">${messageContent || ""}</p>
+          </div>
+
+          <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
+            <a href="mailto:${creatorEmail}?subject=Re: Collaboration${requestedDate ? ` on ${formattedDate}` : ""}" 
+               style="display: inline-block; background: linear-gradient(135deg, #8b5cf6, #d946ef); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+              Reply to ${creatorName}
             </a>
           </div>
 
