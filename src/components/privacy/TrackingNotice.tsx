@@ -40,13 +40,13 @@ export function TrackingNotice() {
                 <div className="flex items-center gap-3 flex-1">
                   <Info className="w-4 h-4 flex-shrink-0" />
                   <p className="text-sm">
-                    We track clicks to improve the tool, not to follow you around.{" "}
+                    Respectful, anonymous tracking for a better experience.{" "}
                     <Link
                       to="/transparency"
                       className="underline underline-offset-2 hover:no-underline font-medium"
                       onClick={handleDismiss}
                     >
-                      Learn How
+                      Learn how we protect you
                     </Link>
                   </p>
                 </div>
