@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Calendar, Clock, Copy, ExternalLink, MessageSquare, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,11 @@ export default function Dashboard() {
   const [requests, setRequests] = useState<CollabRequest[]>([]);
   const [bookedDates, setBookedDates] = useState<string[]>([]);
   const [bookingDetails, setBookingDetails] = useState<BookingInfo[]>([]);
+  const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
+
+  const handleImageError = useCallback((requestId: string) => {
+    setImageErrors(prev => new Set(prev).add(requestId));
+  }, []);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -284,9 +289,18 @@ export default function Dashboard() {
                     className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors cursor-pointer"
                     onClick={() => navigate("/dashboard/requests")}
                   >
-                    <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center text-primary-foreground font-semibold text-sm">
-                      {request.requester_name.charAt(0).toUpperCase()}
-                    </div>
+                    {request.requester_profile_image_url && !imageErrors.has(request.id) ? (
+                      <img 
+                        src={request.requester_profile_image_url} 
+                        alt={request.requester_name}
+                        className="w-10 h-10 rounded-full object-cover"
+                        onError={() => handleImageError(request.id)}
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center text-primary-foreground font-semibold text-sm">
+                        {request.requester_name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate">{request.requester_name}</p>
                       <p className="text-sm text-muted-foreground truncate">
