@@ -81,8 +81,6 @@ export default function AdminAnalytics() {
   const [feedback, setFeedback] = useState<UserFeedback[]>([]);
   const [dailyMetrics, setDailyMetrics] = useState<DailyMetric[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshingImages, setIsRefreshingImages] = useState(false);
-  const [imageRefreshProgress, setImageRefreshProgress] = useState({ current: 0, total: 0 });
 
   useEffect(() => {
     if (!loading && !isAdmin) {
@@ -145,74 +143,6 @@ export default function AdminAnalytics() {
     }
 
     setIsLoading(false);
-  };
-
-  // Bulk refresh all missing profile images
-  const refreshAllProfileImages = async () => {
-    setIsRefreshingImages(true);
-    setImageRefreshProgress({ current: 0, total: 0 });
-    
-    try {
-      // Get all creators with missing profile images but have substack URL
-      const { data: staleCreators, error } = await supabase
-        .from('creators')
-        .select('id, substack_url, name')
-        .is('profile_image_url', null)
-        .not('substack_url', 'is', null);
-      
-      if (error) {
-        console.error("Failed to fetch stale creators:", error);
-        return;
-      }
-      
-      if (!staleCreators || staleCreators.length === 0) {
-        alert("All creators already have profile images!");
-        setIsRefreshingImages(false);
-        return;
-      }
-      
-      setImageRefreshProgress({ current: 0, total: staleCreators.length });
-      
-      let successCount = 0;
-      let failCount = 0;
-      
-      for (let i = 0; i < staleCreators.length; i++) {
-        const creator = staleCreators[i];
-        setImageRefreshProgress({ current: i + 1, total: staleCreators.length });
-        
-        try {
-          const { data: profileData, error: profileError } = await supabase.functions.invoke(
-            'fetch-substack-profile',
-            { body: { substackUrl: creator.substack_url } }
-          );
-          
-          if (!profileError && profileData?.imageUrl) {
-            await supabase
-              .from('creators')
-              .update({ profile_image_url: profileData.imageUrl })
-              .eq('id', creator.id);
-            successCount++;
-          } else {
-            failCount++;
-            console.log(`Failed to fetch image for ${creator.name}:`, profileError);
-          }
-        } catch (e) {
-          failCount++;
-          console.log(`Error fetching image for ${creator.name}:`, e);
-        }
-        
-        // Small delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-      
-      alert(`Profile image refresh complete!\n✅ Success: ${successCount}\n❌ Failed: ${failCount}`);
-    } catch (e) {
-      console.error("Bulk refresh failed:", e);
-      alert("Bulk refresh failed. Check console for details.");
-    } finally {
-      setIsRefreshingImages(false);
-      setImageRefreshProgress({ current: 0, total: 0 });
-    }
   };
 
   // Helper to safely extract event_data properties
@@ -367,32 +297,11 @@ export default function AdminAnalytics() {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
-                <BarChart3 className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <h1 className="text-3xl font-bold">Admin Analytics</h1>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
+              <BarChart3 className="w-5 h-5 text-primary-foreground" />
             </div>
-            
-            {/* Admin Actions */}
-            <button
-              onClick={refreshAllProfileImages}
-              disabled={isRefreshingImages}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {isRefreshingImages ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  Refreshing {imageRefreshProgress.current}/{imageRefreshProgress.total}...
-                </>
-              ) : (
-                <>
-                  <Users className="w-4 h-4" />
-                  Refresh All Profile Images
-                </>
-              )}
-            </button>
+            <h1 className="text-3xl font-bold">Admin Analytics</h1>
           </div>
           <p className="text-muted-foreground">
             Track key metrics, funnel performance, and user feedback
