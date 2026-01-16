@@ -23,6 +23,8 @@ interface Creator {
   newsletter_url: string | null;
   welcome_message: string | null;
   profile_image_url: string | null;
+  collab_style: string | null;
+  collab_guidelines: string | null;
 }
 
 interface Availability {
@@ -108,7 +110,7 @@ export default function PublicBooking() {
     // Fetch creator from public view (excludes sensitive data like email)
     const { data: creatorData, error } = await supabase
       .from('public_creator_profiles')
-      .select('id, username, name, substack_url, newsletter_url, welcome_message, profile_image_url')
+      .select('id, username, name, substack_url, newsletter_url, welcome_message, profile_image_url, collab_style, collab_guidelines')
       .eq('username', username)
       .maybeSingle();
 
@@ -485,9 +487,17 @@ export default function PublicBooking() {
             </a>
           )}
           {creator.welcome_message && (
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-4">
               {creator.welcome_message}
             </p>
+          )}
+          {creator.collab_style && (
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full text-sm">
+              <span className="text-primary font-medium">{creator.collab_style}</span>
+              {creator.collab_guidelines && (
+                <span className="text-muted-foreground">• Guidelines available</span>
+              )}
+            </div>
           )}
         </motion.div>
 
