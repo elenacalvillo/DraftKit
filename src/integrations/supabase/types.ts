@@ -95,6 +95,7 @@ export type Database = {
           creator_notes: string | null
           id: string
           message: string | null
+          reminder_sent_at: string | null
           requested_date: string | null
           requester_email: string
           requester_name: string
@@ -111,6 +112,7 @@ export type Database = {
           creator_notes?: string | null
           id?: string
           message?: string | null
+          reminder_sent_at?: string | null
           requested_date?: string | null
           requester_email: string
           requester_name: string
@@ -127,6 +129,7 @@ export type Database = {
           creator_notes?: string | null
           id?: string
           message?: string | null
+          reminder_sent_at?: string | null
           requested_date?: string | null
           requester_email?: string
           requester_name?: string
@@ -238,6 +241,7 @@ export type Database = {
           name: string
           newsletter_url: string | null
           profile_image_url: string | null
+          reminder_days_before: number | null
           substack_url: string | null
           updated_at: string
           user_id: string
@@ -255,6 +259,7 @@ export type Database = {
           name: string
           newsletter_url?: string | null
           profile_image_url?: string | null
+          reminder_days_before?: number | null
           substack_url?: string | null
           updated_at?: string
           user_id: string
@@ -272,6 +277,7 @@ export type Database = {
           name?: string
           newsletter_url?: string | null
           profile_image_url?: string | null
+          reminder_days_before?: number | null
           substack_url?: string | null
           updated_at?: string
           user_id?: string

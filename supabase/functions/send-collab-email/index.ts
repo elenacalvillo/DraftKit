@@ -34,7 +34,7 @@ const corsHeaders = {
 };
 
 interface EmailRequest {
-  type: "request_approved" | "request_declined" | "request_received" | "request_cancelled_by_guest" | "collab_cancelled_by_host" | "new_message";
+  type: "request_approved" | "request_declined" | "request_received" | "request_cancelled_by_guest" | "collab_cancelled_by_host" | "new_message" | "collab_reminder";
   requestId: string;
   messageContent?: string;
 }
@@ -428,6 +428,123 @@ serve(async (req: Request): Promise<Response> => {
         </body>
         </html>
       `;
+    } else if (type === "collab_reminder") {
+      // Send reminders to BOTH host and guest
+      const hostEmailHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 32px;">
+            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #8b5cf6, #d946ef); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+              <span style="color: white; font-size: 24px;">⏰</span>
+            </div>
+            <h1 style="margin: 0; font-size: 24px; color: #1e293b;">Collaboration Reminder</h1>
+          </div>
+
+          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${creatorName},</p>
+          
+          <p style="font-size: 16px; margin-bottom: 24px;">
+            Just a friendly reminder that you have a collaboration with <strong>${requesterName}</strong> coming up on <strong>${formattedDate}</strong>!
+          </p>
+
+          <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #8b5cf6;">
+            <p style="margin: 0 0 8px 0; font-weight: 600; color: #475569;">Collaborator:</p>
+            <p style="margin: 0 0 16px 0; color: #1e293b;">${requesterName} (${requesterEmail})</p>
+            <p style="margin: 0 0 8px 0; font-weight: 600; color: #475569;">Date:</p>
+            <p style="margin: 0; color: #1e293b;">${formattedDate}</p>
+          </div>
+
+          <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
+            <a href="${baseUrl}/dashboard/requests" 
+               style="display: inline-block; background: linear-gradient(135deg, #8b5cf6, #d946ef); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+              View Details
+            </a>
+          </div>
+
+          <p style="font-size: 14px; color: #64748b; margin-top: 32px;">
+            Happy collaborating!<br>
+            The CollabStack Team
+          </p>
+        </body>
+        </html>
+      `;
+
+      const guestEmailHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 32px;">
+            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #8b5cf6, #d946ef); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+              <span style="color: white; font-size: 24px;">⏰</span>
+            </div>
+            <h1 style="margin: 0; font-size: 24px; color: #1e293b;">Collaboration Reminder</h1>
+          </div>
+
+          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterName},</p>
+          
+          <p style="font-size: 16px; margin-bottom: 24px;">
+            Just a friendly reminder that you have a collaboration with <strong>${creatorName}</strong> coming up on <strong>${formattedDate}</strong>!
+          </p>
+
+          <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #8b5cf6;">
+            <p style="margin: 0 0 8px 0; font-weight: 600; color: #475569;">Creator:</p>
+            <p style="margin: 0 0 16px 0; color: #1e293b;">${creatorName}</p>
+            <p style="margin: 0 0 8px 0; font-weight: 600; color: #475569;">Date:</p>
+            <p style="margin: 0; color: #1e293b;">${formattedDate}</p>
+          </div>
+
+          ${collabGuidelines ? `
+          <div style="background: #fef3c7; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #f59e0b;">
+            <h3 style="margin: 0 0 12px 0; color: #92400e; font-size: 16px;">📋 ${creatorName}'s Collaboration Playbook</h3>
+            <p style="margin: 0 0 8px 0; color: #78350f;"><strong>Style:</strong> ${collabStyle}</p>
+            <p style="margin: 0; color: #78350f; white-space: pre-line;">${collabGuidelines}</p>
+          </div>
+          ` : ""}
+
+          <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
+            <a href="mailto:${creatorEmail}?subject=Re: Collaboration on ${formattedDate}" 
+               style="display: inline-block; background: linear-gradient(135deg, #8b5cf6, #d946ef); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+              Contact ${creatorName}
+            </a>
+          </div>
+
+          <p style="font-size: 14px; color: #64748b; margin-top: 32px;">
+            Happy collaborating!<br>
+            The CollabStack Team
+          </p>
+        </body>
+        </html>
+      `;
+
+      // Send emails to both parties
+      const hostEmailSubject = `⏰ Reminder: Collaboration with ${requesterName} on ${formattedDate}`;
+      const guestEmailSubject = `⏰ Reminder: Collaboration with ${creatorName} on ${formattedDate}`;
+
+      const emailPromises = [];
+      
+      if (creatorEmail) {
+        emailPromises.push(sendEmail([creatorEmail], hostEmailSubject, hostEmailHtml));
+      }
+      if (requesterEmail) {
+        emailPromises.push(sendEmail([requesterEmail], guestEmailSubject, guestEmailHtml));
+      }
+
+      await Promise.all(emailPromises);
+
+      console.log(`Reminder emails sent successfully to both parties for request ${requestId}`);
+
+      return new Response(
+        JSON.stringify({ success: true, message: "Reminder emails sent to both parties" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     if (!toEmail) {
