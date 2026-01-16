@@ -152,6 +152,11 @@ export default function Requests() {
 
     // Track approval
     trackEvent("collab_approved", { request_id: id });
+
+    // Send email notification (fire and forget)
+    supabase.functions.invoke('send-collab-email', {
+      body: { type: 'request_approved', requestId: id }
+    }).catch(err => console.error('Failed to send approval email:', err));
   };
 
   const handleDecline = async (id: string) => {
@@ -176,6 +181,11 @@ export default function Requests() {
 
     // Track decline
     trackEvent("collab_declined", { request_id: id });
+
+    // Send email notification (fire and forget)
+    supabase.functions.invoke('send-collab-email', {
+      body: { type: 'request_declined', requestId: id }
+    }).catch(err => console.error('Failed to send decline email:', err));
   };
 
   const handleCancel = async (id: string) => {

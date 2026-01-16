@@ -56,9 +56,9 @@ export function HeroSection() {
             transition={{ duration: 0.6, delay: 0.1 }}
             className="text-4xl md:text-6xl font-bold tracking-tight mb-6"
           >
-            Build your audience
+            The collaborative engine
             <br />
-            <span className="gradient-text">through shared stories</span>
+            <span className="gradient-text">for your next great post</span>
           </motion.h1>
 
           {/* Subheadline */}
@@ -68,8 +68,8 @@ export function HeroSection() {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="text-xl text-muted-foreground max-w-2xl mx-auto mb-12"
           >
-            Let AI handle the prep work so you can focus on the connection. Share one link, 
-            sync schedules, and show up to every conversation with ideas worth discussing.
+            Sync schedules, find your perfect content match, and get a ready-to-publish 
+            plan in seconds. No more awkward DM chains.
           </motion.p>
 
           {/* CTA Buttons */}
@@ -117,8 +117,8 @@ export function HeroSection() {
               image={teamProfiles[2].image}
               name={teamProfiles[2].name}
               initials={teamProfiles[2].initials}
-              title="Show Up Prepared"
-              description="Our AI reads both newsletters to surface the common ground you'll actually love discussing"
+              title="Automated Playbooks"
+              description="Share your interview formats or writing guidelines automatically when a request is approved"
               delay={0.7}
             />
           </motion.div>

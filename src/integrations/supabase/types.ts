@@ -229,6 +229,8 @@ export type Database = {
       creators: {
         Row: {
           bio: string | null
+          collab_guidelines: string | null
+          collab_style: string | null
           created_at: string
           email: string
           id: string
@@ -244,6 +246,8 @@ export type Database = {
         }
         Insert: {
           bio?: string | null
+          collab_guidelines?: string | null
+          collab_style?: string | null
           created_at?: string
           email: string
           id?: string
@@ -259,6 +263,8 @@ export type Database = {
         }
         Update: {
           bio?: string | null
+          collab_guidelines?: string | null
+          collab_style?: string | null
           created_at?: string
           email?: string
           id?: string
@@ -366,6 +372,8 @@ export type Database = {
       public_creator_profiles: {
         Row: {
           bio: string | null
+          collab_guidelines: string | null
+          collab_style: string | null
           created_at: string | null
           id: string | null
           name: string | null
@@ -377,6 +385,8 @@ export type Database = {
         }
         Insert: {
           bio?: string | null
+          collab_guidelines?: string | null
+          collab_style?: string | null
           created_at?: string | null
           id?: string | null
           name?: string | null
@@ -388,6 +398,8 @@ export type Database = {
         }
         Update: {
           bio?: string | null
+          collab_guidelines?: string | null
+          collab_style?: string | null
           created_at?: string | null
           id?: string | null
           name?: string | null

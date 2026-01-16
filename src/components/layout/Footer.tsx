@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Sparkles, Heart } from "lucide-react";
+import { Sparkles, Heart, Shield } from "lucide-react";
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
@@ -25,9 +25,10 @@ export function Footer() {
           <div className="flex items-center gap-6 text-sm">
             <Link
               to="/transparency"
-              className="text-muted-foreground hover:text-foreground transition-colors"
+              className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
             >
-              Transparency
+              <Shield className="w-3.5 h-3.5" />
+              How we protect you
             </Link>
             <a
               href="mailto:hello@collabstack.com"

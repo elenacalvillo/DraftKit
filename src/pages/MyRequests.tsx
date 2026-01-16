@@ -7,9 +7,21 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Send, Calendar, Clock, ExternalLink, Inbox, ArrowRight } from 'lucide-react';
+import { Send, Calendar, Clock, ExternalLink, Inbox, ArrowRight, X, CalendarClock } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface SentRequest {
   id: string;
@@ -41,6 +53,7 @@ export default function MyRequests() {
   const navigate = useNavigate();
   const [requests, setRequests] = useState<SentRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -95,6 +108,35 @@ export default function MyRequests() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCancelRequest = async (requestId: string) => {
+    setCancellingId(requestId);
+    try {
+      const { error } = await supabase
+        .from('collab_requests')
+        .update({ status: 'cancelled' })
+        .eq('id', requestId)
+        .eq('requester_user_id', user?.id)
+        .eq('status', 'pending');
+
+      if (error) throw error;
+
+      setRequests(prev => prev.map(r => 
+        r.id === requestId ? { ...r, status: 'cancelled' } : r
+      ));
+      toast.success('Request cancelled successfully');
+    } catch (error) {
+      console.error('Error cancelling request:', error);
+      toast.error('Failed to cancel request');
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
+  const handleReschedule = (creatorUsername: string) => {
+    navigate(`/${creatorUsername}`);
+    toast.info('Please submit a new request with your preferred date');
   };
 
   if (authLoading || loading) {
@@ -205,6 +247,51 @@ export default function MyRequests() {
                         <span>{request.requester_email}</span>
                       </div>
                     </div>
+
+                    {/* Action buttons for pending requests */}
+                    {request.status === 'pending' && (
+                      <div className="flex gap-2 pt-3 border-t mt-3">
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              disabled={cancellingId === request.id}
+                            >
+                              <X className="h-4 w-4 mr-1" />
+                              Cancel Request
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Cancel this request?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will cancel your collaboration request with {request.creator?.name}. 
+                                You can always submit a new request later.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Keep Request</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleCancelRequest(request.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Cancel Request
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => request.creator?.username && handleReschedule(request.creator.username)}
+                        >
+                          <CalendarClock className="h-4 w-4 mr-1" />
+                          Reschedule
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               );

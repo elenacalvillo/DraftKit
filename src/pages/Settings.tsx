@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Copy, ExternalLink, Check, AlertTriangle, ArrowLeft, User } from "lucide-react";
+import { Copy, ExternalLink, Check, AlertTriangle, ArrowLeft, User, BookOpen } from "lucide-react";
 import { Link } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { settingsSchema } from "@/lib/validations";
@@ -27,6 +28,8 @@ export default function Settings() {
     substackUrl: "",
     newsletterUrl: "",
     welcomeMessage: "",
+    collabStyle: "Virtual Coffee",
+    collabGuidelines: "",
   });
 
   // Auto-fetch profile image if missing
@@ -77,6 +80,8 @@ export default function Settings() {
         substackUrl: creator.substack_url || "",
         newsletterUrl: (creator as any).newsletter_url || "",
         welcomeMessage: creator.welcome_message || "",
+        collabStyle: (creator as any).collab_style || "Virtual Coffee",
+        collabGuidelines: (creator as any).collab_guidelines || "",
       });
       setPreviewImageUrl((creator as any).profile_image_url || null);
       
@@ -133,6 +138,8 @@ export default function Settings() {
         newsletter_url: formData.newsletterUrl,
         welcome_message: formData.welcomeMessage || null,
         profile_image_url: profileImageUrl,
+        collab_style: formData.collabStyle,
+        collab_guidelines: formData.collabGuidelines || null,
       })
       .eq('id', creator.id);
 
@@ -400,11 +407,69 @@ export default function Settings() {
           </div>
         </motion.div>
 
-        {/* Integrations */}
+        {/* Collaboration Playbook */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
+          className="glass-card p-6 mb-6"
+        >
+          <div className="flex items-center gap-2 mb-6">
+            <BookOpen className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-semibold">Collaboration Playbook</h2>
+          </div>
+          <p className="text-sm text-muted-foreground mb-6">
+            Help collaborators know what to expect when working with you. This info is shown on your public booking page.
+          </p>
+          
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="collabStyle">Preferred Collaboration Style</Label>
+              <Select
+                value={formData.collabStyle}
+                onValueChange={(value) => setFormData({ ...formData, collabStyle: value })}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a style" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Virtual Coffee">Virtual Coffee (30-60 min video call)</SelectItem>
+                  <SelectItem value="Async Drafting">Async Drafting (collaborative writing)</SelectItem>
+                  <SelectItem value="Interview Style">Interview Style (Q&A format)</SelectItem>
+                  <SelectItem value="Custom">Custom (see guidelines below)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="collabGuidelines">Collaboration Guidelines</Label>
+              <Textarea
+                id="collabGuidelines"
+                value={formData.collabGuidelines}
+                onChange={(e) =>
+                  setFormData({ ...formData, collabGuidelines: e.target.value })
+                }
+                placeholder="Share how you like to work with collaborators...
+
+Example:
+• I prefer 30-minute Zoom calls on Tuesdays or Thursdays
+• Please come prepared with 2-3 topic ideas
+• I'll send a draft within 5 business days after our call
+• I'm open to cross-posts and newsletter swaps"
+                rows={6}
+              />
+              <p className="text-xs text-muted-foreground">
+                Markdown supported. These guidelines will be sent to collaborators when you approve their request.
+              </p>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Integrations */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
           className="glass-card p-6 mb-6"
         >
           <h2 className="text-lg font-semibold mb-6">Integrations</h2>
@@ -412,21 +477,19 @@ export default function Settings() {
           <div className="space-y-4">
             <div className="flex items-center justify-between p-4 bg-muted/50 rounded-xl">
               <div>
-                <h3 className="font-medium">Stripe</h3>
+                <h3 className="font-medium">Email Notifications</h3>
                 <p className="text-sm text-muted-foreground">
-                  Accept payments for collaborations
+                  Collaborators receive emails when you approve or decline requests
                 </p>
               </div>
-              <Button variant="outline" disabled>
-                Coming Soon
-              </Button>
+              <span className="text-xs font-medium text-success bg-success/10 px-2 py-1 rounded-full">Active</span>
             </div>
 
             <div className="flex items-center justify-between p-4 bg-muted/50 rounded-xl">
               <div>
-                <h3 className="font-medium">Resend</h3>
+                <h3 className="font-medium">Stripe</h3>
                 <p className="text-sm text-muted-foreground">
-                  Send email notifications
+                  Accept payments for collaborations
                 </p>
               </div>
               <Button variant="outline" disabled>
