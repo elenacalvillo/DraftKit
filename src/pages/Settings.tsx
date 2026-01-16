@@ -7,12 +7,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { settingsSchema } from "@/lib/validations";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+
+const COLLAB_STYLE_OPTIONS = [
+  { value: "Virtual Coffee", label: "Virtual Coffee", description: "30-60 min video call" },
+  { value: "Async Drafting", label: "Async Drafting", description: "Collaborative writing" },
+  { value: "Interview Style", label: "Interview Style", description: "Q&A format" },
+  { value: "Custom", label: "Custom", description: "See guidelines below" },
+];
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -28,10 +36,37 @@ export default function Settings() {
     substackUrl: "",
     newsletterUrl: "",
     welcomeMessage: "",
-    collabStyle: "Virtual Coffee",
+    collabStyles: ["Virtual Coffee"] as string[],
     collabGuidelines: "",
     reminderDaysBefore: 3,
   });
+
+  // Parse collab_style from DB (could be single value or JSON array)
+  const parseCollabStyles = (value: string | null): string[] => {
+    if (!value) return ["Virtual Coffee"];
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [value];
+    } catch {
+      return [value];
+    }
+  };
+
+  const toggleCollabStyle = (style: string) => {
+    setFormData(prev => {
+      const current = prev.collabStyles;
+      if (current.includes(style)) {
+        // Prevent removing if it's the last one
+        if (current.length === 1) {
+          toast.error("You must have at least one collaboration style selected");
+          return prev;
+        }
+        return { ...prev, collabStyles: current.filter(s => s !== style) };
+      } else {
+        return { ...prev, collabStyles: [...current, style] };
+      }
+    });
+  };
 
   // Auto-fetch profile image if missing
   const autoFetchProfileImage = async (substackUrl: string) => {
@@ -81,7 +116,7 @@ export default function Settings() {
         substackUrl: creator.substack_url || "",
         newsletterUrl: (creator as any).newsletter_url || "",
         welcomeMessage: creator.welcome_message || "",
-        collabStyle: (creator as any).collab_style || "Virtual Coffee",
+        collabStyles: parseCollabStyles((creator as any).collab_style),
         collabGuidelines: (creator as any).collab_guidelines || "",
         reminderDaysBefore: (creator as any).reminder_days_before ?? 3,
       });
@@ -140,7 +175,7 @@ export default function Settings() {
         newsletter_url: formData.newsletterUrl,
         welcome_message: formData.welcomeMessage || null,
         profile_image_url: profileImageUrl,
-        collab_style: formData.collabStyle,
+        collab_style: JSON.stringify(formData.collabStyles),
         collab_guidelines: formData.collabGuidelines || null,
         reminder_days_before: formData.reminderDaysBefore,
       })
@@ -426,22 +461,39 @@ export default function Settings() {
           </p>
           
           <div className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="collabStyle">Preferred Collaboration Style</Label>
-              <Select
-                value={formData.collabStyle}
-                onValueChange={(value) => setFormData({ ...formData, collabStyle: value })}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a style" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Virtual Coffee">Virtual Coffee (30-60 min video call)</SelectItem>
-                  <SelectItem value="Async Drafting">Async Drafting (collaborative writing)</SelectItem>
-                  <SelectItem value="Interview Style">Interview Style (Q&A format)</SelectItem>
-                  <SelectItem value="Custom">Custom (see guidelines below)</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="space-y-3">
+              <Label>Preferred Collaboration Styles (select all that apply)</Label>
+              <div className="grid gap-3">
+                {COLLAB_STYLE_OPTIONS.map((option) => (
+                  <div
+                    key={option.value}
+                    className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-colors ${
+                      formData.collabStyles.includes(option.value)
+                        ? "bg-primary/10 border-primary/30"
+                        : "bg-muted/50 border-transparent hover:border-muted-foreground/20"
+                    }`}
+                    onClick={() => toggleCollabStyle(option.value)}
+                  >
+                    <Checkbox
+                      id={`collab-${option.value}`}
+                      checked={formData.collabStyles.includes(option.value)}
+                      onCheckedChange={() => toggleCollabStyle(option.value)}
+                    />
+                    <div className="flex-1">
+                      <label 
+                        htmlFor={`collab-${option.value}`}
+                        className="font-medium cursor-pointer"
+                      >
+                        {option.label}
+                      </label>
+                      <p className="text-sm text-muted-foreground">{option.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Collaborators will choose one of your selected styles when booking
+              </p>
             </div>
 
             <div className="space-y-2">

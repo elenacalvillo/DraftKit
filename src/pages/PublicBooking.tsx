@@ -32,6 +32,40 @@ interface Availability {
   blocked_dates: string[];
 }
 
+// Parse collab_style from DB (could be single value or JSON array)
+const parseCollabStyles = (value: string | null): string[] => {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [value];
+  } catch {
+    return [value];
+  }
+};
+
+// Get date clarification text based on collab type
+const getDateClarification = (collabType: string | null): { icon: string; text: string } => {
+  if (!collabType) return { icon: "📅", text: "Select a date for your collaboration" };
+  
+  if (collabType === "Virtual Coffee") {
+    return { 
+      icon: "📞", 
+      text: "This is the date for your video call" 
+    };
+  } else if (collabType === "Interview Style") {
+    return { 
+      icon: "📝", 
+      text: "This is your target date for exchanging Q&A" 
+    };
+  } else if (collabType === "Async Drafting") {
+    return { 
+      icon: "✍️", 
+      text: "This is your target publication date" 
+    };
+  }
+  return { icon: "📅", text: "This is your target collaboration date" };
+};
+
 export default function PublicBooking() {
   const { username } = useParams<{ username: string }>();
   const navigate = useNavigate();
@@ -49,6 +83,10 @@ export default function PublicBooking() {
   const [notFound, setNotFound] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Collab type selection
+  const [availableCollabTypes, setAvailableCollabTypes] = useState<string[]>([]);
+  const [selectedCollabType, setSelectedCollabType] = useState<string | null>(null);
 
   // AI Match state
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -121,8 +159,14 @@ export default function PublicBooking() {
     }
 
     setCreator(creatorData);
-
-    // Fetch availability
+    
+    // Parse collab styles
+    const styles = parseCollabStyles(creatorData.collab_style);
+    setAvailableCollabTypes(styles);
+    // Auto-select if only one style available
+    if (styles.length === 1) {
+      setSelectedCollabType(styles[0]);
+    }
     const { data: availData } = await supabase
       .from('availability')
       .select('available_dates, blocked_dates')
@@ -265,6 +309,12 @@ export default function PublicBooking() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if ((!selectedDate && !isFlexibleDate) || !username || !creator) return;
+    
+    // Require collab type selection if multiple available
+    if (availableCollabTypes.length > 1 && !selectedCollabType) {
+      setErrors(prev => ({ ...prev, collabType: "Please select a collaboration type" }));
+      return;
+    }
 
     setErrors({});
 
@@ -326,6 +376,7 @@ export default function PublicBooking() {
         requested_date: isFlexibleDate ? null : selectedDate,
         status: 'pending',
         requester_user_id: user?.id || null,
+        selected_collab_type: selectedCollabType,
       })
       .select('id')
       .single();
@@ -506,12 +557,24 @@ export default function PublicBooking() {
               {creator.welcome_message}
             </p>
           )}
-          {creator.collab_style && (
+          {availableCollabTypes.length === 1 && (
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full text-sm">
-              <span className="text-primary font-medium">{creator.collab_style}</span>
+              <span className="text-primary font-medium">{availableCollabTypes[0]}</span>
               {creator.collab_guidelines && (
                 <span className="text-muted-foreground">• Guidelines available</span>
               )}
+            </div>
+          )}
+          {availableCollabTypes.length > 1 && (
+            <div className="flex flex-wrap gap-2 justify-center">
+              {availableCollabTypes.map((style) => (
+                <span 
+                  key={style}
+                  className="px-3 py-1 bg-primary/10 rounded-full text-sm text-primary font-medium"
+                >
+                  {style}
+                </span>
+              ))}
             </div>
           )}
         </motion.div>
@@ -621,14 +684,72 @@ export default function PublicBooking() {
                   Back to calendar
                 </button>
 
-                <div className="mb-8">
+                <div className="mb-6 space-y-4">
                   <div className="inline-flex items-center gap-3 px-4 py-3 bg-primary/10 rounded-xl">
                     <Calendar className="w-5 h-5 text-primary" />
                     <span className="font-medium">
                       {isFlexibleDate ? "Flexible - Let's discuss timing" : formatSelectedDate(selectedDate!)}
                     </span>
                   </div>
+                  
+                  {/* Date clarification text */}
+                  {!isFlexibleDate && selectedCollabType && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-4 py-2 rounded-lg">
+                      <span>{getDateClarification(selectedCollabType).icon}</span>
+                      <span>{getDateClarification(selectedCollabType).text}</span>
+                    </div>
+                  )}
                 </div>
+
+                {/* Collab Type Selection - Only show if creator has multiple types */}
+                {availableCollabTypes.length > 1 && (
+                  <div className="mb-6 space-y-3">
+                    <Label className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4" />
+                      Select Collaboration Type <span className="text-destructive">*</span>
+                    </Label>
+                    <div className="grid gap-3">
+                      {availableCollabTypes.map((style) => (
+                        <div
+                          key={style}
+                          className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-colors ${
+                            selectedCollabType === style
+                              ? "bg-primary/10 border-primary/50"
+                              : "bg-muted/30 border-transparent hover:border-muted-foreground/20"
+                          }`}
+                          onClick={() => {
+                            setSelectedCollabType(style);
+                            setErrors(prev => ({ ...prev, collabType: "" }));
+                          }}
+                        >
+                          <div 
+                            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                              selectedCollabType === style 
+                                ? "border-primary bg-primary" 
+                                : "border-muted-foreground/40"
+                            }`}
+                          >
+                            {selectedCollabType === style && (
+                              <Check className="w-3 h-3 text-primary-foreground" />
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-medium">{style}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {style === "Virtual Coffee" && "30-60 min video call"}
+                              {style === "Async Drafting" && "Collaborative writing"}
+                              {style === "Interview Style" && "Q&A format exchange"}
+                              {style === "Custom" && "See creator's guidelines"}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {errors.collabType && (
+                      <p className="text-sm text-destructive">{errors.collabType}</p>
+                    )}
+                  </div>
+                )}
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <div className="grid md:grid-cols-2 gap-6">

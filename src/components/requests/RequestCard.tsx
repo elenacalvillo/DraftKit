@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Calendar, ExternalLink, Mail, Link as LinkIcon, Sparkles, MessageSquare, FileText, XCircle, Ban, RefreshCw } from "lucide-react";
+import { Calendar, ExternalLink, Mail, Link as LinkIcon, Sparkles, MessageSquare, FileText, XCircle, Ban, RefreshCw, Edit2, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CollabRequest, CollabDraft } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 import { CollabDraftModal } from "./CollabDraftModal";
@@ -26,14 +27,18 @@ const extractSubstackName = (url: string | null | undefined): string => {
 interface RequestCardProps {
   request: CollabRequest;
   creatorEmail?: string;
+  creatorCollabStyles?: string[];
   onApprove?: (id: string) => void;
   onDecline?: (id: string) => void;
   onCancel?: (id: string) => void;
   onDraftGenerated?: (id: string, draft: CollabDraft) => void;
   onProfileRefreshed?: (id: string, newImageUrl: string) => void;
+  onCollabTypeChanged?: (id: string, newType: string) => void;
 }
 
-export function RequestCard({ request, creatorEmail, onApprove, onDecline, onCancel, onDraftGenerated, onProfileRefreshed }: RequestCardProps) {
+const COLLAB_STYLE_OPTIONS = ["Virtual Coffee", "Async Drafting", "Interview Style", "Custom"];
+
+export function RequestCard({ request, creatorEmail, creatorCollabStyles, onApprove, onDecline, onCancel, onDraftGenerated, onProfileRefreshed, onCollabTypeChanged }: RequestCardProps) {
   const { trackEvent } = useAnalytics();
   const [imageError, setImageError] = useState(false);
   const [showDraftModal, setShowDraftModal] = useState(false);
@@ -44,6 +49,51 @@ export function RequestCard({ request, creatorEmail, onApprove, onDecline, onCan
   const [localDraft, setLocalDraft] = useState<CollabDraft | null>(
     request.aiDraft as CollabDraft | null
   );
+  
+  // Collab type editing
+  const [isEditingCollabType, setIsEditingCollabType] = useState(false);
+  const [editingCollabType, setEditingCollabType] = useState<string>(
+    (request as any).selected_collab_type || (request as any).selectedCollabType || ""
+  );
+  const [isSavingCollabType, setIsSavingCollabType] = useState(false);
+  
+  const currentCollabType = (request as any).selected_collab_type || (request as any).selectedCollabType;
+  
+  const handleSaveCollabType = async () => {
+    if (!editingCollabType || editingCollabType === currentCollabType) {
+      setIsEditingCollabType(false);
+      return;
+    }
+    
+    setIsSavingCollabType(true);
+    try {
+      const { error } = await supabase
+        .from('collab_requests')
+        .update({ selected_collab_type: editingCollabType })
+        .eq('id', request.id);
+      
+      if (error) throw error;
+      
+      // Send notification email
+      await supabase.functions.invoke('send-collab-email', {
+        body: { 
+          type: 'collab_type_changed', 
+          requestId: request.id,
+          newCollabType: editingCollabType 
+        }
+      });
+      
+      onCollabTypeChanged?.(request.id, editingCollabType);
+      toast.success("Collaboration type updated");
+      trackEvent("collab_type_changed", { request_id: request.id, new_type: editingCollabType });
+    } catch (error) {
+      console.error("Failed to update collab type:", error);
+      toast.error("Failed to update collaboration type");
+    } finally {
+      setIsSavingCollabType(false);
+      setIsEditingCollabType(false);
+    }
+  };
   
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return null;
@@ -229,6 +279,67 @@ export function RequestCard({ request, creatorEmail, onApprove, onDecline, onCan
 
         {/* Details */}
         <div className="space-y-3 mb-4">
+          {/* Collab Type Display/Edit */}
+          {currentCollabType && (
+            <div className="flex items-center gap-2">
+              {isEditingCollabType ? (
+                <div className="flex items-center gap-2 flex-1">
+                  <Select
+                    value={editingCollabType}
+                    onValueChange={setEditingCollabType}
+                  >
+                    <SelectTrigger className="h-8 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(creatorCollabStyles || COLLAB_STYLE_OPTIONS).map((style) => (
+                        <SelectItem key={style} value={style}>
+                          {style}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={handleSaveCollabType}
+                    disabled={isSavingCollabType}
+                  >
+                    <Check className="w-4 h-4 text-success" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => {
+                      setIsEditingCollabType(false);
+                      setEditingCollabType(currentCollabType);
+                    }}
+                  >
+                    <X className="w-4 h-4 text-muted-foreground" />
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-medium text-primary">{currentCollabType}</span>
+                  {request.status === "approved" && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 ml-1"
+                      onClick={() => setIsEditingCollabType(true)}
+                      title="Change collaboration type"
+                    >
+                      <Edit2 className="w-3 h-3 text-muted-foreground" />
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+          
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Calendar className="w-4 h-4" />
             <span>
