@@ -30,6 +30,7 @@ export default function Settings() {
     welcomeMessage: "",
     collabStyle: "Virtual Coffee",
     collabGuidelines: "",
+    reminderDaysBefore: 3,
   });
 
   // Auto-fetch profile image if missing
@@ -82,6 +83,7 @@ export default function Settings() {
         welcomeMessage: creator.welcome_message || "",
         collabStyle: (creator as any).collab_style || "Virtual Coffee",
         collabGuidelines: (creator as any).collab_guidelines || "",
+        reminderDaysBefore: (creator as any).reminder_days_before ?? 3,
       });
       setPreviewImageUrl((creator as any).profile_image_url || null);
       
@@ -140,6 +142,7 @@ export default function Settings() {
         profile_image_url: profileImageUrl,
         collab_style: formData.collabStyle,
         collab_guidelines: formData.collabGuidelines || null,
+        reminder_days_before: formData.reminderDaysBefore,
       })
       .eq('id', creator.id);
 
@@ -483,6 +486,35 @@ Example:
                 </p>
               </div>
               <span className="text-xs font-medium text-success bg-success/10 px-2 py-1 rounded-full">Active</span>
+            </div>
+
+            <div className="p-4 bg-muted/50 rounded-xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-medium">Collaboration Reminders</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Get notified before your scheduled collaborations
+                  </p>
+                </div>
+                <Select
+                  value={String(formData.reminderDaysBefore)}
+                  onValueChange={(value) => setFormData({ ...formData, reminderDaysBefore: parseInt(value) })}
+                >
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1 day before</SelectItem>
+                    <SelectItem value="2">2 days before</SelectItem>
+                    <SelectItem value="3">3 days before</SelectItem>
+                    <SelectItem value="5">5 days before</SelectItem>
+                    <SelectItem value="7">7 days before</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Both you and your collaborator will receive a reminder email
+              </p>
             </div>
 
             <div className="flex items-center justify-between p-4 bg-muted/50 rounded-xl">

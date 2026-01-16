@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.send-collab-email]
 verify_jwt = false
+
+[functions.send-collab-reminder]
+verify_jwt = false
