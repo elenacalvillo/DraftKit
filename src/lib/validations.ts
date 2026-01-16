@@ -100,6 +100,25 @@ export const bookingFormSchema = z.object({
   message: messageSchema,
 });
 
+// Allowed collaboration styles
+export const ALLOWED_COLLAB_STYLES = ['Virtual Coffee', 'Async Drafting', 'Interview Style', 'Custom'] as const;
+export type CollabStyle = typeof ALLOWED_COLLAB_STYLES[number];
+
+export const collabStylesSchema = z.array(
+  z.enum(ALLOWED_COLLAB_STYLES)
+).min(1, { message: "Select at least one collaboration style" });
+
+export const collabGuidelinesSchema = z.string()
+  .trim()
+  .max(2000, { message: "Guidelines must be less than 2000 characters" })
+  .optional()
+  .or(z.literal(''));
+
+export const reminderDaysSchema = z.number()
+  .int()
+  .min(1, { message: "Reminder must be at least 1 day before" })
+  .max(14, { message: "Reminder must be at most 14 days before" });
+
 // Settings form schema
 export const settingsSchema = z.object({
   name: nameSchema,
@@ -107,4 +126,7 @@ export const settingsSchema = z.object({
   substackUrl: substackUrlSchema.optional().or(z.literal('')),
   newsletterUrl: newsletterUrlSchema,
   welcomeMessage: welcomeMessageSchema,
+  collabStyles: collabStylesSchema,
+  collabGuidelines: collabGuidelinesSchema,
+  reminderDaysBefore: reminderDaysSchema,
 });
