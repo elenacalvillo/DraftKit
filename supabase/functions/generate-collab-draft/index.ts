@@ -123,6 +123,74 @@ function filterByAuthor(posts: RSSPost[], expectedAuthor: string | null): RSSPos
   return filtered;
 }
 
+// Security constants for RSS fetching
+const RSS_FETCH_TIMEOUT_MS = 15000; // 15 second timeout
+const RSS_MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB max
+const RSS_MAX_PARSE_LENGTH = 500 * 1024; // 500KB for regex parsing to prevent ReDoS
+
+// Fetch RSS with timeout and size limit
+async function fetchRSSWithLimits(url: string): Promise<{ ok: boolean; text: string; error?: string }> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), RSS_FETCH_TIMEOUT_MS);
+  
+  try {
+    const response = await fetch(url, { 
+      headers: { "User-Agent": "CollabFlow/1.0" },
+      signal: controller.signal 
+    });
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      return { ok: false, text: "", error: `HTTP ${response.status}` };
+    }
+    
+    // Check content-length header first
+    const contentLength = response.headers.get("content-length");
+    if (contentLength && parseInt(contentLength) > RSS_MAX_SIZE_BYTES) {
+      return { ok: false, text: "", error: "Response too large" };
+    }
+    
+    // Stream response and enforce size limit
+    const reader = response.body?.getReader();
+    if (!reader) {
+      return { ok: false, text: "", error: "No response body" };
+    }
+    
+    const chunks: Uint8Array[] = [];
+    let totalSize = 0;
+    
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      
+      totalSize += value.length;
+      if (totalSize > RSS_MAX_SIZE_BYTES) {
+        reader.cancel();
+        return { ok: false, text: "", error: "Response too large" };
+      }
+      
+      chunks.push(value);
+    }
+    
+    const decoder = new TextDecoder();
+    let text = chunks.map(chunk => decoder.decode(chunk, { stream: true })).join("");
+    
+    // Limit parsing length to prevent ReDoS
+    if (text.length > RSS_MAX_PARSE_LENGTH) {
+      console.log(`Truncating RSS from ${text.length} to ${RSS_MAX_PARSE_LENGTH} chars for safe parsing`);
+      text = text.substring(0, RSS_MAX_PARSE_LENGTH);
+    }
+    
+    return { ok: true, text };
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === "AbortError") {
+      return { ok: false, text: "", error: "Request timeout" };
+    }
+    return { ok: false, text: "", error: error instanceof Error ? error.message : "Unknown error" };
+  }
+}
+
 function toRSSUrl(substackUrl: string): string {
   let url = substackUrl.trim();
   if (!url.startsWith("http")) {
@@ -248,7 +316,7 @@ serve(async (req) => {
     const creatorName = request.creators?.name || "Creator";
     const requesterName = request.requester_name;
 
-    // Fetch posts from both newsletters with author filtering
+    // Fetch posts from both newsletters with author filtering and security limits
     let creatorPosts: RSSPost[] = [];
     let requesterPosts: RSSPost[] = [];
     let creatorFeedAuthor: string | null = null;
@@ -257,15 +325,14 @@ serve(async (req) => {
     if (creatorUrl) {
       try {
         const rssUrl = toRSSUrl(creatorUrl);
-        const response = await fetch(rssUrl, {
-          headers: { "User-Agent": "CollabFlow/1.0" },
-        });
-        if (response.ok) {
-          const xml = await response.text();
-          const parsed = parseRSS(xml);
+        const result = await fetchRSSWithLimits(rssUrl);
+        if (result.ok) {
+          const parsed = parseRSS(result.text);
           creatorFeedAuthor = parsed.feedAuthor;
           creatorPosts = filterByAuthor(parsed.posts, parsed.feedAuthor);
           console.log(`Creator posts: ${creatorPosts.length} (author: ${creatorFeedAuthor})`);
+        } else {
+          console.error(`Failed to fetch creator RSS: ${result.error}`);
         }
       } catch (e) {
         console.error("Failed to fetch creator RSS:", e);
@@ -275,15 +342,14 @@ serve(async (req) => {
     if (requesterUrl) {
       try {
         const rssUrl = toRSSUrl(requesterUrl);
-        const response = await fetch(rssUrl, {
-          headers: { "User-Agent": "CollabFlow/1.0" },
-        });
-        if (response.ok) {
-          const xml = await response.text();
-          const parsed = parseRSS(xml);
+        const result = await fetchRSSWithLimits(rssUrl);
+        if (result.ok) {
+          const parsed = parseRSS(result.text);
           requesterFeedAuthor = parsed.feedAuthor;
           requesterPosts = filterByAuthor(parsed.posts, parsed.feedAuthor);
           console.log(`Requester posts: ${requesterPosts.length} (author: ${requesterFeedAuthor})`);
+        } else {
+          console.error(`Failed to fetch requester RSS: ${result.error}`);
         }
       } catch (e) {
         console.error("Failed to fetch requester RSS:", e);
