@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Sparkles, Heart, Shield } from "lucide-react";
+import { Sparkles, Heart, Shield, BookOpen } from "lucide-react";
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
@@ -42,7 +42,24 @@ export function Footer() {
           <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
             <span>Built with</span>
             <Heart className="w-3.5 h-3.5 text-primary fill-primary" />
-            <span>for creators</span>
+            <span>by</span>
+            <a
+              href="https://elenacalvillo.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-foreground hover:text-primary transition-colors font-medium"
+            >
+              Elena Calvillo
+            </a>
+            <a
+              href="https://substack.com/@elenacalvillo"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-primary transition-colors"
+              title="Follow on Substack"
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+            </a>
             <span className="mx-2">·</span>
             <span>© {currentYear}</span>
           </div>
