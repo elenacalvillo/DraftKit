@@ -182,7 +182,9 @@ export default function Settings() {
       .eq('id', creator.id);
 
     if (error) {
-      toast.error("Failed to save settings");
+      console.error("Save error:", error);
+      const errorMessage = error.message || "Failed to save settings";
+      toast.error(errorMessage);
       setIsSaving(false);
       return;
     }
