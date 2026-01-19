@@ -127,7 +127,9 @@ export default function Settings() {
         autoFetchProfileImage(creator.substack_url);
       }
     }
-  }, [user, creator, loading, navigate]);
+    // Only re-initialize when creator ID changes (not on every re-fetch)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [creator?.id, loading, navigate]);
 
   const handleSave = async () => {
     if (!creator) return;
