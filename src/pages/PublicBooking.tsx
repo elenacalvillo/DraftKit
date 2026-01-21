@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { CollabCalendar } from "@/components/calendar/CollabCalendar";
 import { supabase } from "@/integrations/supabase/client";
-import { bookingFormSchema } from "@/lib/validations";
+import { bookingFormSchema, COLLAB_TYPE_METADATA, type CollabStyle, type DateMeaning } from "@/lib/validations";
 import { normalizeSubstackUrl } from "@/lib/substack-url";
 import { toast } from "sonner";
 import { analyzeCollabMatch, type CollabSuggestion, type CollabMatchResult } from "@/lib/api/collab-match";
@@ -25,6 +25,7 @@ interface Creator {
   profile_image_url: string | null;
   collab_style: string | null;
   collab_guidelines: string | null;
+  date_meaning: DateMeaning | null;
 }
 
 interface Availability {
@@ -43,27 +44,37 @@ const parseCollabStyles = (value: string | null): string[] => {
   }
 };
 
-// Get date clarification text based on collab type
-const getDateClarification = (collabType: string | null): { icon: string; text: string } => {
+// Get date clarification text based on collab type and host's date meaning setting
+const getDateClarification = (collabType: string | null, dateMeaning: DateMeaning | null): { icon: string; text: string } => {
+  // If host has a specific date meaning set (not flexible), use that
+  if (dateMeaning && dateMeaning !== 'flexible') {
+    if (dateMeaning === 'kickoff') {
+      return { icon: '🚀', text: 'This date is when we start working together' };
+    } else if (dateMeaning === 'publish') {
+      return { icon: '📅', text: 'This is the target publication date' };
+    } else if (dateMeaning === 'live') {
+      return { icon: '📞', text: 'This is the date of the call or event' };
+    }
+  }
+  
+  // Otherwise, use collab-type-specific text
   if (!collabType) return { icon: "📅", text: "Select a date for your collaboration" };
   
-  if (collabType === "Virtual Coffee") {
-    return { 
-      icon: "📞", 
-      text: "This is the date for your video call" 
-    };
-  } else if (collabType === "Interview Style") {
-    return { 
-      icon: "📝", 
-      text: "This is your target date for exchanging Q&A" 
-    };
-  } else if (collabType === "Async Drafting") {
-    return { 
-      icon: "✍️", 
-      text: "This is your target publication date" 
-    };
+  const metadata = COLLAB_TYPE_METADATA[collabType as CollabStyle];
+  if (metadata) {
+    return { icon: metadata.icon, text: metadata.dateMeans };
   }
+  
   return { icon: "📅", text: "This is your target collaboration date" };
+};
+
+// Get the calendar legend text based on date meaning
+const getCalendarLegendText = (dateMeaning: DateMeaning | null): string => {
+  if (!dateMeaning || dateMeaning === 'flexible') return 'Available';
+  if (dateMeaning === 'kickoff') return 'Available to kick off';
+  if (dateMeaning === 'publish') return 'Available to publish';
+  if (dateMeaning === 'live') return 'Available for call/event';
+  return 'Available';
 };
 
 export default function PublicBooking() {
@@ -148,7 +159,7 @@ export default function PublicBooking() {
     // Fetch creator from public view (excludes sensitive data like email)
     const { data: creatorData, error } = await supabase
       .from('public_creator_profiles')
-      .select('id, username, name, substack_url, newsletter_url, welcome_message, profile_image_url, collab_style, collab_guidelines')
+      .select('id, username, name, substack_url, newsletter_url, welcome_message, profile_image_url, collab_style, collab_guidelines, date_meaning')
       .eq('username', username)
       .maybeSingle();
 
@@ -158,7 +169,10 @@ export default function PublicBooking() {
       return;
     }
 
-    setCreator(creatorData);
+    setCreator({
+      ...creatorData,
+      date_meaning: creatorData.date_meaning as DateMeaning | null,
+    });
     
     // Parse collab styles
     const styles = parseCollabStyles(creatorData.collab_style);
@@ -695,8 +709,8 @@ export default function PublicBooking() {
                   {/* Date clarification text */}
                   {!isFlexibleDate && selectedCollabType && (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-4 py-2 rounded-lg">
-                      <span>{getDateClarification(selectedCollabType).icon}</span>
-                      <span>{getDateClarification(selectedCollabType).text}</span>
+                      <span>{getDateClarification(selectedCollabType, creator.date_meaning).icon}</span>
+                      <span>{getDateClarification(selectedCollabType, creator.date_meaning).text}</span>
                     </div>
                   )}
                 </div>
@@ -736,10 +750,7 @@ export default function PublicBooking() {
                           <div className="flex-1">
                             <p className="font-medium">{style}</p>
                             <p className="text-sm text-muted-foreground">
-                              {style === "Virtual Coffee" && "30-60 min video call"}
-                              {style === "Async Drafting" && "Collaborative writing"}
-                              {style === "Interview Style" && "Q&A format exchange"}
-                              {style === "Custom" && "See creator's guidelines"}
+                              {COLLAB_TYPE_METADATA[style as CollabStyle]?.outcome || 'See guidelines'}
                             </p>
                           </div>
                         </div>
@@ -1028,6 +1039,7 @@ export default function PublicBooking() {
                   bookedDates={bookedDates}
                   blockedDates={availability?.blocked_dates || []}
                   onDateSelect={handleDateSelect}
+                  availableLegendText={getCalendarLegendText(creator.date_meaning)}
                 />
 
                 {(!availability?.available_dates || availability.available_dates.length === 0) && (

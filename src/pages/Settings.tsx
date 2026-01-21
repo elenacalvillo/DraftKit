@@ -11,15 +11,27 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { settingsSchema } from "@/lib/validations";
+import { settingsSchema, COLLAB_TYPE_METADATA, type CollabStyle, type DateMeaning } from "@/lib/validations";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
-const COLLAB_STYLE_OPTIONS = [
+const COLLAB_STYLE_OPTIONS: { value: CollabStyle; label: string; description: string }[] = [
   { value: "Virtual Coffee", label: "Virtual Coffee", description: "30-60 min video call" },
   { value: "Async Drafting", label: "Async Drafting", description: "Collaborative writing" },
   { value: "Interview Style", label: "Interview Style", description: "Q&A format" },
+  { value: "Guest Post Exchange", label: "Guest Post Exchange", description: "Publish on each other's newsletters" },
+  { value: "Live Event / Webinar", label: "Live Event / Webinar", description: "Co-host a live session" },
+  { value: "Co-written Article", label: "Co-written Article", description: "Write together" },
+  { value: "Newsletter Shoutout", label: "Newsletter Shoutout", description: "Recommend each other" },
   { value: "Custom", label: "Custom", description: "See guidelines below" },
+];
+
+const DATE_MEANING_OPTIONS: { value: DateMeaning; label: string; description: string }[] = [
+  { value: "kickoff", label: "Kick-off days", description: "The day we start working together" },
+  { value: "publish", label: "Publishing days", description: "The day the final piece goes live" },
+  { value: "live", label: "Live days", description: "The day of a call or event" },
+  { value: "flexible", label: "Flexible", description: "Varies by collaboration type" },
 ];
 
 export default function Settings() {
@@ -39,6 +51,7 @@ export default function Settings() {
     collabStyles: ["Virtual Coffee"] as string[],
     collabGuidelines: "",
     reminderDaysBefore: 3,
+    dateMeaning: "flexible" as DateMeaning,
   });
 
   // Parse collab_style from DB (could be single value or JSON array)
@@ -119,6 +132,7 @@ export default function Settings() {
         collabStyles: parseCollabStyles((creator as any).collab_style),
         collabGuidelines: (creator as any).collab_guidelines || "",
         reminderDaysBefore: (creator as any).reminder_days_before ?? 3,
+        dateMeaning: ((creator as any).date_meaning || "flexible") as DateMeaning,
       });
       setPreviewImageUrl((creator as any).profile_image_url || null);
       
@@ -180,6 +194,7 @@ export default function Settings() {
         collab_style: JSON.stringify(formData.collabStyles),
         collab_guidelines: formData.collabGuidelines || null,
         reminder_days_before: formData.reminderDaysBefore,
+        date_meaning: formData.dateMeaning,
       })
       .eq('id', creator.id);
 
@@ -497,6 +512,39 @@ export default function Settings() {
               </div>
               <p className="text-xs text-muted-foreground">
                 Collaborators will choose one of your selected styles when booking
+              </p>
+            </div>
+
+            {/* Date Meaning Selector */}
+            <div className="space-y-3">
+              <Label>What do your available dates represent?</Label>
+              <RadioGroup
+                value={formData.dateMeaning}
+                onValueChange={(value) => setFormData({ ...formData, dateMeaning: value as DateMeaning })}
+                className="grid gap-3"
+              >
+                {DATE_MEANING_OPTIONS.map((option) => (
+                  <div
+                    key={option.value}
+                    className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-colors ${
+                      formData.dateMeaning === option.value
+                        ? "bg-primary/10 border-primary/30"
+                        : "bg-muted/50 border-transparent hover:border-muted-foreground/20"
+                    }`}
+                    onClick={() => setFormData({ ...formData, dateMeaning: option.value })}
+                  >
+                    <RadioGroupItem value={option.value} id={`date-${option.value}`} />
+                    <div className="flex-1">
+                      <label htmlFor={`date-${option.value}`} className="font-medium cursor-pointer">
+                        {option.label}
+                      </label>
+                      <p className="text-sm text-muted-foreground">{option.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </RadioGroup>
+              <p className="text-xs text-muted-foreground">
+                This context is shown to collaborators on your booking page
               </p>
             </div>
 
