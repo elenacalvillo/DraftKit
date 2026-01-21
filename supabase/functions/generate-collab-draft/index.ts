@@ -286,7 +286,8 @@ serve(async (req) => {
           name,
           substack_url,
           newsletter_url,
-          user_id
+          user_id,
+          collab_guidelines
         )
       `)
       .eq("id", requestId)
@@ -358,8 +359,60 @@ serve(async (req) => {
 
     // Build the prompt for AI with author attribution
     const collabMessage = request.message || "General collaboration";
+    const selectedCollabType = request.selected_collab_type || "General";
+    const hostGuidelines = request.creators?.collab_guidelines || "";
+
+    // Get collab-type-specific instructions
+    const getCollabTypeInstructions = (type: string): string => {
+      switch (type) {
+        case "Virtual Coffee":
+        case "Live Event / Webinar":
+          return `OUTPUT FORMAT: Conversation/Event Agenda
+- Generate a structured agenda with talking points and ice-breakers
+- Include timing suggestions for each section
+- Add audience engagement ideas if applicable
+- Suggest pre-event preparation for both parties`;
+        case "Guest Post Exchange":
+        case "Async Drafting":
+          return `OUTPUT FORMAT: Article Draft Structure  
+- Generate a full article outline with section headers
+- Assign clear ownership (host/guest) for each section
+- Include opening hook written in host's voice
+- Add suggested word counts per section`;
+        case "Co-written Article":
+          return `OUTPUT FORMAT: Collaborative Writing Plan
+- Create shared outline with alternating sections
+- Define clear handoff points between writers
+- Include style guide notes for consistency
+- Suggest a timeline for drafts and revisions`;
+        case "Interview Style":
+          return `OUTPUT FORMAT: Q&A Framework
+- Generate 8-10 interview questions
+- Include follow-up prompts for each question
+- Add narrative arc suggestions
+- Note key quotes to extract for headlines`;
+        case "Newsletter Shoutout":
+          return `OUTPUT FORMAT: Recommendation Package
+- Generate compelling blurb templates (3 lengths: short/medium/long)
+- List key selling points to highlight
+- Include CTA suggestions
+- Add context for why subscribers should care`;
+        default:
+          return `OUTPUT FORMAT: Flexible Collaboration Draft
+- Generate an outline appropriate for the collaboration type
+- Include clear sections with assigned contributors
+- Add talking points and next steps`;
+      }
+    };
+
+    const collabTypeInstructions = getCollabTypeInstructions(selectedCollabType);
 
     const prompt = `You are helping two newsletter creators plan a collaboration. Generate a detailed collaboration draft.
+
+COLLABORATION TYPE: ${selectedCollabType}
+${collabTypeInstructions}
+
+${hostGuidelines ? `HOST'S COLLABORATION GUIDELINES:\n${hostGuidelines}\n\nIMPORTANT: Respect these guidelines in your output.\n` : ""}
 
 CRITICAL: The COLLABORATION REQUEST MESSAGE below is the PRIMARY DIRECTION for this draft. The requester has already proposed specific topics, formats, or ideas. Your draft MUST directly incorporate their suggestions:
 - If they proposed a specific topic/title → Use it as the basis for the collaboration title
@@ -385,7 +438,7 @@ ${request.requested_date ? `SCHEDULED DATE: ${request.requested_date}` : "DATE: 
 
 Generate a collaboration draft that:
 1. Uses the requester's proposed topic/title as the foundation (adapt but don't replace it)
-2. Uses the requester's suggested format if specified, otherwise suggest the best fit
+2. Follows the OUTPUT FORMAT specified above for the "${selectedCollabType}" collaboration type
 3. Writes an opening hook in the host's writing style (based on their posts)
 4. Outlines 4-5 sections following the requester's suggested structure/themes if provided
 5. Lists 4-6 talking points that align with the requester's proposed angles

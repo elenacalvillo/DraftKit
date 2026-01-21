@@ -100,13 +100,28 @@ export const bookingFormSchema = z.object({
   message: messageSchema,
 });
 
-// Allowed collaboration styles
-export const ALLOWED_COLLAB_STYLES = ['Virtual Coffee', 'Async Drafting', 'Interview Style', 'Custom'] as const;
+// Allowed collaboration styles (expanded with outcome-focused types)
+export const ALLOWED_COLLAB_STYLES = [
+  'Virtual Coffee',
+  'Async Drafting', 
+  'Interview Style',
+  'Guest Post Exchange',
+  'Live Event / Webinar',
+  'Co-written Article',
+  'Newsletter Shoutout',
+  'Custom'
+] as const;
 export type CollabStyle = typeof ALLOWED_COLLAB_STYLES[number];
+
+// Date meaning options for calendar
+export const DATE_MEANING_OPTIONS = ['kickoff', 'publish', 'live', 'flexible'] as const;
+export type DateMeaning = typeof DATE_MEANING_OPTIONS[number];
 
 export const collabStylesSchema = z.array(
   z.enum(ALLOWED_COLLAB_STYLES)
 ).min(1, { message: "Select at least one collaboration style" });
+
+export const dateMeaningSchema = z.enum(DATE_MEANING_OPTIONS);
 
 export const collabGuidelinesSchema = z.string()
   .trim()
@@ -129,4 +144,17 @@ export const settingsSchema = z.object({
   collabStyles: collabStylesSchema,
   collabGuidelines: collabGuidelinesSchema,
   reminderDaysBefore: reminderDaysSchema,
+  dateMeaning: dateMeaningSchema.optional(),
 });
+
+// Collab type metadata for UI display
+export const COLLAB_TYPE_METADATA: Record<CollabStyle, { outcome: string; dateMeans: string; icon: string }> = {
+  'Virtual Coffee': { outcome: 'A live conversation', dateMeans: 'Live call date', icon: '☕' },
+  'Async Drafting': { outcome: 'A finished article draft', dateMeans: 'Target publish date', icon: '✍️' },
+  'Interview Style': { outcome: 'A Q&A exchange', dateMeans: 'Deadline for responses', icon: '🎙️' },
+  'Guest Post Exchange': { outcome: 'A finished article draft', dateMeans: 'Drafting deadline', icon: '📝' },
+  'Live Event / Webinar': { outcome: 'A scheduled meeting link', dateMeans: 'The actual live date', icon: '📺' },
+  'Co-written Article': { outcome: 'A shared outline/draft', dateMeans: 'Kick-off brainstorm', icon: '🤝' },
+  'Newsletter Shoutout': { outcome: 'A blurb or recommendation', dateMeans: 'Publish date', icon: '📣' },
+  'Custom': { outcome: 'See guidelines', dateMeans: 'See guidelines', icon: '⚙️' },
+};

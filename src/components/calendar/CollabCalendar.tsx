@@ -27,6 +27,7 @@ interface CollabCalendarProps {
   isEditable?: boolean;
   onToggleAvailable?: (date: string) => void;
   onToggleBlocked?: (date: string) => void;
+  availableLegendText?: string;
 }
 
 export function CollabCalendar({
@@ -38,6 +39,7 @@ export function CollabCalendar({
   isEditable = false,
   onToggleAvailable,
   onToggleBlocked,
+  availableLegendText = "Available",
 }: CollabCalendarProps) {
   // Helper to get booking info for a date
   const getBookingInfo = (dateStr: string): BookingInfo | undefined => {
@@ -321,7 +323,7 @@ export function CollabCalendar({
       <div className="flex items-center justify-center gap-6 mt-6 pt-6 border-t border-border">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-available" />
-          <span className="text-sm text-muted-foreground">Available</span>
+          <span className="text-sm text-muted-foreground">{availableLegendText}</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-booked" />

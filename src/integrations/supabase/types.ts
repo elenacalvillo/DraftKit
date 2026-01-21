@@ -244,6 +244,7 @@ export type Database = {
           collab_guidelines: string | null
           collab_style: string | null
           created_at: string
+          date_meaning: string | null
           email: string
           id: string
           join_directory_waitlist: boolean | null
@@ -262,6 +263,7 @@ export type Database = {
           collab_guidelines?: string | null
           collab_style?: string | null
           created_at?: string
+          date_meaning?: string | null
           email: string
           id?: string
           join_directory_waitlist?: boolean | null
@@ -280,6 +282,7 @@ export type Database = {
           collab_guidelines?: string | null
           collab_style?: string | null
           created_at?: string
+          date_meaning?: string | null
           email?: string
           id?: string
           join_directory_waitlist?: boolean | null
@@ -390,6 +393,7 @@ export type Database = {
           collab_guidelines: string | null
           collab_style: string | null
           created_at: string | null
+          date_meaning: string | null
           id: string | null
           name: string | null
           newsletter_url: string | null
@@ -403,6 +407,7 @@ export type Database = {
           collab_guidelines?: string | null
           collab_style?: string | null
           created_at?: string | null
+          date_meaning?: string | null
           id?: string | null
           name?: string | null
           newsletter_url?: string | null
@@ -416,6 +421,7 @@ export type Database = {
           collab_guidelines?: string | null
           collab_style?: string | null
           created_at?: string | null
+          date_meaning?: string | null
           id?: string | null
           name?: string | null
           newsletter_url?: string | null
