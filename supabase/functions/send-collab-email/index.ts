@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 // Dynamic import for Resend to avoid npm: specifier issues
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+const RESEND_FROM = Deno.env.get("RESEND_FROM") || "CollabStack <onboarding@resend.dev>";
 
 async function sendEmail(to: string[], subject: string, html: string) {
   const response = await fetch("https://api.resend.com/emails", {
@@ -12,7 +13,7 @@ async function sendEmail(to: string[], subject: string, html: string) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: "CollabStack <onboarding@resend.dev>",
+      from: RESEND_FROM,
       reply_to: "hello@elenacalvillo.com",
       to,
       subject,
@@ -21,8 +22,24 @@ async function sendEmail(to: string[], subject: string, html: string) {
   });
   
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Resend API error: ${error}`);
+    const errorText = await response.text();
+
+    // Resend blocks sending to non-owner addresses until a domain is verified.
+    // Don't hard-fail the whole app flow—treat email as "best effort" and
+    // return a 200 with a "skipped" response so the UI doesn't break.
+    if (
+      response.status === 403 &&
+      (errorText.includes("You can only send testing emails") ||
+        errorText.includes("validation_error"))
+    ) {
+      console.warn(
+        "Resend email skipped (domain not verified / testing restriction):",
+        errorText,
+      );
+      return { skipped: true, reason: "RESEND_DOMAIN_NOT_VERIFIED", error: errorText };
+    }
+
+    throw new Error(`Resend API error: ${errorText}`);
   }
   
   return await response.json();
