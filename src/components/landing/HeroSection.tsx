@@ -68,7 +68,7 @@ export function HeroSection() {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="text-xl text-muted-foreground max-w-2xl mx-auto mb-12"
           >
-            Sync schedules, find your perfect content match, and get a ready-to-publish 
+            Sync schedules, find the right collaborator, and get a ready-to-publish 
             plan in seconds. No more awkward DM chains.
           </motion.p>
 
@@ -117,7 +117,7 @@ export function HeroSection() {
               image={teamProfiles[2].image}
               name={teamProfiles[2].name}
               initials={teamProfiles[2].initials}
-              title="Automated Playbooks"
+              title="Drafting Playbooks"
               description="Share your interview formats or writing guidelines automatically when a request is approved"
               delay={0.7}
             />

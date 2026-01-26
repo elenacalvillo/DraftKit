@@ -1150,7 +1150,7 @@ export default function PublicBooking() {
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <Sparkles className="w-4 h-4" />
-            Powered by CollabFlow
+            Powered by DraftKit
           </Link>
         </motion.div>
       </div>
