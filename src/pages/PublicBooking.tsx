@@ -526,7 +526,7 @@ export default function PublicBooking() {
             className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span className="text-sm">Back to CollabFlow</span>
+            <span className="text-sm">Back to DraftKit</span>
           </Link>
         </motion.div>
 
@@ -655,7 +655,7 @@ export default function PublicBooking() {
                     <h3 className="font-semibold">Want to track this collaboration?</h3>
                   </div>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Create your free CollabFlow account to track all your requests, 
+                    Create your free DraftKit account to track all your requests, 
                     get notified of responses, and receive collaborations from other creators.
                   </p>
                   <div className="flex flex-col sm:flex-row gap-3 justify-center">

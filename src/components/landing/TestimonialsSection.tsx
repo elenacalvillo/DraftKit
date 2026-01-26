@@ -25,7 +25,7 @@ const testimonials: Testimonial[] = [
     name: "Coming Soon",
     role: "Your feedback here",
     initials: "YF",
-    quote: "We'd love to hear about your experience using CollabStack. Share your story and help others discover the power of meaningful collaborations.",
+    quote: "We'd love to hear about your experience using DraftKit. Share your story and help others discover the power of meaningful collaborations.",
   },
   {
     name: "Coming Soon",

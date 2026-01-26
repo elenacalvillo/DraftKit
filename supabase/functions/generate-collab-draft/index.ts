@@ -135,7 +135,7 @@ async function fetchRSSWithLimits(url: string): Promise<{ ok: boolean; text: str
   
   try {
     const response = await fetch(url, { 
-      headers: { "User-Agent": "CollabFlow/1.0" },
+      headers: { "User-Agent": "DraftKit/1.0" },
       signal: controller.signal 
     });
     clearTimeout(timeoutId);

@@ -6,7 +6,7 @@ const steps = [
   {
     profile: teamProfiles[3], // Raghav
     title: "Share Your Link",
-    description: "Create your profile with a personal welcome message and get your booking page (collabstack.app/yourname)",
+    description: "Create your profile with a personal welcome message and get your booking page (draftkit.app/yourname)",
   },
   {
     profile: teamProfiles[1], // Stef
