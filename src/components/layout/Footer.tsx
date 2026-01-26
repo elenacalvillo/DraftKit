@@ -31,7 +31,7 @@ export function Footer() {
               How we protect you
             </Link>
             <a
-              href="mailto:hello@collabstack.com"
+              href="mailto:hello@draftkit.app"
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
               Contact
