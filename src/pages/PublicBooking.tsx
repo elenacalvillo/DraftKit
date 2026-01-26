@@ -128,28 +128,23 @@ export default function PublicBooking() {
     fetchCreatorData();
   }, [username]);
 
-  // Pre-fill form for logged-in users with their creator profile
+  // Pre-fill form for logged-in users with their creator profile from auth context
+  // Note: We use the creator from useAuth() which queries the creators table with proper RLS
+  // (auth.uid() = user_id), but for public data we use public_creator_profiles view
+  const { creator: authCreator } = useAuth();
+  
   useEffect(() => {
-    if (!user) return;
+    if (!user || !authCreator) return;
     
-    const fetchUserProfile = async () => {
-      const { data: creatorProfile } = await supabase
-        .from('creators')
-        .select('name, email, substack_url')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      
-      if (creatorProfile) {
-        setFormData(prev => ({
-          ...prev,
-          name: creatorProfile.name || prev.name,
-          email: creatorProfile.email || prev.email,
-          substackUrl: creatorProfile.substack_url || prev.substackUrl,
-        }));
-      }
-    };
-    fetchUserProfile();
-  }, [user]);
+    // Use the authenticated user's creator profile from auth context
+    // Email comes from auth context (protected by RLS), other fields from public view
+    setFormData(prev => ({
+      ...prev,
+      name: authCreator.name || prev.name,
+      email: authCreator.email || prev.email,
+      substackUrl: authCreator.substack_url || prev.substackUrl,
+    }));
+  }, [user, authCreator]);
 
   const fetchCreatorData = async () => {
     if (!username) return;

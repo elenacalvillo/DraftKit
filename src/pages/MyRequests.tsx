@@ -87,14 +87,14 @@ export default function MyRequests() {
 
       if (error) throw error;
 
-      // Fetch creator details for each request
+      // Fetch creator details for each request using public view (excludes sensitive email)
       const requestsWithCreators = await Promise.all(
         (data || []).map(async (request) => {
           const { data: creatorData } = await supabase
-            .from('creators')
+            .from('public_creator_profiles')
             .select('name, username, profile_image_url, substack_url')
             .eq('id', request.creator_id)
-            .single();
+            .maybeSingle();
 
           return {
             ...request,
