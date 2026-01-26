@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 // Dynamic import for Resend to avoid npm: specifier issues
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-const RESEND_FROM = Deno.env.get("RESEND_FROM") || "CollabStack <onboarding@resend.dev>";
+const RESEND_FROM = Deno.env.get("RESEND_FROM") || "DraftKit Notifications <notifications@draftkit.app>";
 
 async function sendEmail(to: string[], subject: string, html: string) {
   const response = await fetch("https://api.resend.com/emails", {
@@ -14,7 +14,7 @@ async function sendEmail(to: string[], subject: string, html: string) {
     },
     body: JSON.stringify({
       from: RESEND_FROM,
-      reply_to: "hello@elenacalvillo.com",
+      reply_to: "hello@draftkit.app",
       to,
       subject,
       html,
@@ -136,7 +136,7 @@ serve(async (req: Request): Promise<Response> => {
       : "Flexible date";
 
     // Build the booking page URL
-    const baseUrl = Deno.env.get("SITE_URL") || "https://collabstack.lovable.app";
+    const baseUrl = Deno.env.get("SITE_URL") || "https://draftkit.app";
     const bookingUrl = `${baseUrl}/${creatorUsername}`;
 
     let emailSubject = "";
@@ -214,7 +214,7 @@ serve(async (req: Request): Promise<Response> => {
 
           <p style="font-size: 14px; color: #64748b; margin-top: 32px;">
             Happy collaborating!<br>
-            The CollabStack Team
+            The DraftKit Team
           </p>
         </body>
         </html>
@@ -258,7 +258,7 @@ serve(async (req: Request): Promise<Response> => {
 
           <p style="font-size: 14px; color: #64748b; margin-top: 32px;">
             Best of luck,<br>
-            The CollabStack Team
+            The DraftKit Team
           </p>
         </body>
         </html>
@@ -305,7 +305,7 @@ serve(async (req: Request): Promise<Response> => {
 
           <p style="font-size: 14px; color: #64748b; margin-top: 32px;">
             Happy collaborating!<br>
-            The CollabStack Team
+            The DraftKit Team
           </p>
         </body>
         </html>
@@ -352,7 +352,7 @@ serve(async (req: Request): Promise<Response> => {
           </div>
 
           <p style="font-size: 14px; color: #64748b; margin-top: 32px;">
-            The CollabStack Team
+            The DraftKit Team
           </p>
         </body>
         </html>
@@ -397,7 +397,7 @@ serve(async (req: Request): Promise<Response> => {
 
           <p style="font-size: 14px; color: #64748b; margin-top: 32px;">
             Best of luck,<br>
-            The CollabStack Team
+            The DraftKit Team
           </p>
         </body>
         </html>
@@ -441,7 +441,7 @@ serve(async (req: Request): Promise<Response> => {
 
           <p style="font-size: 14px; color: #64748b; margin-top: 32px;">
             Happy collaborating!<br>
-            The CollabStack Team
+            The DraftKit Team
           </p>
         </body>
         </html>
@@ -485,7 +485,7 @@ serve(async (req: Request): Promise<Response> => {
 
           <p style="font-size: 14px; color: #64748b; margin-top: 32px;">
             Happy collaborating!<br>
-            The CollabStack Team
+            The DraftKit Team
           </p>
         </body>
         </html>
@@ -536,7 +536,7 @@ serve(async (req: Request): Promise<Response> => {
 
           <p style="font-size: 14px; color: #64748b; margin-top: 32px;">
             Happy collaborating!<br>
-            The CollabStack Team
+            The DraftKit Team
           </p>
         </body>
         </html>
@@ -618,7 +618,7 @@ serve(async (req: Request): Promise<Response> => {
 
           <p style="font-size: 14px; color: #64748b; margin-top: 32px;">
             Happy collaborating!<br>
-            The CollabStack Team
+            The DraftKit Team
           </p>
         </body>
         </html>

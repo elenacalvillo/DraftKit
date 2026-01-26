@@ -72,7 +72,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
               <Sparkles className="w-4 h-4 text-primary-foreground" />
             </div>
-            <span className="text-lg font-bold gradient-text">CollabFlow</span>
+            <span className="text-lg font-bold gradient-text">DraftKit</span>
           </Link>
           <Button
             variant="ghost"
@@ -98,7 +98,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-glow">
             <Sparkles className="w-5 h-5 text-primary-foreground" />
           </div>
-          <span className="text-xl font-bold gradient-text">CollabFlow</span>
+          <span className="text-xl font-bold gradient-text">DraftKit</span>
         </Link>
 
         {/* Navigation */}

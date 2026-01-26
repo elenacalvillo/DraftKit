@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { X, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-const STORAGE_KEY = "collabstack_tracking_notice_dismissed";
+const STORAGE_KEY = "draftkit_tracking_notice_dismissed";
 
 export function TrackingNotice() {
   const [isVisible, setIsVisible] = useState(false);

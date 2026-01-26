@@ -124,7 +124,7 @@ export default function Login() {
             </div>
             <h1 className="text-2xl font-bold">Welcome Back</h1>
             <p className="text-muted-foreground mt-1">
-              Sign in to your CollabFlow account
+              Sign in to your DraftKit account
             </p>
           </div>
 

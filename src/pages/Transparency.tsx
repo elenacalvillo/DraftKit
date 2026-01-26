@@ -27,7 +27,7 @@ const sections = [
     points: [
       {
         title: "Functional Events Only",
-        text: "To make CollabStack better, we track functional events like booking clicks and draft exports—nothing more."
+        text: "To make DraftKit better, we track functional events like booking clicks and draft exports—nothing more."
       },
       {
         title: "Anonymous Improvement",
@@ -81,7 +81,7 @@ export default function Transparency() {
             <Shield className="w-8 h-8 text-primary-foreground" />
           </div>
           <h1 className="text-4xl md:text-5xl font-bold mb-4">
-            The CollabStack{" "}
+            The DraftKit{" "}
             <span className="gradient-text">Privacy Promise</span>
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
@@ -130,7 +130,7 @@ export default function Transparency() {
         >
           <h3 className="text-2xl font-bold mb-4">Ready to collaborate with confidence?</h3>
           <p className="text-muted-foreground mb-6">
-            Join creators who trust CollabStack with their collaborations.
+            Join creators who trust DraftKit with their projects.
           </p>
           <Button asChild variant="hero" size="lg">
             <Link to="/signup">

@@ -508,7 +508,7 @@ export default function Signup() {
                     <Label htmlFor="username">Username</Label>
                     <div className="relative">
                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">
-                        collabflow.com/
+                        draftkit.app/
                       </span>
                       <Input
                         id="username"

@@ -341,7 +341,7 @@ export default function Requests() {
               </p>
               <div className="mt-6 p-4 bg-muted/50 rounded-xl inline-block">
                 <code className="text-sm text-primary">
-                  collabflow.com/{creator.username}
+                  draftkit.app/{creator.username}
                 </code>
               </div>
             </motion.div>

@@ -14,7 +14,7 @@ export function Footer() {
               <Sparkles className="w-4 h-4 text-primary-foreground" />
             </div>
             <div>
-              <span className="font-semibold text-foreground">CollabStack</span>
+              <span className="font-semibold text-foreground">DraftKit</span>
               <p className="text-xs text-muted-foreground">
                 Simplifying creator collaborations
               </p>

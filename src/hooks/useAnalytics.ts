@@ -22,10 +22,10 @@ export type AnalyticsEventType =
   | "draft_regeneration_requested";
 
 function getOrCreateSessionId(): string {
-  let sessionId = sessionStorage.getItem("collabflow_session_id");
+  let sessionId = sessionStorage.getItem("draftkit_session_id");
   if (!sessionId) {
     sessionId = crypto.randomUUID();
-    sessionStorage.setItem("collabflow_session_id", sessionId);
+    sessionStorage.setItem("draftkit_session_id", sessionId);
   }
   return sessionId;
 }

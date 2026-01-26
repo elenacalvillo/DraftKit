@@ -10,7 +10,7 @@ export default function Demo() {
       <header className="fixed top-0 left-0 right-0 z-50 glass-card border-0 border-b">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link to="/" className="text-xl font-bold gradient-text">
-            CollabStack
+            DraftKit
           </Link>
           <div className="flex items-center gap-4">
             <Button variant="ghost" asChild>
@@ -32,7 +32,7 @@ export default function Demo() {
             className="text-center mb-16"
           >
             <h1 className="text-4xl md:text-5xl font-bold mb-4">
-              How <span className="gradient-text">CollabStack</span> Works
+              How <span className="gradient-text">DraftKit</span> Works
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
               A simple, beautiful way to connect with fellow creators—on your terms.
@@ -59,14 +59,14 @@ export default function Demo() {
               number={3}
               icon={<Heart className="w-6 h-6" />}
               title="Share Your Link"
-              description="Share your personalized booking page (collabstack.app/yourname) with potential collaborators. They'll see your availability and can tell you why they want to connect."
+              description="Share your personalized booking page (draftkit.app/yourname) with potential collaborators. They'll see your availability and can tell you why they want to connect."
               delay={0.3}
             />
             <Step
               number={4}
               icon={<CheckCircle className="w-6 h-6" />}
               title="Start the Conversation"
-              description="Review requests, get AI-curated talking points based on both newsletters, and jump straight into meaningful conversations—no small talk needed."
+              description="Review requests, get ready-to-use talking points based on both newsletters, and jump straight into meaningful conversations—no small talk needed."
               delay={0.4}
             />
           </div>

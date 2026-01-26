@@ -49,10 +49,10 @@ export interface CollabRequest {
 }
 
 const STORAGE_KEYS = {
-  creators: 'collabflow:creators',
-  availability: 'collabflow:availability',
-  requests: 'collabflow:requests',
-  currentUser: 'collabflow:currentUser',
+  creators: 'draftkit:creators',
+  availability: 'draftkit:availability',
+  requests: 'draftkit:requests',
+  currentUser: 'draftkit:currentUser',
 };
 
 // Creator functions
