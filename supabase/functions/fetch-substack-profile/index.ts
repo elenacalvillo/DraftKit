@@ -90,6 +90,52 @@ interface SubstackProfile {
   tagline: string | null;
 }
 
+// SSRF Protection: Validate URL is a safe Substack domain
+function isAllowedDomain(url: string): boolean {
+  try {
+    const urlObj = new URL(url);
+    const hostname = urlObj.hostname.toLowerCase();
+    
+    // Only allow HTTPS
+    if (urlObj.protocol !== "https:") {
+      console.warn(`SSRF blocked: non-HTTPS protocol: ${urlObj.protocol}`);
+      return false;
+    }
+    
+    // Block localhost and private IPs
+    const blockedPatterns = [
+      /^localhost$/i,
+      /^127\./,
+      /^10\./,
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./,
+      /^192\.168\./,
+      /^169\.254\./, // Link-local / AWS metadata
+      /^0\./, 
+      /^\[::1\]$/,
+      /^\[fd/i, // IPv6 private
+      /^\[fe80:/i, // IPv6 link-local
+    ];
+    
+    for (const pattern of blockedPatterns) {
+      if (pattern.test(hostname)) {
+        console.warn(`SSRF blocked: private/local address: ${hostname}`);
+        return false;
+      }
+    }
+    
+    // Allowlist: Only Substack domains
+    if (hostname.endsWith(".substack.com") || hostname === "substack.com") {
+      return true;
+    }
+    
+    console.warn(`SSRF blocked: non-Substack domain: ${hostname}. Only *.substack.com domains are allowed.`);
+    return false;
+  } catch (e) {
+    console.warn(`SSRF blocked: invalid URL: ${url}`);
+    return false;
+  }
+}
+
 function normalizeSubstackUrl(url: string): string {
   let normalized = url.trim().replace(/\/+$/, "");
   
@@ -356,6 +402,20 @@ serve(async (req) => {
     const normalizedUrl = normalizeSubstackUrl(substackUrl);
     console.log(`Normalized URL: ${normalizedUrl}`);
     
+    // SSRF Protection: Validate URL before fetching
+    if (!isAllowedDomain(normalizedUrl)) {
+      console.error(`SSRF blocked for URL: ${normalizedUrl}`);
+      return new Response(
+        JSON.stringify({ 
+          error: "Only Substack URLs are supported (*.substack.com)",
+          imageUrl: null,
+          publicationName: null,
+          tagline: null,
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
     // Add timeout to prevent hanging
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
@@ -363,7 +423,7 @@ serve(async (req) => {
     try {
       const response = await fetch(normalizedUrl, {
         headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; CollabBot/1.0)",
+          "User-Agent": "Mozilla/5.0 (compatible; DraftKit/1.0)",
           "Accept": "text/html,application/xhtml+xml",
         },
         signal: controller.signal,

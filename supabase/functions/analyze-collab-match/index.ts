@@ -136,8 +136,63 @@ const RSS_FETCH_TIMEOUT_MS = 15000; // 15 second timeout
 const RSS_MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB max
 const RSS_MAX_PARSE_LENGTH = 500 * 1024; // 500KB for regex parsing to prevent ReDoS
 
-// Fetch RSS with timeout and size limit
+// SSRF Protection: Validate URL is a safe Substack domain
+function isAllowedDomain(url: string): boolean {
+  try {
+    const urlObj = new URL(url);
+    const hostname = urlObj.hostname.toLowerCase();
+    
+    // Only allow HTTPS
+    if (urlObj.protocol !== "https:") {
+      console.warn(`SSRF blocked: non-HTTPS protocol: ${urlObj.protocol}`);
+      return false;
+    }
+    
+    // Block localhost and private IPs
+    const blockedPatterns = [
+      /^localhost$/i,
+      /^127\./,
+      /^10\./,
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./,
+      /^192\.168\./,
+      /^169\.254\./, // Link-local / AWS metadata
+      /^0\./, 
+      /^\[::1\]$/,
+      /^\[fd/i, // IPv6 private
+      /^\[fe80:/i, // IPv6 link-local
+    ];
+    
+    for (const pattern of blockedPatterns) {
+      if (pattern.test(hostname)) {
+        console.warn(`SSRF blocked: private/local address: ${hostname}`);
+        return false;
+      }
+    }
+    
+    // Allowlist: Only Substack domains
+    // This prevents SSRF to arbitrary internal services
+    if (hostname.endsWith(".substack.com") || hostname === "substack.com") {
+      return true;
+    }
+    
+    // Allow custom domains that are explicitly used for newsletters
+    // These are validated by being in our database as creator newsletter URLs
+    // For now, reject any non-substack domains to prevent SSRF
+    console.warn(`SSRF blocked: non-Substack domain: ${hostname}. Only *.substack.com domains are allowed.`);
+    return false;
+  } catch (e) {
+    console.warn(`SSRF blocked: invalid URL: ${url}`);
+    return false;
+  }
+}
+
+// Fetch RSS with timeout, size limit, and SSRF protection
 async function fetchRSSWithLimits(url: string): Promise<{ ok: boolean; text: string; error?: string }> {
+  // SSRF check first
+  if (!isAllowedDomain(url)) {
+    return { ok: false, text: "", error: "URL not allowed. Only Substack domains (*.substack.com) are supported." };
+  }
+  
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), RSS_FETCH_TIMEOUT_MS);
   
