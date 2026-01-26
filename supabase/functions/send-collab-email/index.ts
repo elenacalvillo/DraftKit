@@ -69,6 +69,18 @@ interface CollabDraft {
   suggestedFormat: string;
 }
 
+// Valid email types mapped to required sender roles
+const EMAIL_TYPE_ROLES: Record<EmailRequest["type"], "creator" | "requester" | "service"> = {
+  request_approved: "creator",
+  request_declined: "creator",
+  request_received: "service", // Triggered on booking (no auth required, but rate limited)
+  request_cancelled_by_guest: "requester",
+  collab_cancelled_by_host: "creator",
+  new_message: "creator",
+  collab_reminder: "service", // Called from scheduled function with service role
+  collab_type_changed: "creator",
+};
+
 serve(async (req: Request): Promise<Response> => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -76,6 +88,10 @@ serve(async (req: Request): Promise<Response> => {
   }
 
   try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
     const { type, requestId, messageContent, newCollabType }: EmailRequest = await req.json();
 
     if (!type || !requestId) {
@@ -85,9 +101,61 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const requiredRole = EMAIL_TYPE_ROLES[type];
+    if (!requiredRole) {
+      return new Response(
+        JSON.stringify({ error: "Invalid email type" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // --- AUTHENTICATION & AUTHORIZATION ---
+    const authHeader = req.headers.get("Authorization");
+    let userId: string | null = null;
+    let isServiceRole = false;
+
+    // Check for service role (used by scheduled functions)
+    if (authHeader?.includes(supabaseServiceKey)) {
+      isServiceRole = true;
+      console.log("Request authenticated via service role");
+    } else if (authHeader?.startsWith("Bearer ")) {
+      // Validate user JWT
+      const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+        auth: { persistSession: false },
+        global: { headers: { Authorization: authHeader } },
+      });
+
+      const token = authHeader.replace("Bearer ", "");
+      const { data: { user }, error: userError } = await supabaseAuth.auth.getUser(token);
+      
+      if (!userError && user) {
+        userId = user.id;
+        console.log(`Request authenticated as user: ${userId}`);
+      }
+    }
+
+    // For service-only email types, require service role
+    if (requiredRole === "service" && !isServiceRole) {
+      // Allow "request_received" from unauthenticated users (public booking)
+      if (type !== "request_received") {
+        console.error(`Unauthorized: ${type} requires service role`);
+        return new Response(
+          JSON.stringify({ error: "Unauthorized" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // For creator/requester email types, require authentication
+    if ((requiredRole === "creator" || requiredRole === "requester") && !userId && !isServiceRole) {
+      console.error(`Unauthorized: ${type} requires authentication`);
+      return new Response(
+        JSON.stringify({ error: "Authentication required" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Initialize Supabase client with service role for database operations
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Fetch the request with creator info
@@ -114,6 +182,37 @@ serve(async (req: Request): Promise<Response> => {
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // --- AUTHORIZATION CHECK ---
+    // Verify the authenticated user is authorized for this email type
+    if (!isServiceRole && userId) {
+      // Get the creator's user_id for this request
+      const { data: creator } = await supabase
+        .from("creators")
+        .select("user_id")
+        .eq("id", request.creator_id)
+        .single();
+
+      const creatorUserId = creator?.user_id;
+      const requesterUserId = request.requester_user_id;
+
+      if (requiredRole === "creator" && creatorUserId !== userId) {
+        console.error(`Unauthorized: user ${userId} is not the creator (${creatorUserId}) for request ${requestId}`);
+        return new Response(
+          JSON.stringify({ error: "You are not authorized to send this email" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (requiredRole === "requester" && requesterUserId !== userId) {
+        console.error(`Unauthorized: user ${userId} is not the requester (${requesterUserId}) for request ${requestId}`);
+        return new Response(
+          JSON.stringify({ error: "You are not authorized to send this email" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+    // --- END AUTHORIZATION CHECK ---
 
     const creatorName = request.creators?.name || "Creator";
     const creatorEmail = request.creators?.email;
