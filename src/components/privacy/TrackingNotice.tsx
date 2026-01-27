@@ -1,15 +1,29 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { X, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
 
 const STORAGE_KEY = "draftkit_tracking_notice_dismissed";
 
 export function TrackingNotice() {
   const [isVisible, setIsVisible] = useState(false);
+  const { user } = useAuth();
+  const location = useLocation();
+
+  // Check if on authenticated routes
+  const isAuthenticatedRoute = 
+    location.pathname.startsWith("/dashboard") || 
+    location.pathname.startsWith("/admin");
 
   useEffect(() => {
+    // Don't show on authenticated routes or for logged-in users
+    if (user || isAuthenticatedRoute) {
+      setIsVisible(false);
+      return;
+    }
+
     // Check if notice was already dismissed
     const dismissed = localStorage.getItem(STORAGE_KEY);
     if (!dismissed) {
@@ -17,7 +31,12 @@ export function TrackingNotice() {
       const timer = setTimeout(() => setIsVisible(true), 1000);
       return () => clearTimeout(timer);
     }
-  }, []);
+  }, [user, isAuthenticatedRoute]);
+
+  // Early return if authenticated - don't render anything
+  if (user || isAuthenticatedRoute) {
+    return null;
+  }
 
   const handleDismiss = () => {
     localStorage.setItem(STORAGE_KEY, "true");
