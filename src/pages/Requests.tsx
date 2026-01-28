@@ -46,10 +46,15 @@ export default function Requests() {
 
   useEffect(() => {
     if (highlightParam && requests.length > 0) {
-      // Find if the request exists
+      // Find if the request exists in ALL requests (not just filtered)
       const requestExists = requests.some(r => r.id === highlightParam);
       
       if (requestExists) {
+        // Force "all" tab so the highlighted request is visible regardless of current filter
+        if (activeTab !== "all") {
+          setActiveTab("all");
+        }
+        
         // Set highlighted state
         setHighlightedId(highlightParam);
         
@@ -59,7 +64,7 @@ export default function Requests() {
           if (element) {
             element.scrollIntoView({ behavior: 'smooth', block: 'center' });
           }
-        }, 100);
+        }, 150);
         
         // Clear highlight after 3 seconds
         highlightTimeoutRef.current = setTimeout(() => {
@@ -78,7 +83,7 @@ export default function Requests() {
         clearTimeout(highlightTimeoutRef.current);
       }
     };
-  }, [highlightParam, requests, setSearchParams]);
+  }, [highlightParam, requests, setSearchParams, activeTab]);
 
   useEffect(() => {
     if (!loading && !user) {
