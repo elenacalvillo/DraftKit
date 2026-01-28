@@ -1,133 +1,121 @@
 
 
-## Add Google Sign-In with Lovable Cloud
+## Update Email Branding & Deep-Link to Specific Request
 
-Based on the new Lovable Cloud managed Google OAuth feature, we can add seamless Google sign-in to DraftKit without any manual OAuth configuration.
+Based on your feedback, there are two key improvements needed:
 
----
+1. **Brand Colors** - The emails currently use purple/violet colors (`#8b5cf6`, `#d946ef`) but DraftKit's brand identity is **cream & coral** (`hsl(8 65% 65%)` which is approximately `#d9826b` coral).
 
-### Current State
-
-- `signInWithGoogle` exists in `useAuth.tsx` but uses the older Supabase direct approach
-- No Google sign-in button is visible on Login or Signup pages
-- The `src/integrations/lovable` folder doesn't exist yet (needed for managed OAuth)
+2. **Deep-Link to Specific Request** - The "View Request" button currently links to `/dashboard/requests` (the general list). It should open the specific request so you can take action immediately.
 
 ---
 
-### Implementation Steps
+### Part 1: Brand Color Updates
 
-#### Step 1: Configure Social Auth
+**Current Purple Colors to Replace:**
 
-Use the Lovable Cloud social auth tool to generate the managed OAuth module. This will:
-- Create `src/integrations/lovable/index.ts` with the `lovable.auth.signInWithOAuth()` function
-- Install `@lovable.dev/cloud-auth-js` package automatically
+| Current Color | Meaning | New DraftKit Color |
+|---------------|---------|-------------------|
+| `#8b5cf6` (purple) | Primary/Accent | `#d9826b` (coral - primary) |
+| `#d946ef` (magenta) | Gradient end | `#c9946d` (warm accent) |
+| `linear-gradient(135deg, #8b5cf6, #d946ef)` | Buttons/Icons | `linear-gradient(135deg, #d9826b, #c9946d)` |
 
-#### Step 2: Update Auth Hook
+**Color Mapping from CSS Variables:**
+- Primary: `hsl(8 65% 65%)` = `#d9826b` (coral)
+- Accent: `hsl(24 58% 60%)` = `#c9946d` (warm terracotta)
+- Message box border: Use coral `#d9826b` instead of purple
 
-**File:** `src/hooks/useAuth.tsx`
+---
 
-Update `signInWithGoogle` to use the new Lovable managed method:
+### Part 2: Deep-Link Implementation
+
+**Option A: URL Query Parameter (Recommended)**
+
+Change email link from:
+```
+/dashboard/requests
+```
+To:
+```
+/dashboard/requests?highlight={requestId}
+```
+
+Then update the Requests page to:
+1. Read the `highlight` query parameter on load
+2. Scroll to that request card
+3. Briefly highlight it (pulse animation or border glow)
+4. Optionally auto-expand its details
+
+This approach requires no route changes and works seamlessly.
+
+---
+
+### Files to Modify
+
+| File | Changes |
+|------|---------|
+| `supabase/functions/send-collab-email/index.ts` | Replace all purple colors with coral brand colors; Update "View Request" URLs to include `?highlight={requestId}` |
+| `src/pages/Requests.tsx` | Add logic to read `highlight` query param, scroll to that request, and apply highlight animation |
+
+---
+
+### Detailed Changes
+
+#### Email Function (`send-collab-email/index.ts`)
+
+**Color replacements across all templates:**
+- Icon backgrounds: `linear-gradient(135deg, #8b5cf6, #d946ef)` → `linear-gradient(135deg, #d9826b, #c9946d)`
+- Button backgrounds: Same gradient replacement
+- Message border-left: `#8b5cf6` → `#d9826b`
+- AI draft title color: `#8b5cf6` → `#d9826b`
+- Highlighted text: `#8b5cf6` → `#d9826b`
+
+**URL updates:**
+- Line 399: `${baseUrl}/dashboard/requests` → `${baseUrl}/dashboard/requests?highlight=${requestId}`
+- Line 447: Same pattern
+- Line 579: Same pattern
+
+#### Requests Page (`src/pages/Requests.tsx`)
+
+Add highlight functionality:
+1. Import `useSearchParams` from `react-router-dom`
+2. Read `highlight` parameter on mount
+3. Find the matching request card by ID
+4. Scroll into view with smooth animation
+5. Apply a brief coral glow/pulse effect
+6. Clear the parameter from URL after a delay
 
 ```typescript
-// Import the lovable module
-import { lovable } from "@/integrations/lovable/index";
+// Conceptual code
+const [searchParams, setSearchParams] = useSearchParams();
+const highlightId = searchParams.get('highlight');
 
-// Updated signInWithGoogle method
-const signInWithGoogle = async () => {
-  const { error } = await lovable.auth.signInWithOAuth("google", {
-    redirect_uri: window.location.origin,
-  });
-  
-  return { error: error ? new Error(error.message) : null };
-};
-```
-
-#### Step 3: Add Google Button to Login Page
-
-**File:** `src/pages/Login.tsx`
-
-Add a Google sign-in button with proper styling below the main form:
-
-```text
-+-------------------------------------+
-|        Welcome Back                 |
-|   Sign in to your DraftKit account  |
-+-------------------------------------+
-|  Email:    [__________________]     |
-|  Password: [__________________]     |
-|         [ Sign In ]                 |
-+-------------------------------------+
-|           ─── or ───                |
-|  [G] Continue with Google           |
-+-------------------------------------+
-|   Don't have an account? Sign up    |
-+-------------------------------------+
-```
-
-#### Step 4: Add Google Button to Signup Page (Step 1)
-
-**File:** `src/pages/Signup.tsx`
-
-Add Google option on the account creation step with the same pattern:
-
-```text
-+-------------------------------------+
-|        Create Account               |
-|  Start organizing collaborations    |
-+-------------------------------------+
-|  Email:    [__________________]     |
-|  Password: [__________________]     |
-|         [ Continue ]                |
-+-------------------------------------+
-|           ─── or ───                |
-|  [G] Continue with Google           |
-+-------------------------------------+
-|  Already have an account? Sign in   |
-+-------------------------------------+
+useEffect(() => {
+  if (highlightId && requests.length > 0) {
+    const element = document.getElementById(`request-${highlightId}`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      element.classList.add('highlight-pulse');
+      setTimeout(() => {
+        element.classList.remove('highlight-pulse');
+        setSearchParams({}); // Clear the param
+      }, 3000);
+    }
+  }
+}, [highlightId, requests]);
 ```
 
 ---
 
-### UI Components
+### Visual Result
 
-Both buttons will use:
-- White/light background with subtle border (Google brand guidelines)
-- Google "G" logo icon
-- "Continue with Google" text
-- Full-width matching the form width
-- Loading state with spinner when clicked
+**Before (current email):**
+- Purple gradient icon and buttons
+- Purple accent borders
+- Links to generic `/dashboard/requests`
 
----
-
-### User Flow After Google Sign-In
-
-1. **New User (no creator profile)**:
-   - Redirects to `/signup`
-   - Detects `user` exists but no `creator`
-   - Automatically advances to Step 2 (Profile setup)
-   
-2. **Returning User (has creator profile)**:
-   - Redirects to `/dashboard` automatically
-
-This flow is already handled in the existing `useEffect` in both `Login.tsx` and `Signup.tsx`.
-
----
-
-### Files to Create/Modify
-
-| File | Action | Description |
-|------|--------|-------------|
-| `src/integrations/lovable/index.ts` | Create | Generated by configure-social-auth tool |
-| `src/hooks/useAuth.tsx` | Modify | Update to use `lovable.auth.signInWithOAuth` |
-| `src/pages/Login.tsx` | Modify | Add Google button with divider |
-| `src/pages/Signup.tsx` | Modify | Add Google button with divider (Step 1) |
-
----
-
-### Benefits of Managed OAuth
-
-- No need to create or manage Google Cloud OAuth credentials
-- Lovable handles the consent screen and redirect URLs automatically
-- Works immediately with your existing domain setup
-- Users see a professional, branded Google consent experience
+**After (updated email):**
+- Warm coral gradient matching DraftKit brand
+- Coral accent borders
+- Links to `/dashboard/requests?highlight={requestId}` which auto-scrolls and highlights the specific request card
 
