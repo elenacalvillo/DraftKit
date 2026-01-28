@@ -1,106 +1,61 @@
 
 
-## Personalize "How It Works" Section on Public Booking Page
+## Fix: Update request_declined Email Button to Brand Coral
 
-The current "HOW IT WORKS" header feels corporate and impersonal. We'll make it feel more like "Elena's process" rather than a generic tool explanation.
-
----
-
-### Changes Overview
-
-| File | Change |
-|------|--------|
-| `src/pages/PublicBooking.tsx` | Update headline styling and make it personal/dynamic |
-| `src/lib/validations.ts` | Update async mode process step labels to match "Ship Date" mental model |
+The `request_declined` email template is the only email that still uses the old dark button color (`#475569`) instead of the brand coral gradient.
 
 ---
 
-### 1. Make the Headline Personal and Bold
+### The Problem
 
-**Current:**
+**File:** `supabase/functions/send-collab-email/index.ts`
+**Lines:** 357-359
+
+**Current (wrong):**
 ```html
-<p className="text-xs text-muted-foreground uppercase tracking-wide text-center mb-3">
-  How it works
-</p>
+<a href="${baseUrl}" 
+   style="display: inline-block; background: #475569; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+  Discover More Creators
+</a>
 ```
 
-**Proposed:**
+**Should be (correct coral gradient):**
 ```html
-<h4 className="text-sm font-semibold text-foreground text-center mb-4">
-  My collaboration process
-</h4>
+<a href="${baseUrl}" 
+   style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+  Discover More Creators
+</a>
 ```
-
-**Why "My collaboration process":**
-- Personal ("My") — feels like the creator's own workflow
-- Professional — "collaboration process" is clear and sets boundaries
-- Not corporate — avoids generic "How It Works" template feel
-
-**Alternative options if preferred:**
-- "How I work" (most direct)
-- "My drafting process" (async-specific)
-- "How we'll collaborate" (inclusive but still personal)
 
 ---
 
-### 2. Update Async Mode Process Steps
+### Why This Happened
 
-The current labels reinforce a "calendar booking" mental model that confuses guests like Dominik.
-
-**Current (Async mode):**
-| Step | Label |
-|------|-------|
-| 1 | Topic |
-| 2 | Choose Deadline |
-| 3 | Start Drafting |
-
-**Proposed (Async mode):**
-| Step | Label |
-|------|-------|
-| 1 | Topic |
-| 2 | Ship Date |
-| 3 | Drafting |
-
-**Why these changes:**
-- "Ship Date" reinforces publication milestone (not a meeting)
-- "Drafting" is shorter and cleaner than "Start Drafting"
-- Eliminates ambiguity about what the date represents
+When the brand colors were updated previously, 7 of 8 email button instances were correctly changed to use `linear-gradient(135deg, #d9826b, #c9946d)`, but the `request_declined` button was missed.
 
 ---
 
-### 3. Keep Discovery Mode Steps (Already Clear)
+### All Email Buttons - Audit Results
 
-The discovery mode steps already work well:
-- About You → Schedule Call → Decide Together
-
-These clearly communicate a meeting-first flow, so no changes needed.
-
----
-
-### Files to Modify
-
-| File | Lines | Change |
-|------|-------|--------|
-| `src/pages/PublicBooking.tsx` | ~639-641 | Change `<p>` to `<h4>`, update text to "My collaboration process", update styling |
-| `src/lib/validations.ts` | ~149-153 | Update async `processSteps` labels: "Choose Deadline" → "Ship Date", "Start Drafting" → "Drafting" |
+| Email Type | Line | Current Background | Status |
+|------------|------|-------------------|--------|
+| request_approved | 314 | `linear-gradient(135deg, #d9826b, #c9946d)` | Correct |
+| request_declined | 358 | `#475569` | **WRONG - needs fix** |
+| request_received | 405 | `linear-gradient(135deg, #d9826b, #c9946d)` | Correct |
+| request_cancelled_by_guest | 453 | `linear-gradient(135deg, #d9826b, #c9946d)` | Correct |
+| collab_cancelled_by_host | 497 | `linear-gradient(135deg, #d9826b, #c9946d)` | Correct |
+| new_message | 541 | `linear-gradient(135deg, #d9826b, #c9946d)` | Correct |
+| collab_reminder (host) | 585 | `linear-gradient(135deg, #d9826b, #c9946d)` | Correct |
+| collab_reminder (guest) | 636 | `linear-gradient(135deg, #d9826b, #c9946d)` | Correct |
+| collab_type_changed | 718 | `linear-gradient(135deg, #d9826b, #c9946d)` | Correct |
 
 ---
 
-### Visual Before/After
+### Fix
 
-**Before:**
-```
-HOW IT WORKS (tiny, uppercase, muted)
+**File to modify:** `supabase/functions/send-collab-email/index.ts`
 
-   1         2              3
- Topic   Choose Deadline   Start Drafting
-```
+**Line 358:** Change `background: #475569` to `background: linear-gradient(135deg, #d9826b, #c9946d)`
 
-**After:**
-```
-My collaboration process (bold, readable)
-
-   1         2              3
- Topic    Ship Date       Drafting
-```
+This is a single-line change that will make the "Discover More Creators" button in declined request emails match the coral brand color used in all other DraftKit emails.
 
