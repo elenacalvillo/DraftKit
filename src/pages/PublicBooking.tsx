@@ -8,8 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { CollabCalendar } from "@/components/calendar/CollabCalendar";
 import { supabase } from "@/integrations/supabase/client";
-import { bookingFormSchema, COLLAB_TYPE_METADATA, COLLAB_MODE_METADATA, type CollabStyle, type DateMeaning, type CollabMode } from "@/lib/validations";
-import { normalizeSubstackUrl } from "@/lib/substack-url";
+import { bookingFormSchema, COLLAB_TYPE_METADATA, COLLAB_MODE_METADATA, newsletterPublicationUrlSchema, type CollabStyle, type DateMeaning, type CollabMode } from "@/lib/validations";
+import { normalizeSubstackUrl, isValidNewsletterPublicationUrl } from "@/lib/substack-url";
 import { toast } from "sonner";
 import { analyzeCollabMatch, type CollabSuggestion, type CollabMatchResult } from "@/lib/api/collab-match";
 import { useAnalytics } from "@/hooks/useAnalytics";
@@ -254,7 +254,17 @@ export default function PublicBooking() {
       return;
     }
 
-    // Normalize the Substack URL (handles mobile share links, profile URLs, etc.)
+    // Validate with stricter schema that rejects profile URLs
+    const validationResult = newsletterPublicationUrlSchema.safeParse(formData.substackUrl);
+    
+    if (!validationResult.success) {
+      const errorMsg = validationResult.error.errors[0]?.message || "Please enter a valid newsletter URL";
+      setAnalysisError(errorMsg);
+      toast.error(errorMsg);
+      return;
+    }
+
+    // Normalize the Substack URL (handles mobile share links, etc.)
     const normalizedResult = normalizeSubstackUrl(formData.substackUrl);
     
     if (!normalizedResult.isValid || !normalizedResult.normalized) {
