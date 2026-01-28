@@ -312,7 +312,7 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, onAppr
           >
             <div className="flex items-center gap-2 mb-2">
               <Sparkles className="w-4 h-4 text-primary" />
-              <span className="text-sm font-medium text-primary">AI Draft Ready</span>
+              <span className="text-sm font-medium text-primary">Draft Ready</span>
             </div>
             <p className="text-sm text-muted-foreground line-clamp-2">
               {localDraft.title}

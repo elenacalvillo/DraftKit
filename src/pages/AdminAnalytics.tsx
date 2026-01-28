@@ -225,7 +225,7 @@ export default function AdminAnalytics() {
       color: "bg-primary",
     },
     {
-      name: "AI Match Invoked",
+      name: "SMART Match Invoked",
       count: analyzeMatchInvoked,
       percentage: bookingClicks > 0 ? (analyzeMatchInvoked / bookingClicks) * 100 : 0,
       conversionFromPrevious: bookingClicks > 0 ? (analyzeMatchInvoked / bookingClicks) * 100 : 0,

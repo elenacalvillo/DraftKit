@@ -41,16 +41,16 @@ const sections = [
   },
   {
     icon: Brain,
-    title: "AI Ethics & Content",
+    title: "Content Matching & Drafts",
     description: "Respectful Intelligence",
     points: [
       {
         title: "Public Data Only",
-        text: "Our AI only reads the public RSS feeds you provide to generate collaboration ideas—nothing private."
+        text: "Our matching tools only read the public RSS feeds you provide to generate collaboration ideas—nothing private."
       },
       {
-        title: "No Training on Your Drafts",
-        text: "The drafts generated for your collaborations are private. We do not use your unique voice or unpublished ideas to train our global AI models."
+        title: "Your Drafts Stay Private",
+        text: "The drafts generated for your collaborations are private. We never use your unique voice or unpublished ideas to train any models."
       }
     ]
   }

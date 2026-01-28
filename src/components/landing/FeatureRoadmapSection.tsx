@@ -15,7 +15,7 @@ const features = [
   },
   {
     icon: <BookOpen className="w-5 h-5" />,
-    title: "AI Conversation Prep",
+    title: "SMART Conversation Prep",
     description: "Curated talking points based on what you both write—not generated content, just research done for you",
     status: "live" as const,
   },

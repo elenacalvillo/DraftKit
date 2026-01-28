@@ -251,12 +251,12 @@ serve(async (req: Request): Promise<Response> => {
       toEmail = requesterEmail;
       emailSubject = `🎉 ${creatorName} approved your collaboration request!`;
       
-      // Build AI draft section if available
+      // Build draft section if available
       let draftSection = "";
       if (aiDraft) {
         draftSection = `
           <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #d9826b;">
-            <h3 style="margin: 0 0 16px 0; color: #1e293b; font-size: 18px;">✨ AI-Generated Collaboration Draft</h3>
+            <h3 style="margin: 0 0 16px 0; color: #1e293b; font-size: 18px;">✨ Collaboration Draft</h3>
             <p style="margin: 0 0 12px 0; font-size: 20px; font-weight: 600; color: #d9826b;">${aiDraft.title}</p>
             <p style="margin: 0 0 16px 0; color: #475569; font-style: italic;">${aiDraft.hook}</p>
             
