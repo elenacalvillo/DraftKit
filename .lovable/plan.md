@@ -1,43 +1,54 @@
 
 
-## Dashboard Copy Clarity Update
+## Public Booking Page UI Improvements
 
-You're right that the dashboard copy is unclear and doesn't align with DraftKit's brand positioning. Looking at the screenshot:
-
-| Current Copy | Problem |
-|--------------|---------|
-| "Strategic Outlines" / "AI-powered drafts created" | Violates the "Sam Filter" - too AI-centric |
-| "Open Connections" / "Waiting for your response" | Vague - what's a "connection"? |
-| "Collaborations This Month" / "Ready to publish" | Misleading - these are approved/scheduled, not "ready" |
-| "Your Schedule" | Doesn't reflect async vs discovery mode |
+Based on your screenshot, there are two layout/clarity issues to fix:
 
 ---
 
-### Proposed Changes
+### Issue 1: Badge Too Close to Substack Link
 
-**Stat Card 1: Drafts Created**
-- **Label**: "Draft Outlines" → "Outlines Created"  
-- **Sub-label**: ~~"AI-powered drafts created"~~ → "Ready to refine"
-- **Empty tip**: "Review a request to generate your first collaboration outline"
+**Current behavior**: The "100% Async" badge and "View Substack" link are both on the same line visually, making them feel cramped.
 
-**Stat Card 2: Pending Requests**
-- **Label**: ~~"Open Connections"~~ → "Pending Requests"
-- **Sub-label**: "Awaiting your review"
-- **Empty tip**: "Share your link to start receiving collaboration requests"
+**Solution**: Add a visual break between the badge and the Substack link by:
+- Wrapping them in a flex container with `gap-4` for consistent spacing
+- OR adding a vertical divider between them
+- Keep them on the same line but with clear separation
 
-**Stat Card 3: This Month's Collaborations**
-- **Label**: Keep "Collaborations This Month"
-- **Sub-label**: ~~"Ready to publish"~~ → "Scheduled this month"
-- **Empty tip**: "Approve requests to fill your calendar"
+---
 
-**Calendar Section Header (Mode-Aware)**
-- If `collab_mode === 'async'`: "Your Publication Schedule"
-- If `collab_mode === 'discovery'`: "Your Availability"
-- Fallback: "Your Schedule"
+### Issue 2: Process Steps Need Context
 
-**Calendar Empty State (Mode-Aware)**
-- Async mode: "No availability set yet. Click 'Edit Availability' to mark dates when you can ship."
-- Discovery mode: "No availability set yet. Click 'Edit Availability' to mark dates when you're free for calls."
+**Current behavior**: The numbered steps (1. Topic → 2. Choose Deadline → 3. Start Drafting) appear with no explanation of what they represent.
+
+**Solution**: Add a small, non-intrusive headline above the steps:
+- Text: "How it works" (short and clear)
+- Style: `text-xs text-muted-foreground uppercase tracking-wide`
+- This gives visitors immediate context without being visually heavy
+
+---
+
+### Proposed Layout
+
+```
+                   [Avatar]
+                Elena Calvillo
+
+   ┌──────────────┐       ┌─────────────────┐
+   │ 100% Async ✨ │   •   │  View Substack  │
+   └──────────────┘       └─────────────────┘
+
+        "Welcome message text here..."
+
+              HOW IT WORKS
+   ┌─────┐     ┌──────────────┐     ┌──────────────┐
+   │  1  │ ─── │      2       │ ─── │      3       │
+   │Topic│     │Choose Deadline│     │Start Drafting│
+   └─────┘     └──────────────┘     └──────────────┘
+
+          Open to collaborating on:
+   [Async Drafting] [Interview Style] [Custom]
+```
 
 ---
 
@@ -45,62 +56,81 @@ You're right that the dashboard copy is unclear and doesn't align with DraftKit'
 
 | File | Changes |
 |------|---------|
-| `src/pages/Dashboard.tsx` | Update `stats` array labels/sub-labels, add mode-aware calendar header, update empty state copy |
+| `src/pages/PublicBooking.tsx` | Restructure header section to add spacing between badge/link, add "How it works" headline above process steps |
 
 ---
 
 ### Implementation Details
 
-```typescript
-// Updated stats array
-const stats = [
-  {
-    icon: Users,
-    label: "Outlines Created",
-    subLabel: "Ready to refine",
-    value: draftsCreatedCount,
-    emptyTip: "Review a request to generate your first collaboration outline",
-    color: "text-primary",
-    bg: "bg-primary/10",
-  },
-  {
-    icon: Clock,
-    label: "Pending Requests",
-    subLabel: "Awaiting your review",
-    value: pendingCount,
-    emptyTip: "Share your link to start receiving collaboration requests",
-    color: "text-accent",
-    bg: "bg-accent/10",
-  },
-  {
-    icon: Calendar,
-    label: "Collaborations This Month",
-    subLabel: "Scheduled this month",
-    value: thisMonthCollabs,
-    emptyTip: "Approve requests to fill your calendar",
-    color: "text-success",
-    bg: "bg-success/10",
-  },
-];
+**1. Badge and Substack link in a flex row with visual separator:**
 
-// Mode-aware calendar header
-const calendarHeader = creator.collab_mode === 'discovery' 
-  ? "Your Availability" 
-  : "Your Publication Schedule";
+```tsx
+{/* Badge + Substack Link Row */}
+<div className="flex items-center justify-center gap-4 mb-4">
+  {/* Mode Badge */}
+  {creator.collab_mode && (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/20 rounded-full cursor-help">
+            <span className="text-lg">{COLLAB_MODE_METADATA[creator.collab_mode].icon}</span>
+            <span className="font-medium text-primary">{COLLAB_MODE_METADATA[creator.collab_mode].badge}</span>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p className="text-sm max-w-[250px]">{COLLAB_MODE_METADATA[creator.collab_mode].badgeTooltip}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )}
 
-// Mode-aware empty state
-const emptyStateText = creator.collab_mode === 'discovery'
-  ? "No availability set yet. Click 'Edit Availability' to mark dates when you're free for calls."
-  : "No availability set yet. Click 'Edit Availability' to mark dates when you can ship.";
+  {/* Separator dot (only if both badge and link exist) */}
+  {creator.collab_mode && creator.substack_url && (
+    <span className="text-muted-foreground/50">•</span>
+  )}
+
+  {creator.substack_url && (
+    <a
+      href={creator.substack_url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-2 text-primary hover:underline"
+    >
+      <ExternalLink className="w-4 h-4" />
+      View Substack
+    </a>
+  )}
+</div>
+```
+
+**2. Add headline above process steps:**
+
+```tsx
+{/* Process Steps */}
+{!isSuccess && !selectedDate && !isFlexibleDate && creator.collab_mode && (
+  <motion.div
+    initial={{ opacity: 0, y: 10 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ delay: 0.2 }}
+    className="max-w-md mx-auto mb-8"
+  >
+    {/* New headline for context */}
+    <p className="text-xs text-muted-foreground uppercase tracking-wide text-center mb-3">
+      How it works
+    </p>
+    <div className="flex items-center justify-center gap-2">
+      {/* ...existing step circles... */}
+    </div>
+  </motion.div>
+)}
 ```
 
 ---
 
-### Why These Changes
+### Why These Changes Work
 
-1. **"Outlines Created"** removes AI language while keeping the professional outcome focus
-2. **"Pending Requests"** is immediately clear - these are requests waiting for action
-3. **"Scheduled this month"** accurately describes approved collaborations on the calendar
-4. **Mode-aware headers** reinforce the async/discovery distinction you just added
-5. **All empty tips are actionable** - they tell the creator exactly what to do next
+1. **Separator dot** (`•`) creates clear visual distinction between two related but different elements
+2. **Flex row with gap-4** ensures consistent spacing regardless of text length
+3. **"How it works" headline** in small caps (`text-xs uppercase tracking-wide`) provides context without competing with the creator's name or welcome message
+4. **Non-intrusive styling** keeps the focus on the creator's profile while adding necessary clarity
 
