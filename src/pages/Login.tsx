@@ -5,14 +5,17 @@ import { ArrowLeft, Mail, Lock, Sparkles, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/hooks/useAuth";
 import { loginSchema } from "@/lib/validations";
 import { toast } from "sonner";
+import { GoogleIcon } from "@/components/icons/GoogleIcon";
 
 export default function Login() {
   const navigate = useNavigate();
-  const { signIn, user, creator, loading } = useAuth();
+  const { signIn, signInWithGoogle, user, creator, loading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -69,6 +72,17 @@ export default function Login() {
     toast.success("Welcome back!");
     navigate("/dashboard");
     setIsLoading(false);
+  };
+
+  const handleGoogleSignIn = async () => {
+    setIsGoogleLoading(true);
+    const { error } = await signInWithGoogle();
+    
+    if (error) {
+      toast.error(error.message || "Failed to sign in with Google");
+      setIsGoogleLoading(false);
+    }
+    // Don't set loading to false on success - the page will redirect
   };
 
   if (loading) {
@@ -208,6 +222,39 @@ export default function Login() {
               )}
             </Button>
           </form>
+
+          {/* Divider */}
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <Separator className="w-full" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 text-muted-foreground">or</span>
+            </div>
+          </div>
+
+          {/* Google Sign In */}
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            className="w-full h-12 gap-3"
+            onClick={handleGoogleSignIn}
+            disabled={isGoogleLoading}
+          >
+            {isGoogleLoading ? (
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                className="w-5 h-5 border-2 border-foreground border-t-transparent rounded-full"
+              />
+            ) : (
+              <>
+                <GoogleIcon className="w-5 h-5" />
+                Continue with Google
+              </>
+            )}
+          </Button>
 
           {/* Footer */}
           <p className="text-center text-sm text-muted-foreground mt-6">

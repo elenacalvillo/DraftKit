@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import { CollabCalendar } from "@/components/calendar/CollabCalendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/useAuth";
@@ -27,6 +28,7 @@ import { useAnalytics } from "@/hooks/useAnalytics";
 import { supabase } from "@/integrations/supabase/client";
 import { signupStep1Schema, signupStep2Schema } from "@/lib/validations";
 import { toast } from "sonner";
+import { GoogleIcon } from "@/components/icons/GoogleIcon";
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -39,10 +41,11 @@ interface CreatorData {
 export default function Signup() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, creator, loading, signUp, refreshCreator } = useAuth();
+  const { user, creator, loading, signUp, signInWithGoogle, refreshCreator } = useAuth();
   const { trackEvent } = useAnalytics();
   const [currentStep, setCurrentStep] = useState<Step>(1);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [createdUser, setCreatedUser] = useState<CreatorData | null>(null);
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -119,6 +122,17 @@ export default function Signup() {
 
     setIsLoading(false);
     setCurrentStep(2);
+  };
+
+  const handleGoogleSignIn = async () => {
+    setIsGoogleLoading(true);
+    const { error } = await signInWithGoogle();
+    
+    if (error) {
+      toast.error(error.message || "Failed to sign in with Google");
+      setIsGoogleLoading(false);
+    }
+    // Don't set loading to false on success - the page will redirect
   };
 
   const handleStep2 = async (e: React.FormEvent) => {
@@ -458,6 +472,39 @@ export default function Signup() {
                     We respect your privacy. No data selling. No AI training on private drafts.
                   </p>
                 </form>
+
+                {/* Divider */}
+                <div className="relative my-6">
+                  <div className="absolute inset-0 flex items-center">
+                    <Separator className="w-full" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">or</span>
+                  </div>
+                </div>
+
+                {/* Google Sign In */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="lg"
+                  className="w-full h-12 gap-3"
+                  onClick={handleGoogleSignIn}
+                  disabled={isGoogleLoading}
+                >
+                  {isGoogleLoading ? (
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      className="w-5 h-5 border-2 border-foreground border-t-transparent rounded-full"
+                    />
+                  ) : (
+                    <>
+                      <GoogleIcon className="w-5 h-5" />
+                      Continue with Google
+                    </>
+                  )}
+                </Button>
 
                 <p className="text-center text-sm text-muted-foreground mt-6">
                   Already have an account?{" "}
