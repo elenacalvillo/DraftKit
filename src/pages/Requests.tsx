@@ -158,7 +158,7 @@ export default function Requests() {
     );
 
     toast.success(`Collaboration with ${request.requester_name} approved!`, {
-      description: "Click 'Generate Draft' to create an AI collaboration outline.",
+      description: "Click 'Generate Draft' to create a collaboration outline.",
     });
 
     // Track approval

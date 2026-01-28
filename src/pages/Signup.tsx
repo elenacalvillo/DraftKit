@@ -596,7 +596,7 @@ export default function Signup() {
                       <p className="text-sm text-destructive">{errors.newsletterUrl}</p>
                     )}
                     <p className="text-xs text-muted-foreground">
-                      Required for AI collaboration suggestions. Use format: yourname.substack.com
+                      Required for SMART-powered content matching. Use format: yourname.substack.com
                     </p>
                   </div>
 

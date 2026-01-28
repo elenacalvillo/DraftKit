@@ -1080,7 +1080,7 @@ export default function PublicBooking() {
                       >
                         <div className="flex items-center gap-2 text-sm font-medium text-primary">
                           <Lightbulb className="w-4 h-4" />
-                          AI Collaboration Ideas
+                          SMART Match Ideas
                         </div>
                         
                         <div className="grid gap-3">

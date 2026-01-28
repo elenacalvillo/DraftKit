@@ -58,10 +58,10 @@ export const substackUrlOptionalSchema = z.string()
 // Legacy alias for backwards compatibility
 export const substackUrlSchema = substackUrlOptionalSchema;
 
-// Newsletter URL - required for AI analysis (format: username.substack.com)
+// Newsletter URL - required for content matching (format: username.substack.com)
 export const newsletterUrlSchema = z.string()
   .trim()
-  .min(1, { message: "Newsletter URL is required for AI collaboration suggestions" })
+  .min(1, { message: "Newsletter URL is required for SMART-powered content matching" })
   .refine(
     isValidSubstackUrl,
     { message: "Enter your newsletter URL (e.g., yourname.substack.com)" }
