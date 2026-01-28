@@ -565,34 +565,42 @@ export default function PublicBooking() {
           )}
           <h1 className="text-4xl font-bold mb-3">{creator.name}</h1>
           
-          {/* Mode Badge */}
-          {creator.collab_mode && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/20 rounded-full mb-4 cursor-help">
-                    <span className="text-lg">{COLLAB_MODE_METADATA[creator.collab_mode].icon}</span>
-                    <span className="font-medium text-primary">{COLLAB_MODE_METADATA[creator.collab_mode].badge}</span>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="text-sm max-w-[250px]">{COLLAB_MODE_METADATA[creator.collab_mode].badgeTooltip}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
+          {/* Badge + Substack Link Row */}
+          <div className="flex items-center justify-center gap-4 mb-4">
+            {/* Mode Badge */}
+            {creator.collab_mode && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/20 rounded-full cursor-help">
+                      <span className="text-lg">{COLLAB_MODE_METADATA[creator.collab_mode].icon}</span>
+                      <span className="font-medium text-primary">{COLLAB_MODE_METADATA[creator.collab_mode].badge}</span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-sm max-w-[250px]">{COLLAB_MODE_METADATA[creator.collab_mode].badgeTooltip}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
 
-          {creator.substack_url && (
-            <a
-              href={creator.substack_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-primary hover:underline mb-4"
-            >
-              <ExternalLink className="w-4 h-4" />
-              View Substack
-            </a>
-          )}
+            {/* Separator dot (only if both badge and link exist) */}
+            {creator.collab_mode && creator.substack_url && (
+              <span className="text-muted-foreground/50">•</span>
+            )}
+
+            {creator.substack_url && (
+              <a
+                href={creator.substack_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-primary hover:underline"
+              >
+                <ExternalLink className="w-4 h-4" />
+                View Substack
+              </a>
+            )}
+          </div>
           {creator.welcome_message && (
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-6">
               {creator.welcome_message}
@@ -607,6 +615,10 @@ export default function PublicBooking() {
               transition={{ delay: 0.2 }}
               className="max-w-md mx-auto mb-8"
             >
+              {/* Headline for context */}
+              <p className="text-xs text-muted-foreground uppercase tracking-wide text-center mb-3">
+                How it works
+              </p>
               <div className="flex items-center justify-center gap-2">
                 {COLLAB_MODE_METADATA[creator.collab_mode].processSteps.map((step, index) => (
                   <div key={step.step} className="flex items-center">
