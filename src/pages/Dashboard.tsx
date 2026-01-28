@@ -157,15 +157,6 @@ export default function Dashboard() {
     },
   ];
 
-  // Mode-aware calendar section
-  const calendarHeader = creator.collab_mode === 'discovery' 
-    ? "Your Availability" 
-    : "Your Publication Schedule";
-
-  const emptyStateText = creator.collab_mode === 'discovery'
-    ? "No availability set yet. Click 'Edit Availability' to mark dates when you're free for calls."
-    : "No availability set yet. Click 'Edit Availability' to mark dates when you can ship.";
-
   if (loading || !creator) {
     return (
       <div className="min-h-screen gradient-bg flex items-center justify-center">
@@ -177,6 +168,15 @@ export default function Dashboard() {
       </div>
     );
   }
+
+  // Mode-aware calendar section (must be after creator null-check)
+  const calendarHeader = creator.collab_mode === 'discovery' 
+    ? "Your Availability" 
+    : "Your Publication Schedule";
+
+  const emptyStateText = creator.collab_mode === 'discovery'
+    ? "No availability set yet. Click 'Edit Availability' to mark dates when you're free for calls."
+    : "No availability set yet. Click 'Edit Availability' to mark dates when you can ship.";
 
   return (
     <DashboardLayout>
