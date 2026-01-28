@@ -250,9 +250,9 @@ serve(async (req: Request): Promise<Response> => {
       let draftSection = "";
       if (aiDraft) {
         draftSection = `
-          <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #8b5cf6;">
+          <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #d9826b;">
             <h3 style="margin: 0 0 16px 0; color: #1e293b; font-size: 18px;">✨ AI-Generated Collaboration Draft</h3>
-            <p style="margin: 0 0 12px 0; font-size: 20px; font-weight: 600; color: #8b5cf6;">${aiDraft.title}</p>
+            <p style="margin: 0 0 12px 0; font-size: 20px; font-weight: 600; color: #d9826b;">${aiDraft.title}</p>
             <p style="margin: 0 0 16px 0; color: #475569; font-style: italic;">${aiDraft.hook}</p>
             
             <p style="margin: 16px 0 8px 0; font-weight: 600; color: #1e293b;">Suggested Format:</p>
@@ -287,7 +287,7 @@ serve(async (req: Request): Promise<Response> => {
         </head>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="text-align: center; margin-bottom: 32px;">
-            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #8b5cf6, #d946ef); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #d9826b, #c9946d); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
               <span style="color: white; font-size: 24px;">✨</span>
             </div>
             <h1 style="margin: 0; font-size: 24px; color: #1e293b;">Collaboration Approved!</h1>
@@ -306,7 +306,7 @@ serve(async (req: Request): Promise<Response> => {
           <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
             <p style="margin: 0 0 16px 0; color: #475569;">Ready to get started?</p>
             <a href="mailto:${creatorEmail}?subject=Re: Collaboration on ${formattedDate}" 
-               style="display: inline-block; background: linear-gradient(135deg, #8b5cf6, #d946ef); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+               style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
               Reply to ${creatorName}
             </a>
           </div>
@@ -376,7 +376,7 @@ serve(async (req: Request): Promise<Response> => {
         </head>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="text-align: center; margin-bottom: 32px;">
-            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #8b5cf6, #d946ef); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #d9826b, #c9946d); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
               <span style="color: white; font-size: 24px;">📨</span>
             </div>
             <h1 style="margin: 0; font-size: 24px; color: #1e293b;">New Collaboration Request</h1>
@@ -389,15 +389,15 @@ serve(async (req: Request): Promise<Response> => {
           </p>
 
           ${request.message ? `
-          <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #8b5cf6;">
+          <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #d9826b;">
             <p style="margin: 0 0 8px 0; font-weight: 600; color: #475569;">Their message:</p>
             <p style="margin: 0; color: #1e293b; white-space: pre-line;">${request.message}</p>
           </div>
           ` : ""}
 
           <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
-            <a href="${baseUrl}/dashboard/requests" 
-               style="display: inline-block; background: linear-gradient(135deg, #8b5cf6, #d946ef); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+            <a href="${baseUrl}/dashboard/requests?highlight=${requestId}" 
+               style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
               View Request
             </a>
           </div>
@@ -444,8 +444,8 @@ serve(async (req: Request): Promise<Response> => {
           ` : ""}
 
           <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
-            <a href="${baseUrl}/dashboard/requests" 
-               style="display: inline-block; background: linear-gradient(135deg, #8b5cf6, #d946ef); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+            <a href="${baseUrl}/dashboard/requests?highlight=${requestId}" 
+               style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
               View All Requests
             </a>
           </div>
@@ -489,7 +489,7 @@ serve(async (req: Request): Promise<Response> => {
           <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
             <p style="margin: 0 0 16px 0; color: #475569;">Looking for other collaborators?</p>
             <a href="${baseUrl}" 
-               style="display: inline-block; background: linear-gradient(135deg, #8b5cf6, #d946ef); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+               style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
               Discover More Creators
             </a>
           </div>
@@ -515,7 +515,7 @@ serve(async (req: Request): Promise<Response> => {
         </head>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="text-align: center; margin-bottom: 32px;">
-            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #8b5cf6, #d946ef); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #d9826b, #c9946d); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
               <span style="color: white; font-size: 24px;">💬</span>
             </div>
             <h1 style="margin: 0; font-size: 24px; color: #1e293b;">New Message</h1>
@@ -527,13 +527,13 @@ serve(async (req: Request): Promise<Response> => {
             <strong>${creatorName}</strong> sent you a message about your collaboration${requestedDate ? ` on <strong>${formattedDate}</strong>` : ""}:
           </p>
 
-          <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #8b5cf6;">
+          <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #d9826b;">
             <p style="margin: 0; color: #1e293b; white-space: pre-line; font-size: 16px;">${messageContent || ""}</p>
           </div>
 
           <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
             <a href="mailto:${creatorEmail}?subject=Re: Collaboration${requestedDate ? ` on ${formattedDate}` : ""}" 
-               style="display: inline-block; background: linear-gradient(135deg, #8b5cf6, #d946ef); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+               style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
               Reply to ${creatorName}
             </a>
           </div>
@@ -556,7 +556,7 @@ serve(async (req: Request): Promise<Response> => {
         </head>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="text-align: center; margin-bottom: 32px;">
-            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #8b5cf6, #d946ef); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #d9826b, #c9946d); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
               <span style="color: white; font-size: 24px;">⏰</span>
             </div>
             <h1 style="margin: 0; font-size: 24px; color: #1e293b;">Collaboration Reminder</h1>
@@ -568,7 +568,7 @@ serve(async (req: Request): Promise<Response> => {
             Just a friendly reminder that you have a collaboration with <strong>${requesterName}</strong> coming up on <strong>${formattedDate}</strong>!
           </p>
 
-          <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #8b5cf6;">
+          <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #d9826b;">
             <p style="margin: 0 0 8px 0; font-weight: 600; color: #475569;">Collaborator:</p>
             <p style="margin: 0 0 16px 0; color: #1e293b;">${requesterName} (${requesterEmail})</p>
             <p style="margin: 0 0 8px 0; font-weight: 600; color: #475569;">Date:</p>
@@ -576,8 +576,8 @@ serve(async (req: Request): Promise<Response> => {
           </div>
 
           <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
-            <a href="${baseUrl}/dashboard/requests" 
-               style="display: inline-block; background: linear-gradient(135deg, #8b5cf6, #d946ef); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+            <a href="${baseUrl}/dashboard/requests?highlight=${requestId}" 
+               style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
               View Details
             </a>
           </div>
@@ -599,7 +599,7 @@ serve(async (req: Request): Promise<Response> => {
         </head>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="text-align: center; margin-bottom: 32px;">
-            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #8b5cf6, #d946ef); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #d9826b, #c9946d); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
               <span style="color: white; font-size: 24px;">⏰</span>
             </div>
             <h1 style="margin: 0; font-size: 24px; color: #1e293b;">Collaboration Reminder</h1>
@@ -611,7 +611,7 @@ serve(async (req: Request): Promise<Response> => {
             Just a friendly reminder that you have a collaboration with <strong>${creatorName}</strong> coming up on <strong>${formattedDate}</strong>!
           </p>
 
-          <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #8b5cf6;">
+          <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #d9826b;">
             <p style="margin: 0 0 8px 0; font-weight: 600; color: #475569;">Creator:</p>
             <p style="margin: 0 0 16px 0; color: #1e293b;">${creatorName}</p>
             <p style="margin: 0 0 8px 0; font-weight: 600; color: #475569;">Date:</p>
@@ -628,7 +628,7 @@ serve(async (req: Request): Promise<Response> => {
 
           <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
             <a href="mailto:${creatorEmail}?subject=Re: Collaboration on ${formattedDate}" 
-               style="display: inline-block; background: linear-gradient(135deg, #8b5cf6, #d946ef); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+               style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
               Contact ${creatorName}
             </a>
           </div>
@@ -679,7 +679,7 @@ serve(async (req: Request): Promise<Response> => {
         </head>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="text-align: center; margin-bottom: 32px;">
-            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #8b5cf6, #d946ef); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #d9826b, #c9946d); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
               <span style="color: white; font-size: 24px;">📝</span>
             </div>
             <h1 style="margin: 0; font-size: 24px; color: #1e293b;">Collaboration Type Updated</h1>
@@ -691,9 +691,9 @@ serve(async (req: Request): Promise<Response> => {
             <strong>${creatorName}</strong> has updated the collaboration type for your upcoming collaboration${requestedDate ? ` on <strong>${formattedDate}</strong>` : ""}.
           </p>
 
-          <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #8b5cf6; text-align: center;">
+          <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #d9826b; text-align: center;">
             <p style="margin: 0 0 8px 0; color: #64748b; font-size: 14px;">New Collaboration Type</p>
-            <p style="margin: 0; font-size: 24px; font-weight: 600; color: #8b5cf6;">${collabTypeName}</p>
+            <p style="margin: 0; font-size: 24px; font-weight: 600; color: #d9826b;">${collabTypeName}</p>
           </div>
 
           <p style="font-size: 16px; margin-bottom: 24px; color: #475569;">
@@ -710,7 +710,7 @@ serve(async (req: Request): Promise<Response> => {
           <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
             <p style="margin: 0 0 16px 0; color: #475569;">Have questions about the change?</p>
             <a href="mailto:${creatorEmail}?subject=Re: Collaboration type update" 
-               style="display: inline-block; background: linear-gradient(135deg, #8b5cf6, #d946ef); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+               style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
               Contact ${creatorName}
             </a>
           </div>

@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Inbox, ArrowLeft } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { RequestCard } from "@/components/requests/RequestCard";
 import { CollabDraft } from "@/lib/storage";
@@ -33,10 +33,52 @@ type FilterTab = "all" | "pending" | "approved" | "declined" | "cancelled";
 
 export default function Requests() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, creator, loading } = useAuth();
   const { trackEvent } = useAnalytics();
   const [requests, setRequests] = useState<DbCollabRequest[]>([]);
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Handle highlight query parameter
+  const highlightParam = searchParams.get('highlight');
+
+  useEffect(() => {
+    if (highlightParam && requests.length > 0) {
+      // Find if the request exists
+      const requestExists = requests.some(r => r.id === highlightParam);
+      
+      if (requestExists) {
+        // Set highlighted state
+        setHighlightedId(highlightParam);
+        
+        // Scroll to the element after a brief delay to ensure it's rendered
+        setTimeout(() => {
+          const element = document.getElementById(`request-${highlightParam}`);
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 100);
+        
+        // Clear highlight after 3 seconds
+        highlightTimeoutRef.current = setTimeout(() => {
+          setHighlightedId(null);
+          // Clear the URL parameter
+          setSearchParams({});
+        }, 3000);
+      } else {
+        // Request not found, clear the param
+        setSearchParams({});
+      }
+    }
+
+    return () => {
+      if (highlightTimeoutRef.current) {
+        clearTimeout(highlightTimeoutRef.current);
+      }
+    };
+  }, [highlightParam, requests, setSearchParams]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -350,9 +392,14 @@ export default function Requests() {
               {mappedRequests.map((request, index) => (
                 <motion.div
                   key={request.id}
+                  id={`request-${request.id}`}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
+                  className={cn(
+                    "transition-all duration-500",
+                    highlightedId === request.id && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-2xl shadow-glow"
+                  )}
                 >
                   <RequestCard
                     request={request}
