@@ -1,135 +1,47 @@
 
 
-## Validate Newsletter Publication URLs (Not Profile URLs)
+## Remove "AI" References - Apply Sam Filter Branding
 
-The current validation accepts profile URLs like `https://substack.com/@elenacalvillo`, but these don't work for the "Match Our Content" feature because:
-
-1. A profile username is NOT the same as a newsletter subdomain
-2. `@elenacalvillo` (profile) vs `productreleasenotes` (newsletter) are different
-3. The RSS fetch fails because `elenacalvillo.substack.com/feed` doesn't exist
+Per the brand guidelines, we need to replace "AI" terminology with "SMART" across the application. The Sam Filter prioritizes "Professional Utility" over "AI-led automation".
 
 ---
 
-### The Problem
+### Locations to Update
 
-| URL Type | Example | Has RSS Feed? |
-|----------|---------|---------------|
-| Newsletter URL | `productreleasenotes.substack.com` | Yes |
-| Profile URL | `substack.com/@elenacalvillo` | No (profile page only) |
-
-The helper text says "yourname.substack.com" but accepts profile URLs - confusing!
-
----
-
-### Solution
-
-Create a **stricter validation** that only accepts **newsletter/publication URLs** (not profile URLs) for the booking form's substackUrl field.
+| File | Line | Current Text | Proposed Text |
+|------|------|--------------|---------------|
+| `Settings.tsx` | 398 | "Required for AI collaboration suggestions" | "Required for SMART-powered content matching" |
+| `Signup.tsx` | 599 | "Required for AI collaboration suggestions" | "Required for SMART-powered content matching" |
+| `validations.ts` | 64 | "Newsletter URL is required for AI collaboration suggestions" | "Newsletter URL is required for SMART-powered content matching" |
+| `PublicBooking.tsx` | 1083 | "AI Collaboration Ideas" | "SMART Match Ideas" |
+| `Requests.tsx` | 161 | "create an AI collaboration outline" | "create a collaboration outline" |
+| `CollabDraftModal.tsx` | 96 | "AI Collaboration Draft" | "SMART Draft Workspace" |
+| `AdminAnalytics.tsx` | 486 | "AI Suggestions Used" | "SMART Suggestions Used" |
 
 ---
 
 ### Changes Overview
 
-| File | Change |
-|------|--------|
-| `src/lib/substack-url.ts` | Add new `isValidNewsletterUrl()` function that rejects profile URLs |
-| `src/lib/validations.ts` | Create `newsletterPublicationUrlSchema` using the new validator |
-| `src/pages/PublicBooking.tsx` | Update validation to use stricter schema + show clear error message |
+**7 files** need updates to replace AI terminology with Sam Filter-compliant alternatives:
+
+1. **Settings.tsx** - Helper text under Newsletter URL field
+2. **Signup.tsx** - Helper text during onboarding  
+3. **validations.ts** - Zod validation error message
+4. **PublicBooking.tsx** - Section header for match suggestions
+5. **Requests.tsx** - Toast notification after approval
+6. **CollabDraftModal.tsx** - Modal dialog title
+7. **AdminAnalytics.tsx** - Analytics card title (admin-only, but for consistency)
 
 ---
 
-### Implementation Details
+### Terminology Map (Sam Filter)
 
-**1. Add new validator function (substack-url.ts):**
-
-```typescript
-/**
- * Check if input is a valid newsletter publication URL (NOT a profile URL)
- * Profile URLs like substack.com/@username are rejected because they don't have RSS feeds
- */
-export function isValidNewsletterPublicationUrl(input: string): boolean {
-  if (!input || typeof input !== 'string') return false;
-  
-  let url = input.trim();
-  url = url.replace(/[?#].*$/, '');
-  url = url.replace(/\/+$/, '');
-  const withoutProtocol = url.replace(/^https?:\/\//, '');
-  
-  // REJECT: substack.com/@username (Profile URLs don't have RSS feeds)
-  const profileMatch = withoutProtocol.match(/^(?:www\.)?substack\.com\/@/i);
-  if (profileMatch) {
-    return false;
-  }
-  
-  // ACCEPT: open.substack.com/pub/username (Mobile share - points to publication)
-  const mobileMatch = withoutProtocol.match(/^open\.substack\.com\/pub\/([a-zA-Z0-9_-]+)/i);
-  if (mobileMatch) return true;
-  
-  // ACCEPT: username.substack.com (Standard newsletter format)
-  const standardMatch = withoutProtocol.match(/^([a-zA-Z0-9][a-zA-Z0-9_-]*)\.substack\.com(?:\/.*)?$/i);
-  if (standardMatch) return true;
-  
-  // ACCEPT: Bare username (will be converted to username.substack.com)
-  const bareUsernameMatch = withoutProtocol.match(/^([a-zA-Z0-9][a-zA-Z0-9_-]{1,49})$/);
-  if (bareUsernameMatch && !withoutProtocol.includes('.') && !withoutProtocol.includes('/')) {
-    return true;
-  }
-  
-  return false;
-}
-```
-
-**2. Add stricter schema (validations.ts):**
-
-```typescript
-import { isValidNewsletterPublicationUrl } from './substack-url';
-
-// Newsletter PUBLICATION URL - required for content matching (rejects profile URLs)
-export const newsletterPublicationUrlSchema = z.string()
-  .trim()
-  .min(1, { message: "Newsletter URL is required" })
-  .refine(
-    isValidNewsletterPublicationUrl,
-    { message: "Enter your newsletter URL (e.g., yourname.substack.com). Profile URLs like substack.com/@name won't work." }
-  );
-```
-
-**3. Update PublicBooking.tsx validation:**
-
-Update the inline validation for the substackUrl field to use the new stricter schema and show a helpful error message when a profile URL is detected.
-
----
-
-### Visual Before/After
-
-**Before (accepts profile URL, fails silently on fetch):**
-```
-Your Newsletter URL *
-[https://substack.com/@elenacalvillo] [Match Our Content]
-                                        ↳ (Click fails with confusing error)
-```
-
-**After (rejects profile URL with clear message):**
-```
-Your Newsletter URL *
-[https://substack.com/@elenacalvillo] [Match Our Content]
-Enter your newsletter URL (e.g., yourname.substack.com). 
-Profile URLs like substack.com/@name won't work.
-```
-
----
-
-### Why Profile URLs Don't Work
-
-Profile pages (`substack.com/@username`) are user profiles, not newsletters:
-- They show the user's bio, subscriptions, and activity
-- They do NOT have an RSS feed (`/feed` endpoint)
-- The username in the profile may be completely different from their newsletter subdomain
-
-Example:
-- **Profile**: `substack.com/@elenacalvillo` (Elena's profile page)
-- **Newsletter**: `productreleasenotes.substack.com` (Elena's actual newsletter)
-
-These are NOT interchangeable!
+| Old Term | New Term |
+|----------|----------|
+| "AI collaboration" | "SMART-powered" or "content matching" |
+| "AI-powered" | "SMART-powered" |
+| "AI suggestions" | "SMART suggestions" |
+| "AI draft" | "SMART draft" |
 
 ---
 
@@ -137,7 +49,11 @@ These are NOT interchangeable!
 
 | File | Changes |
 |------|---------|
-| `src/lib/substack-url.ts` | Add `isValidNewsletterPublicationUrl()` function |
-| `src/lib/validations.ts` | Add `newsletterPublicationUrlSchema` |
-| `src/pages/PublicBooking.tsx` | Update validation logic to reject profile URLs with clear error |
+| `src/pages/Settings.tsx` | Line 398: Update helper text |
+| `src/pages/Signup.tsx` | Line 599: Update helper text |
+| `src/lib/validations.ts` | Line 64: Update validation message |
+| `src/pages/PublicBooking.tsx` | Line 1083: Update section header |
+| `src/pages/Requests.tsx` | Line 161: Update toast description |
+| `src/components/requests/CollabDraftModal.tsx` | Line 96: Update modal title |
+| `src/pages/AdminAnalytics.tsx` | Line 486: Update card title |
 
