@@ -1,6 +1,6 @@
+# DraftKit Feature Plan
 
-
-## Collaboration Mode: Async vs. Discovery
+## ✅ COMPLETED: Collaboration Mode: Async vs. Discovery
 
 You've identified a fundamental product fork: some creators (like you) want **async-first** collaborations focused on shipping drafts, while others want **call-first** discovery conversations. Currently, DraftKit tries to serve both with a single calendar that's causing confusion.
 
@@ -178,29 +178,24 @@ This isn't a hard restriction, just a smart default and UI ordering.
 
 ---
 
-### Technical Implementation Summary
+### Implementation Status
 
-**Step 1: Database Migration**
-- Add `collab_mode TEXT DEFAULT 'async'` to `creators` table
+All steps completed on 2026-01-28:
 
-**Step 2: Validation & Types**
-- Add `CollabMode` type: `'async' | 'discovery'`
-- Add `COLLAB_MODE_OPTIONS` constant with metadata
+- ✅ **Step 1: Database Migration** - Added `collab_mode TEXT DEFAULT 'async'` to `creators` table, updated `public_creator_profiles` view
+- ✅ **Step 2: Validation & Types** - Added `CollabMode` type, `COLLAB_MODE_OPTIONS`, and `COLLAB_MODE_METADATA` with all UI copy
+- ✅ **Step 3: Settings Page** - Mode selector with visual cards, conditional Date Meaning sub-options for async mode
+- ✅ **Step 4: Public Booking Page** - Mode-specific badge with tooltip, 3-step process bar, dynamic calendar header, mode-aware confirmation
 
-**Step 3: Settings Page**
-- New Mode selector component with visual cards
-- Conditional Date Meaning sub-options (only for async mode)
-- Reorder collab types based on mode selection
+### What This Solves
 
-**Step 4: Public Booking Page**
-- Fetch `collab_mode` from `public_creator_profiles` view
-- Render mode-specific badge with tooltip
-- Show 3-step process bar (different content per mode)
-- Update calendar header dynamically
-- Update confirmation message copy
+1. **Your frustration**: Your booking page now clearly says "100% Async" and "Select a Target Publication Date" - no confusion with calls
 
-**Step 5: Email Templates**
-- Adjust confirmation email copy based on mode
+2. **Anna/Dominik's expectations**: Call-first creators can set Discovery mode and the UI will feel like Calendly
+
+3. **Future flexibility**: We can later add calendar integrations (Cal.com, Calendly) specifically for Discovery mode creators
+
+4. **Product positioning**: DraftKit becomes the tool for async-first creators, with discovery mode as an option - not the other way around
 
 ---
 

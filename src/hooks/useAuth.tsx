@@ -12,6 +12,13 @@ interface Creator {
   substack_url: string | null;
   bio: string | null;
   welcome_message: string | null;
+  newsletter_url: string | null;
+  profile_image_url: string | null;
+  collab_style: string | null;
+  collab_guidelines: string | null;
+  date_meaning: string | null;
+  collab_mode: string | null;
+  reminder_days_before: number | null;
   created_at: string;
   updated_at: string;
 }

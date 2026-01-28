@@ -11,10 +11,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { settingsSchema, COLLAB_TYPE_METADATA, type CollabStyle, type DateMeaning } from "@/lib/validations";
+import { settingsSchema, COLLAB_TYPE_METADATA, COLLAB_MODE_METADATA, COLLAB_MODE_OPTIONS, type CollabStyle, type DateMeaning, type CollabMode } from "@/lib/validations";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const COLLAB_STYLE_OPTIONS: { value: CollabStyle; label: string; description: string }[] = [
   { value: "Virtual Coffee", label: "Virtual Coffee", description: "30-60 min video call" },
@@ -30,9 +32,11 @@ const COLLAB_STYLE_OPTIONS: { value: CollabStyle; label: string; description: st
 const DATE_MEANING_OPTIONS: { value: DateMeaning; label: string; description: string }[] = [
   { value: "kickoff", label: "Kick-off days", description: "The day we start working together" },
   { value: "publish", label: "Publishing days", description: "The day the final piece goes live" },
-  { value: "live", label: "Live days", description: "The day of a call or event" },
-  { value: "flexible", label: "Flexible", description: "Varies by collaboration type" },
 ];
+
+// Async mode recommended collab types (shown first in the list)
+const ASYNC_RECOMMENDED_TYPES = ['Async Drafting', 'Guest Post Exchange', 'Interview Style', 'Co-written Article', 'Newsletter Shoutout'];
+const DISCOVERY_RECOMMENDED_TYPES = ['Virtual Coffee', 'Live Event / Webinar'];
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -52,6 +56,7 @@ export default function Settings() {
     collabGuidelines: "",
     reminderDaysBefore: 3,
     dateMeaning: "flexible" as DateMeaning,
+    collabMode: "async" as CollabMode,
   });
 
   // Parse collab_style from DB (could be single value or JSON array)
@@ -133,6 +138,7 @@ export default function Settings() {
         collabGuidelines: (creator as any).collab_guidelines || "",
         reminderDaysBefore: (creator as any).reminder_days_before ?? 3,
         dateMeaning: ((creator as any).date_meaning || "flexible") as DateMeaning,
+        collabMode: ((creator as any).collab_mode || "async") as CollabMode,
       });
       setPreviewImageUrl((creator as any).profile_image_url || null);
       
@@ -195,6 +201,7 @@ export default function Settings() {
         collab_guidelines: formData.collabGuidelines || null,
         reminder_days_before: formData.reminderDaysBefore,
         date_meaning: formData.dateMeaning,
+        collab_mode: formData.collabMode,
       })
       .eq('id', creator.id);
 
@@ -515,38 +522,100 @@ export default function Settings() {
               </p>
             </div>
 
-            {/* Date Meaning Selector */}
+            {/* Collaboration Mode Selector */}
             <div className="space-y-3">
-              <Label>What do your available dates represent?</Label>
-              <RadioGroup
-                value={formData.dateMeaning}
-                onValueChange={(value) => setFormData({ ...formData, dateMeaning: value as DateMeaning })}
-                className="grid gap-3"
-              >
-                {DATE_MEANING_OPTIONS.map((option) => (
-                  <div
-                    key={option.value}
-                    className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-colors ${
-                      formData.dateMeaning === option.value
-                        ? "bg-primary/10 border-primary/30"
-                        : "bg-muted/50 border-transparent hover:border-muted-foreground/20"
-                    }`}
-                    onClick={() => setFormData({ ...formData, dateMeaning: option.value })}
-                  >
-                    <RadioGroupItem value={option.value} id={`date-${option.value}`} />
-                    <div className="flex-1">
-                      <label htmlFor={`date-${option.value}`} className="font-medium cursor-pointer">
-                        {option.label}
-                      </label>
-                      <p className="text-sm text-muted-foreground">{option.description}</p>
+              <Label>How do you prefer to collaborate?</Label>
+              <div className="grid gap-3">
+                {COLLAB_MODE_OPTIONS.map((mode) => {
+                  const metadata = COLLAB_MODE_METADATA[mode];
+                  const isSelected = formData.collabMode === mode;
+                  return (
+                    <div
+                      key={mode}
+                      className={`p-5 rounded-xl border-2 cursor-pointer transition-all ${
+                        isSelected
+                          ? "bg-primary/10 border-primary shadow-sm"
+                          : "bg-muted/50 border-transparent hover:border-muted-foreground/20"
+                      }`}
+                      onClick={() => setFormData({ ...formData, collabMode: mode })}
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="text-2xl">{metadata.icon}</span>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-semibold">{metadata.label}</span>
+                            {mode === 'async' && (
+                              <Badge variant="secondary" className="text-xs">Recommended</Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-2">{metadata.description}</p>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge 
+                                  variant="outline" 
+                                  className={`text-xs ${isSelected ? 'border-primary/50 text-primary' : ''}`}
+                                >
+                                  {metadata.badge}
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs max-w-[200px]">{metadata.badgeTooltip}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </RadioGroup>
-              <p className="text-xs text-muted-foreground">
-                This context is shown to collaborators on your booking page
-              </p>
+                  );
+                })}
+              </div>
             </div>
+
+            {/* Date Meaning Selector - Only show for async mode */}
+            {formData.collabMode === 'async' && (
+              <div className="space-y-3">
+                <Label>What do your available dates represent?</Label>
+                <RadioGroup
+                  value={formData.dateMeaning}
+                  onValueChange={(value) => setFormData({ ...formData, dateMeaning: value as DateMeaning })}
+                  className="grid gap-3"
+                >
+                  {DATE_MEANING_OPTIONS.map((option) => (
+                    <div
+                      key={option.value}
+                      className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-colors ${
+                        formData.dateMeaning === option.value
+                          ? "bg-primary/10 border-primary/30"
+                          : "bg-muted/50 border-transparent hover:border-muted-foreground/20"
+                      }`}
+                      onClick={() => setFormData({ ...formData, dateMeaning: option.value })}
+                    >
+                      <RadioGroupItem value={option.value} id={`date-${option.value}`} />
+                      <div className="flex-1">
+                        <label htmlFor={`date-${option.value}`} className="font-medium cursor-pointer">
+                          {option.label}
+                        </label>
+                        <p className="text-sm text-muted-foreground">{option.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </RadioGroup>
+                <p className="text-xs text-muted-foreground">
+                  This context is shown to collaborators on your booking page
+                </p>
+              </div>
+            )}
+
+            {/* Discovery mode info */}
+            {formData.collabMode === 'discovery' && (
+              <div className="p-4 bg-accent/20 border border-accent/30 rounded-xl">
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-medium text-foreground">📅 Dates = Call slots</span><br />
+                  Your available dates will be shown as times for intro calls. Visitors will receive a calendar invite after booking.
+                </p>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="collabGuidelines">Collaboration Guidelines</Label>
