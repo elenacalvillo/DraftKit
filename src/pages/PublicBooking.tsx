@@ -971,13 +971,13 @@ export default function PublicBooking() {
                             ) : (
                               <>
                                 <Sparkles className="w-4 h-4 mr-2" />
-                                Find Ideas
+                                Match Our Content
                               </>
                             )}
                           </Button>
                           {!formData.substackUrl && !isAnalyzing && (
                             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-foreground text-background text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
-                              Enter your newsletter URL first
+                              We'll scan both newsletters to suggest topics that fit our overlap
                               <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-foreground" />
                             </div>
                           )}
@@ -988,14 +988,14 @@ export default function PublicBooking() {
                       <p className="text-sm text-destructive">{errors.substackUrl}</p>
                     )}
                     <p className="text-xs text-muted-foreground">
-                      Your newsletter URL for AI-powered collaboration ideas (e.g., yourname.substack.com)
+                      Your newsletter URL for SMART-powered collaboration ideas (e.g., yourname.substack.com)
                     </p>
                     
                     {/* Show message when creator hasn't linked newsletter */}
                     {!creator.newsletter_url && !creator.substack_url && (
                       <p className="text-xs text-muted-foreground/70 flex items-center gap-1.5 mt-1">
                         <AlertCircle className="w-3 h-3" />
-                        AI matching unavailable — {creator.name} hasn't linked their newsletter yet
+                        Smart matching unavailable — {creator.name} hasn't linked their newsletter yet
                       </p>
                     )}
                   </div>
