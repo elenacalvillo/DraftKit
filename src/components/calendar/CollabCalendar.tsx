@@ -28,6 +28,7 @@ interface CollabCalendarProps {
   onToggleAvailable?: (date: string) => void;
   onToggleBlocked?: (date: string) => void;
   availableLegendText?: string;
+  collabMode?: 'async' | 'discovery' | null;
 }
 
 export function CollabCalendar({
@@ -40,6 +41,7 @@ export function CollabCalendar({
   onToggleAvailable,
   onToggleBlocked,
   availableLegendText = "Available",
+  collabMode,
 }: CollabCalendarProps) {
   // Helper to get booking info for a date
   const getBookingInfo = (dateStr: string): BookingInfo | undefined => {
@@ -258,7 +260,11 @@ export function CollabCalendar({
           <div className="flex items-center gap-2 text-sm">
             <CalendarDays className="w-4 h-4 text-primary" />
             <span>
-              Next available dates are in{" "}
+              Next available{" "}
+              <span className="font-medium">
+                {collabMode === 'discovery' ? 'call slots' : collabMode === 'async' ? 'publication dates' : 'dates'}
+              </span>{" "}
+              are in{" "}
               <span className="font-medium text-primary">
                 {monthNames[firstAvailableDate.getMonth()]} {firstAvailableDate.getFullYear()}
               </span>
