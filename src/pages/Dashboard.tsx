@@ -130,32 +130,41 @@ export default function Dashboard() {
   const stats = [
     {
       icon: Users,
-      label: "Strategic Outlines",
-      subLabel: "AI-powered drafts created",
+      label: "Outlines Created",
+      subLabel: "Ready to refine",
       value: draftsCreatedCount,
-      emptyTip: "Review a request to generate your first AI outline",
+      emptyTip: "Review a request to generate your first collaboration outline",
       color: "text-primary",
       bg: "bg-primary/10",
     },
     {
       icon: Clock,
-      label: "Open Connections",
-      subLabel: "Waiting for your response",
+      label: "Pending Requests",
+      subLabel: "Awaiting your review",
       value: pendingCount,
-      emptyTip: "Share your link to attract new partners",
+      emptyTip: "Share your link to start receiving collaboration requests",
       color: "text-accent",
       bg: "bg-accent/10",
     },
     {
       icon: Calendar,
       label: "Collaborations This Month",
-      subLabel: "Ready to publish",
+      subLabel: "Scheduled this month",
       value: thisMonthCollabs,
-      emptyTip: "Time to launch your next partnership!",
+      emptyTip: "Approve requests to fill your calendar",
       color: "text-success",
       bg: "bg-success/10",
     },
   ];
+
+  // Mode-aware calendar section
+  const calendarHeader = creator.collab_mode === 'discovery' 
+    ? "Your Availability" 
+    : "Your Publication Schedule";
+
+  const emptyStateText = creator.collab_mode === 'discovery'
+    ? "No availability set yet. Click 'Edit Availability' to mark dates when you're free for calls."
+    : "No availability set yet. Click 'Edit Availability' to mark dates when you can ship.";
 
   if (loading || !creator) {
     return (
@@ -265,7 +274,7 @@ export default function Dashboard() {
             className="lg:col-span-2"
           >
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">Your Schedule</h2>
+              <h2 className="text-xl font-semibold">{calendarHeader}</h2>
               <Button 
                 variant="outline" 
                 size="sm" 
@@ -287,7 +296,7 @@ export default function Dashboard() {
               >
                 <p className="text-sm text-muted-foreground">
                   <span className="font-medium text-foreground">No availability set yet.</span>{" "}
-                  Click "Edit Availability" to mark dates when you're free to collaborate.
+                  {emptyStateText.replace("No availability set yet. ", "")}
                 </p>
               </motion.div>
             )}
