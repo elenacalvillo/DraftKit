@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { isValidSubstackUrl } from './substack-url';
+import { isValidSubstackUrl, isValidNewsletterPublicationUrl } from './substack-url';
 
 export const emailSchema = z.string()
   .trim()
@@ -26,13 +26,23 @@ export const urlSchema = z.string()
   .url({ message: "Invalid URL format" })
   .max(500, { message: "URL must be less than 500 characters" });
 
-// Substack URL - REQUIRED (for booking form)
+// Substack URL - REQUIRED (for booking form) - accepts any valid Substack URL format
 export const substackUrlRequiredSchema = z.string()
   .trim()
   .min(1, { message: "Newsletter URL is required" })
   .refine(
     isValidSubstackUrl,
     { message: "Enter your Substack URL (e.g., yourname.substack.com)" }
+  );
+
+// Newsletter PUBLICATION URL - required for content matching (rejects profile URLs)
+// Use this when you need to fetch RSS/content - profile URLs won't work
+export const newsletterPublicationUrlSchema = z.string()
+  .trim()
+  .min(1, { message: "Newsletter URL is required" })
+  .refine(
+    isValidNewsletterPublicationUrl,
+    { message: "Enter your newsletter URL (e.g., yourname.substack.com). Profile URLs like substack.com/@name won't work." }
   );
 
 // Substack URL - OPTIONAL (for settings/profile)

@@ -98,6 +98,43 @@ export function isValidSubstackUrl(input: string): boolean {
 }
 
 /**
+ * Check if input is a valid newsletter publication URL (NOT a profile URL)
+ * Profile URLs like substack.com/@username are rejected because they don't have RSS feeds
+ * 
+ * This is stricter than isValidSubstackUrl - use this when you need to fetch RSS/content
+ */
+export function isValidNewsletterPublicationUrl(input: string): boolean {
+  if (!input || typeof input !== 'string') return false;
+  
+  let url = input.trim();
+  url = url.replace(/[?#].*$/, '');
+  url = url.replace(/\/+$/, '');
+  const withoutProtocol = url.replace(/^https?:\/\//, '');
+  
+  // REJECT: substack.com/@username (Profile URLs don't have RSS feeds)
+  const profileMatch = withoutProtocol.match(/^(?:www\.)?substack\.com\/@/i);
+  if (profileMatch) {
+    return false;
+  }
+  
+  // ACCEPT: open.substack.com/pub/username (Mobile share - points to publication)
+  const mobileMatch = withoutProtocol.match(/^open\.substack\.com\/pub\/([a-zA-Z0-9_-]+)/i);
+  if (mobileMatch) return true;
+  
+  // ACCEPT: username.substack.com (Standard newsletter format)
+  const standardMatch = withoutProtocol.match(/^([a-zA-Z0-9][a-zA-Z0-9_-]*)\.substack\.com(?:\/.*)?$/i);
+  if (standardMatch) return true;
+  
+  // ACCEPT: Bare username (will be converted to username.substack.com)
+  const bareUsernameMatch = withoutProtocol.match(/^([a-zA-Z0-9][a-zA-Z0-9_-]{1,49})$/);
+  if (bareUsernameMatch && !withoutProtocol.includes('.') && !withoutProtocol.includes('/')) {
+    return true;
+  }
+  
+  return false;
+}
+
+/**
  * Extract just the username from a Substack URL
  */
 export function extractSubstackUsername(input: string): string | null {
