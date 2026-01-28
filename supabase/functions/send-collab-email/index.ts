@@ -355,7 +355,7 @@ serve(async (req: Request): Promise<Response> => {
           <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
             <p style="margin: 0 0 16px 0; color: #475569;">Looking for other collaborators?</p>
             <a href="${baseUrl}" 
-               style="display: inline-block; background: #475569; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+               style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
               Discover More Creators
             </a>
           </div>
