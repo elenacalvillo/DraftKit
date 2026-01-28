@@ -1,130 +1,43 @@
-# DraftKit Feature Plan
 
-## ✅ COMPLETED: Collaboration Mode: Async vs. Discovery
 
-You've identified a fundamental product fork: some creators (like you) want **async-first** collaborations focused on shipping drafts, while others want **call-first** discovery conversations. Currently, DraftKit tries to serve both with a single calendar that's causing confusion.
+## Dashboard Copy Clarity Update
 
----
+You're right that the dashboard copy is unclear and doesn't align with DraftKit's brand positioning. Looking at the screenshot:
 
-### The Core Problem
-
-Today's system has:
-- A single "Date Meaning" setting (kickoff/publish/live/flexible)
-- Multiple collaboration types selectable simultaneously
-- But visitors still think "calendar = meeting"
-
-This creates cognitive dissonance: Anna and Dominik expect Calendly-like scheduling, but your flow is "pick a deadline, start drafting."
+| Current Copy | Problem |
+|--------------|---------|
+| "Strategic Outlines" / "AI-powered drafts created" | Violates the "Sam Filter" - too AI-centric |
+| "Open Connections" / "Waiting for your response" | Vague - what's a "connection"? |
+| "Collaborations This Month" / "Ready to publish" | Misleading - these are approved/scheduled, not "ready" |
+| "Your Schedule" | Doesn't reflect async vs discovery mode |
 
 ---
 
-### The Mode Solution
+### Proposed Changes
 
-Instead of making the calendar do two jobs, let creators explicitly declare their **Collaboration Mode** at the top level of their Playbook settings. This single choice cascades through the entire experience.
+**Stat Card 1: Drafts Created**
+- **Label**: "Draft Outlines" → "Outlines Created"  
+- **Sub-label**: ~~"AI-powered drafts created"~~ → "Ready to refine"
+- **Empty tip**: "Review a request to generate your first collaboration outline"
 
-| Setting | Mode A: "Async Workspace" | Mode B: "Discovery First" |
-|---------|---------------------------|---------------------------|
-| **Calendar header** | "Select a Target Publication Date" | "Pick a Time to Chat" |
-| **Available = ...** | Days you can ship | Days you're free for calls |
-| **What happens after booking** | Guest gets draft outline | Guest gets calendar invite |
-| **Confirmation copy** | "Check your email for the first draft" | "Check your email for a meeting link" |
-| **Badge on profile** | "100% Async" | "Let's Chat First" |
+**Stat Card 2: Pending Requests**
+- **Label**: ~~"Open Connections"~~ → "Pending Requests"
+- **Sub-label**: "Awaiting your review"
+- **Empty tip**: "Share your link to start receiving collaboration requests"
 
----
+**Stat Card 3: This Month's Collaborations**
+- **Label**: Keep "Collaborations This Month"
+- **Sub-label**: ~~"Ready to publish"~~ → "Scheduled this month"
+- **Empty tip**: "Approve requests to fill your calendar"
 
-### Why One Mode Per Creator (Not Per Collab Type)
+**Calendar Section Header (Mode-Aware)**
+- If `collab_mode === 'async'`: "Your Publication Schedule"
+- If `collab_mode === 'discovery'`: "Your Availability"
+- Fallback: "Your Schedule"
 
-Trying to mix modes (e.g., "Async Drafting uses publish dates" + "Virtual Coffee uses live dates") creates a UX nightmare where the calendar changes meaning based on what the guest selects. 
-
-The cleaner approach: **You pick your style, the UI adapts everywhere.**
-
----
-
-### Database Changes
-
-**Modify the `creators` table:**
-
-| Column | Type | Description |
-|--------|------|-------------|
-| `collab_mode` | text | `'async'` or `'discovery'` (default: `'async'`) |
-
-The existing `date_meaning` column becomes derived from `collab_mode`:
-- `async` mode → dates mean "publish" or "kickoff" (creator picks which)
-- `discovery` mode → dates mean "live" (call slots)
-
----
-
-### Settings UI Changes
-
-**Replace the current Date Meaning radio group with a Mode selector:**
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│ How do you prefer to collaborate?                          │
-│                                                              │
-│ ┌─────────────────────────────────────────────────────────┐ │
-│ │ ✍️  Async Workspace (Recommended for you)               │ │
-│ │    Skip the calls. Guests request a topic, you start    │ │
-│ │    drafting. Calendar shows publication deadlines.      │ │
-│ │                                                          │ │
-│ │    "100% Async" badge shown on your booking page         │ │
-│ └─────────────────────────────────────────────────────────┘ │
-│                                                              │
-│ ┌─────────────────────────────────────────────────────────┐ │
-│ │ ☕  Discovery First                                      │ │
-│ │    Meet collaborators on a call before committing.      │ │
-│ │    Calendar shows available call slots.                 │ │
-│ │                                                          │ │
-│ │    Integrates with Calendly/Cal.com (future)             │ │
-│ └─────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────┘
-```
-
-If **Async Workspace** is selected, show a sub-option:
-- "Dates represent **kick-off** days (when we start)"
-- "Dates represent **publication** days (when we ship)"
-
----
-
-### Public Booking Page Changes
-
-**For Async Mode creators:**
-
-1. **Badge near profile name**: "100% Async" with a tooltip explaining "No calls required - we'll start drafting right away"
-
-2. **Calendar header**: "Select a Target Publication Date" (or "Select a Kick-off Date" based on sub-setting)
-
-3. **Process steps** (visual 3-step bar):
-   ```
-   [1. Topic] → [2. Choose Deadline] → [3. Start Drafting]
-   ```
-
-4. **Confirmation message**: "Great! This is our target ship date. Check your email for the first draft."
-
-**For Discovery Mode creators:**
-
-1. **Badge**: "Let's Chat First" 
-
-2. **Calendar header**: "Pick a Time for an Intro Call"
-
-3. **Process steps**:
-   ```
-   [1. About You] → [2. Schedule Call] → [3. Decide Together]
-   ```
-
-4. **Confirmation message**: "Great! Check your email for a calendar invite to discuss your collaboration."
-
----
-
-### Filter Collaboration Types by Mode
-
-When a creator selects their mode, intelligently filter (or re-order) their available collaboration types:
-
-| Mode | Recommended Types | De-emphasized |
-|------|-------------------|---------------|
-| Async | Async Drafting, Guest Post Exchange, Interview Style, Co-written Article, Newsletter Shoutout | Virtual Coffee, Live Event |
-| Discovery | Virtual Coffee, Live Event / Webinar | Async types still available |
-
-This isn't a hard restriction, just a smart default and UI ordering.
+**Calendar Empty State (Mode-Aware)**
+- Async mode: "No availability set yet. Click 'Edit Availability' to mark dates when you can ship."
+- Discovery mode: "No availability set yet. Click 'Edit Availability' to mark dates when you're free for calls."
 
 ---
 
@@ -132,80 +45,62 @@ This isn't a hard restriction, just a smart default and UI ordering.
 
 | File | Changes |
 |------|---------|
-| `supabase/migrations/` | Add `collab_mode` column to `creators` table with default `'async'` |
-| `src/lib/validations.ts` | Add `COLLAB_MODE_OPTIONS` and schema |
-| `src/pages/Settings.tsx` | Replace Date Meaning radio with Mode selector + conditional sub-options |
-| `src/pages/PublicBooking.tsx` | Render mode-specific badge, calendar header, process steps, confirmation copy |
-| `src/components/calendar/CollabCalendar.tsx` | Accept `calendarHeader` prop for dynamic header text |
+| `src/pages/Dashboard.tsx` | Update `stats` array labels/sub-labels, add mode-aware calendar header, update empty state copy |
 
 ---
 
-### Visual Preview: Your Booking Page After This Change
+### Implementation Details
 
+```typescript
+// Updated stats array
+const stats = [
+  {
+    icon: Users,
+    label: "Outlines Created",
+    subLabel: "Ready to refine",
+    value: draftsCreatedCount,
+    emptyTip: "Review a request to generate your first collaboration outline",
+    color: "text-primary",
+    bg: "bg-primary/10",
+  },
+  {
+    icon: Clock,
+    label: "Pending Requests",
+    subLabel: "Awaiting your review",
+    value: pendingCount,
+    emptyTip: "Share your link to start receiving collaboration requests",
+    color: "text-accent",
+    bg: "bg-accent/10",
+  },
+  {
+    icon: Calendar,
+    label: "Collaborations This Month",
+    subLabel: "Scheduled this month",
+    value: thisMonthCollabs,
+    emptyTip: "Approve requests to fill your calendar",
+    color: "text-success",
+    bg: "bg-success/10",
+  },
+];
+
+// Mode-aware calendar header
+const calendarHeader = creator.collab_mode === 'discovery' 
+  ? "Your Availability" 
+  : "Your Publication Schedule";
+
+// Mode-aware empty state
+const emptyStateText = creator.collab_mode === 'discovery'
+  ? "No availability set yet. Click 'Edit Availability' to mark dates when you're free for calls."
+  : "No availability set yet. Click 'Edit Availability' to mark dates when you can ship.";
 ```
-┌─────────────────────────────────────────────────────────────┐
-│          [Your avatar]                                       │
-│          Elena Calvillo                                      │
-│          ┌──────────────┐                                    │
-│          │ 100% Async ✨ │                                    │
-│          └──────────────┘                                    │
-│                                                              │
-│  "Looking forward to crafting something great together..."   │
-│                                                              │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│      ┌──────┐     ┌──────────────┐     ┌──────────────┐     │
-│      │  1   │ ─── │      2       │ ─── │      3       │     │
-│      │Topic │     │Choose Deadline│    │Start Drafting│     │
-│      └──────┘     └──────────────┘     └──────────────┘     │
-│                                                              │
-│            📅 Select a Target Publication Date               │
-│                                                              │
-│               [  January 2026  ]                             │
-│         Mon  Tue  Wed  Thu  Fri  Sat  Sun                   │
-│          ...calendar days...                                 │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
-```
 
 ---
 
-### Migration Strategy
+### Why These Changes
 
-1. **Default existing creators to `async` mode** (since DraftKit's brand is async-first)
-2. Existing `date_meaning` values map to the new sub-option under async mode
-3. No breaking changes for current users
-
----
-
-### Implementation Status
-
-All steps completed on 2026-01-28:
-
-- ✅ **Step 1: Database Migration** - Added `collab_mode TEXT DEFAULT 'async'` to `creators` table, updated `public_creator_profiles` view
-- ✅ **Step 2: Validation & Types** - Added `CollabMode` type, `COLLAB_MODE_OPTIONS`, and `COLLAB_MODE_METADATA` with all UI copy
-- ✅ **Step 3: Settings Page** - Mode selector with visual cards, conditional Date Meaning sub-options for async mode
-- ✅ **Step 4: Public Booking Page** - Mode-specific badge with tooltip, 3-step process bar, dynamic calendar header, mode-aware confirmation
-
-### What This Solves
-
-1. **Your frustration**: Your booking page now clearly says "100% Async" and "Select a Target Publication Date" - no confusion with calls
-
-2. **Anna/Dominik's expectations**: Call-first creators can set Discovery mode and the UI will feel like Calendly
-
-3. **Future flexibility**: We can later add calendar integrations (Cal.com, Calendly) specifically for Discovery mode creators
-
-4. **Product positioning**: DraftKit becomes the tool for async-first creators, with discovery mode as an option - not the other way around
-
----
-
-### What This Solves
-
-1. **Your frustration**: Your booking page will clearly say "100% Async" and "Pick a Publication Date" - no confusion with calls
-
-2. **Anna/Dominik's expectations**: Call-first creators can set Discovery mode and the UI will feel like Calendly
-
-3. **Future flexibility**: We can later add calendar integrations (Cal.com, Calendly) specifically for Discovery mode creators
-
-4. **Product positioning**: DraftKit becomes the tool for async-first creators, with discovery mode as an option - not the other way around
+1. **"Outlines Created"** removes AI language while keeping the professional outcome focus
+2. **"Pending Requests"** is immediately clear - these are requests waiting for action
+3. **"Scheduled this month"** accurately describes approved collaborations on the calendar
+4. **Mode-aware headers** reinforce the async/discovery distinction you just added
+5. **All empty tips are actionable** - they tell the creator exactly what to do next
 
