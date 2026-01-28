@@ -635,10 +635,10 @@ export default function PublicBooking() {
               transition={{ delay: 0.2 }}
               className="max-w-md mx-auto mb-8"
             >
-              {/* Headline for context */}
-              <p className="text-xs text-muted-foreground uppercase tracking-wide text-center mb-3">
-                How it works
-              </p>
+              {/* Personal headline for process */}
+              <h4 className="text-sm font-semibold text-foreground text-center mb-4">
+                My collaboration process
+              </h4>
               <div className="flex items-center justify-center gap-2">
                 {COLLAB_MODE_METADATA[creator.collab_mode].processSteps.map((step, index) => (
                   <div key={step.step} className="flex items-center">

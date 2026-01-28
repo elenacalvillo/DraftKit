@@ -148,8 +148,8 @@ export const COLLAB_MODE_METADATA: Record<CollabMode, {
     confirmationText: 'Great! This is our target ship date. Check your email for the first draft.',
     processSteps: [
       { step: 1, label: 'Topic' },
-      { step: 2, label: 'Choose Deadline' },
-      { step: 3, label: 'Start Drafting' },
+      { step: 2, label: 'Ship Date' },
+      { step: 3, label: 'Drafting' },
     ],
     icon: '✍️',
   },
