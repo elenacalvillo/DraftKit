@@ -287,6 +287,7 @@ export default function Dashboard() {
               availableDates={availability}
               bookedDates={bookedDates}
               bookingDetails={bookingDetails}
+              collabMode={creator.collab_mode as 'async' | 'discovery' | null}
             />
             {availability.length === 0 && (
               <motion.div

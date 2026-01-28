@@ -1190,6 +1190,7 @@ export default function PublicBooking() {
                       ? 'Available for call' 
                       : getCalendarLegendText(creator.date_meaning)
                   }
+                  collabMode={creator.collab_mode as 'async' | 'discovery' | null}
                 />
 
                 {(!availability?.available_dates || availability.available_dates.length === 0) && (
