@@ -103,7 +103,7 @@ export default function PublicBooking() {
   const [availableCollabTypes, setAvailableCollabTypes] = useState<string[]>([]);
   const [selectedCollabType, setSelectedCollabType] = useState<string | null>(null);
 
-  // AI Match state
+  // SMART Match state
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [matchResult, setMatchResult] = useState<CollabMatchResult | null>(null);
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
@@ -142,12 +142,18 @@ export default function PublicBooking() {
     if (!user || !authCreator) return;
     
     // Use the authenticated user's creator profile from auth context
-    // Email comes from auth context (protected by RLS), other fields from public view
+    // Prefer newsletter_url for substackUrl (it's a publication URL, not profile)
+    // Only use substack_url as fallback if it looks like a publication URL
+    const preferredNewsletterUrl = authCreator.newsletter_url || 
+      (authCreator.substack_url && isValidNewsletterPublicationUrl(authCreator.substack_url) 
+        ? authCreator.substack_url 
+        : '');
+    
     setFormData(prev => ({
       ...prev,
       name: authCreator.name || prev.name,
       email: authCreator.email || prev.email,
-      substackUrl: authCreator.substack_url || prev.substackUrl,
+      substackUrl: preferredNewsletterUrl || prev.substackUrl,
     }));
   }, [user, authCreator]);
 
@@ -308,7 +314,7 @@ export default function PublicBooking() {
       } else if (errorMessage.includes("RSS") || errorMessage.includes("feed")) {
         userFriendlyError = "Couldn't access your newsletter feed. Make sure your Substack URL is correct and your newsletter is public.";
       } else if (errorMessage.includes("No posts") || errorMessage.includes("no posts")) {
-        userFriendlyError = "Your newsletter doesn't have enough published posts yet for AI analysis.";
+        userFriendlyError = "Your newsletter doesn't have enough published posts yet for content analysis.";
       }
       
       setAnalysisError(userFriendlyError);
@@ -358,6 +364,10 @@ export default function PublicBooking() {
       return;
     }
 
+    // Normalize the newsletter URL before storing (ensures canonical format)
+    const normalizedUrl = normalizeSubstackUrl(formData.substackUrl.trim());
+    const normalizedSubstackUrl = normalizedUrl.normalized || formData.substackUrl.trim();
+
     // Check if date is still available using public view (only if specific date selected)
     if (selectedDate && !isFlexibleDate) {
       const { data: existingRequest } = await supabase
@@ -398,7 +408,7 @@ export default function PublicBooking() {
         creator_id: creator.id,
         requester_name: formData.name.trim(),
         requester_email: formData.email.trim(),
-        requester_substack_url: formData.substackUrl.trim(),
+        requester_substack_url: normalizedSubstackUrl,
         requester_profile_image_url: requesterProfileImageUrl,
         message: formData.message.trim() || null,
         requested_date: isFlexibleDate ? null : selectedDate,
@@ -706,20 +716,49 @@ export default function PublicBooking() {
                   <Check className="w-10 h-10 text-success" />
                 </motion.div>
                 <h2 className="text-2xl font-bold mb-2">Request Sent!</h2>
-                <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                  {creator.name} has received your collaboration request
-                  {selectedDate && !isFlexibleDate ? (
-                    <>
-                      {" "}for{" "}
-                      <span className="font-medium text-foreground">
-                        {formatSelectedDate(selectedDate)}
+                <p className="text-sm text-muted-foreground mb-4">Sent to {creator.name}</p>
+                
+                {/* Date with meaning */}
+                {selectedDate && !isFlexibleDate ? (
+                  <div className="mb-4 p-4 bg-primary/5 border border-primary/20 rounded-xl max-w-md mx-auto">
+                    <div className="flex items-center justify-center gap-2 mb-1">
+                      <Calendar className="w-4 h-4 text-primary" />
+                      <span className="font-medium">{formatSelectedDate(selectedDate)}</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {creator.collab_mode === 'discovery' 
+                        ? 'Requested intro call time' 
+                        : creator.date_meaning === 'publish' 
+                          ? 'Target publication date'
+                          : creator.date_meaning === 'kickoff'
+                            ? 'Kickoff date'
+                            : 'Requested collaboration date'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="mb-4 p-4 bg-muted/50 rounded-xl max-w-md mx-auto">
+                    <p className="text-sm text-muted-foreground">Timing: Flexible — {creator.name} will suggest dates</p>
+                  </div>
+                )}
+                
+                {/* What happens next */}
+                <div className="mb-6 max-w-md mx-auto text-left">
+                  <h3 className="text-sm font-semibold text-center mb-3">What happens next</h3>
+                  <div className="space-y-2 text-sm text-muted-foreground">
+                    <div className="flex items-start gap-2">
+                      <Mail className="w-4 h-4 mt-0.5 text-primary shrink-0" />
+                      <span>{creator.name} will receive your request and review it</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <ArrowRight className="w-4 h-4 mt-0.5 text-primary shrink-0" />
+                      <span>
+                        {creator.collab_mode === 'discovery' 
+                          ? 'If accepted, you\'ll receive a calendar invite for your intro call'
+                          : 'If accepted, you\'ll receive an email with next steps for drafting'}
                       </span>
-                    </>
-                  ) : (
-                    " with flexible timing"
-                  )}
-                  . They'll be in touch soon.
-                </p>
+                    </div>
+                  </div>
+                </div>
 
                 {/* Account creation CTA */}
                 <motion.div
@@ -746,13 +785,14 @@ export default function PublicBooking() {
                         });
                         navigate(`/signup?${params.toString()}`);
                       }}
-                      className="gradient-primary"
+                      className="gradient-primary w-full sm:w-auto"
                     >
                       Create Account
                       <ArrowRight className="w-4 h-4 ml-2" />
                     </Button>
                     <Button
                       variant="ghost"
+                      className="w-full sm:w-auto"
                       onClick={() => {
                         setIsSuccess(false);
                         setSelectedDate(null);
@@ -1045,7 +1085,7 @@ export default function PublicBooking() {
                     )}
                   </AnimatePresence>
 
-                  {/* AI Match Suggestions */}
+                  {/* SMART Match Suggestions */}
                   <AnimatePresence>
                     {isAnalyzing && (
                       <motion.div

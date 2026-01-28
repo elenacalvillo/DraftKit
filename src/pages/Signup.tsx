@@ -469,7 +469,7 @@ export default function Signup() {
 
                   <p className="text-center text-xs text-muted-foreground mt-4 flex items-center justify-center gap-1.5">
                     <Shield className="w-3.5 h-3.5 text-primary/60" />
-                    We respect your privacy. No data selling. No AI training on private drafts.
+                    We respect your privacy. No data selling. We never train on your private drafts.
                   </p>
                 </form>
 

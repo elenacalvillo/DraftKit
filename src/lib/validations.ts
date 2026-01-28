@@ -59,12 +59,13 @@ export const substackUrlOptionalSchema = z.string()
 export const substackUrlSchema = substackUrlOptionalSchema;
 
 // Newsletter URL - required for content matching (format: username.substack.com)
+// Rejects profile URLs like substack.com/@name which don't have RSS feeds
 export const newsletterUrlSchema = z.string()
   .trim()
   .min(1, { message: "Newsletter URL is required for SMART-powered content matching" })
   .refine(
-    isValidSubstackUrl,
-    { message: "Enter your newsletter URL (e.g., yourname.substack.com)" }
+    isValidNewsletterPublicationUrl,
+    { message: "Enter your newsletter URL (e.g., yourname.substack.com). Profile URLs like substack.com/@name won't work." }
   );
 
 export const messageSchema = z.string()
@@ -102,11 +103,11 @@ export const loginSchema = z.object({
   password: passwordSchema,
 });
 
-// Public booking form schema
+// Public booking form schema - uses STRICT newsletter validation (rejects profile URLs)
 export const bookingFormSchema = z.object({
   name: nameSchema,
   email: emailSchema,
-  substackUrl: substackUrlRequiredSchema,
+  substackUrl: newsletterPublicationUrlSchema,
   message: messageSchema,
 });
 
