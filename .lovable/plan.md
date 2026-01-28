@@ -1,113 +1,216 @@
 
-Goal
-- Fix the “View Request” email button so it reliably opens the Requests page (and highlights the specific request) instead of always landing on /dashboard.
-- Add a guardrail to prevent accidental duplicate emails during testing / retries.
-- Keep all email templates visually consistent with the DraftKit brand.
 
-What’s happening (root cause hypothesis)
-- Your app code routes /dashboard/requests correctly (React Router has a dedicated route, and Requests.tsx supports ?highlight=...).
-- The behavior you’re describing (“even if I type the URL manually, it becomes /dashboard”) strongly suggests the redirect is happening before the React app can even run (i.e., at the hosting / custom-domain routing layer).
-- If the hosting layer rewrites or redirects /dashboard/* → /dashboard, then deep links like /dashboard/requests will never reach the SPA router on initial load, regardless of being logged in.
+## Collaboration Mode: Async vs. Discovery
 
-Strategy (works even if the hosting layer rewrites /dashboard/requests)
-1) Make email CTAs link to a “safe” path that we know is not rewritten: /dashboard
-2) Encode what we want to open (requests + request id) in the querystring on /dashboard
-3) Add a small client-side redirect handler on the Dashboard page that:
-   - reads those query params
-   - immediately navigates to /dashboard/requests?highlight=...
-   - uses replace navigation to avoid back-button weirdness
-4) Keep the existing highlight/scroll logic in Requests.tsx (and improve it slightly so the highlighted request is visible even if filters would hide it)
+You've identified a fundamental product fork: some creators (like you) want **async-first** collaborations focused on shipping drafts, while others want **call-first** discovery conversations. Currently, DraftKit tries to serve both with a single calendar that's causing confusion.
 
-Planned code changes
+---
 
-A) Update ALL email templates’ “View …” links to use a safe deep-link format
-File: supabase/functions/send-collab-email/index.ts
+### The Core Problem
 
-- Introduce a single helper for building the CTA link so every template stays consistent:
+Today's system has:
+- A single "Date Meaning" setting (kickoff/publish/live/flexible)
+- Multiple collaboration types selectable simultaneously
+- But visitors still think "calendar = meeting"
 
-  Example:
-  - const buildDashboardRequestLink = (baseUrl: string, requestId: string) =>
-      `${baseUrl}/dashboard?open=requests&highlight=${encodeURIComponent(requestId)}`;
+This creates cognitive dissonance: Anna and Dominik expect Calendly-like scheduling, but your flow is "pick a deadline, start drafting."
 
-- Replace every occurrence of:
-  - ${baseUrl}/dashboard/requests?highlight=${requestId}
-  with:
-  - ${buildDashboardRequestLink(baseUrl, requestId)}
+---
 
-Why this helps:
-- The server only sees /dashboard (a known-good route), so it won’t “collapse” the path.
-- The app can then redirect internally to the real /dashboard/requests route and pass highlight along.
+### The Mode Solution
 
-B) Add a “Dashboard deep-link router” that forwards /dashboard?open=requests&highlight=... → /dashboard/requests?highlight=...
-File: src/pages/Dashboard.tsx
+Instead of making the calendar do two jobs, let creators explicitly declare their **Collaboration Mode** at the top level of their Playbook settings. This single choice cascades through the entire experience.
 
-- Import useSearchParams (and optionally useLocation) from react-router-dom.
-- Add a useEffect that runs once auth is resolved and the creator exists:
-  - If searchParams.get("open") === "requests":
-      - Read highlight = searchParams.get("highlight")
-      - Navigate to:
-        - /dashboard/requests?highlight=<highlight> (if highlight present)
-        - /dashboard/requests (if highlight missing)
-      - Use navigate(target, { replace: true }) so the URL cleans up and the back button doesn’t bounce oddly.
-- Important: run this redirect before fetchData() to reduce flicker (or do it right after auth checks but before heavy UI rendering).
+| Setting | Mode A: "Async Workspace" | Mode B: "Discovery First" |
+|---------|---------------------------|---------------------------|
+| **Calendar header** | "Select a Target Publication Date" | "Pick a Time to Chat" |
+| **Available = ...** | Days you can ship | Days you're free for calls |
+| **What happens after booking** | Guest gets draft outline | Guest gets calendar invite |
+| **Confirmation copy** | "Check your email for the first draft" | "Check your email for a meeting link" |
+| **Badge on profile** | "100% Async" | "Let's Chat First" |
 
-C) Make Requests highlight work even if filters would hide the request
-File: src/pages/Requests.tsx
+---
 
-Current behavior:
-- highlight only applies after requests are loaded and the request exists in the list.
-Potential issue:
-- If activeTab is not “all” and the highlighted request is filtered out, the element never exists in DOM, so scroll/highlight won’t occur.
+### Why One Mode Per Creator (Not Per Collab Type)
 
-Change:
-- When highlightParam exists:
-  - temporarily setActiveTab("all") before trying to scroll/highlight
-  - then proceed with existing highlight logic
+Trying to mix modes (e.g., "Async Drafting uses publish dates" + "Virtual Coffee uses live dates") creates a UX nightmare where the calendar changes meaning based on what the guest selects. 
 
-This makes “highlight from email” resilient.
+The cleaner approach: **You pick your style, the UI adapts everywhere.**
 
-D) Duplicate-email guardrail (optional but recommended before “mass sending”)
-Problem:
-- Today, if the same send-collab-email call is invoked twice (double-click, retry, client re-submit, network race), Resend can deliver duplicates.
+---
 
-Implementation option (recommended):
-1) Add a small database table to log sends (Lovable Cloud migration):
-   - public.email_events
-     - id uuid primary key default gen_random_uuid()
-     - request_id uuid not null
-     - type text not null
-     - to_email text not null
-     - created_at timestamptz not null default now()
-     - provider_id text null (Resend message id)
-     - status text not null default 'sent' (or 'skipped'/'failed')
-2) In send-collab-email:
-   - Before sending, check if an identical (request_id, type, to_email) was sent in the last N minutes (e.g., 2–5 minutes).
-   - If yes: return 200 with { skipped: true, reason: "DUPLICATE_GUARD" } and do not send.
-   - If no: send, then insert an email_events row.
+### Database Changes
 
-Notes:
-- We should NOT dedupe collab_reminder aggressively because reminders may legitimately repeat. We’ll apply the guard only to “event” emails like request_received / approved / declined / cancelled / new_message, or set different windows per type.
+**Modify the `creators` table:**
 
-Testing / verification checklist (what we’ll do right after implementation)
-1) Send a single test email to hello@elenacalvillo.com for a real requestId.
-2) Click “View Request”:
-   - Expected URL sequence:
-     - opens /dashboard?open=requests&highlight=...
-     - immediately navigates to /dashboard/requests?highlight=...
-3) Confirm Requests page:
-   - scrolls to the correct request
-   - shows the coral highlight ring
-4) Confirm no duplicates:
-   - Trigger the same email twice in quick succession (simulated)
-   - Expect the second attempt to be skipped (if we implement the guardrail)
+| Column | Type | Description |
+|--------|------|-------------|
+| `collab_mode` | text | `'async'` or `'discovery'` (default: `'async'`) |
 
-Why this plan matches your requirement
-- It does not rely on /dashboard/requests being directly reachable on first-load, which appears to be the core problem on your domain right now.
-- It still lands users on the correct request, even if they “never logged out,” because it’s independent of session; it’s purely about path handling.
-- It keeps your email templates consistent by using a single CTA link helper rather than scattered hard-coded URLs.
+The existing `date_meaning` column becomes derived from `collab_mode`:
+- `async` mode → dates mean "publish" or "kickoff" (creator picks which)
+- `discovery` mode → dates mean "live" (call slots)
 
-Files involved
-- supabase/functions/send-collab-email/index.ts (update CTA links; optionally add send logging)
-- src/pages/Dashboard.tsx (add query-param deep-link redirect handler)
-- src/pages/Requests.tsx (ensure highlight works regardless of tab filters)
-- (Optional) Database migration for email_events table (only if we add dedupe/send logging)
+---
+
+### Settings UI Changes
+
+**Replace the current Date Meaning radio group with a Mode selector:**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ How do you prefer to collaborate?                          │
+│                                                              │
+│ ┌─────────────────────────────────────────────────────────┐ │
+│ │ ✍️  Async Workspace (Recommended for you)               │ │
+│ │    Skip the calls. Guests request a topic, you start    │ │
+│ │    drafting. Calendar shows publication deadlines.      │ │
+│ │                                                          │ │
+│ │    "100% Async" badge shown on your booking page         │ │
+│ └─────────────────────────────────────────────────────────┘ │
+│                                                              │
+│ ┌─────────────────────────────────────────────────────────┐ │
+│ │ ☕  Discovery First                                      │ │
+│ │    Meet collaborators on a call before committing.      │ │
+│ │    Calendar shows available call slots.                 │ │
+│ │                                                          │ │
+│ │    Integrates with Calendly/Cal.com (future)             │ │
+│ └─────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+```
+
+If **Async Workspace** is selected, show a sub-option:
+- "Dates represent **kick-off** days (when we start)"
+- "Dates represent **publication** days (when we ship)"
+
+---
+
+### Public Booking Page Changes
+
+**For Async Mode creators:**
+
+1. **Badge near profile name**: "100% Async" with a tooltip explaining "No calls required - we'll start drafting right away"
+
+2. **Calendar header**: "Select a Target Publication Date" (or "Select a Kick-off Date" based on sub-setting)
+
+3. **Process steps** (visual 3-step bar):
+   ```
+   [1. Topic] → [2. Choose Deadline] → [3. Start Drafting]
+   ```
+
+4. **Confirmation message**: "Great! This is our target ship date. Check your email for the first draft."
+
+**For Discovery Mode creators:**
+
+1. **Badge**: "Let's Chat First" 
+
+2. **Calendar header**: "Pick a Time for an Intro Call"
+
+3. **Process steps**:
+   ```
+   [1. About You] → [2. Schedule Call] → [3. Decide Together]
+   ```
+
+4. **Confirmation message**: "Great! Check your email for a calendar invite to discuss your collaboration."
+
+---
+
+### Filter Collaboration Types by Mode
+
+When a creator selects their mode, intelligently filter (or re-order) their available collaboration types:
+
+| Mode | Recommended Types | De-emphasized |
+|------|-------------------|---------------|
+| Async | Async Drafting, Guest Post Exchange, Interview Style, Co-written Article, Newsletter Shoutout | Virtual Coffee, Live Event |
+| Discovery | Virtual Coffee, Live Event / Webinar | Async types still available |
+
+This isn't a hard restriction, just a smart default and UI ordering.
+
+---
+
+### Files to Modify
+
+| File | Changes |
+|------|---------|
+| `supabase/migrations/` | Add `collab_mode` column to `creators` table with default `'async'` |
+| `src/lib/validations.ts` | Add `COLLAB_MODE_OPTIONS` and schema |
+| `src/pages/Settings.tsx` | Replace Date Meaning radio with Mode selector + conditional sub-options |
+| `src/pages/PublicBooking.tsx` | Render mode-specific badge, calendar header, process steps, confirmation copy |
+| `src/components/calendar/CollabCalendar.tsx` | Accept `calendarHeader` prop for dynamic header text |
+
+---
+
+### Visual Preview: Your Booking Page After This Change
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│          [Your avatar]                                       │
+│          Elena Calvillo                                      │
+│          ┌──────────────┐                                    │
+│          │ 100% Async ✨ │                                    │
+│          └──────────────┘                                    │
+│                                                              │
+│  "Looking forward to crafting something great together..."   │
+│                                                              │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│      ┌──────┐     ┌──────────────┐     ┌──────────────┐     │
+│      │  1   │ ─── │      2       │ ─── │      3       │     │
+│      │Topic │     │Choose Deadline│    │Start Drafting│     │
+│      └──────┘     └──────────────┘     └──────────────┘     │
+│                                                              │
+│            📅 Select a Target Publication Date               │
+│                                                              │
+│               [  January 2026  ]                             │
+│         Mon  Tue  Wed  Thu  Fri  Sat  Sun                   │
+│          ...calendar days...                                 │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Migration Strategy
+
+1. **Default existing creators to `async` mode** (since DraftKit's brand is async-first)
+2. Existing `date_meaning` values map to the new sub-option under async mode
+3. No breaking changes for current users
+
+---
+
+### Technical Implementation Summary
+
+**Step 1: Database Migration**
+- Add `collab_mode TEXT DEFAULT 'async'` to `creators` table
+
+**Step 2: Validation & Types**
+- Add `CollabMode` type: `'async' | 'discovery'`
+- Add `COLLAB_MODE_OPTIONS` constant with metadata
+
+**Step 3: Settings Page**
+- New Mode selector component with visual cards
+- Conditional Date Meaning sub-options (only for async mode)
+- Reorder collab types based on mode selection
+
+**Step 4: Public Booking Page**
+- Fetch `collab_mode` from `public_creator_profiles` view
+- Render mode-specific badge with tooltip
+- Show 3-step process bar (different content per mode)
+- Update calendar header dynamically
+- Update confirmation message copy
+
+**Step 5: Email Templates**
+- Adjust confirmation email copy based on mode
+
+---
+
+### What This Solves
+
+1. **Your frustration**: Your booking page will clearly say "100% Async" and "Pick a Publication Date" - no confusion with calls
+
+2. **Anna/Dominik's expectations**: Call-first creators can set Discovery mode and the UI will feel like Calendly
+
+3. **Future flexibility**: We can later add calendar integrations (Cal.com, Calendly) specifically for Discovery mode creators
+
+4. **Product positioning**: DraftKit becomes the tool for async-first creators, with discovery mode as an option - not the other way around
+
