@@ -395,7 +395,7 @@ export default function Settings() {
                 <p className="text-sm text-destructive">{errors.newsletterUrl}</p>
               )}
               <p className="text-xs text-muted-foreground">
-                Required for AI collaboration suggestions (e.g., yourname.substack.com)
+                Required for SMART-powered content matching (e.g., yourname.substack.com)
               </p>
             </div>
 

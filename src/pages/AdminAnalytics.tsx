@@ -483,13 +483,13 @@ export default function AdminAnalytics() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <Target className="w-4 h-4" />
-                  AI Suggestions Used
+                  SMART Suggestions Used
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold text-primary">{aiSuggestionSelected}</div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Topics selected from AI matches
+                  Topics selected from SMART matches
                 </p>
               </CardContent>
             </Card>

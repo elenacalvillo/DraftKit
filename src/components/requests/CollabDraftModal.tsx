@@ -93,7 +93,7 @@ Estimated Read Time: ${draft.estimatedReadTime}`;
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-primary" />
-            AI Collaboration Draft
+            SMART Draft Workspace
           </DialogTitle>
         </DialogHeader>
 
