@@ -113,7 +113,52 @@ export const ALLOWED_COLLAB_STYLES = [
 ] as const;
 export type CollabStyle = typeof ALLOWED_COLLAB_STYLES[number];
 
-// Date meaning options for calendar
+// Collaboration mode options (async-first vs discovery-first)
+export const COLLAB_MODE_OPTIONS = ['async', 'discovery'] as const;
+export type CollabMode = typeof COLLAB_MODE_OPTIONS[number];
+
+// Collaboration mode metadata for UI
+export const COLLAB_MODE_METADATA: Record<CollabMode, {
+  label: string;
+  description: string;
+  badge: string;
+  badgeTooltip: string;
+  calendarHeader: string;
+  confirmationText: string;
+  processSteps: { step: number; label: string }[];
+  icon: string;
+}> = {
+  async: {
+    label: 'Async Workspace',
+    description: 'Skip the calls. Guests request a topic, you start drafting. Calendar shows publication deadlines.',
+    badge: '100% Async',
+    badgeTooltip: 'No calls required – we\'ll start drafting right away',
+    calendarHeader: 'Select a Target Publication Date',
+    confirmationText: 'Great! This is our target ship date. Check your email for the first draft.',
+    processSteps: [
+      { step: 1, label: 'Topic' },
+      { step: 2, label: 'Choose Deadline' },
+      { step: 3, label: 'Start Drafting' },
+    ],
+    icon: '✍️',
+  },
+  discovery: {
+    label: 'Discovery First',
+    description: 'Meet collaborators on a call before committing. Calendar shows available call slots.',
+    badge: "Let's Chat First",
+    badgeTooltip: 'We\'ll have a quick call to discuss our collaboration',
+    calendarHeader: 'Pick a Time for an Intro Call',
+    confirmationText: 'Great! Check your email for a calendar invite to discuss your collaboration.',
+    processSteps: [
+      { step: 1, label: 'About You' },
+      { step: 2, label: 'Schedule Call' },
+      { step: 3, label: 'Decide Together' },
+    ],
+    icon: '☕',
+  },
+};
+
+// Date meaning options for calendar (used as sub-option in async mode)
 export const DATE_MEANING_OPTIONS = ['kickoff', 'publish', 'live', 'flexible'] as const;
 export type DateMeaning = typeof DATE_MEANING_OPTIONS[number];
 
@@ -134,6 +179,8 @@ export const reminderDaysSchema = z.number()
   .min(1, { message: "Reminder must be at least 1 day before" })
   .max(14, { message: "Reminder must be at most 14 days before" });
 
+export const collabModeSchema = z.enum(COLLAB_MODE_OPTIONS);
+
 // Settings form schema
 export const settingsSchema = z.object({
   name: nameSchema,
@@ -145,6 +192,7 @@ export const settingsSchema = z.object({
   collabGuidelines: collabGuidelinesSchema,
   reminderDaysBefore: reminderDaysSchema,
   dateMeaning: dateMeaningSchema.optional(),
+  collabMode: collabModeSchema.optional(),
 });
 
 // Collab type metadata for UI display

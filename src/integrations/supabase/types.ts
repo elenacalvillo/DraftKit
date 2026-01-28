@@ -245,6 +245,7 @@ export type Database = {
         Row: {
           bio: string | null
           collab_guidelines: string | null
+          collab_mode: string | null
           collab_style: string | null
           created_at: string
           date_meaning: string | null
@@ -264,6 +265,7 @@ export type Database = {
         Insert: {
           bio?: string | null
           collab_guidelines?: string | null
+          collab_mode?: string | null
           collab_style?: string | null
           created_at?: string
           date_meaning?: string | null
@@ -283,6 +285,7 @@ export type Database = {
         Update: {
           bio?: string | null
           collab_guidelines?: string | null
+          collab_mode?: string | null
           collab_style?: string | null
           created_at?: string
           date_meaning?: string | null
@@ -424,6 +427,7 @@ export type Database = {
         Row: {
           bio: string | null
           collab_guidelines: string | null
+          collab_mode: string | null
           collab_style: string | null
           created_at: string | null
           date_meaning: string | null
@@ -438,6 +442,7 @@ export type Database = {
         Insert: {
           bio?: string | null
           collab_guidelines?: string | null
+          collab_mode?: string | null
           collab_style?: string | null
           created_at?: string | null
           date_meaning?: string | null
@@ -452,6 +457,7 @@ export type Database = {
         Update: {
           bio?: string | null
           collab_guidelines?: string | null
+          collab_mode?: string | null
           collab_style?: string | null
           created_at?: string | null
           date_meaning?: string | null

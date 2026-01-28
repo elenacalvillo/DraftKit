@@ -1,19 +1,22 @@
 import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Calendar, Check, ExternalLink, Sparkles, Mail, User, MessageSquare, Lightbulb, Loader2, AlertCircle, RefreshCw } from "lucide-react";
+import { ArrowLeft, ArrowRight, Calendar, Check, ExternalLink, Sparkles, Mail, User, MessageSquare, Lightbulb, Loader2, AlertCircle, RefreshCw, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { CollabCalendar } from "@/components/calendar/CollabCalendar";
 import { supabase } from "@/integrations/supabase/client";
-import { bookingFormSchema, COLLAB_TYPE_METADATA, type CollabStyle, type DateMeaning } from "@/lib/validations";
+import { bookingFormSchema, COLLAB_TYPE_METADATA, COLLAB_MODE_METADATA, type CollabStyle, type DateMeaning, type CollabMode } from "@/lib/validations";
 import { normalizeSubstackUrl } from "@/lib/substack-url";
 import { toast } from "sonner";
 import { analyzeCollabMatch, type CollabSuggestion, type CollabMatchResult } from "@/lib/api/collab-match";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { useAuth } from "@/hooks/useAuth";
+
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface Creator {
   id: string;
@@ -26,6 +29,7 @@ interface Creator {
   collab_style: string | null;
   collab_guidelines: string | null;
   date_meaning: DateMeaning | null;
+  collab_mode: CollabMode | null;
 }
 
 interface Availability {
@@ -155,7 +159,7 @@ export default function PublicBooking() {
     // Fetch creator from public view (excludes sensitive data like email)
     const { data: creatorData, error } = await supabase
       .from('public_creator_profiles')
-      .select('id, username, name, substack_url, newsletter_url, welcome_message, profile_image_url, collab_style, collab_guidelines, date_meaning')
+      .select('id, username, name, substack_url, newsletter_url, welcome_message, profile_image_url, collab_style, collab_guidelines, date_meaning, collab_mode')
       .eq('username', username)
       .maybeSingle();
 
@@ -168,6 +172,7 @@ export default function PublicBooking() {
     setCreator({
       ...creatorData,
       date_meaning: creatorData.date_meaning as DateMeaning | null,
+      collab_mode: (creatorData.collab_mode || 'async') as CollabMode,
     });
     
     // Parse collab styles
@@ -549,16 +554,34 @@ export default function PublicBooking() {
             <img 
               src={creator.profile_image_url} 
               alt={creator.name}
-              className="w-20 h-20 rounded-full mx-auto mb-6 object-cover shadow-glow ring-4 ring-primary/20"
+              className="w-20 h-20 rounded-full mx-auto mb-4 object-cover shadow-glow ring-4 ring-primary/20"
             />
           ) : (
-            <div className="w-20 h-20 rounded-full gradient-primary mx-auto mb-6 flex items-center justify-center shadow-glow">
+            <div className="w-20 h-20 rounded-full gradient-primary mx-auto mb-4 flex items-center justify-center shadow-glow">
               <span className="text-3xl font-bold text-primary-foreground">
                 {creator.name.charAt(0).toUpperCase()}
               </span>
             </div>
           )}
-          <h1 className="text-4xl font-bold mb-4">{creator.name}</h1>
+          <h1 className="text-4xl font-bold mb-3">{creator.name}</h1>
+          
+          {/* Mode Badge */}
+          {creator.collab_mode && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/20 rounded-full mb-4 cursor-help">
+                    <span className="text-lg">{COLLAB_MODE_METADATA[creator.collab_mode].icon}</span>
+                    <span className="font-medium text-primary">{COLLAB_MODE_METADATA[creator.collab_mode].badge}</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-sm max-w-[250px]">{COLLAB_MODE_METADATA[creator.collab_mode].badgeTooltip}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+
           {creator.substack_url && (
             <a
               href={creator.substack_url}
@@ -571,10 +594,39 @@ export default function PublicBooking() {
             </a>
           )}
           {creator.welcome_message && (
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-4">
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-6">
               {creator.welcome_message}
             </p>
           )}
+
+          {/* Process Steps - only show when not in success state and not filling form */}
+          {!isSuccess && !selectedDate && !isFlexibleDate && creator.collab_mode && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="max-w-md mx-auto mb-8"
+            >
+              <div className="flex items-center justify-center gap-2">
+                {COLLAB_MODE_METADATA[creator.collab_mode].processSteps.map((step, index) => (
+                  <div key={step.step} className="flex items-center">
+                    <div className="flex flex-col items-center">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                        index === 0 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                      }`}>
+                        {step.step}
+                      </div>
+                      <span className="text-xs text-muted-foreground mt-1 whitespace-nowrap">{step.label}</span>
+                    </div>
+                    {index < COLLAB_MODE_METADATA[creator.collab_mode!].processSteps.length - 1 && (
+                      <div className="w-8 h-0.5 bg-muted mx-1 mb-4" />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
           {/* Collaboration Types with Outcomes */}
           {availableCollabTypes.length === 1 && (
             <div className="max-w-md mx-auto p-4 bg-accent/20 border border-accent/30 rounded-xl text-left">
@@ -587,11 +639,6 @@ export default function PublicBooking() {
                   </p>
                 </div>
               </div>
-              {creator.date_meaning && creator.date_meaning !== 'flexible' && (
-                <p className="text-xs text-muted-foreground mt-2 pt-2 border-t border-border">
-                  📅 Dates represent: <span className="font-medium">{getCalendarLegendText(creator.date_meaning).replace('Available ', '')}</span>
-                </p>
-              )}
             </div>
           )}
           {availableCollabTypes.length > 1 && (
@@ -1105,14 +1152,20 @@ export default function PublicBooking() {
               >
                 <div className="text-center mb-8">
                   <h2 className="text-xl font-semibold mb-2">
-                    Target Publication Date
+                    {creator.collab_mode 
+                      ? COLLAB_MODE_METADATA[creator.collab_mode].calendarHeader
+                      : 'Target Publication Date'}
                   </h2>
                   <p className="text-muted-foreground">
-                    When do you want this collaboration to go live?
+                    {creator.collab_mode === 'discovery'
+                      ? 'When are you available for a quick intro call?'
+                      : 'When do you want this collaboration to go live?'}
                   </p>
-                  <p className="text-xs text-muted-foreground/70 mt-2 max-w-sm mx-auto">
-                    This is not a meeting. It's the date we aim to publish on Substack.
-                  </p>
+                  {creator.collab_mode === 'async' && (
+                    <p className="text-xs text-muted-foreground/70 mt-2 max-w-sm mx-auto">
+                      This is not a meeting. It's the date we aim to publish on Substack.
+                    </p>
+                  )}
                 </div>
 
                 <CollabCalendar
@@ -1120,7 +1173,11 @@ export default function PublicBooking() {
                   bookedDates={bookedDates}
                   blockedDates={availability?.blocked_dates || []}
                   onDateSelect={handleDateSelect}
-                  availableLegendText={getCalendarLegendText(creator.date_meaning)}
+                  availableLegendText={
+                    creator.collab_mode === 'discovery' 
+                      ? 'Available for call' 
+                      : getCalendarLegendText(creator.date_meaning)
+                  }
                 />
 
                 {(!availability?.available_dates || availability.available_dates.length === 0) && (
