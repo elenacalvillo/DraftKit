@@ -1,92 +1,119 @@
 
+## Fix Guest Booking Journey - UX Clarity Improvements
 
-## Hide Privacy Notice on Authenticated Pages
+Based on detailed feedback from beta testers (Dominik, Karen, and others), this plan addresses three critical friction points in the public booking flow at `draftkit.app/{username}`.
 
-### Overview
-The tracking notice bar currently shows on all pages, including the Dashboard and other authenticated areas. Since users have already accepted the privacy policy during signup, we should hide it on authenticated pages. Users can always access the transparency information via the footer link.
+---
 
-### Implementation Approach
+### Issue 1: "Publication vs. Meeting" Confusion
 
-There are two reliable ways to detect if a user is on an authenticated page:
-1. **Check if user is logged in** - Use `useAuth()` hook to check for authenticated session
-2. **Check route path** - Detect if the current route starts with `/dashboard` or `/admin`
+**Problem:** Users think they're booking a meeting/call rather than selecting a target publication date. The current calendar header says "Select a Date" which implies scheduling.
 
-The recommended approach is to use **both** checks for robustness:
-- If the user is authenticated (has a session), hide the notice
-- Additionally, hide on dashboard/admin routes regardless of loading state
+**Solution:** Update calendar headers and add clarifying copy.
 
-### File to Modify
+**File:** `src/pages/PublicBooking.tsx`
 
-**`src/components/privacy/TrackingNotice.tsx`**
+| Location | Current Copy | New Copy |
+|----------|--------------|----------|
+| Calendar Header (lines 1089-1104) | "Select a Date" | "Target Publication Date" |
+| Calendar Subheading | "Choose an available date to collaborate with {name}" | "When do you want this collaboration to go live?" |
+| New element | N/A | Add clarifying note under calendar: "This is not a meeting. It's the date we aim to publish on Substack." |
 
-### Changes Required
+---
 
-1. Import `useAuth` hook from `@/hooks/useAuth`
-2. Import `useLocation` from `react-router-dom`
-3. Add logic to check if user is authenticated or on a dashboard route
-4. Return `null` early if on authenticated pages (before the visibility logic)
+### Issue 2: "See Guidelines" Dead-End
 
-### Code Changes
+**Problem:** When "Custom" collab type is selected, the outcome shows "See guidelines" but there's no actual link or tooltip - it's just dead text.
+
+**Solution:** Replace "See guidelines" with actionable text that doesn't mislead users.
+
+**File:** `src/lib/validations.ts`
 
 ```typescript
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Link, useLocation } from "react-router-dom";
-import { X, Info } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useAuth } from "@/hooks/useAuth";
+// FROM
+'Custom': { outcome: 'See guidelines', dateMeans: 'See guidelines', icon: '...' }
 
-const STORAGE_KEY = "draftkit_tracking_notice_dismissed";
-
-export function TrackingNotice() {
-  const [isVisible, setIsVisible] = useState(false);
-  const { user } = useAuth();
-  const location = useLocation();
-
-  // Check if on authenticated routes
-  const isAuthenticatedRoute = 
-    location.pathname.startsWith("/dashboard") || 
-    location.pathname.startsWith("/admin");
-
-  useEffect(() => {
-    // Don't show on authenticated routes or for logged-in users
-    if (user || isAuthenticatedRoute) {
-      setIsVisible(false);
-      return;
-    }
-
-    // Check if notice was already dismissed
-    const dismissed = localStorage.getItem(STORAGE_KEY);
-    if (!dismissed) {
-      // Small delay for better UX
-      const timer = setTimeout(() => setIsVisible(true), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [user, isAuthenticatedRoute]);
-
-  // Early return if authenticated - don't render anything
-  if (user || isAuthenticatedRoute) {
-    return null;
-  }
-
-  // ... rest of the component unchanged
-}
+// TO  
+'Custom': { outcome: 'Custom arrangement', dateMeans: 'To be discussed', icon: '...' }
 ```
 
-### Logic Explanation
+**File:** `src/pages/Settings.tsx`
 
-| Condition | Notice Behavior |
-|-----------|-----------------|
-| User logged in | Hidden |
-| On `/dashboard/*` route | Hidden |
-| On `/admin/*` route | Hidden |
-| Public page, not dismissed | Shows after 1s delay |
-| Public page, already dismissed | Hidden |
+```typescript
+// FROM
+{ value: "Custom", label: "Custom", description: "See guidelines below" }
 
-### Why This Approach
+// TO
+{ value: "Custom", label: "Custom", description: "Define your own format" }
+```
 
-- **`useAuth().user`**: Detects authenticated session (covers all logged-in scenarios)
-- **Route check**: Provides immediate hiding without waiting for auth state to load
-- **Early return `null`**: Prevents even rendering the AnimatePresence wrapper on authenticated pages
-- **Preserves localStorage logic**: For unauthenticated visitors who dismissed the notice
+---
 
+### Issue 3: "Find Ideas" Button UX
+
+**Problem:** The AI "Find Ideas" button is clickable before a URL is entered, leading to confusing errors.
+
+**Solution:** The button already has `disabled={isAnalyzing || !formData.substackUrl}` (line 897), which should work. However, we should add visual feedback to make it clearer why it's disabled.
+
+**File:** `src/pages/PublicBooking.tsx`
+
+Add a tooltip or visual cue when hovering over the disabled button:
+- When disabled: Show muted styling with tooltip "Enter your newsletter URL first"
+- Add a subtle prompt under the input field when empty
+
+---
+
+### Issue 4: Include AI Suggestion in Owner Notification
+
+**Problem:** When a guest clicks "Use This" on an AI suggestion, the host/owner should be able to see which AI-generated idea was selected in their notification.
+
+**Solution:** Include the selected AI suggestion details in the collab_request record and email notification.
+
+**File:** `src/pages/PublicBooking.tsx`
+
+1. Track when an AI suggestion is used:
+   ```typescript
+   const [selectedAiSuggestion, setSelectedAiSuggestion] = useState<CollabSuggestion | null>(null);
+   ```
+
+2. Update `handleUseSuggestion` to store the selection:
+   ```typescript
+   const handleUseSuggestion = (suggestion: CollabSuggestion) => {
+     setSelectedAiSuggestion(suggestion);  // Store the selection
+     // ... existing code
+   };
+   ```
+
+3. Include in the insert payload:
+   ```typescript
+   .insert({
+     // ... existing fields
+     ai_suggestion_used: selectedAiSuggestion ? JSON.stringify({
+       topic: selectedAiSuggestion.topic,
+       format: selectedAiSuggestion.format,
+       description: selectedAiSuggestion.description
+     }) : null,
+   })
+   ```
+
+**Database Change:** Add `ai_suggestion_used` column (JSONB, nullable) to `collab_requests` table.
+
+---
+
+### Summary of File Changes
+
+| File | Changes |
+|------|---------|
+| `src/pages/PublicBooking.tsx` | Update calendar headers, add clarification note, track AI suggestion selection, enhance button UX |
+| `src/lib/validations.ts` | Update "Custom" metadata to remove dead "See guidelines" text |
+| `src/pages/Settings.tsx` | Update "Custom" collab style description |
+| Database | Add `ai_suggestion_used` JSONB column |
+
+---
+
+### Technical Notes
+
+- All copy changes focus on emphasizing **publication/shipping dates** over meeting/scheduling language
+- The "See guidelines" text is removed entirely since the feature isn't implemented
+- AI suggestion tracking helps hosts understand what sparked the guest's interest
+- Form validation already prevents submission without required fields; no additional changes needed for the "Failed to submit" error (likely a transient network issue)
