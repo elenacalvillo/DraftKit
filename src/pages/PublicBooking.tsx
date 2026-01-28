@@ -104,6 +104,7 @@ export default function PublicBooking() {
   const [matchResult, setMatchResult] = useState<CollabMatchResult | null>(null);
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [selectedAiSuggestion, setSelectedAiSuggestion] = useState<CollabSuggestion | null>(null);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -310,6 +311,9 @@ export default function PublicBooking() {
       creator_username: username,
     });
     
+    // Store the selected suggestion so it can be included in the request
+    setSelectedAiSuggestion(suggestion);
+    
     const newMessage = `I'd love to collaborate on: "${suggestion.topic}"\n\n${suggestion.description}\n\nFormat: ${suggestion.format}`;
     setFormData({ ...formData, message: newMessage });
     toast.success("Suggestion added to your message!");
@@ -386,6 +390,11 @@ export default function PublicBooking() {
         status: 'pending',
         requester_user_id: user?.id || null,
         selected_collab_type: selectedCollabType,
+        ai_suggestion_used: selectedAiSuggestion ? {
+          topic: selectedAiSuggestion.topic,
+          format: selectedAiSuggestion.format,
+          description: selectedAiSuggestion.description,
+        } : null,
       })
       .select('id')
       .single();
@@ -889,23 +898,31 @@ export default function PublicBooking() {
                         className="h-12 flex-1"
                       />
                       {(creator.newsletter_url || creator.substack_url) && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="lg"
-                          onClick={handleAnalyzeMatch}
-                          disabled={isAnalyzing || !formData.substackUrl}
-                          className="shrink-0"
-                        >
-                          {isAnalyzing ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <>
-                              <Sparkles className="w-4 h-4 mr-2" />
-                              Find Ideas
-                            </>
+                        <div className="relative group">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="lg"
+                            onClick={handleAnalyzeMatch}
+                            disabled={isAnalyzing || !formData.substackUrl}
+                            className="shrink-0"
+                          >
+                            {isAnalyzing ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <>
+                                <Sparkles className="w-4 h-4 mr-2" />
+                                Find Ideas
+                              </>
+                            )}
+                          </Button>
+                          {!formData.substackUrl && !isAnalyzing && (
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-foreground text-background text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
+                              Enter your newsletter URL first
+                              <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-foreground" />
+                            </div>
                           )}
-                        </Button>
+                        </div>
                       )}
                     </div>
                     {errors.substackUrl && (
@@ -1088,19 +1105,13 @@ export default function PublicBooking() {
               >
                 <div className="text-center mb-8">
                   <h2 className="text-xl font-semibold mb-2">
-                    {creator.date_meaning === 'publish' ? 'Pick a Publication Date' :
-                     creator.date_meaning === 'live' ? 'Pick a Day for Your Call' :
-                     creator.date_meaning === 'kickoff' ? 'Pick a Day to Start' :
-                     'Select a Date'}
+                    Target Publication Date
                   </h2>
                   <p className="text-muted-foreground">
-                    {creator.date_meaning === 'publish' 
-                      ? `Choose when you'd like your collaboration with ${creator.name} to go live`
-                      : creator.date_meaning === 'live' 
-                      ? `Choose when to have your conversation with ${creator.name}`
-                      : creator.date_meaning === 'kickoff'
-                      ? `Choose when to start working with ${creator.name}`
-                      : `Choose an available date to collaborate with ${creator.name}`}
+                    When do you want this collaboration to go live?
+                  </p>
+                  <p className="text-xs text-muted-foreground/70 mt-2 max-w-sm mx-auto">
+                    This is not a meeting. It's the date we aim to publish on Substack.
                   </p>
                 </div>
 

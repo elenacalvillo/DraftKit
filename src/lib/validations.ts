@@ -156,5 +156,5 @@ export const COLLAB_TYPE_METADATA: Record<CollabStyle, { outcome: string; dateMe
   'Live Event / Webinar': { outcome: 'A scheduled meeting link', dateMeans: 'The actual live date', icon: '📺' },
   'Co-written Article': { outcome: 'A shared outline/draft', dateMeans: 'Kick-off brainstorm', icon: '🤝' },
   'Newsletter Shoutout': { outcome: 'A blurb or recommendation', dateMeans: 'Publish date', icon: '📣' },
-  'Custom': { outcome: 'See guidelines', dateMeans: 'See guidelines', icon: '⚙️' },
+  'Custom': { outcome: 'Custom arrangement', dateMeans: 'To be discussed', icon: '⚙️' },
 };

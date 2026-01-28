@@ -24,7 +24,7 @@ const COLLAB_STYLE_OPTIONS: { value: CollabStyle; label: string; description: st
   { value: "Live Event / Webinar", label: "Live Event / Webinar", description: "Co-host a live session" },
   { value: "Co-written Article", label: "Co-written Article", description: "Write together" },
   { value: "Newsletter Shoutout", label: "Newsletter Shoutout", description: "Recommend each other" },
-  { value: "Custom", label: "Custom", description: "See guidelines below" },
+  { value: "Custom", label: "Custom", description: "Define your own format" },
 ];
 
 const DATE_MEANING_OPTIONS: { value: DateMeaning; label: string; description: string }[] = [

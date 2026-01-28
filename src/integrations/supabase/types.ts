@@ -89,6 +89,7 @@ export type Database = {
       collab_requests: {
         Row: {
           ai_draft: Json | null
+          ai_suggestion_used: Json | null
           approved_at: string | null
           created_at: string
           creator_id: string
@@ -109,6 +110,7 @@ export type Database = {
         }
         Insert: {
           ai_draft?: Json | null
+          ai_suggestion_used?: Json | null
           approved_at?: string | null
           created_at?: string
           creator_id: string
@@ -129,6 +131,7 @@ export type Database = {
         }
         Update: {
           ai_draft?: Json | null
+          ai_suggestion_used?: Json | null
           approved_at?: string | null
           created_at?: string
           creator_id?: string
