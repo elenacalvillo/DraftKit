@@ -1,120 +1,135 @@
 
 
-## Clarify "Next Available Dates" Message Based on Collaboration Mode
+## Validate Newsletter Publication URLs (Not Profile URLs)
 
-The banner in the calendar currently says "Next available dates are in March 2026" but doesn't specify what those dates represent. This is confusing because:
-- In **Async Workspace mode**: dates are for **publishing**
-- In **Discovery First mode**: dates are for **calls/meetings**
+The current validation accepts profile URLs like `https://substack.com/@elenacalvillo`, but these don't work for the "Match Our Content" feature because:
+
+1. A profile username is NOT the same as a newsletter subdomain
+2. `@elenacalvillo` (profile) vs `productreleasenotes` (newsletter) are different
+3. The RSS fetch fails because `elenacalvillo.substack.com/feed` doesn't exist
 
 ---
 
 ### The Problem
 
-**Current text:**
-> Next available dates are in March 2026
+| URL Type | Example | Has RSS Feed? |
+|----------|---------|---------------|
+| Newsletter URL | `productreleasenotes.substack.com` | Yes |
+| Profile URL | `substack.com/@elenacalvillo` | No (profile page only) |
 
-**User's question:**
-> "dates for what??? For publish? For taking calls?"
-
-This is the same clarity issue we just fixed on the Public Booking page - we need mode-aware messaging.
+The helper text says "yourname.substack.com" but accepts profile URLs - confusing!
 
 ---
 
 ### Solution
 
-Pass the `collab_mode` to the calendar component and use it to generate context-aware messaging.
+Create a **stricter validation** that only accepts **newsletter/publication URLs** (not profile URLs) for the booking form's substackUrl field.
 
 ---
 
 ### Changes Overview
 
-| Component | Change |
-|-----------|--------|
-| `CollabCalendar.tsx` | Add optional `collabMode` prop, update banner text to be mode-aware |
-| `Dashboard.tsx` | Pass `creator.collab_mode` to the CollabCalendar component |
-| `PublicBooking.tsx` | Pass `creator.collab_mode` to the CollabCalendar component |
-
----
-
-### Updated Banner Text
-
-| Mode | New Text |
-|------|----------|
-| `async` | "Next available **publication dates** are in March 2026" |
-| `discovery` | "Next available **call slots** are in March 2026" |
-| No mode set | "Next available dates are in March 2026" (fallback) |
+| File | Change |
+|------|--------|
+| `src/lib/substack-url.ts` | Add new `isValidNewsletterUrl()` function that rejects profile URLs |
+| `src/lib/validations.ts` | Create `newsletterPublicationUrlSchema` using the new validator |
+| `src/pages/PublicBooking.tsx` | Update validation to use stricter schema + show clear error message |
 
 ---
 
 ### Implementation Details
 
-**1. Update CollabCalendar interface (CollabCalendar.tsx):**
+**1. Add new validator function (substack-url.ts):**
 
-```tsx
-interface CollabCalendarProps {
-  // ... existing props
-  collabMode?: 'async' | 'discovery' | null;
+```typescript
+/**
+ * Check if input is a valid newsletter publication URL (NOT a profile URL)
+ * Profile URLs like substack.com/@username are rejected because they don't have RSS feeds
+ */
+export function isValidNewsletterPublicationUrl(input: string): boolean {
+  if (!input || typeof input !== 'string') return false;
+  
+  let url = input.trim();
+  url = url.replace(/[?#].*$/, '');
+  url = url.replace(/\/+$/, '');
+  const withoutProtocol = url.replace(/^https?:\/\//, '');
+  
+  // REJECT: substack.com/@username (Profile URLs don't have RSS feeds)
+  const profileMatch = withoutProtocol.match(/^(?:www\.)?substack\.com\/@/i);
+  if (profileMatch) {
+    return false;
+  }
+  
+  // ACCEPT: open.substack.com/pub/username (Mobile share - points to publication)
+  const mobileMatch = withoutProtocol.match(/^open\.substack\.com\/pub\/([a-zA-Z0-9_-]+)/i);
+  if (mobileMatch) return true;
+  
+  // ACCEPT: username.substack.com (Standard newsletter format)
+  const standardMatch = withoutProtocol.match(/^([a-zA-Z0-9][a-zA-Z0-9_-]*)\.substack\.com(?:\/.*)?$/i);
+  if (standardMatch) return true;
+  
+  // ACCEPT: Bare username (will be converted to username.substack.com)
+  const bareUsernameMatch = withoutProtocol.match(/^([a-zA-Z0-9][a-zA-Z0-9_-]{1,49})$/);
+  if (bareUsernameMatch && !withoutProtocol.includes('.') && !withoutProtocol.includes('/')) {
+    return true;
+  }
+  
+  return false;
 }
 ```
 
-**2. Update banner text logic (CollabCalendar.tsx, around line 260):**
+**2. Add stricter schema (validations.ts):**
 
-```tsx
-// Determine mode-aware date label
-const dateTypeLabel = collabMode === 'discovery' 
-  ? 'call slots' 
-  : collabMode === 'async' 
-    ? 'publication dates' 
-    : 'dates';
+```typescript
+import { isValidNewsletterPublicationUrl } from './substack-url';
 
-// In the banner:
-<span>
-  Next available <span className="font-medium">{dateTypeLabel}</span> are in{" "}
-  <span className="font-medium text-primary">
-    {monthNames[firstAvailableDate.getMonth()]} {firstAvailableDate.getFullYear()}
-  </span>
-</span>
+// Newsletter PUBLICATION URL - required for content matching (rejects profile URLs)
+export const newsletterPublicationUrlSchema = z.string()
+  .trim()
+  .min(1, { message: "Newsletter URL is required" })
+  .refine(
+    isValidNewsletterPublicationUrl,
+    { message: "Enter your newsletter URL (e.g., yourname.substack.com). Profile URLs like substack.com/@name won't work." }
+  );
 ```
 
-**3. Pass collabMode from Dashboard.tsx:**
+**3. Update PublicBooking.tsx validation:**
 
-```tsx
-<CollabCalendar
-  availableDates={availability}
-  bookedDates={bookedDates}
-  bookingDetails={bookingDetails}
-  collabMode={creator.collab_mode as 'async' | 'discovery' | null}
-/>
-```
-
-**4. Pass collabMode from PublicBooking.tsx:**
-
-```tsx
-<CollabCalendar
-  availableDates={availableDates}
-  // ... other props
-  collabMode={creator.collab_mode as 'async' | 'discovery' | null}
-/>
-```
+Update the inline validation for the substackUrl field to use the new stricter schema and show a helpful error message when a profile URL is detected.
 
 ---
 
 ### Visual Before/After
 
-**Before (vague):**
+**Before (accepts profile URL, fails silently on fetch):**
 ```
-Next available dates are in March 2026  [Jump there →]
-```
-
-**After - Async mode:**
-```
-Next available publication dates are in March 2026  [Jump there →]
+Your Newsletter URL *
+[https://substack.com/@elenacalvillo] [Match Our Content]
+                                        ↳ (Click fails with confusing error)
 ```
 
-**After - Discovery mode:**
+**After (rejects profile URL with clear message):**
 ```
-Next available call slots are in March 2026  [Jump there →]
+Your Newsletter URL *
+[https://substack.com/@elenacalvillo] [Match Our Content]
+Enter your newsletter URL (e.g., yourname.substack.com). 
+Profile URLs like substack.com/@name won't work.
 ```
+
+---
+
+### Why Profile URLs Don't Work
+
+Profile pages (`substack.com/@username`) are user profiles, not newsletters:
+- They show the user's bio, subscriptions, and activity
+- They do NOT have an RSS feed (`/feed` endpoint)
+- The username in the profile may be completely different from their newsletter subdomain
+
+Example:
+- **Profile**: `substack.com/@elenacalvillo` (Elena's profile page)
+- **Newsletter**: `productreleasenotes.substack.com` (Elena's actual newsletter)
+
+These are NOT interchangeable!
 
 ---
 
@@ -122,7 +137,7 @@ Next available call slots are in March 2026  [Jump there →]
 
 | File | Changes |
 |------|---------|
-| `src/components/calendar/CollabCalendar.tsx` | Add `collabMode` prop, update banner text |
-| `src/pages/Dashboard.tsx` | Pass `collabMode` prop to CollabCalendar |
-| `src/pages/PublicBooking.tsx` | Pass `collabMode` prop to CollabCalendar |
+| `src/lib/substack-url.ts` | Add `isValidNewsletterPublicationUrl()` function |
+| `src/lib/validations.ts` | Add `newsletterPublicationUrlSchema` |
+| `src/pages/PublicBooking.tsx` | Update validation logic to reject profile URLs with clear error |
 
