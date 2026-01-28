@@ -1,119 +1,133 @@
 
-## Fix Guest Booking Journey - UX Clarity Improvements
 
-Based on detailed feedback from beta testers (Dominik, Karen, and others), this plan addresses three critical friction points in the public booking flow at `draftkit.app/{username}`.
+## Add Google Sign-In with Lovable Cloud
 
----
-
-### Issue 1: "Publication vs. Meeting" Confusion
-
-**Problem:** Users think they're booking a meeting/call rather than selecting a target publication date. The current calendar header says "Select a Date" which implies scheduling.
-
-**Solution:** Update calendar headers and add clarifying copy.
-
-**File:** `src/pages/PublicBooking.tsx`
-
-| Location | Current Copy | New Copy |
-|----------|--------------|----------|
-| Calendar Header (lines 1089-1104) | "Select a Date" | "Target Publication Date" |
-| Calendar Subheading | "Choose an available date to collaborate with {name}" | "When do you want this collaboration to go live?" |
-| New element | N/A | Add clarifying note under calendar: "This is not a meeting. It's the date we aim to publish on Substack." |
+Based on the new Lovable Cloud managed Google OAuth feature, we can add seamless Google sign-in to DraftKit without any manual OAuth configuration.
 
 ---
 
-### Issue 2: "See Guidelines" Dead-End
+### Current State
 
-**Problem:** When "Custom" collab type is selected, the outcome shows "See guidelines" but there's no actual link or tooltip - it's just dead text.
+- `signInWithGoogle` exists in `useAuth.tsx` but uses the older Supabase direct approach
+- No Google sign-in button is visible on Login or Signup pages
+- The `src/integrations/lovable` folder doesn't exist yet (needed for managed OAuth)
 
-**Solution:** Replace "See guidelines" with actionable text that doesn't mislead users.
+---
 
-**File:** `src/lib/validations.ts`
+### Implementation Steps
+
+#### Step 1: Configure Social Auth
+
+Use the Lovable Cloud social auth tool to generate the managed OAuth module. This will:
+- Create `src/integrations/lovable/index.ts` with the `lovable.auth.signInWithOAuth()` function
+- Install `@lovable.dev/cloud-auth-js` package automatically
+
+#### Step 2: Update Auth Hook
+
+**File:** `src/hooks/useAuth.tsx`
+
+Update `signInWithGoogle` to use the new Lovable managed method:
 
 ```typescript
-// FROM
-'Custom': { outcome: 'See guidelines', dateMeans: 'See guidelines', icon: '...' }
+// Import the lovable module
+import { lovable } from "@/integrations/lovable/index";
 
-// TO  
-'Custom': { outcome: 'Custom arrangement', dateMeans: 'To be discussed', icon: '...' }
+// Updated signInWithGoogle method
+const signInWithGoogle = async () => {
+  const { error } = await lovable.auth.signInWithOAuth("google", {
+    redirect_uri: window.location.origin,
+  });
+  
+  return { error: error ? new Error(error.message) : null };
+};
 ```
 
-**File:** `src/pages/Settings.tsx`
+#### Step 3: Add Google Button to Login Page
 
-```typescript
-// FROM
-{ value: "Custom", label: "Custom", description: "See guidelines below" }
+**File:** `src/pages/Login.tsx`
 
-// TO
-{ value: "Custom", label: "Custom", description: "Define your own format" }
+Add a Google sign-in button with proper styling below the main form:
+
+```text
++-------------------------------------+
+|        Welcome Back                 |
+|   Sign in to your DraftKit account  |
++-------------------------------------+
+|  Email:    [__________________]     |
+|  Password: [__________________]     |
+|         [ Sign In ]                 |
++-------------------------------------+
+|           ─── or ───                |
+|  [G] Continue with Google           |
++-------------------------------------+
+|   Don't have an account? Sign up    |
++-------------------------------------+
+```
+
+#### Step 4: Add Google Button to Signup Page (Step 1)
+
+**File:** `src/pages/Signup.tsx`
+
+Add Google option on the account creation step with the same pattern:
+
+```text
++-------------------------------------+
+|        Create Account               |
+|  Start organizing collaborations    |
++-------------------------------------+
+|  Email:    [__________________]     |
+|  Password: [__________________]     |
+|         [ Continue ]                |
++-------------------------------------+
+|           ─── or ───                |
+|  [G] Continue with Google           |
++-------------------------------------+
+|  Already have an account? Sign in   |
++-------------------------------------+
 ```
 
 ---
 
-### Issue 3: "Find Ideas" Button UX
+### UI Components
 
-**Problem:** The AI "Find Ideas" button is clickable before a URL is entered, leading to confusing errors.
-
-**Solution:** The button already has `disabled={isAnalyzing || !formData.substackUrl}` (line 897), which should work. However, we should add visual feedback to make it clearer why it's disabled.
-
-**File:** `src/pages/PublicBooking.tsx`
-
-Add a tooltip or visual cue when hovering over the disabled button:
-- When disabled: Show muted styling with tooltip "Enter your newsletter URL first"
-- Add a subtle prompt under the input field when empty
+Both buttons will use:
+- White/light background with subtle border (Google brand guidelines)
+- Google "G" logo icon
+- "Continue with Google" text
+- Full-width matching the form width
+- Loading state with spinner when clicked
 
 ---
 
-### Issue 4: Include AI Suggestion in Owner Notification
+### User Flow After Google Sign-In
 
-**Problem:** When a guest clicks "Use This" on an AI suggestion, the host/owner should be able to see which AI-generated idea was selected in their notification.
+1. **New User (no creator profile)**:
+   - Redirects to `/signup`
+   - Detects `user` exists but no `creator`
+   - Automatically advances to Step 2 (Profile setup)
+   
+2. **Returning User (has creator profile)**:
+   - Redirects to `/dashboard` automatically
 
-**Solution:** Include the selected AI suggestion details in the collab_request record and email notification.
-
-**File:** `src/pages/PublicBooking.tsx`
-
-1. Track when an AI suggestion is used:
-   ```typescript
-   const [selectedAiSuggestion, setSelectedAiSuggestion] = useState<CollabSuggestion | null>(null);
-   ```
-
-2. Update `handleUseSuggestion` to store the selection:
-   ```typescript
-   const handleUseSuggestion = (suggestion: CollabSuggestion) => {
-     setSelectedAiSuggestion(suggestion);  // Store the selection
-     // ... existing code
-   };
-   ```
-
-3. Include in the insert payload:
-   ```typescript
-   .insert({
-     // ... existing fields
-     ai_suggestion_used: selectedAiSuggestion ? JSON.stringify({
-       topic: selectedAiSuggestion.topic,
-       format: selectedAiSuggestion.format,
-       description: selectedAiSuggestion.description
-     }) : null,
-   })
-   ```
-
-**Database Change:** Add `ai_suggestion_used` column (JSONB, nullable) to `collab_requests` table.
+This flow is already handled in the existing `useEffect` in both `Login.tsx` and `Signup.tsx`.
 
 ---
 
-### Summary of File Changes
+### Files to Create/Modify
 
-| File | Changes |
-|------|---------|
-| `src/pages/PublicBooking.tsx` | Update calendar headers, add clarification note, track AI suggestion selection, enhance button UX |
-| `src/lib/validations.ts` | Update "Custom" metadata to remove dead "See guidelines" text |
-| `src/pages/Settings.tsx` | Update "Custom" collab style description |
-| Database | Add `ai_suggestion_used` JSONB column |
+| File | Action | Description |
+|------|--------|-------------|
+| `src/integrations/lovable/index.ts` | Create | Generated by configure-social-auth tool |
+| `src/hooks/useAuth.tsx` | Modify | Update to use `lovable.auth.signInWithOAuth` |
+| `src/pages/Login.tsx` | Modify | Add Google button with divider |
+| `src/pages/Signup.tsx` | Modify | Add Google button with divider (Step 1) |
 
 ---
 
-### Technical Notes
+### Benefits of Managed OAuth
 
-- All copy changes focus on emphasizing **publication/shipping dates** over meeting/scheduling language
-- The "See guidelines" text is removed entirely since the feature isn't implemented
-- AI suggestion tracking helps hosts understand what sparked the guest's interest
-- Form validation already prevents submission without required fields; no additional changes needed for the "Failed to submit" error (likely a transient network issue)
+- No need to create or manage Google Cloud OAuth credentials
+- Lovable handles the consent screen and redirect URLs automatically
+- Works immediately with your existing domain setup
+- Users see a professional, branded Google consent experience
+
