@@ -237,6 +237,11 @@ serve(async (req: Request): Promise<Response> => {
     // Build the booking page URL
     const baseUrl = Deno.env.get("SITE_URL") || "https://draftkit.app";
     const bookingUrl = `${baseUrl}/${creatorUsername}`;
+    
+    // Helper to build safe deep-link URLs that work around server-side routing
+    // Uses /dashboard?open=requests&highlight=... format which the client then redirects
+    const buildDashboardRequestLink = (reqId: string) =>
+      `${baseUrl}/dashboard?open=requests&highlight=${encodeURIComponent(reqId)}`;
 
     let emailSubject = "";
     let emailHtml = "";
@@ -396,7 +401,7 @@ serve(async (req: Request): Promise<Response> => {
           ` : ""}
 
           <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
-            <a href="${baseUrl}/dashboard/requests?highlight=${requestId}" 
+            <a href="${buildDashboardRequestLink(requestId)}" 
                style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
               View Request
             </a>
@@ -444,7 +449,7 @@ serve(async (req: Request): Promise<Response> => {
           ` : ""}
 
           <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
-            <a href="${baseUrl}/dashboard/requests?highlight=${requestId}" 
+            <a href="${buildDashboardRequestLink(requestId)}" 
                style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
               View All Requests
             </a>
@@ -576,7 +581,7 @@ serve(async (req: Request): Promise<Response> => {
           </div>
 
           <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
-            <a href="${baseUrl}/dashboard/requests?highlight=${requestId}" 
+            <a href="${buildDashboardRequestLink(requestId)}" 
                style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
               View Details
             </a>
@@ -731,8 +736,55 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
+    // --- DUPLICATE EMAIL GUARDRAIL ---
+    // Prevent sending duplicate emails within a short window (2 minutes)
+    // Excludes collab_reminder as reminders may legitimately repeat
+    const DEDUP_TYPES = [
+      "request_received",
+      "request_approved", 
+      "request_declined",
+      "request_cancelled_by_guest",
+      "collab_cancelled_by_host",
+      "new_message",
+      "collab_type_changed"
+    ];
+
+    if (DEDUP_TYPES.includes(type)) {
+      const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+      
+      const { data: recentSend } = await supabase
+        .from("email_events")
+        .select("id")
+        .eq("request_id", requestId)
+        .eq("type", type)
+        .eq("to_email", toEmail)
+        .gte("created_at", twoMinutesAgo)
+        .limit(1)
+        .maybeSingle();
+
+      if (recentSend) {
+        console.log(`Duplicate email skipped (${type}) - already sent within 2 minutes`);
+        return new Response(
+          JSON.stringify({ skipped: true, reason: "DUPLICATE_GUARD" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+    // --- END DUPLICATE GUARDRAIL ---
+
     // Send the email
     const emailResponse = await sendEmail([toEmail], emailSubject, emailHtml);
+
+    // Log successful send to email_events
+    if (!emailResponse.skipped) {
+      await supabase.from("email_events").insert({
+        request_id: requestId,
+        type,
+        to_email: toEmail,
+        provider_id: emailResponse.id || null,
+        status: "sent"
+      });
+    }
 
     console.log(`Email sent successfully (${type}):`, emailResponse);
 

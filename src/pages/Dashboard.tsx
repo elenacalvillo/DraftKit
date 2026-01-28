@@ -7,7 +7,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { CollabCalendar } from "@/components/calendar/CollabCalendar";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import type { Json } from "@/integrations/supabase/types";
 
 interface CollabRequest {
@@ -29,6 +29,7 @@ interface BookingInfo {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, creator, loading } = useAuth();
   const [availability, setAvailability] = useState<string[]>([]);
   const [requests, setRequests] = useState<CollabRequest[]>([]);
@@ -39,6 +40,26 @@ export default function Dashboard() {
   const handleImageError = useCallback((requestId: string) => {
     setImageErrors(prev => new Set(prev).add(requestId));
   }, []);
+
+  // Deep-link router: Handle ?open=requests&highlight=... from email CTAs
+  // This works around server-side routing that may redirect /dashboard/requests -> /dashboard
+  useEffect(() => {
+    if (loading) return;
+    
+    const openTarget = searchParams.get("open");
+    const highlightId = searchParams.get("highlight");
+    
+    if (openTarget === "requests") {
+      // Build the target URL with highlight param if present
+      const targetUrl = highlightId 
+        ? `/dashboard/requests?highlight=${encodeURIComponent(highlightId)}`
+        : "/dashboard/requests";
+      
+      // Use replace to avoid back-button confusion
+      navigate(targetUrl, { replace: true });
+      return;
+    }
+  }, [loading, searchParams, navigate]);
 
   useEffect(() => {
     if (!loading && !user) {

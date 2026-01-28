@@ -301,6 +301,36 @@ export type Database = {
         }
         Relationships: []
       }
+      email_events: {
+        Row: {
+          created_at: string
+          id: string
+          provider_id: string | null
+          request_id: string
+          status: string
+          to_email: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          provider_id?: string | null
+          request_id: string
+          status?: string
+          to_email: string
+          type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          provider_id?: string | null
+          request_id?: string
+          status?: string
+          to_email?: string
+          type?: string
+        }
+        Relationships: []
+      }
       user_feedback: {
         Row: {
           created_at: string | null
