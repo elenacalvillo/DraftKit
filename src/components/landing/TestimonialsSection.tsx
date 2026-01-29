@@ -2,6 +2,8 @@ import { motion } from "framer-motion";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Quote } from "lucide-react";
 import stefImage from "@/assets/profiles/stef.jpg";
+import karoImage from "@/assets/profiles/karo.jpg";
+import dheerajImage from "@/assets/profiles/dheeraj.jpg";
 
 interface Testimonial {
   name: string;
@@ -22,16 +24,20 @@ const testimonials: Testimonial[] = [
     highlight: "thoughtful and differentiating",
   },
   {
-    name: "Coming Soon",
-    role: "Your feedback here",
-    initials: "YF",
-    quote: "We'd love to hear about your experience using DraftKit. Share your story and help others discover the power of meaningful collaborations.",
+    name: "Karo",
+    role: "PM",
+    image: karoImage,
+    initials: "KA",
+    quote: "Beautiful build by a fellow PM. I love that my calendar is under my rules and people can only book in the windows I chose.",
+    highlight: "my calendar is under my rules",
   },
   {
-    name: "Coming Soon",
-    role: "Your feedback here",
-    initials: "YF",
-    quote: "Join our growing community of newsletter creators who are building authentic connections and creating impactful collaborations together.",
+    name: "Dheeraj",
+    role: "Newsletter Creator",
+    image: dheerajImage,
+    initials: "DH",
+    quote: "That's a really fantastic tool that you build and makes it super convenient. I vibe coded a single page app more like brute force for something similar but I don't think I need it anymore now that you have launched this :)",
+    highlight: "super convenient",
   },
 ];
 
