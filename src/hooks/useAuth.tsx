@@ -8,7 +8,6 @@ interface Creator {
   user_id: string;
   username: string;
   name: string;
-  email: string;
   substack_url: string | null;
   bio: string | null;
   welcome_message: string | null;
@@ -50,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq('user_id', userId)
       .maybeSingle();
     
-    setCreator(data as Creator | null);
+    setCreator((data as Creator) ?? null);
   };
 
   useEffect(() => {

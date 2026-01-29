@@ -152,7 +152,7 @@ export default function PublicBooking() {
     setFormData(prev => ({
       ...prev,
       name: authCreator.name || prev.name,
-      email: authCreator.email || prev.email,
+      email: user.email || prev.email,
       substackUrl: preferredNewsletterUrl || prev.substackUrl,
     }));
   }, [user, authCreator]);

@@ -69,6 +69,13 @@ interface CollabDraft {
   suggestedFormat: string;
 }
 
+function extractCreatorEmail(creatorRow: any): string | null {
+  const cc = creatorRow?.creator_contacts;
+  if (!cc) return null;
+  if (Array.isArray(cc)) return cc[0]?.email ?? null;
+  return cc.email ?? null;
+}
+
 // Valid email types mapped to required sender roles
 const EMAIL_TYPE_ROLES: Record<EmailRequest["type"], "creator" | "requester" | "service"> = {
   request_approved: "creator",
@@ -167,10 +174,10 @@ serve(async (req: Request): Promise<Response> => {
         creators (
           name,
           username,
-          email,
           collab_style,
           collab_guidelines,
-          newsletter_url
+          newsletter_url,
+          creator_contacts ( email )
         )
       `)
       .eq("id", requestId)
@@ -216,7 +223,7 @@ serve(async (req: Request): Promise<Response> => {
     // --- END AUTHORIZATION CHECK ---
 
     const creatorName = request.creators?.name || "Creator";
-    const creatorEmail = request.creators?.email;
+    const creatorEmail = extractCreatorEmail(request.creators);
     const creatorUsername = request.creators?.username;
     const requesterName = request.requester_name;
     const requesterEmail = request.requester_email;
@@ -370,7 +377,7 @@ serve(async (req: Request): Promise<Response> => {
       `;
     } else if (type === "request_received") {
       // Email to host when they receive a new request
-      toEmail = creatorEmail;
+      toEmail = creatorEmail || "";
       emailSubject = `🔔 New collaboration request from ${requesterName}`;
       
       emailHtml = `
@@ -479,7 +486,7 @@ serve(async (req: Request): Promise<Response> => {
       `;
     } else if (type === "request_cancelled_by_guest") {
       // Email to host when guest cancels their pending request
-      toEmail = creatorEmail;
+      toEmail = creatorEmail || "";
       emailSubject = `📋 ${requesterName} cancelled their collaboration request`;
       
       emailHtml = `
@@ -795,6 +802,14 @@ serve(async (req: Request): Promise<Response> => {
     if (!toEmail) {
       return new Response(
         JSON.stringify({ error: "No recipient email found" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!toEmail) {
+      console.error("Missing recipient email for", type, "request", requestId);
+      return new Response(
+        JSON.stringify({ error: "Missing recipient email" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

@@ -136,6 +136,13 @@ const generateEmailHtml = (
   `;
 };
 
+function extractCreatorEmail(creatorRow: any): string | null {
+  const cc = creatorRow?.creator_contacts;
+  if (!cc) return null;
+  if (Array.isArray(cc)) return cc[0]?.email ?? null;
+  return cc.email ?? null;
+}
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -226,7 +233,7 @@ const handler = async (req: Request): Promise<Response> => {
     const userIds = proUsers.map((u) => u.user_id);
     const { data: creators, error: creatorsError } = await supabaseAdmin
       .from("creators")
-      .select("user_id, name, email")
+      .select("user_id, name, creator_contacts(email)")
       .in("user_id", userIds);
 
     if (creatorsError) {
@@ -243,7 +250,10 @@ const handler = async (req: Request): Promise<Response> => {
         JSON.stringify({
           previewMode: true,
           recipientCount: creators?.length || 0,
-          recipients: creators?.map((c) => ({ name: c.name, email: c.email })),
+          recipients: creators?.map((c: any) => ({
+            name: c.name,
+            email: extractCreatorEmail(c),
+          })),
           sampleHtml: generateEmailHtml(
             creators?.[0]?.name || "Creator",
             subject,
@@ -262,27 +272,34 @@ const handler = async (req: Request): Promise<Response> => {
 
     for (const creator of creators || []) {
       try {
+        const email = extractCreatorEmail(creator);
+        if (!email) {
+          results.push({ email: "", status: "failed", error: "Missing recipient email" });
+          continue;
+        }
+
         const html = generateEmailHtml(creator.name, subject, features);
 
-        const emailResponse = await sendEmail(creator.email, subject, html);
+        const emailResponse = await sendEmail(email, subject, html);
 
         // Log to email_events
         await supabaseAdmin.from("email_events").insert({
           request_id: crypto.randomUUID(), // Use a unique ID for release notes
           type: "release_notes",
-          to_email: creator.email,
+          to_email: email,
           status: "sent",
           provider_id: emailResponse?.id || null,
         });
 
-        results.push({ email: creator.email, status: "sent" });
+        results.push({ email, status: "sent" });
 
         // Rate limiting - wait 100ms between sends
         await new Promise((resolve) => setTimeout(resolve, 100));
       } catch (error) {
-        console.error(`Failed to send to ${creator.email}:`, error);
+        const email = extractCreatorEmail(creator) || "";
+        console.error(`Failed to send to ${email}:`, error);
         results.push({
-          email: creator.email,
+          email,
           status: "failed",
           error: error instanceof Error ? error.message : "Unknown error",
         });
