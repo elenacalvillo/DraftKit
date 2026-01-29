@@ -1,56 +1,41 @@
 
-# Add New Testimonials and Update Raghav's Profile Picture
 
-## Overview
-Add two new real testimonials from Karo and Dheeraj to replace the placeholder "Coming Soon" cards, and update Raghav's profile picture across the app.
+# Fix Google OAuth Redirect URI Mismatch
 
-## Changes Summary
+## The Problem
+The error `Error 400: redirect_uri_mismatch` means Google OAuth is rejecting the login request because the redirect URI being sent (`https://collabstack.lovable.app`) isn't in the list of authorized redirect URIs.
 
-### 1. Add Profile Images to Assets
-Copy the uploaded images to the project:
-- `karo.jpg` - Karo's profile photo for her testimonial
-- `Dheeraj.jpg` - Dheeraj's profile photo for his testimonial
-- `Raghav-2.jpg` - New Raghav profile picture (will replace existing `raghav.jpg`)
+## Root Cause
+This is a **configuration issue**, not a code bug. The Google OAuth settings need to include your published domain as an authorized redirect URI.
 
-### 2. Update Testimonials Section
-Replace the two "Coming Soon" placeholder testimonials with real feedback:
+## Solution
 
-| Position | Current | New |
-|----------|---------|-----|
-| 1st | Stefania (keep) | Stefania (unchanged) |
-| 2nd | "Coming Soon" placeholder | **Karo** - PM feedback about calendar control |
-| 3rd | "Coming Soon" placeholder | **Dheeraj** - Developer feedback about convenience |
+### For Lovable Cloud Managed OAuth (Current Setup)
+Since this project uses Lovable Cloud's managed OAuth system, you need to ensure your published domain is properly configured:
 
-**New Testimonials Content:**
+1. **Open your backend settings** in Lovable Cloud
+2. Navigate to **Users → Authentication Settings → Sign In Methods → Google**
+3. Verify that your custom domain (`collabstack.lovable.app`) is included in the authorized redirect URIs
 
-**Karo** (PM / Product Manager)
-- Quote: "Beautiful build by a fellow PM. I love that my calendar is under my rules and people can only book in the windows I chose."
-- Highlight: "my calendar is under my rules"
+If you're using your own Google OAuth credentials (BYOK):
+1. Go to [Google Cloud Console](https://console.cloud.google.com)
+2. Navigate to **APIs & Services → Credentials**
+3. Click on your OAuth 2.0 Client ID
+4. Under **Authorized redirect URIs**, add:
+   - `https://collabstack.lovable.app` (your published domain)
+   - The callback URL from Lovable Cloud's Authentication Settings for Google
 
-**Dheeraj** (Newsletter Creator)
-- Quote: "That's a really fantastic tool that you build and makes it super convenient. I vibe coded a single page app more like brute force for something similar but I don't think I need it anymore now that you have launched this :)"
-- Highlight: "super convenient"
-
-### 3. Update Raghav's Profile Picture
-Replace the existing `raghav.jpg` in `src/assets/profiles/` with the new image. This will automatically update anywhere Raghav's image is used (currently in `team-profiles.ts`).
-
-## Files to Modify
-
-```text
-Files to create/copy:
-  src/assets/profiles/karo.jpg (from user-uploads://karo.jpg)
-  src/assets/profiles/dheeraj.jpg (from user-uploads://Dheeraj.jpg)
-  src/assets/profiles/raghav.jpg (replace with user-uploads://Raghav-2.jpg)
-
-Files to modify:
-  src/components/landing/TestimonialsSection.tsx
-    - Import karo and dheeraj images
-    - Replace placeholder testimonials with real ones
+## No Code Changes Required
+The current implementation is correct:
+```typescript
+const signInWithGoogle = async () => {
+  const result = await lovable.auth.signInWithOAuth("google", {
+    redirect_uri: window.location.origin,  // ✓ Correctly uses current origin
+  });
+  // ...
+};
 ```
 
-## Technical Details
+## Next Steps
+To fix this, open your backend dashboard and check the Google OAuth configuration:
 
-The testimonials array will be updated to include:
-- Proper imports for new profile images
-- Real testimonial data with highlight phrases for visual emphasis
-- Appropriate role labels ("PM" for Karo, "Newsletter Creator" for Dheeraj)
