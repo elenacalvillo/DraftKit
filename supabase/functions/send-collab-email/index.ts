@@ -51,7 +51,7 @@ const corsHeaders = {
 };
 
 interface EmailRequest {
-  type: "request_approved" | "request_declined" | "request_received" | "request_cancelled_by_guest" | "collab_cancelled_by_host" | "new_message" | "collab_reminder" | "collab_type_changed";
+  type: "request_approved" | "request_declined" | "request_received" | "request_submitted" | "request_cancelled_by_guest" | "collab_cancelled_by_host" | "new_message" | "collab_reminder" | "collab_type_changed";
   requestId: string;
   messageContent?: string;
   newCollabType?: string;
@@ -74,6 +74,7 @@ const EMAIL_TYPE_ROLES: Record<EmailRequest["type"], "creator" | "requester" | "
   request_approved: "creator",
   request_declined: "creator",
   request_received: "service", // Triggered on booking (no auth required, but rate limited)
+  request_submitted: "service", // Guest confirmation email (triggered on booking)
   request_cancelled_by_guest: "requester",
   collab_cancelled_by_host: "creator",
   new_message: "creator",
@@ -404,6 +405,68 @@ serve(async (req: Request): Promise<Response> => {
             <a href="${buildDashboardRequestLink(requestId)}" 
                style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
               View Request
+            </a>
+          </div>
+
+          <p style="font-size: 14px; color: #64748b; margin-top: 32px;">
+            Happy collaborating!<br>
+            The DraftKit Team
+          </p>
+        </body>
+        </html>
+      `;
+    } else if (type === "request_submitted") {
+      // Guest confirmation email - sent to requester after they submit a booking
+      toEmail = requesterEmail;
+      emailSubject = `✅ Your collaboration request with ${creatorName} was submitted`;
+      
+      emailHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 32px;">
+            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #d9826b, #c9946d); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+              <span style="color: white; font-size: 24px;">✅</span>
+            </div>
+            <h1 style="margin: 0; font-size: 24px; color: #1e293b;">Request Submitted!</h1>
+          </div>
+
+          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterName},</p>
+          
+          <p style="font-size: 16px; margin-bottom: 24px;">
+            Your collaboration request with <strong>${creatorName}</strong>${requestedDate ? ` for <strong>${formattedDate}</strong>` : ""} has been successfully submitted.
+          </p>
+
+          <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #d9826b;">
+            <h3 style="margin: 0 0 16px 0; color: #1e293b; font-size: 16px;">📋 What happens next?</h3>
+            <ol style="margin: 0; padding-left: 20px; color: #475569;">
+              <li style="margin-bottom: 8px;"><strong>${creatorName}</strong> will review your request</li>
+              <li style="margin-bottom: 8px;">You'll receive an email when they respond</li>
+              <li style="margin-bottom: 0;">If approved, you'll get collaboration details and next steps</li>
+            </ol>
+          </div>
+
+          ${request.message ? `
+          <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0;">
+            <p style="margin: 0 0 8px 0; font-weight: 600; color: #475569;">Your message:</p>
+            <p style="margin: 0; color: #1e293b; white-space: pre-line; font-style: italic;">"${request.message}"</p>
+          </div>
+          ` : ""}
+
+          <div style="background: #ecfdf5; border-radius: 12px; padding: 16px 24px; margin: 24px 0; border-left: 4px solid #10b981;">
+            <p style="margin: 0; color: #065f46; font-size: 14px;">
+              💡 <strong>Tip:</strong> While you wait, why not create your own DraftKit page to receive collaboration requests?
+            </p>
+          </div>
+
+          <div style="text-align: center; margin: 32px 0;">
+            <a href="${baseUrl}/signup" 
+               style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+              Create Your Page
             </a>
           </div>
 

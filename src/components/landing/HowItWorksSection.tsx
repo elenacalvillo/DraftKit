@@ -16,7 +16,7 @@ const steps = [
   {
     profile: teamProfiles[2], // Cristina
     title: "Prep Your Conversation",
-    description: "Get AI-curated talking points based on what you both write about—so you can skip the small talk",
+    description: "Get curated talking points based on what you both write about—so you can skip the small talk",
   },
 ];
 

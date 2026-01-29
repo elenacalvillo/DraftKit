@@ -436,16 +436,26 @@ export default function PublicBooking() {
       return;
     }
 
-    // Send email notification to the host (creator)
+    // Send email notifications (fire-and-forget)
     if (insertedRequest?.id) {
+      // Send notification to the host (creator)
       supabase.functions.invoke('send-collab-email', {
         body: { 
           type: 'request_received', 
           requestId: insertedRequest.id 
         }
       }).catch(err => {
-        // Fire-and-forget: don't block the UI, just log errors
-        console.error('Failed to send notification email:', err);
+        console.error('Failed to send host notification email:', err);
+      });
+      
+      // Send confirmation to the guest (requester)
+      supabase.functions.invoke('send-collab-email', {
+        body: { 
+          type: 'request_submitted', 
+          requestId: insertedRequest.id 
+        }
+      }).catch(err => {
+        console.error('Failed to send guest confirmation email:', err);
       });
     }
 
