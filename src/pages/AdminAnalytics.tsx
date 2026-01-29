@@ -165,7 +165,7 @@ export default function AdminAnalytics() {
   const collabApproved = events.filter((e) => e.event_type === "collab_approved").length;
   const collabDeclined = events.filter((e) => e.event_type === "collab_declined").length;
 
-  // Calculate AI Attachment Rate: % of bookings that used AI-suggested topics
+  // Calculate SMART Attachment Rate: % of bookings that used SMART-suggested topics
   const bookingsWithAiSuggestion = events.filter((e) => {
     if (e.event_type !== "booking_submitted") return false;
     const data = getEventData(e);

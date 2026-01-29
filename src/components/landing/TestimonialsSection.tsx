@@ -18,7 +18,7 @@ const testimonials: Testimonial[] = [
     role: "Newsletter Creator",
     image: stefImage,
     initials: "ST",
-    quote: "The AI-generated ideas based on both our profiles felt like a very thoughtful and differentiating touch. The sign-up experience was smooth, and being able to create my own collaboration page right away felt really nice and empowering.",
+    quote: "The content-matched ideas based on both our profiles felt like a very thoughtful and differentiating touch. The sign-up experience was smooth, and being able to create my own collaboration page right away felt really nice and empowering.",
     highlight: "thoughtful and differentiating",
   },
   {

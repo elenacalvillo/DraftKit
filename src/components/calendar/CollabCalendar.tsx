@@ -145,10 +145,11 @@ export function CollabCalendar({
         setSelectedDate(dateStr);
         onDateSelect?.(dateStr);
       } else if (status !== "booked") {
-        // Show helpful feedback when clicking unavailable dates
+        // Show helpful feedback when clicking unavailable dates (mode-aware)
         if (firstAvailableDate) {
           const availMonth = monthNames[firstAvailableDate.getMonth()];
-          toast.info(`No availability on this date. Check ${availMonth} for available dates.`, {
+          const slotType = collabMode === 'discovery' ? 'call slots' : collabMode === 'async' ? 'publication dates' : 'availability';
+          toast.info(`No ${slotType} on this date. Check ${availMonth} for available dates.`, {
             action: {
               label: `Go to ${availMonth}`,
               onClick: jumpToAvailability,
