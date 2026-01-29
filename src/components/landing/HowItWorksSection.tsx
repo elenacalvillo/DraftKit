@@ -1,20 +1,16 @@
 import { motion } from "framer-motion";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { teamProfiles } from "@/data/team-profiles";
+import { ChevronRight } from "lucide-react";
 
 const steps = [
   {
-    profile: teamProfiles[3], // Raghav
     title: "Share Your Link",
     description: "Create your profile with a personal welcome message and get your booking page (draftkit.app/yourname)",
   },
   {
-    profile: teamProfiles[1], // Stef
     title: "Guests Pick a Date",
     description: "Collaborators see your availability and share why they want to connect—on their terms",
   },
   {
-    profile: teamProfiles[2], // Cristina
     title: "Prep Your Conversation",
     description: "Get curated talking points based on what you both write about—so you can skip the small talk",
   },
@@ -45,24 +41,24 @@ export function HowItWorksSection() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: index * 0.15 }}
-              className="relative"
+              className="relative text-center"
             >
-              {/* Connector line */}
+              {/* Numbered Circle */}
+              <div className="relative z-10 w-16 h-16 rounded-full bg-card border-2 border-border flex items-center justify-center mx-auto mb-6">
+                <span className="text-sm font-semibold text-primary">
+                  {String(index + 1).padStart(2, '0')}
+                </span>
+              </div>
+              
+              {/* Chevron Arrow - hidden on mobile, shown between steps on desktop */}
               {index < steps.length - 1 && (
-                <div className="hidden md:block absolute top-10 left-1/2 w-full h-0.5 bg-gradient-to-r from-primary/50 to-primary/20" />
+                <div className="hidden md:block absolute top-8 -right-4 transform -translate-y-1/2 z-20">
+                  <ChevronRight className="w-8 h-8 text-muted-foreground/40" />
+                </div>
               )}
               
-              <div className="relative z-10 flex flex-col items-center text-center">
-                {/* Profile Avatar */}
-                <Avatar className="w-20 h-20 mb-6 border-3 border-primary/30 shadow-lg ring-4 ring-primary/10">
-                  <AvatarImage src={step.profile.image} alt={step.profile.name} className="object-cover" />
-                  <AvatarFallback className="text-xl font-medium">{step.profile.initials}</AvatarFallback>
-                </Avatar>
-                
-                <span className="text-sm font-medium text-primary mb-2">Step {index + 1}</span>
-                <h3 className="text-xl font-semibold mb-3">{step.title}</h3>
-                <p className="text-muted-foreground">{step.description}</p>
-              </div>
+              <h3 className="font-medium text-lg text-foreground mb-2">{step.title}</h3>
+              <p className="text-muted-foreground text-sm leading-relaxed">{step.description}</p>
             </motion.div>
           ))}
         </div>
