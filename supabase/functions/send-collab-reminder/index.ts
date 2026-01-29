@@ -38,8 +38,8 @@ serve(async (req: Request): Promise<Response> => {
         creators (
           id,
           name,
-          email,
-          reminder_days_before
+          reminder_days_before,
+          creator_contacts ( email )
         )
       `)
       .eq("status", "approved")

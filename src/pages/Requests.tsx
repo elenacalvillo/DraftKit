@@ -408,7 +408,7 @@ export default function Requests() {
                 >
                   <RequestCard
                     request={request}
-                    creatorEmail={creator.email}
+                    creatorEmail={user?.email || ""}
                     onApprove={handleApprove}
                     onDecline={handleDecline}
                     onCancel={handleCancel}

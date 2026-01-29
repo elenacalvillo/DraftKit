@@ -202,6 +202,42 @@ export type Database = {
           },
         ]
       }
+      creator_contacts: {
+        Row: {
+          created_at: string
+          creator_id: string
+          email: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          creator_id: string
+          email: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          creator_id?: string
+          email?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creator_contacts_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: true
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creator_contacts_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: true
+            referencedRelation: "public_creator_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       creator_writing_samples: {
         Row: {
           creator_id: string
@@ -249,7 +285,6 @@ export type Database = {
           collab_style: string | null
           created_at: string
           date_meaning: string | null
-          email: string
           id: string
           join_directory_waitlist: boolean | null
           name: string
@@ -269,7 +304,6 @@ export type Database = {
           collab_style?: string | null
           created_at?: string
           date_meaning?: string | null
-          email: string
           id?: string
           join_directory_waitlist?: boolean | null
           name: string
@@ -289,7 +323,6 @@ export type Database = {
           collab_style?: string | null
           created_at?: string
           date_meaning?: string | null
-          email?: string
           id?: string
           join_directory_waitlist?: boolean | null
           name?: string

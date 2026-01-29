@@ -205,7 +205,6 @@ export default function Signup() {
         user_id: session.user.id,
         username: formData.username,
         name: formData.name,
-        email: formData.email,
         substack_url: formData.substackUrl || null,
         newsletter_url: formData.newsletterUrl,
         welcome_message: formData.welcomeMessage || `Hi! I'm ${formData.name}. Let's collaborate!`,
@@ -217,6 +216,22 @@ export default function Signup() {
 
     if (error) {
       toast.error("Failed to create profile. Please try again.");
+      setIsLoading(false);
+      return;
+    }
+
+    // Store email in the private creator_contacts table (not in public creators table)
+    const { error: contactError } = await supabase
+      .from('creator_contacts')
+      .insert({
+        creator_id: newCreator.id,
+        email: formData.email,
+      });
+
+    if (contactError) {
+      // Best-effort rollback so we don't leave a partially created account
+      await supabase.from('creators').delete().eq('id', newCreator.id);
+      toast.error("Failed to save your email. Please try again.");
       setIsLoading(false);
       return;
     }
