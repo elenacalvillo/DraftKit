@@ -1,170 +1,63 @@
 
+# Redesign "How It Works" Section
 
-## Early Adopter Classification + Release Notes Email
+## Overview
+Replace the current avatar-based step design with a cleaner, numbered circle design featuring chevron arrows between steps, matching the reference design you provided.
 
-You currently have **13 creators** in the database. The existing `pro` role already covers your first 6 early adopters. I'll extend this to classify all pre-launch users and create a release notes email system.
+## Current vs. New Design
 
----
+| Aspect | Current | New |
+|--------|---------|-----|
+| Step indicator | Profile avatars | Numbered circles (01, 02, 03) |
+| Connector | Gradient horizontal line | Chevron arrow icons |
+| Layout | 3 columns | 3 columns (keeping your 3 steps) |
+| Step label | "Step 1" text badge | Number inside circle |
+| Style | Heavy shadows, rings | Clean white circles with subtle border |
 
-### Current Early Adopters (already have `pro` role)
+## Visual Changes
 
-| Name | Username | Joined |
-|------|----------|--------|
-| Elena Calvillo | elenacalvillo | Jan 9 |
-| Anna Levitt | bbco | Jan 12 |
-| Raghav Mehra | raghav | Jan 13 |
-| Karo (Product with Attitude) | karo | Jan 13 |
-| The Responsible AI Brief | traib | Jan 13 |
-| Stefania Barabas | stefsdevnotes | Jan 14 |
+**Numbered Circles**
+- Clean white background with subtle gray border
+- Step number formatted as "01", "02", "03" 
+- Primary brand color for the number text
+- 16x16 (w-16 h-16) rounded-full circles
 
-### Additional Pre-Launch Creators (need `pro` role added)
+**Chevron Arrows**
+- SVG chevron arrows between steps (hidden on mobile)
+- Positioned to the right of each step (except the last)
+- Subtle gray color to not distract from content
 
-| Name | Username | Joined |
-|------|----------|--------|
-| Elena Tester | testing | Jan 16 (test account - skip) |
-| AI Meets Girlboss | aimeetsgirlboss | Jan 17 |
-| Dheeraj Sharma | genaiunplugged | Jan 18 |
-| Mia Kiraki | miakiraki | Jan 19 |
-| Karen Spinner | karenspinner | Jan 21 |
-| Gamal Jastram | gamaljastram | Jan 23 |
-| Nick Quick | nickquick | Jan 26 |
+**Layout**
+- Centered text alignment
+- Title in medium weight, dark color
+- Description in muted gray, relaxed line height
 
----
+## Implementation Steps
 
-## Implementation Plan
-
-### Part 1: Extend `pro` Role to All Pre-Launch Creators
-
-Add the 6 remaining real creators (excluding test account) to the `pro` role via a data insert. This marks everyone who joined before launch as an early adopter.
-
-**Data to insert into `user_roles`:**
-```sql
-INSERT INTO public.user_roles (user_id, role)
-SELECT user_id, 'pro'::app_role FROM public.creators
-WHERE username NOT IN ('testing') -- skip test account
-  AND user_id NOT IN (SELECT user_id FROM public.user_roles WHERE role = 'pro')
-```
-
----
-
-### Part 2: Create Release Notes Email System
-
-**New edge function: `send-release-notes`**
-
-This function will:
-1. Accept a release notes payload (subject, body HTML, target audience)
-2. Query all `pro` users (early adopters)
-3. Send personalized emails to each creator
-
-**File structure:**
-```
-supabase/functions/send-release-notes/index.ts
-```
-
-**Features:**
-- Admin-only access (checks `admin` role)
-- Personalized greeting with creator's name
-- Brand-consistent HTML template (coral gradient header)
-- Rate limiting to avoid Resend limits
-- Logs sent emails to `email_events` table
-
----
-
-### Part 3: Release Notes Email Content
-
-**Subject:** "What's New in DraftKit - January 2026"
-
-**Content highlights:**
-1. **SMART Match Ideas** - Content-matched collaboration drafts
-2. **Ship Date Workflow** - Clear async collaboration process
-3. **Guest Confirmation Emails** - Guests now receive booking receipts
-4. **My Collaboration Process** - Personalized booking page experience
-5. **Brand refresh** - Coral gradient buttons and consistent styling
-
----
+1. **Remove avatar dependencies** - Remove Avatar imports and teamProfiles data
+2. **Simplify step data** - Keep just title and description
+3. **Update grid layout** - Maintain 3 columns with better spacing
+4. **Replace step indicator** - Swap Avatar for numbered circle div
+5. **Add chevron arrows** - Add inline SVG chevrons between steps
+6. **Refine typography** - Match the clean, minimal style from reference
 
 ## Technical Details
 
-### Edge Function: `send-release-notes/index.ts`
-
 ```text
-+------------------+
-|  Admin triggers  |
-|  release notes   |
-+--------+---------+
-         |
-         v
-+--------+---------+
-| Edge function    |
-| validates admin  |
-+--------+---------+
-         |
-         v
-+--------+---------+
-| Query pro users  |
-| from user_roles  |
-+--------+---------+
-         |
-         v
-+--------+---------+
-| Send personalized|
-| email via Resend |
-+--------+---------+
-         |
-         v
-+--------+---------+
-| Log to           |
-| email_events     |
-+------------------+
+File to modify:
+  src/components/landing/HowItWorksSection.tsx
+
+Changes:
+  - Remove: Avatar, AvatarImage, AvatarFallback imports
+  - Remove: teamProfiles import
+  - Simplify: steps array (remove profile property)
+  - Replace: Avatar with numbered circle div
+  - Add: Chevron arrow SVG between steps
+  - Update: Styling to match cleaner aesthetic
 ```
 
-### Email Template Structure
-
-- **Header**: DraftKit logo with coral gradient background
-- **Body**: 
-  - Personal greeting ("Hi {name}")
-  - Thank you for being an early adopter
-  - What's new list (bullet points with feature highlights)
-  - CTA button: "Explore Your Dashboard"
-- **Footer**: "Thank you for being part of our founding creator community"
-
----
-
-## Files to Create/Modify
-
-| File | Action | Description |
-|------|--------|-------------|
-| `supabase/functions/send-release-notes/index.ts` | Create | New edge function for bulk release notes |
-| `user_roles` table | Insert | Add `pro` role to 6 remaining pre-launch creators |
-
----
-
-## How to Use
-
-After implementation, you'll be able to trigger release notes by calling:
-
-```typescript
-// From admin panel or manually
-await supabase.functions.invoke('send-release-notes', {
-  body: {
-    subject: "What's New in DraftKit - January 2026",
-    features: [
-      { title: "SMART Match Ideas", description: "Get content-matched collaboration drafts" },
-      // ... more features
-    ]
-  }
-});
-```
-
----
-
-## Summary
-
-| Task | Effort |
-|------|--------|
-| Add `pro` role to 6 remaining creators | 1 data insert |
-| Create release notes edge function | Medium - new function with HTML template |
-| Write release notes content | Content ready (based on completed pre-launch items) |
-
-This gives you a reusable system for future product updates and a clear way to identify your founding creators forever.
-
+## Step Content (Preserved)
+The existing step content will be kept:
+1. **Share Your Link** - Create your profile with a personal welcome message...
+2. **Guests Pick a Date** - Collaborators see your availability...
+3. **Prep Your Conversation** - Get curated talking points...
