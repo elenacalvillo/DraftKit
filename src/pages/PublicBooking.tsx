@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Calendar, Check, ExternalLink, Sparkles, Mail, User, MessageSquare, Lightbulb, Loader2, AlertCircle, RefreshCw, Info } from "lucide-react";
+import { ArrowLeft, ArrowRight, Calendar, Check, ChevronRight, ExternalLink, Sparkles, Mail, User, MessageSquare, Lightbulb, Loader2, AlertCircle, RefreshCw, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -675,19 +675,17 @@ export default function PublicBooking() {
               <h4 className="text-sm font-semibold text-foreground text-center mb-4">
                 My collaboration process
               </h4>
-              <div className="flex items-center justify-center gap-2">
+              <div className="flex items-center justify-center gap-4">
                 {COLLAB_MODE_METADATA[creator.collab_mode].processSteps.map((step, index) => (
                   <div key={step.step} className="flex items-center">
                     <div className="flex flex-col items-center">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                        index === 0 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-                      }`}>
-                        {step.step}
+                      <div className="w-8 h-8 rounded-full bg-card border border-border flex items-center justify-center">
+                        <span className="text-xs font-semibold text-primary">{step.step}</span>
                       </div>
-                      <span className="text-xs text-muted-foreground mt-1 whitespace-nowrap">{step.label}</span>
+                      <span className="text-xs text-muted-foreground mt-1.5 whitespace-nowrap">{step.label}</span>
                     </div>
                     {index < COLLAB_MODE_METADATA[creator.collab_mode!].processSteps.length - 1 && (
-                      <div className="w-8 h-0.5 bg-muted mx-1 mb-4" />
+                      <ChevronRight className="w-4 h-4 text-muted-foreground/40 mx-1 mb-4" />
                     )}
                   </div>
                 ))}
