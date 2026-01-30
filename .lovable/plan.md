@@ -1,191 +1,153 @@
 
+# Fix Theme Preset Color Palette
 
-# Brand Customization Feature Implementation
+## Problem
 
-## Overview
-
-This feature adds custom profile themes as a Pro-tier benefit, allowing creators to personalize the background gradient on their public booking page (`/@username`). This creates a stronger sense of brand identity and increases platform stickiness through customization investment.
-
----
-
-## Feature Breakdown
-
-| Feature | Free Tier | Pro Tier |
-|---------|-----------|----------|
-| Profile Theme | DraftKit Signature (Coral/Cream) | Custom Gradients & Brand Colors |
-| Presets | DraftKit Default only | 6+ curated professional presets |
-| Custom Colors | Not available | Full hex code picker |
+The current theme presets use overly saturated colors that clash with DraftKit's light cream interface. The screenshot shows a harsh coral/terracotta gradient that overwhelms the page and creates poor contrast with UI elements like the calendar and collaboration badges.
 
 ---
 
-## Technical Implementation
+## Solution
 
-### Phase 1: Database Schema Updates
-
-**Add theme column to `creators` table:**
-
-```sql
-ALTER TABLE creators ADD COLUMN profile_theme JSONB DEFAULT '{"preset": "default"}'::jsonb;
-```
-
-The JSONB structure supports:
-- Preset themes: `{"preset": "coral"}`
-- Custom colors: `{"type": "linear", "colors": ["#FF6B6B", "#4ECDC4"], "angle": 135}`
-- Future mesh gradients: `{"type": "mesh", "colors": [...], "positions": [...]}`
-
-**Update `public_creator_profiles` view** to expose the theme:
-
-```sql
-CREATE OR REPLACE VIEW public_creator_profiles AS
-SELECT 
-  id, username, name, bio, substack_url, newsletter_url,
-  welcome_message, profile_image_url, collab_style, 
-  collab_guidelines, date_meaning, collab_mode, created_at,
-  profile_theme  -- NEW: Expose theme to public booking page
-FROM creators;
-```
+Redesign the color palette to:
+1. Match the **DraftKit brand** for the default preset (use actual `--primary` HSL value)
+2. Convert all Pro presets to **soft pastel tones** with lower saturation and higher lightness
+3. Maintain visual distinction between presets while ensuring harmony with the interface
 
 ---
 
-### Phase 2: Theme Presets
+## Color Changes
 
-**New file: `src/lib/theme-presets.ts`**
+### Before vs After
 
-Define 6 curated gradient presets with professional aesthetics:
+| Preset | Before (Saturated) | After (Pastel) |
+|--------|-------------------|----------------|
+| **Default** | `12 76% 61%` (harsh coral) | `8 65% 65%` (DraftKit primary) |
+| **Ocean** | `210 80% 50%` (intense blue) | `210 40% 70%` (soft sky blue) |
+| **Sunset** | `35 90% 55%` (harsh orange) | `25 50% 72%` (soft peach) |
+| **Forest** | `150 60% 40%` (dark emerald) | `150 35% 65%` (soft sage) |
+| **Midnight** | `270 60% 50%` (vivid purple) | `260 35% 68%` (soft lavender) |
+| **Monochrome** | `220 10% 50%` (flat gray) | `220 15% 75%` (soft silver) |
 
-| Preset ID | Name | Colors | Style |
-|-----------|------|--------|-------|
-| `default` | DraftKit Coral | Coral → Terracotta | Brand default |
-| `ocean` | Ocean Depths | Deep Blue → Teal | Cool professional |
-| `sunset` | Sunset Warmth | Orange → Pink | Warm creative |
-| `forest` | Forest Calm | Emerald → Sage | Natural balanced |
-| `midnight` | Midnight Pro | Purple → Indigo | Dark sophisticated |
-| `monochrome` | Clean Slate | Gray → Slate | Minimal neutral |
-
-Each preset includes:
-- `backgroundGradient`: CSS for the page background
-- `accentGradient`: CSS for interactive elements
-- `glowColor`: HSL for the profile image ring
+### Design Principles Applied:
+- **Saturation**: Reduced from 60-90% down to 30-50%
+- **Lightness**: Increased to 65-75% for pastel effect
+- **Gradients**: Subtle transitions between similar tones (not contrasting hues)
 
 ---
 
-### Phase 3: Settings UI - Style Tab
+## Implementation
 
-**New component: `src/components/settings/ProfileStyleSection.tsx`**
+### File: `src/lib/theme-presets.ts`
 
-A new glass-card section in Settings with:
-
-1. **Preset Grid** (2x3 for 6 presets)
-   - Visual swatch preview showing the gradient
-   - Radio-style selection with checkmark
-   - Current theme highlighted
-
-2. **Custom Color Picker** (Pro only)
-   - Two color inputs (start/end)
-   - Angle slider (45°/90°/135°/180°)
-   - Live preview swatch
-
-3. **Pro Gate**
-   - Free users see presets locked with a Pro badge overlay
-   - Clicking locked preset shows `UpgradePrompt` with feature copy
-   - Only "DraftKit Default" is available on free tier
-
-**Settings page modification:**
-
-Add the Style section between "Profile" and "Collaboration Playbook" sections.
-
----
-
-### Phase 4: Public Booking Page Theme Application
-
-**Modify: `src/pages/PublicBooking.tsx`**
-
-Apply the creator's theme to:
-
-1. **Page Background** - Replace fixed `gradient-bg` class with dynamic CSS variable
-2. **Floating Orbs** - Use theme accent colors for animated background blobs
-3. **Profile Ring** - Apply theme's glow color to the profile image ring
+Update the `THEME_PRESETS` object with pastel-friendly HSL values:
 
 ```typescript
-// Generate CSS custom properties from theme
-const themeStyles = useMemo(() => {
-  const theme = creator.profile_theme || { preset: 'default' };
-  return getThemeStyles(theme);
-}, [creator.profile_theme]);
-
-// Apply as inline style to root container
-<div style={themeStyles}>
-```
-
----
-
-### Phase 5: Live Preview in Settings
-
-**Add preview panel to Style section:**
-
-A miniature representation of the public booking page that updates in real-time as the user selects presets or adjusts custom colors. This creates the "investment" moment where creators spend time perfecting their look.
-
----
-
-## Files to Create/Modify
-
-| File | Action | Purpose |
-|------|--------|---------|
-| Database migration | Create | Add `profile_theme` column |
-| `src/lib/theme-presets.ts` | Create | Preset definitions and theme utilities |
-| `src/components/settings/ProfileStyleSection.tsx` | Create | Style customization UI |
-| `src/pages/Settings.tsx` | Modify | Add Style section |
-| `src/pages/PublicBooking.tsx` | Modify | Apply theme to page |
-| `src/hooks/useAuth.tsx` | Modify | Include `profile_theme` in Creator type |
-
----
-
-## Implementation Order
-
-1. **Database migration** - Add `profile_theme` column and update view
-2. **Create theme presets** - Define the 6 professional gradients
-3. **Build Style section component** - Preset grid + custom picker
-4. **Integrate into Settings** - Add new section with Pro gating
-5. **Apply theme on PublicBooking** - Dynamic background rendering
-6. **Add live preview** - Real-time feedback in Settings
-
----
-
-## Pro Feature Gating Logic
-
-```typescript
-// In ProfileStyleSection.tsx
-const { isPro } = usePro();
-
-// Free users: Only "default" preset clickable
-// Pro users: All presets + custom picker available
-
-const handlePresetClick = (presetId: string) => {
-  if (!isPro && presetId !== 'default') {
-    // Show upgrade prompt
-    setShowUpgrade(true);
-    return;
-  }
-  setSelectedPreset(presetId);
+export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
+  default: {
+    id: 'default',
+    name: 'DraftKit Coral',
+    description: 'Our signature warm coral gradient',
+    colors: {
+      primary: '8 65% 65%',      // Matches --primary exactly
+      secondary: '12 55% 70%',   // Softer coral
+      accent: '8 65% 65%',
+      glow: '8 65% 65%',
+    },
+    angle: 135,
+    isPro: false,
+  },
+  ocean: {
+    id: 'ocean',
+    name: 'Ocean Breeze',
+    description: 'Calm, professional soft blue',
+    colors: {
+      primary: '210 40% 70%',    // Soft sky blue
+      secondary: '195 35% 75%', // Soft aqua
+      accent: '210 40% 70%',
+      glow: '195 40% 75%',
+    },
+    angle: 135,
+    isPro: true,
+  },
+  sunset: {
+    id: 'sunset',
+    name: 'Sunset Glow',
+    description: 'Warm, inviting peach tones',
+    colors: {
+      primary: '25 50% 72%',    // Soft peach
+      secondary: '340 40% 75%', // Soft rose
+      accent: '25 50% 72%',
+      glow: '25 50% 72%',
+    },
+    angle: 135,
+    isPro: true,
+  },
+  forest: {
+    id: 'forest',
+    name: 'Forest Mist',
+    description: 'Natural, balanced sage',
+    colors: {
+      primary: '150 35% 65%',   // Soft sage
+      secondary: '140 30% 72%', // Soft mint
+      accent: '150 35% 65%',
+      glow: '150 35% 70%',
+    },
+    angle: 135,
+    isPro: true,
+  },
+  midnight: {
+    id: 'midnight',
+    name: 'Lavender Dream',
+    description: 'Soft, elegant purple',
+    colors: {
+      primary: '260 35% 68%',   // Soft lavender
+      secondary: '280 30% 75%', // Soft lilac
+      accent: '260 35% 68%',
+      glow: '260 35% 72%',
+    },
+    angle: 135,
+    isPro: true,
+  },
+  monochrome: {
+    id: 'monochrome',
+    name: 'Silver Slate',
+    description: 'Minimal, elegant neutral',
+    colors: {
+      primary: '220 15% 75%',   // Soft silver
+      secondary: '220 12% 80%', // Light gray
+      accent: '220 15% 75%',
+      glow: '220 15% 78%',
+    },
+    angle: 135,
+    isPro: true,
+  },
 };
 ```
 
 ---
 
-## Analytics Events
+## Visual Result
 
-Track user engagement with the feature:
-
-- `profile_theme_changed` - When a user selects a new preset or custom theme
-- `profile_theme_upgrade_prompt_shown` - When free user clicks locked preset
-- `profile_theme_upgrade_clicked` - When user clicks "Go Pro" from theme section
+The new pastel palette will:
+- **Blend smoothly** with the cream background (`39 33% 97%`)
+- **Reduce visual strain** by avoiding high saturation colors
+- **Allow UI elements** (cards, buttons, badges) to remain readable
+- **Feel premium** through subtle, sophisticated color choices
 
 ---
 
-## Why This Fits the DraftKit Brand
+## Files to Modify
 
-1. **Zero API Cost** - Just a hex code in the database, no LLM calls
-2. **Visual Social Proof** - Custom themes on shared links signal "Pro" status
-3. **Retention Hook** - Time invested in customization = lower churn
-4. **The "Lovable" Factor** - Doesn't block shipping posts, just makes the experience premium
+| File | Change |
+|------|--------|
+| `src/lib/theme-presets.ts` | Update all 6 preset color values to pastel tones |
 
+---
+
+## Why This Works
+
+1. **Brand Consistency**: Default now uses the exact DraftKit `--primary` color
+2. **Interface Harmony**: Pastel tones don't compete with UI elements
+3. **Professional Aesthetic**: Soft gradients feel more sophisticated than saturated ones
+4. **Creator-Friendly**: The subtle palette lets profile photos and content stand out
