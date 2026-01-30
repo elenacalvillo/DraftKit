@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { Shield, BarChart3, Brain, ArrowRight, ArrowLeft } from "lucide-react";
+import { Shield, BarChart3, Brain, ArrowRight, ArrowLeft, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Navbar } from "@/components/layout/Navbar";
 
@@ -84,9 +84,18 @@ export default function Transparency() {
             The DraftKit{" "}
             <span className="gradient-text">Privacy Promise</span>
           </h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-4">
             We believe transparency is the foundation of trust. Here's exactly how we handle your data.
           </p>
+          <div className="mt-4">
+            <Link
+              to="/privacy"
+              className="inline-flex items-center gap-2 text-primary hover:underline text-sm"
+            >
+              <FileText className="w-4 h-4" />
+              Read our formal Privacy Policy
+            </Link>
+          </div>
         </motion.div>
 
         {/* Sections */}

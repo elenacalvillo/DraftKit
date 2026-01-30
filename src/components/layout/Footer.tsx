@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Sparkles, Heart, Shield, BookOpen } from "lucide-react";
+import { Sparkles, Heart, Shield, BookOpen, FileText } from "lucide-react";
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
@@ -23,6 +23,13 @@ export function Footer() {
 
           {/* Links */}
           <div className="flex items-center gap-6 text-sm">
+            <Link
+              to="/privacy"
+              className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              Privacy Policy
+            </Link>
             <Link
               to="/transparency"
               className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
