@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Copy, RefreshCw, Sparkles, User, Users, Clock, CheckCircle, ChevronDown, FileText, FileIcon } from "lucide-react";
+import { Copy, RefreshCw, Sparkles, User, Users, Clock, CheckCircle, ChevronDown, FileText, FileIcon, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { CollabDraft } from "@/lib/storage";
 import { useAnalytics } from "@/hooks/useAnalytics";
+import { useGoogleDocs } from "@/hooks/useGoogleDocs";
 import { exportToDocx, exportToGoogleDocs } from "@/lib/export-draft";
 
 interface CollabDraftModalProps {
@@ -39,7 +40,9 @@ export function CollabDraftModal({
   onRegenerate,
 }: CollabDraftModalProps) {
   const [copied, setCopied] = useState(false);
+  const [isExportingToGoogleDocs, setIsExportingToGoogleDocs] = useState(false);
   const { trackEvent } = useAnalytics();
+  const { createGoogleDoc, isLoading: isGoogleDocsLoading, error: googleDocsError, isGisLoaded } = useGoogleDocs();
 
   const copyToClipboard = () => {
     if (!draft) return;
@@ -245,13 +248,35 @@ Estimated Read Time: ${draft.estimatedReadTime}`;
                     </DropdownMenuItem>
                     <DropdownMenuItem 
                       onClick={async () => {
+                        if (!draft) return;
+                        setIsExportingToGoogleDocs(true);
+                        
+                        // Try OAuth flow first if GIS is loaded
+                        if (isGisLoaded) {
+                          const docUrl = await createGoogleDoc(draft, requesterName);
+                          if (docUrl) {
+                            window.open(docUrl, "_blank");
+                            toast.success("Google Doc created with your draft!");
+                            trackEvent("draft_exported_google_docs_oauth", { draft_title: draft.title });
+                            setIsExportingToGoogleDocs(false);
+                            return;
+                          }
+                        }
+                        
+                        // Fallback to copy-paste method
                         await exportToGoogleDocs(draft, requesterName);
                         toast.success("Content copied! Paste into Google Docs with Cmd/Ctrl+V");
-                        trackEvent("draft_exported_google_docs", { draft_title: draft.title });
+                        trackEvent("draft_exported_google_docs_fallback", { draft_title: draft.title });
+                        setIsExportingToGoogleDocs(false);
                       }}
                       className="cursor-pointer"
+                      disabled={isExportingToGoogleDocs || isGoogleDocsLoading}
                     >
-                      <FileIcon className="w-4 h-4 mr-2" />
+                      {(isExportingToGoogleDocs || isGoogleDocsLoading) ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <FileIcon className="w-4 h-4 mr-2" />
+                      )}
                       Open in Google Docs
                     </DropdownMenuItem>
                   </DropdownMenuContent>

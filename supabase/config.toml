@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.send-feedback-notification]
 verify_jwt = false
+
+[functions.create-google-doc]
+verify_jwt = false

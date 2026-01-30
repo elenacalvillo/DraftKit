@@ -13,6 +13,8 @@ export type AnalyticsEventType =
   | "draft_copied"
   | "draft_exported_docx"
   | "draft_exported_google_docs"
+  | "draft_exported_google_docs_oauth"
+  | "draft_exported_google_docs_fallback"
   | "user_signup"
   | "collab_approved"
   | "collab_declined"
