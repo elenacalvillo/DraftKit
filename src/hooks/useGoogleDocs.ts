@@ -38,8 +38,8 @@ interface TokenClient {
   requestAccessToken: (overrideConfig?: { prompt?: string }) => void;
 }
 
-// The Google Client ID from environment (set via secrets)
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID;
+// The Google Client ID (public/publishable key - safe to include in frontend)
+const GOOGLE_CLIENT_ID = "861292583943-nlc181v5rufgrgf86b6vh92jjkdkc1fa.apps.googleusercontent.com";
 
 // Required scope for creating Google Docs
 const DOCS_SCOPE = "https://www.googleapis.com/auth/documents";
