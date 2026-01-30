@@ -48,8 +48,8 @@ export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
     name: "Ocean Breeze",
     description: "Whisper of sky blue",
     colors: {
-      primary: "200 20% 92%", // Near-white sky
-      secondary: "190 15% 93%", // Softer aqua
+      primary: "200 20% 93%", // Near-white sky
+      secondary: "190 15% 94%", // Softer aqua
       accent: "200 20% 95%",
       glow: "200 20% 93%",
     },
@@ -61,8 +61,8 @@ export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
     name: "Sunset Glow",
     description: "Whisper of peach warmth",
     colors: {
-      primary: "20 22% 95%", // Near-white peach
-      secondary: "35 18% 96%", // Softer cream
+      primary: "20 22% 93%", // Near-white peach
+      secondary: "35 18% 94%", // Softer cream
       accent: "20 22% 95%",
       glow: "20 22% 93%",
     },
