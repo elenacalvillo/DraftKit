@@ -1,70 +1,137 @@
 
 
-# Add Two-Way Messaging for Collaborators
+# Export to Docs - Quick Win Feature
 
-Enable guests (requesters) to send messages to creators directly through the app, creating a complete two-way messaging experience without relying solely on email replies.
-
-## Current State
-
-- **Creator → Guest**: Creators can message guests via `SendMessageModal` on the Requests page. Messages are saved to `collaboration_messages` table and trigger an email notification to the guest.
-- **Guest → Creator**: Currently, guests can only reply via email (using "Reply to [Creator]" button in notification emails). There's no in-app messaging UI for guests.
-- **Database**: The `collaboration_messages` table exists with RLS policies already supporting requester inserts for their own requests.
+Enable creators to export their collaboration drafts directly to Google Docs or as a downloadable Word document, fitting seamlessly into Substackers' "final polish" workflow.
 
 ## What Will Be Built
 
-A new "Message" button on the **Sent Requests** page (`MyRequests.tsx`) that opens a modal for guests to send messages to creators. When sent:
-1. Message is saved to the `collaboration_messages` table
-2. Email notification is sent to the creator
-3. Confirmation toast appears for the guest
+An "Export to Docs" button in the SMART Draft Workspace modal that offers two export options:
 
-## Implementation Approach
+1. **Download as Word (.docx)** - Instant download for offline editing
+2. **Open in Google Docs** - One-click export to Google Docs (no API key required)
 
-### 1. Create Guest Message Modal Component
-A new `GuestMessageModal.tsx` component (similar to `SendMessageModal`) that:
-- Accepts request details (request ID, creator name)
-- Provides a textarea for composing messages
-- Saves to `collaboration_messages` with `sender_type: "requester"`
-- Triggers email notification to the creator
+## Why This Approach
 
-### 2. Add New Email Type for Guest Messages
-Update the `send-collab-email` edge function to handle a new `new_message_from_guest` type that:
-- Sends to the creator's email (from `creator_contacts` table)
-- Includes the message content and guest details
-- Has a "Reply" button linking to their dashboard requests page
+| Approach | Pros | Cons |
+|----------|------|------|
+| **Google Docs via URL (chosen)** | No OAuth setup, instant, works everywhere | Opens as new doc (no folder selection) |
+| Google Drive API | Full control, choose folder | Requires OAuth, complex setup |
+| **docx.js library (chosen)** | Client-side, no backend needed, real .docx | Adds ~80KB to bundle |
+| Plain text download | Zero dependencies | No formatting preserved |
 
-### 3. Update Sent Requests Page
-Add a "Message" button to each approved request card on the `MyRequests.tsx` page, which opens the new modal.
+The chosen approach balances simplicity with professional output - no API keys, no OAuth dance, just click and go.
 
-### 4. Update Authorization Rules
-Add `new_message_from_guest: "requester"` to the edge function's role mapping so guests are authorized to trigger this email type.
+## User Flow
 
-## Technical Details
+```text
+User clicks "Generate Draft" or "View Draft"
+             |
+             v
+    +-------------------+
+    |  Draft Modal      |
+    |  opens with       |
+    |  draft content    |
+    +-------------------+
+             |
+             v
+    User clicks dropdown arrow next to "Copy Draft"
+             |
+             v
+    +-------------------+
+    | Export Options    |
+    | - Copy Draft      |
+    | - Download .docx  |
+    | - Open in Docs    |
+    +-------------------+
+             |
+    +--------+---------+
+    |                  |
+    v                  v
+Download .docx    Opens Google Docs
+   file          with draft content
+```
 
-### New Files
-- `src/components/requests/GuestMessageModal.tsx` - Modal for guests to compose and send messages
+## Implementation Details
 
-### Modified Files
-- `src/pages/MyRequests.tsx` - Add Message button to approved request cards
-- `supabase/functions/send-collab-email/index.ts` - Add `new_message_from_guest` email type and template
+### 1. Add docx Library
+Install `docx` package for generating Word documents client-side. This is a mature, well-maintained library specifically designed for creating .docx files in JavaScript.
 
-### Database
-No schema changes needed - the existing `collaboration_messages` table and RLS policies already support this:
-- Requesters can insert messages for their own requests (policy exists)
-- Requesters can view messages for their own requests (policy exists)
+### 2. Create Export Utility
+New file: `src/lib/export-draft.ts`
 
-### Edge Function Changes
-1. Add new email type `new_message_from_guest` to the `EmailRequest` type
-2. Add role mapping: `new_message_from_guest: "requester"`
-3. Add email template that notifies the creator with:
-   - Message content from the guest
-   - Link to view the request in their dashboard
-   - "Reply" button to respond via email
+Provides two export functions:
+- `exportToDocx(draft, requesterName)` - Generates and downloads a formatted .docx file
+- `exportToGoogleDocs(draft, requesterName)` - Opens Google Docs with pre-filled content
 
-### UI Flow
-1. Guest visits `/dashboard/my-requests`
-2. On approved requests, a "Message [Creator Name]" button appears
-3. Clicking opens `GuestMessageModal`
-4. Guest types message and clicks "Send"
-5. Message saves to database, email sent to creator
-6. Toast confirms: "Message sent to [Creator Name]!"
+The Word document will include:
+- Title as Heading 1
+- Metadata (format, estimated read time)
+- Opening hook in a styled block
+- Numbered outline sections with contributor badges
+- Talking points as bullet list
+- Tone notes section
+
+### 3. Update CollabDraftModal
+Modify: `src/components/requests/CollabDraftModal.tsx`
+
+Replace the single "Copy Draft" button with a split button dropdown:
+- Primary action: Copy Draft (existing behavior)
+- Dropdown menu:
+  - Download as Word Document (.docx)
+  - Open in Google Docs
+
+### 4. Analytics Tracking
+Track export events to understand usage:
+- `draft_exported_docx` - When user downloads Word file
+- `draft_exported_google_docs` - When user opens in Google Docs
+
+## Technical Notes
+
+### Google Docs Export (No API Required)
+Uses the URL scheme: `https://docs.google.com/document/create?body={encoded_content}`
+
+This opens a new Google Doc with the content pre-filled. The user must be logged into Google, but no OAuth or API keys are needed.
+
+**Limitation**: Content is plain text (no formatting preserved). For formatted exports, users should use the Word download option.
+
+### Word Document Generation
+Uses the `docx` npm package to generate proper Office Open XML documents:
+
+```typescript
+import { Document, Packer, Paragraph, TextRun, HeadingLevel } from "docx";
+
+const doc = new Document({
+  sections: [{
+    children: [
+      new Paragraph({
+        heading: HeadingLevel.HEADING_1,
+        children: [new TextRun({ text: draft.title, bold: true })]
+      }),
+      // ... more content
+    ]
+  }]
+});
+
+const blob = await Packer.toBlob(doc);
+saveAs(blob, `${draft.title}.docx`);
+```
+
+### File Naming
+Documents are named using the draft title, sanitized for filesystem compatibility:
+- `"Creator × Guest: Topic Ideas"` becomes `"Creator × Guest - Topic Ideas.docx"`
+
+### Files Changed
+
+**New Files:**
+- `src/lib/export-draft.ts` - Export utility functions
+
+**Modified Files:**
+- `src/components/requests/CollabDraftModal.tsx` - Add export dropdown
+- `package.json` - Add `docx` and `file-saver` dependencies
+
+### Bundle Impact
+- `docx`: ~80KB gzipped (tree-shakeable)
+- `file-saver`: ~3KB gzipped
+- Total impact: ~83KB (acceptable for the value provided)
 
