@@ -1,56 +1,75 @@
 
-# Fix Google Docs OAuth - Client ID Not Available to Frontend
+# Fix Google OAuth Popup Blocked in Preview (ERR_BLOCKED_BY_RESPONSE)
 
-## Problem Identified
+## Problem
 
-The `VITE_GOOGLE_OAUTH_CLIENT_ID` is stored as a backend secret, but Vite environment variables must be in the `.env` file to be available during the frontend build. Currently:
-
-1. The hook reads `import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID`
-2. This returns `undefined` (not in `.env`)
-3. The OAuth flow is skipped with "Google OAuth is not configured"
-4. Falls back to copy-paste method
-5. Blank document opens
-
-## Why This Is Safe
-
-Google OAuth Client IDs are **public/publishable keys**. They are:
-- Designed to be visible in browser code
-- Protected by authorized JavaScript origins in Google Cloud Console
-- Already visible to any user who inspects your page source
-
-This is different from the Client Secret, which must stay on the backend.
+Google's OAuth consent page refuses to load inside iframes for security reasons. The Lovable preview environment loads your app in an iframe, causing the `ERR_BLOCKED_BY_RESPONSE` error when the Google Identity Services SDK tries to open its consent popup.
 
 ## Solution
 
-Add the Google OAuth Client ID to the `.env` file so Vite can inject it during the build.
+Modify the OAuth flow to detect when running inside an iframe and handle it appropriately:
 
-## Implementation
+1. **Detect iframe environment** - Check if the app is running inside an iframe
+2. **Use `window.open()` with proper targeting** - Force the OAuth flow to open in a new top-level window/tab instead of within the current context
+3. **Implement message passing** - After authorization completes in the new window, pass the token back to the parent window to continue the document creation flow
 
-### File: `.env`
+## Technical Implementation
 
-Add the `VITE_GOOGLE_OAUTH_CLIENT_ID` line with your actual Client ID from Google Cloud Console:
+### File: `src/hooks/useGoogleDocs.ts`
 
+**Changes:**
+1. Add iframe detection helper
+2. Create a dedicated popup window for OAuth when in iframe context
+3. Handle the OAuth callback via `postMessage` communication between windows
+4. Keep the existing flow for non-iframe environments (production)
+
+**Key code changes:**
+
+```typescript
+// Detect if running inside an iframe
+const isInIframe = (): boolean => {
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true; // Cross-origin iframes throw errors
+  }
+};
+
+// When requesting the token, explicitly open in a new window
+if (isInIframe()) {
+  // Use a popup approach that works around iframe restrictions
+  const popup = window.open(
+    'about:blank',
+    'google-oauth-popup',
+    'width=500,height=600,scrollbars=yes'
+  );
+  // The GIS SDK will redirect to this popup
+}
 ```
-VITE_SUPABASE_PROJECT_ID="cbgchxesngdsvkevbqwh"
-VITE_SUPABASE_PUBLISHABLE_KEY="..."
-VITE_SUPABASE_URL="https://cbgchxesngdsvkevbqwh.supabase.co"
-VITE_GOOGLE_OAUTH_CLIENT_ID="your-client-id-here.apps.googleusercontent.com"
-```
 
-### Required Information
+**Alternative approach - Full page redirect:**
+If popups are blocked by the browser, implement a redirect-based flow:
+1. Store draft data in localStorage before redirect
+2. Redirect to Google OAuth
+3. On return, retrieve draft from localStorage and complete document creation
 
-You will need to provide your Google OAuth Client ID. You can find this in:
-1. Google Cloud Console
-2. APIs & Services
-3. Credentials
-4. Your OAuth 2.0 Client ID
+### File: `src/components/requests/CollabDraftModal.tsx`
 
-The format is: `XXXXXXXXXXXX-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX.apps.googleusercontent.com`
+**Changes:**
+- Add user feedback when OAuth is blocked
+- Show clear messaging about opening in a new tab/window
+- Add a "Try in new tab" fallback button if popup fails
 
-## Verification Checklist
+## Verification Steps
 
-After adding the Client ID:
-1. The preview will rebuild with the new env variable
-2. Click "Open in Google Docs" on a draft
-3. A Google OAuth popup should appear asking for permission
-4. After granting access, the doc should open WITH content pre-filled
+1. Open the preview in Lovable
+2. Navigate to a collab request with a generated draft
+3. Click "Open in Google Docs" from the dropdown
+4. A new browser tab/window should open with Google's consent screen
+5. After granting permission, the Google Doc should be created with content
+
+## Fallback Behavior
+
+If the popup/redirect approach still fails (e.g., aggressive popup blockers):
+- The existing fallback (copy to clipboard + open blank doc) remains available
+- User sees a helpful toast message explaining what happened
