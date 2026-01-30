@@ -1,53 +1,70 @@
 
 
-# Add Feedback Email Notifications
+# Add Two-Way Messaging for Collaborators
 
-When someone submits feedback through the widget, you'll receive an instant email notification so you never miss user input.
+Enable guests (requesters) to send messages to creators directly through the app, creating a complete two-way messaging experience without relying solely on email replies.
+
+## Current State
+
+- **Creator → Guest**: Creators can message guests via `SendMessageModal` on the Requests page. Messages are saved to `collaboration_messages` table and trigger an email notification to the guest.
+- **Guest → Creator**: Currently, guests can only reply via email (using "Reply to [Creator]" button in notification emails). There's no in-app messaging UI for guests.
+- **Database**: The `collaboration_messages` table exists with RLS policies already supporting requester inserts for their own requests.
 
 ## What Will Be Built
 
-A new backend function that sends you an email whenever feedback is submitted, including:
-- The feedback type (bug, feature request, praise, etc.)
-- Star rating (if provided)
-- The full message content
-- The page URL where they submitted
-- The user's email (if provided) so you can reply
+A new "Message" button on the **Sent Requests** page (`MyRequests.tsx`) that opens a modal for guests to send messages to creators. When sent:
+1. Message is saved to the `collaboration_messages` table
+2. Email notification is sent to the creator
+3. Confirmation toast appears for the guest
 
 ## Implementation Approach
 
-### 1. Create New Backend Function
-A new `send-feedback-notification` function will be created that:
-- Receives feedback details (type, message, rating, email, page URL)
-- Formats a clean HTML email with all the details
-- Sends to your admin email using the existing Resend configuration
+### 1. Create Guest Message Modal Component
+A new `GuestMessageModal.tsx` component (similar to `SendMessageModal`) that:
+- Accepts request details (request ID, creator name)
+- Provides a textarea for composing messages
+- Saves to `collaboration_messages` with `sender_type: "requester"`
+- Triggers email notification to the creator
 
-### 2. Update Feedback Widget
-After successfully saving feedback to the database, the widget will call the new function to trigger the email notification. This happens in the background so users don't experience any delay.
+### 2. Add New Email Type for Guest Messages
+Update the `send-collab-email` edge function to handle a new `new_message_from_guest` type that:
+- Sends to the creator's email (from `creator_contacts` table)
+- Includes the message content and guest details
+- Has a "Reply" button linking to their dashboard requests page
 
-### 3. Email Format
-The notification email will include:
-- Color-coded header based on feedback type (red for bugs, purple for features, etc.)
-- Star rating visualization
-- Full message content
-- Quick "Reply" button if the user provided their email
-- Page URL for context
+### 3. Update Sent Requests Page
+Add a "Message" button to each approved request card on the `MyRequests.tsx` page, which opens the new modal.
+
+### 4. Update Authorization Rules
+Add `new_message_from_guest: "requester"` to the edge function's role mapping so guests are authorized to trigger this email type.
 
 ## Technical Details
 
-**New File:**
-- `supabase/functions/send-feedback-notification/index.ts`
+### New Files
+- `src/components/requests/GuestMessageModal.tsx` - Modal for guests to compose and send messages
 
-**Modified File:**
-- `src/components/feedback/FeedbackWidget.tsx` - Add edge function call after database insert
+### Modified Files
+- `src/pages/MyRequests.tsx` - Add Message button to approved request cards
+- `supabase/functions/send-collab-email/index.ts` - Add `new_message_from_guest` email type and template
 
-**Configuration:**
-- `supabase/config.toml` - Register new function with `verify_jwt = false` (allows anonymous feedback)
+### Database
+No schema changes needed - the existing `collaboration_messages` table and RLS policies already support this:
+- Requesters can insert messages for their own requests (policy exists)
+- Requesters can view messages for their own requests (policy exists)
 
-**Email Destination:**
-The notification will be sent to `hello@draftkit.app` (matching your existing reply-to address). This can be customized if you prefer a different address.
+### Edge Function Changes
+1. Add new email type `new_message_from_guest` to the `EmailRequest` type
+2. Add role mapping: `new_message_from_guest: "requester"`
+3. Add email template that notifies the creator with:
+   - Message content from the guest
+   - Link to view the request in their dashboard
+   - "Reply" button to respond via email
 
-**Security:**
-- No authentication required (feedback can be anonymous)
-- Email is sent via Resend using your already-configured API key
-- Uses the existing `notifications@draftkit.app` sender address
+### UI Flow
+1. Guest visits `/dashboard/my-requests`
+2. On approved requests, a "Message [Creator Name]" button appears
+3. Clicking opens `GuestMessageModal`
+4. Guest types message and clicks "Send"
+5. Message saves to database, email sent to creator
+6. Toast confirms: "Message sent to [Creator Name]!"
 
