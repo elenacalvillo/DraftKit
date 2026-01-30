@@ -244,9 +244,9 @@ Estimated Read Time: ${draft.estimatedReadTime}`;
                       Download as Word (.docx)
                     </DropdownMenuItem>
                     <DropdownMenuItem 
-                      onClick={() => {
-                        exportToGoogleDocs(draft, requesterName);
-                        toast.success("Opening Google Docs...");
+                      onClick={async () => {
+                        await exportToGoogleDocs(draft, requesterName);
+                        toast.success("Content copied! Paste into Google Docs with Cmd/Ctrl+V");
                         trackEvent("draft_exported_google_docs", { draft_title: draft.title });
                       }}
                       className="cursor-pointer"
