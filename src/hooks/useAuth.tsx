@@ -18,6 +18,7 @@ interface Creator {
   date_meaning: string | null;
   collab_mode: string | null;
   reminder_days_before: number | null;
+  profile_theme: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }

@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ProfileStyleSection } from "@/components/settings/ProfileStyleSection";
 
 const COLLAB_STYLE_OPTIONS: { value: CollabStyle; label: string; description: string }[] = [
   { value: "Virtual Coffee", label: "Virtual Coffee", description: "30-60 min video call" },
@@ -472,6 +473,9 @@ export default function Settings() {
             </Button>
           </div>
         </motion.div>
+
+        {/* Profile Style */}
+        <ProfileStyleSection />
 
         {/* Collaboration Playbook */}
         <motion.div
