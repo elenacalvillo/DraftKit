@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Check, Palette, Lock, Crown } from "lucide-react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -153,15 +154,16 @@ export function ProfileStyleSection() {
           {/* Mini profile mockup */}
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="flex flex-col items-center">
-              <div 
-                className="w-12 h-12 rounded-full bg-background/90 flex items-center justify-center shadow-lg"
+              <Avatar 
+                className="w-12 h-12 ring-2 ring-white/50 shadow-lg"
                 style={{ boxShadow: `0 0 20px hsla(${THEME_PRESETS[selectedPreset]?.colors.glow || '12 76% 61%'} / 0.4)` }}
               >
-                <span className="text-lg font-bold text-foreground">
+                <AvatarImage src={(creator as any)?.profile_image_url || undefined} />
+                <AvatarFallback className="bg-background/90 text-foreground font-bold text-lg">
                   {creator?.name?.charAt(0) || 'A'}
-                </span>
-              </div>
-              <div className="mt-2 text-sm font-medium text-white drop-shadow-md">
+                </AvatarFallback>
+              </Avatar>
+              <div className="mt-2 text-sm font-medium text-foreground">
                 {creator?.name || 'Your Name'}
               </div>
             </div>
