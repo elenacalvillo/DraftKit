@@ -1,21 +1,20 @@
 
-# Two-Tier Monetization Strategy Implementation
 
-## Executive Summary
+# Brand Customization Feature Implementation
 
-This plan implements a Free/Pro tiered system for DraftKit, gating high-value features for professional creators while keeping the platform accessible to all. The price point of $12/month aligns with premium Substack subscriptions, positioning DraftKit as a professional tool.
+## Overview
+
+This feature adds custom profile themes as a Pro-tier benefit, allowing creators to personalize the background gradient on their public booking page (`/@username`). This creates a stronger sense of brand identity and increases platform stickiness through customization investment.
 
 ---
 
-## Tier Breakdown
+## Feature Breakdown
 
-| Feature | Free Tier | Pro Tier ($12/mo) |
-|---------|-----------|-------------------|
-| Active Collaborations | 1 at a time | Unlimited |
-| SMART Matching | Basic (3 matches) | Deep archive analysis |
-| Exporting | Copy to Clipboard only | Google Docs + Word |
-| Calendar Mode | Fixed to "Target Publication Date" | Async vs. Discovery toggle |
-| Directory Privacy | Public | Option to hide profile |
+| Feature | Free Tier | Pro Tier |
+|---------|-----------|----------|
+| Profile Theme | DraftKit Signature (Coral/Cream) | Custom Gradients & Brand Colors |
+| Presets | DraftKit Default only | 6+ curated professional presets |
+| Custom Colors | Not available | Full hex code picker |
 
 ---
 
@@ -23,307 +22,108 @@ This plan implements a Free/Pro tiered system for DraftKit, gating high-value fe
 
 ### Phase 1: Database Schema Updates
 
-**Modify `creators` table** to add subscription tracking:
+**Add theme column to `creators` table:**
 
 ```sql
-ALTER TABLE creators ADD COLUMN subscription_tier TEXT DEFAULT 'free';
-ALTER TABLE creators ADD COLUMN trial_ends_at TIMESTAMPTZ;
-ALTER TABLE creators ADD COLUMN stripe_customer_id TEXT;
-ALTER TABLE creators ADD COLUMN stripe_subscription_id TEXT;
+ALTER TABLE creators ADD COLUMN profile_theme JSONB DEFAULT '{"preset": "default"}'::jsonb;
 ```
 
-The existing `user_roles` table with `app_role: "pro"` enum will continue to work for manual pro assignments (early adopters, lifetime deals). The new `subscription_tier` column handles Stripe-managed subscriptions.
+The JSONB structure supports:
+- Preset themes: `{"preset": "coral"}`
+- Custom colors: `{"type": "linear", "colors": ["#FF6B6B", "#4ECDC4"], "angle": 135}`
+- Future mesh gradients: `{"type": "mesh", "colors": [...], "positions": [...]}`
 
-**New helper function** to check pro access (combines both methods):
+**Update `public_creator_profiles` view** to expose the theme:
 
 ```sql
-CREATE OR REPLACE FUNCTION public.is_pro_user(_user_id UUID)
-RETURNS BOOLEAN
-LANGUAGE sql STABLE SECURITY DEFINER
-SET search_path = 'public'
-AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM user_roles 
-    WHERE user_id = _user_id AND role = 'pro'
-  )
-  OR EXISTS (
-    SELECT 1 FROM creators 
-    WHERE user_id = _user_id 
-    AND subscription_tier = 'pro'
-    AND (trial_ends_at IS NULL OR trial_ends_at > NOW())
-  )
-$$;
+CREATE OR REPLACE VIEW public_creator_profiles AS
+SELECT 
+  id, username, name, bio, substack_url, newsletter_url,
+  welcome_message, profile_image_url, collab_style, 
+  collab_guidelines, date_meaning, collab_mode, created_at,
+  profile_theme  -- NEW: Expose theme to public booking page
+FROM creators;
 ```
 
 ---
 
-### Phase 2: Frontend Tier Hook
+### Phase 2: Theme Presets
 
-**File: `src/hooks/usePro.ts`** (update existing)
+**New file: `src/lib/theme-presets.ts`**
 
-Enhance to check both `user_roles` and `subscription_tier`:
+Define 6 curated gradient presets with professional aesthetics:
+
+| Preset ID | Name | Colors | Style |
+|-----------|------|--------|-------|
+| `default` | DraftKit Coral | Coral → Terracotta | Brand default |
+| `ocean` | Ocean Depths | Deep Blue → Teal | Cool professional |
+| `sunset` | Sunset Warmth | Orange → Pink | Warm creative |
+| `forest` | Forest Calm | Emerald → Sage | Natural balanced |
+| `midnight` | Midnight Pro | Purple → Indigo | Dark sophisticated |
+| `monochrome` | Clean Slate | Gray → Slate | Minimal neutral |
+
+Each preset includes:
+- `backgroundGradient`: CSS for the page background
+- `accentGradient`: CSS for interactive elements
+- `glowColor`: HSL for the profile image ring
+
+---
+
+### Phase 3: Settings UI - Style Tab
+
+**New component: `src/components/settings/ProfileStyleSection.tsx`**
+
+A new glass-card section in Settings with:
+
+1. **Preset Grid** (2x3 for 6 presets)
+   - Visual swatch preview showing the gradient
+   - Radio-style selection with checkmark
+   - Current theme highlighted
+
+2. **Custom Color Picker** (Pro only)
+   - Two color inputs (start/end)
+   - Angle slider (45°/90°/135°/180°)
+   - Live preview swatch
+
+3. **Pro Gate**
+   - Free users see presets locked with a Pro badge overlay
+   - Clicking locked preset shows `UpgradePrompt` with feature copy
+   - Only "DraftKit Default" is available on free tier
+
+**Settings page modification:**
+
+Add the Style section between "Profile" and "Collaboration Playbook" sections.
+
+---
+
+### Phase 4: Public Booking Page Theme Application
+
+**Modify: `src/pages/PublicBooking.tsx`**
+
+Apply the creator's theme to:
+
+1. **Page Background** - Replace fixed `gradient-bg` class with dynamic CSS variable
+2. **Floating Orbs** - Use theme accent colors for animated background blobs
+3. **Profile Ring** - Apply theme's glow color to the profile image ring
 
 ```typescript
-export function usePro() {
-  const { user, creator } = useAuth();
-  
-  const { data, isLoading } = useQuery({
-    queryKey: ["isPro", user?.id, creator?.id],
-    queryFn: async () => {
-      if (!user?.id) return { isPro: false, tier: 'free', trialEndsAt: null };
-      
-      // Check user_roles for manual pro (early adopters)
-      const { data: hasRole } = await supabase.rpc("has_role", {
-        _user_id: user.id,
-        _role: "pro",
-      });
-      
-      // Check creator subscription
-      const { data: creatorData } = await supabase
-        .from('creators')
-        .select('subscription_tier, trial_ends_at')
-        .eq('user_id', user.id)
-        .single();
-      
-      const isInTrial = creatorData?.trial_ends_at && 
-        new Date(creatorData.trial_ends_at) > new Date();
-      
-      return {
-        isPro: hasRole || creatorData?.subscription_tier === 'pro' || isInTrial,
-        tier: creatorData?.subscription_tier || 'free',
-        trialEndsAt: creatorData?.trial_ends_at,
-        isInTrial,
-      };
-    },
-    enabled: !!user?.id,
-  });
+// Generate CSS custom properties from theme
+const themeStyles = useMemo(() => {
+  const theme = creator.profile_theme || { preset: 'default' };
+  return getThemeStyles(theme);
+}, [creator.profile_theme]);
 
-  return { 
-    isPro: data?.isPro ?? false, 
-    tier: data?.tier ?? 'free',
-    trialEndsAt: data?.trialEndsAt,
-    isInTrial: data?.isInTrial ?? false,
-    isLoading 
-  };
-}
+// Apply as inline style to root container
+<div style={themeStyles}>
 ```
 
 ---
 
-### Phase 3: Active Collaboration Counting
+### Phase 5: Live Preview in Settings
 
-**New Hook: `src/hooks/useActiveCollabs.ts`**
+**Add preview panel to Style section:**
 
-```typescript
-export function useActiveCollabs() {
-  const { creator } = useAuth();
-  
-  const { data, isLoading } = useQuery({
-    queryKey: ["activeCollabs", creator?.id],
-    queryFn: async () => {
-      if (!creator?.id) return { count: 0, limit: 1, canApprove: true };
-      
-      const { count } = await supabase
-        .from('collab_requests')
-        .select('*', { count: 'exact', head: true })
-        .eq('creator_id', creator.id)
-        .eq('status', 'approved');
-      
-      return { count: count || 0 };
-    },
-    enabled: !!creator?.id,
-  });
-
-  return { activeCount: data?.count ?? 0, isLoading };
-}
-```
-
----
-
-### Phase 4: Feature Gates
-
-#### 4.1 Collaboration Limit Gate
-
-**File: `src/pages/Requests.tsx`**
-
-Modify `handleApprove` to check collaboration limits:
-
-```typescript
-const handleApprove = async (id: string) => {
-  // For free users, check if they already have an active collab
-  if (!isPro && activeCount >= 1) {
-    toast.error("Free tier is limited to 1 active collaboration", {
-      description: "Upgrade to Pro for unlimited collaborations",
-      action: {
-        label: "Go Pro",
-        onClick: () => navigate("/dashboard/settings?upgrade=true"),
-      },
-    });
-    return;
-  }
-  // ... existing approve logic
-};
-```
-
-**File: `src/components/requests/RequestCard.tsx`**
-
-Disable approve button when at limit:
-
-```typescript
-<Button
-  variant="gradient"
-  className="flex-1"
-  onClick={() => onApprove?.(request.id)}
-  disabled={!canApprove}
->
-  {canApprove ? "Approve" : "Limit Reached"}
-</Button>
-```
-
-#### 4.2 Export Feature Gate
-
-**File: `src/components/requests/CollabDraftModal.tsx`**
-
-Show/hide export options based on tier:
-
-```typescript
-const { isPro } = usePro();
-
-// In the dropdown menu:
-{isPro ? (
-  <>
-    <DropdownMenuItem onClick={handleExportToWord}>
-      <FileText className="w-4 h-4 mr-2" />
-      Download as Word (.docx)
-    </DropdownMenuItem>
-    <DropdownMenuItem onClick={handleExportToGoogleDocs}>
-      <FileIcon className="w-4 h-4 mr-2" />
-      Open in Google Docs
-    </DropdownMenuItem>
-  </>
-) : (
-  <DropdownMenuItem 
-    onClick={() => navigate("/dashboard/settings?upgrade=true")}
-    className="text-muted-foreground"
-  >
-    <Crown className="w-4 h-4 mr-2" />
-    Upgrade for Export Options
-  </DropdownMenuItem>
-)}
-```
-
-#### 4.3 Calendar Mode Gate
-
-**File: `src/pages/Settings.tsx`**
-
-Lock collaboration mode selector for free users:
-
-```typescript
-const { isPro } = usePro();
-
-{/* Collaboration Mode Selector */}
-<div className="space-y-3">
-  <div className="flex items-center gap-2">
-    <Label>How do you prefer to collaborate?</Label>
-    {!isPro && (
-      <Badge variant="outline" className="text-xs">
-        <Crown className="w-3 h-3 mr-1" />
-        Pro
-      </Badge>
-    )}
-  </div>
-  {isPro ? (
-    // ... existing mode selector
-  ) : (
-    <div className="p-4 bg-muted/50 rounded-xl border border-dashed">
-      <p className="text-sm text-muted-foreground">
-        Free accounts use "100% Async" mode with Target Publication Dates.
-      </p>
-      <Button variant="link" className="p-0 h-auto mt-2">
-        Upgrade to customize your collaboration style
-      </Button>
-    </div>
-  )}
-</div>
-```
-
----
-
-### Phase 5: Upgrade UI Components
-
-**New Component: `src/components/subscription/UpgradePrompt.tsx`**
-
-A reusable upgrade modal/card:
-
-```typescript
-interface UpgradePromptProps {
-  feature: 'export' | 'collabs' | 'mode';
-  onUpgrade: () => void;
-}
-
-const FEATURE_COPY = {
-  export: {
-    title: "Export to Google Docs & Word",
-    description: "One-click export to your favorite writing tools",
-  },
-  collabs: {
-    title: "Unlimited Collaborations",
-    description: "Work with as many creators as you want, simultaneously",
-  },
-  mode: {
-    title: "Custom Collaboration Playbook",
-    description: "Toggle between Async and Discovery modes",
-  },
-};
-```
-
-**New Page: `src/pages/Pricing.tsx`** (or section in Settings)
-
-Display pricing with feature comparison table.
-
----
-
-### Phase 6: Stripe Integration
-
-**Enable Stripe Connector** to handle:
-- Customer creation on signup
-- Subscription management ($12/month)
-- Webhook handling for subscription status changes
-
-**New Edge Function: `supabase/functions/handle-subscription-webhook/index.ts`**
-
-Updates `creators.subscription_tier` based on Stripe events:
-- `customer.subscription.created` → set tier to 'pro'
-- `customer.subscription.deleted` → set tier to 'free'
-- `customer.subscription.updated` → handle plan changes
-
----
-
-### Phase 7: Founding Member Trial Logic
-
-For launch, auto-enroll new signups in 30-day Pro trial:
-
-**File: `supabase/functions/send-collab-email/index.ts`** (or new trigger)
-
-On creator insert, set `trial_ends_at` to 30 days from now:
-
-```sql
-CREATE OR REPLACE FUNCTION set_founder_trial()
-RETURNS TRIGGER AS $$
-BEGIN
-  -- Only during founding period (adjust date as needed)
-  IF NOW() < '2026-03-01'::TIMESTAMPTZ THEN
-    NEW.subscription_tier := 'pro';
-    NEW.trial_ends_at := NOW() + INTERVAL '30 days';
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER creator_founder_trial
-BEFORE INSERT ON creators
-FOR EACH ROW EXECUTE FUNCTION set_founder_trial();
-```
+A miniature representation of the public booking page that updates in real-time as the user selects presets or adjusts custom colors. This creates the "investment" moment where creators spend time perfecting their look.
 
 ---
 
@@ -331,27 +131,61 @@ FOR EACH ROW EXECUTE FUNCTION set_founder_trial();
 
 | File | Action | Purpose |
 |------|--------|---------|
-| `src/hooks/usePro.ts` | Modify | Enhanced tier checking |
-| `src/hooks/useActiveCollabs.ts` | Create | Track active collaboration count |
-| `src/pages/Requests.tsx` | Modify | Gate approve action |
-| `src/components/requests/RequestCard.tsx` | Modify | Disable approve button when at limit |
-| `src/components/requests/CollabDraftModal.tsx` | Modify | Gate export options |
-| `src/pages/Settings.tsx` | Modify | Gate collaboration mode toggle |
-| `src/components/subscription/UpgradePrompt.tsx` | Create | Reusable upgrade CTA |
-| `src/components/subscription/ProBadge.tsx` | Create | Visual indicator for Pro features |
-| Database migration | Create | Add subscription columns to creators |
-| Stripe edge functions | Create | Handle subscription webhooks |
+| Database migration | Create | Add `profile_theme` column |
+| `src/lib/theme-presets.ts` | Create | Preset definitions and theme utilities |
+| `src/components/settings/ProfileStyleSection.tsx` | Create | Style customization UI |
+| `src/pages/Settings.tsx` | Modify | Add Style section |
+| `src/pages/PublicBooking.tsx` | Modify | Apply theme to page |
+| `src/hooks/useAuth.tsx` | Modify | Include `profile_theme` in Creator type |
 
 ---
 
 ## Implementation Order
 
-1. **Database migration** - Add subscription columns and helper function
-2. **Update `usePro` hook** - Support both role-based and subscription-based Pro
-3. **Create `useActiveCollabs` hook** - Count active collaborations
-4. **Gate collaboration approvals** - Free tier limit enforcement
-5. **Gate export features** - Hide advanced export for free tier
-6. **Gate settings** - Lock collaboration mode for free tier
-7. **Build upgrade UI** - Prompts and pricing display
-8. **Stripe integration** - Payment processing and webhooks
-9. **Founding member logic** - Auto-trial for early signups
+1. **Database migration** - Add `profile_theme` column and update view
+2. **Create theme presets** - Define the 6 professional gradients
+3. **Build Style section component** - Preset grid + custom picker
+4. **Integrate into Settings** - Add new section with Pro gating
+5. **Apply theme on PublicBooking** - Dynamic background rendering
+6. **Add live preview** - Real-time feedback in Settings
+
+---
+
+## Pro Feature Gating Logic
+
+```typescript
+// In ProfileStyleSection.tsx
+const { isPro } = usePro();
+
+// Free users: Only "default" preset clickable
+// Pro users: All presets + custom picker available
+
+const handlePresetClick = (presetId: string) => {
+  if (!isPro && presetId !== 'default') {
+    // Show upgrade prompt
+    setShowUpgrade(true);
+    return;
+  }
+  setSelectedPreset(presetId);
+};
+```
+
+---
+
+## Analytics Events
+
+Track user engagement with the feature:
+
+- `profile_theme_changed` - When a user selects a new preset or custom theme
+- `profile_theme_upgrade_prompt_shown` - When free user clicks locked preset
+- `profile_theme_upgrade_clicked` - When user clicks "Go Pro" from theme section
+
+---
+
+## Why This Fits the DraftKit Brand
+
+1. **Zero API Cost** - Just a hex code in the database, no LLM calls
+2. **Visual Social Proof** - Custom themes on shared links signal "Pro" status
+3. **Retention Hook** - Time invested in customization = lower churn
+4. **The "Lovable" Factor** - Doesn't block shipping posts, just makes the experience premium
+
