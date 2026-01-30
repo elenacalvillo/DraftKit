@@ -1,82 +1,150 @@
 
 
-# Fix Export to Docs Feature
+# Google Docs Direct Export - Full OAuth Integration
 
-## Problem Analysis
+Enable creators to export drafts directly to Google Docs with content pre-filled, eliminating the copy-paste step.
 
-Two issues were identified during testing:
+## What Will Be Built
 
-### Issue 1: Google Docs Opens Blank
-The URL scheme `https://docs.google.com/document/create?body={content}` does not work. Google Docs does not support pre-filling document content via URL parameters. This approach was based on outdated documentation that described a feature Google never fully implemented for public use.
+A seamless "Export to Google Docs" feature that:
+1. Prompts user to authorize with Google (one-time)
+2. Creates a new Google Doc with the draft content already inside
+3. Opens the document for editing
 
-### Issue 2: React Warning in Console
-There's a ref forwarding warning related to `DropdownMenuContent` that appears when opening the dropdown. While cosmetic, this should be fixed.
+## How It Works
 
-## Solution
+```text
+User clicks "Open in Google Docs"
+            |
+            v
+   +------------------+
+   | First time only: |
+   | Google OAuth     |
+   | popup appears    |
+   +------------------+
+            |
+            v
+   +------------------+
+   | Backend creates  |
+   | document via     |
+   | Google Docs API  |
+   +------------------+
+            |
+            v
+   +------------------+
+   | Browser opens    |
+   | the new doc      |
+   | WITH content     |
+   +------------------+
+```
 
-### For Google Docs Export
-Since Google Docs cannot accept pre-filled content via URL without OAuth API integration, the best alternative is a **copy-to-clipboard workflow**:
+## Architecture
 
-1. Copy the formatted text to clipboard
-2. Open a new blank Google Docs document
-3. Show a toast instructing the user to paste
+The implementation uses Google Identity Services (GIS) for modern OAuth 2.0 flow:
 
-This maintains the low-friction goal while working within Google's limitations.
+**Frontend (Browser)**
+- Load Google Identity Services SDK
+- Request OAuth token with `https://www.googleapis.com/auth/documents` scope
+- Send token + draft content to backend function
 
-### For Word Export
-The Word export code appears correct. Need to verify the `docx` library is generating content properly. Add error handling and logging to diagnose any issues.
+**Backend (Edge Function)**
+- Receive OAuth token and draft content
+- Call Google Docs API to create document
+- Insert formatted text into document
+- Return document URL to frontend
 
-### For React Warning
-Add `forwardRef` to the `DropdownMenuContent` component to properly forward refs.
+**Frontend (cont.)**
+- Open returned Google Doc URL in new tab
+- Store OAuth refresh token for future exports (optional enhancement)
+
+## Setup Requirements
+
+This feature requires a Google Cloud project with OAuth credentials. You will need to:
+
+1. Create a Google Cloud Project (free)
+2. Enable the Google Docs API
+3. Create OAuth 2.0 credentials (Web application type)
+4. Add authorized JavaScript origins for your domain
 
 ## Implementation Details
 
-### 1. Update export-draft.ts
+### 1. Create Backend Function
 
-**Google Docs Export - New Approach:**
-```typescript
-export function exportToGoogleDocs(draft: CollabDraft, requesterName: string): void {
-  const content = formatDraftAsPlainText(draft, requesterName);
-  
-  // Copy to clipboard first
-  navigator.clipboard.writeText(content);
-  
-  // Open blank Google Docs
-  window.open("https://docs.google.com/document/create", "_blank");
-}
+New file: `supabase/functions/create-google-doc/index.ts`
+
+This function:
+- Receives the user's OAuth access token and draft content
+- Creates a new Google Doc via the API
+- Inserts the formatted draft content
+- Returns the document URL
+
+### 2. Add Google Identity Services to Frontend
+
+Update `index.html` to load the GIS SDK:
+```html
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 ```
 
-The calling component will show a toast like: "Content copied! Paste it into the new Google Doc (Cmd/Ctrl+V)"
+### 3. Create Google OAuth Hook
 
-**Word Export - Add Error Handling:**
-- Wrap in try/catch
-- Add console logging to help diagnose if issues persist
+New file: `src/hooks/useGoogleDocs.ts`
 
-### 2. Update CollabDraftModal.tsx
+Provides:
+- `requestGoogleAuth()` - Triggers OAuth popup
+- `createGoogleDoc(draft)` - Creates doc with content
+- `isAuthorized` - Whether user has granted access
 
-Update the Google Docs menu item click handler to:
-1. Call the export function (which copies to clipboard)
-2. Show a more informative toast: "Content copied! Opening Google Docs - paste with Cmd/Ctrl+V"
+### 4. Update Export Function
 
-### 3. Fix DropdownMenu Ref Warning
+Modify `src/lib/export-draft.ts`:
+- Keep existing Word export unchanged
+- Update `exportToGoogleDocs` to use OAuth flow
+- Fall back to copy-paste if OAuth fails/denied
 
-Update `src/components/ui/dropdown-menu.tsx` to properly forward refs using React.forwardRef on the wrapper components.
+### 5. Update Modal UI
 
-## Files to Modify
+Modify `src/components/requests/CollabDraftModal.tsx`:
+- Show loading state during OAuth/creation
+- Handle authorization errors gracefully
+- Open the created document
 
-| File | Changes |
-|------|---------|
-| `src/lib/export-draft.ts` | Update `exportToGoogleDocs` to copy-then-open approach; add error handling to `exportToDocx` |
-| `src/components/requests/CollabDraftModal.tsx` | Update toast message for Google Docs export |
-| `src/components/ui/dropdown-menu.tsx` | Fix ref forwarding warning |
+## Files to Create/Modify
 
-## Testing Checklist
+| File | Action | Purpose |
+|------|--------|---------|
+| `supabase/functions/create-google-doc/index.ts` | Create | Backend API for Google Docs creation |
+| `index.html` | Modify | Add GIS script tag |
+| `src/hooks/useGoogleDocs.ts` | Create | Google OAuth + Docs API hook |
+| `src/lib/export-draft.ts` | Modify | Integrate new OAuth flow |
+| `src/components/requests/CollabDraftModal.tsx` | Modify | Handle loading/error states |
 
-After implementation:
-- Generate or view an existing draft
-- Click dropdown arrow next to "Copy Draft"
-- Test "Download as Word (.docx)" - verify file downloads with content
-- Test "Open in Google Docs" - verify clipboard contains content and Google Docs opens
-- Paste content into Google Docs to confirm it works
-- Verify no React warnings in console
+## Google Cloud Setup (User Action Required)
+
+Before implementation, you need to set up Google Cloud credentials:
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select existing
+3. Enable "Google Docs API" in APIs & Services
+4. Go to Credentials > Create Credentials > OAuth 2.0 Client ID
+5. Application type: Web application
+6. Add Authorized JavaScript origins:
+   - `https://collabstack.lovable.app` (production)
+   - Your preview URL for testing
+7. Copy the Client ID
+
+After setup, I'll need the **Google OAuth Client ID** to complete the implementation.
+
+## Security Considerations
+
+- OAuth tokens are short-lived and scoped to only document creation
+- No tokens are stored on our backend - only passed through
+- Users can revoke access anytime via Google Account settings
+- The backend function validates the token before using it
+
+## Alternative: Fallback Behavior
+
+If a user declines OAuth or something fails:
+- Show a toast explaining they can still copy-paste
+- Fall back to the current copy-to-clipboard + open blank doc behavior
+- This ensures the feature always works, just with varying convenience
 
