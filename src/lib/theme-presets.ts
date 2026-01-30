@@ -32,13 +32,13 @@ export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
   default: {
     id: 'default',
     name: 'DraftKit Coral',
-    description: 'Our signature warm coral gradient',
+    description: 'Our signature warm cream gradient',
     colors: {
-      // REAL DraftKit brand colors from --gradient-primary
-      primary: '8 65% 65%',      // Authentic coral
-      secondary: '24 58% 60%',   // Terracotta end
-      accent: '8 65% 65%',
-      glow: '12 60% 72%',        // Mid-gradient for glow
+      // Matches --gradient-hero from landing page
+      primary: '39 33% 97%',     // Warm cream
+      secondary: '8 40% 96%',    // Subtle coral warmth
+      accent: '8 65% 65%',       // Coral for interactive elements
+      glow: '8 50% 90%',         // Soft coral glow
     },
     angle: 135,
     isPro: false,
