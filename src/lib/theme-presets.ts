@@ -34,75 +34,75 @@ export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
     name: 'DraftKit Coral',
     description: 'Our signature warm coral gradient',
     colors: {
-      primary: '12 76% 61%', // Coral
-      secondary: '16 65% 45%', // Terracotta
-      accent: '12 76% 61%',
-      glow: '12 76% 61%',
+      primary: '8 65% 65%', // Matches --primary exactly
+      secondary: '12 55% 70%', // Softer coral
+      accent: '8 65% 65%',
+      glow: '8 65% 65%',
     },
     angle: 135,
-    isPro: false, // Available to all users
+    isPro: false,
   },
   ocean: {
     id: 'ocean',
-    name: 'Ocean Depths',
-    description: 'Cool, professional deep blue',
+    name: 'Ocean Breeze',
+    description: 'Calm, professional soft blue',
     colors: {
-      primary: '210 80% 50%', // Deep Blue
-      secondary: '175 65% 45%', // Teal
-      accent: '210 80% 50%',
-      glow: '175 65% 55%',
+      primary: '210 40% 70%', // Soft sky blue
+      secondary: '195 35% 75%', // Soft aqua
+      accent: '210 40% 70%',
+      glow: '195 40% 75%',
     },
     angle: 135,
     isPro: true,
   },
   sunset: {
     id: 'sunset',
-    name: 'Sunset Warmth',
-    description: 'Warm creative energy',
+    name: 'Sunset Glow',
+    description: 'Warm, inviting peach tones',
     colors: {
-      primary: '35 90% 55%', // Orange
-      secondary: '330 70% 60%', // Pink
-      accent: '35 90% 55%',
-      glow: '35 90% 55%',
+      primary: '25 50% 72%', // Soft peach
+      secondary: '340 40% 75%', // Soft rose
+      accent: '25 50% 72%',
+      glow: '25 50% 72%',
     },
     angle: 135,
     isPro: true,
   },
   forest: {
     id: 'forest',
-    name: 'Forest Calm',
-    description: 'Natural, balanced green',
+    name: 'Forest Mist',
+    description: 'Natural, balanced sage',
     colors: {
-      primary: '150 60% 40%', // Emerald
-      secondary: '120 30% 55%', // Sage
-      accent: '150 60% 40%',
-      glow: '150 60% 50%',
+      primary: '150 35% 65%', // Soft sage
+      secondary: '140 30% 72%', // Soft mint
+      accent: '150 35% 65%',
+      glow: '150 35% 70%',
     },
     angle: 135,
     isPro: true,
   },
   midnight: {
     id: 'midnight',
-    name: 'Midnight Pro',
-    description: 'Dark, sophisticated purple',
+    name: 'Lavender Dream',
+    description: 'Soft, elegant purple',
     colors: {
-      primary: '270 60% 50%', // Purple
-      secondary: '240 70% 40%', // Indigo
-      accent: '270 60% 50%',
-      glow: '270 60% 60%',
+      primary: '260 35% 68%', // Soft lavender
+      secondary: '280 30% 75%', // Soft lilac
+      accent: '260 35% 68%',
+      glow: '260 35% 72%',
     },
     angle: 135,
     isPro: true,
   },
   monochrome: {
     id: 'monochrome',
-    name: 'Clean Slate',
-    description: 'Minimal, neutral gray',
+    name: 'Silver Slate',
+    description: 'Minimal, elegant neutral',
     colors: {
-      primary: '220 10% 50%', // Gray
-      secondary: '220 15% 35%', // Slate
-      accent: '220 10% 50%',
-      glow: '220 10% 60%',
+      primary: '220 15% 75%', // Soft silver
+      secondary: '220 12% 80%', // Light gray
+      accent: '220 15% 75%',
+      glow: '220 15% 78%',
     },
     angle: 135,
     isPro: true,
