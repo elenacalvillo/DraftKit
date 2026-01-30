@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Calendar, Check, ExternalLink, Sparkles, Mail, User, MessageSquare, Lightbulb, Loader2, AlertCircle, RefreshCw, Info } from "lucide-react";
@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { analyzeCollabMatch, type CollabSuggestion, type CollabMatchResult } from "@/lib/api/collab-match";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { useAuth } from "@/hooks/useAuth";
+import { parseProfileTheme, getThemeStyles, type ProfileTheme } from "@/lib/theme-presets";
 
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -30,6 +31,7 @@ interface Creator {
   collab_guidelines: string | null;
   date_meaning: DateMeaning | null;
   collab_mode: CollabMode | null;
+  profile_theme: Record<string, unknown> | null;
 }
 
 interface Availability {
@@ -117,6 +119,12 @@ export default function PublicBooking() {
     message: "",
   });
 
+  // Generate theme styles from creator's profile_theme
+  const themeStyles = useMemo(() => {
+    const theme = parseProfileTheme(creator?.profile_theme);
+    return getThemeStyles(theme);
+  }, [creator?.profile_theme]);
+
   // Track booking link clicked and store session start time
   useEffect(() => {
     if (!username || hasTrackedPageView.current) return;
@@ -165,7 +173,7 @@ export default function PublicBooking() {
     // Fetch creator from public view (excludes sensitive data like email)
     const { data: creatorData, error } = await supabase
       .from('public_creator_profiles')
-      .select('id, username, name, substack_url, newsletter_url, welcome_message, profile_image_url, collab_style, collab_guidelines, date_meaning, collab_mode')
+      .select('id, username, name, substack_url, newsletter_url, welcome_message, profile_image_url, collab_style, collab_guidelines, date_meaning, collab_mode, profile_theme')
       .eq('username', username)
       .maybeSingle();
 
@@ -179,6 +187,7 @@ export default function PublicBooking() {
       ...creatorData,
       date_meaning: creatorData.date_meaning as DateMeaning | null,
       collab_mode: (creatorData.collab_mode || 'async') as CollabMode,
+      profile_theme: creatorData.profile_theme as Record<string, unknown> | null,
     });
     
     // Parse collab styles
@@ -529,7 +538,13 @@ export default function PublicBooking() {
   }
 
   return (
-    <div className="min-h-screen gradient-bg">
+    <div 
+      className="min-h-screen"
+      style={{
+        ...themeStyles,
+        background: `var(--theme-gradient, linear-gradient(135deg, hsl(12 76% 61%), hsl(16 65% 45%)))`,
+      }}
+    >
       {/* Background elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <motion.div
@@ -542,7 +557,8 @@ export default function PublicBooking() {
             repeat: Infinity,
             ease: "easeInOut",
           }}
-          className="absolute top-1/4 -right-1/4 w-1/2 h-1/2 rounded-full bg-gradient-to-br from-primary/20 to-transparent blur-3xl"
+          className="absolute top-1/4 -right-1/4 w-1/2 h-1/2 rounded-full blur-3xl"
+          style={{ background: `radial-gradient(circle, hsla(var(--theme-primary, 12 76% 61%) / 0.3), transparent)` }}
         />
         <motion.div
           animate={{
@@ -554,7 +570,8 @@ export default function PublicBooking() {
             repeat: Infinity,
             ease: "easeInOut",
           }}
-          className="absolute -bottom-1/4 -left-1/4 w-1/2 h-1/2 rounded-full bg-gradient-to-tr from-accent/20 to-transparent blur-3xl"
+          className="absolute -bottom-1/4 -left-1/4 w-1/2 h-1/2 rounded-full blur-3xl"
+          style={{ background: `radial-gradient(circle, hsla(var(--theme-secondary, 16 65% 45%) / 0.3), transparent)` }}
         />
       </div>
 
@@ -584,11 +601,20 @@ export default function PublicBooking() {
             <img 
               src={creator.profile_image_url} 
               alt={creator.name}
-              className="w-20 h-20 rounded-full mx-auto mb-4 object-cover shadow-glow ring-4 ring-primary/20"
+              className="w-20 h-20 rounded-full mx-auto mb-4 object-cover ring-4 ring-white/20"
+              style={{ 
+                boxShadow: `0 0 30px hsla(var(--theme-glow, 12 76% 61%) / 0.4)`,
+              }}
             />
           ) : (
-            <div className="w-20 h-20 rounded-full gradient-primary mx-auto mb-4 flex items-center justify-center shadow-glow">
-              <span className="text-3xl font-bold text-primary-foreground">
+            <div 
+              className="w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center"
+              style={{ 
+                background: `var(--theme-gradient)`,
+                boxShadow: `0 0 30px hsla(var(--theme-glow, 12 76% 61%) / 0.4)`,
+              }}
+            >
+              <span className="text-3xl font-bold text-white">
                 {creator.name.charAt(0).toUpperCase()}
               </span>
             </div>

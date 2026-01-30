@@ -290,6 +290,7 @@ export type Database = {
           name: string
           newsletter_url: string | null
           profile_image_url: string | null
+          profile_theme: Json | null
           reminder_days_before: number | null
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
@@ -313,6 +314,7 @@ export type Database = {
           name: string
           newsletter_url?: string | null
           profile_image_url?: string | null
+          profile_theme?: Json | null
           reminder_days_before?: number | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
@@ -336,6 +338,7 @@ export type Database = {
           name?: string
           newsletter_url?: string | null
           profile_image_url?: string | null
+          profile_theme?: Json | null
           reminder_days_before?: number | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
@@ -480,6 +483,7 @@ export type Database = {
           name: string | null
           newsletter_url: string | null
           profile_image_url: string | null
+          profile_theme: Json | null
           substack_url: string | null
           username: string | null
           welcome_message: string | null
@@ -495,6 +499,7 @@ export type Database = {
           name?: string | null
           newsletter_url?: string | null
           profile_image_url?: string | null
+          profile_theme?: Json | null
           substack_url?: string | null
           username?: string | null
           welcome_message?: string | null
@@ -510,6 +515,7 @@ export type Database = {
           name?: string | null
           newsletter_url?: string | null
           profile_image_url?: string | null
+          profile_theme?: Json | null
           substack_url?: string | null
           username?: string | null
           welcome_message?: string | null

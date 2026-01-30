@@ -1,9 +1,9 @@
-import { Crown, Sparkles, FileText, Users, Calendar } from "lucide-react";
+import { Crown, Sparkles, FileText, Users, Calendar, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
-type FeatureType = 'export' | 'collabs' | 'mode' | 'matching';
+type FeatureType = 'export' | 'collabs' | 'mode' | 'matching' | 'style';
 
 interface UpgradePromptProps {
   feature: FeatureType;
@@ -35,6 +35,11 @@ const FEATURE_COPY: Record<FeatureType, {
     title: "Advanced SMART Matching",
     description: "Deep archive analysis for more complex matches",
     icon: Sparkles,
+  },
+  style: {
+    title: "Custom Profile Themes",
+    description: "Personalize your booking page with brand colors",
+    icon: Palette,
   },
 };
 
