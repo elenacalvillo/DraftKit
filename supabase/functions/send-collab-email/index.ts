@@ -51,7 +51,7 @@ const corsHeaders = {
 };
 
 interface EmailRequest {
-  type: "request_approved" | "request_declined" | "request_received" | "request_submitted" | "request_cancelled_by_guest" | "collab_cancelled_by_host" | "new_message" | "collab_reminder" | "collab_type_changed";
+  type: "request_approved" | "request_declined" | "request_received" | "request_submitted" | "request_cancelled_by_guest" | "collab_cancelled_by_host" | "new_message" | "new_message_from_guest" | "collab_reminder" | "collab_type_changed";
   requestId: string;
   messageContent?: string;
   newCollabType?: string;
@@ -85,6 +85,7 @@ const EMAIL_TYPE_ROLES: Record<EmailRequest["type"], "creator" | "requester" | "
   request_cancelled_by_guest: "requester",
   collab_cancelled_by_host: "creator",
   new_message: "creator",
+  new_message_from_guest: "requester", // Guest messaging creator
   collab_reminder: "service", // Called from scheduled function with service role
   collab_type_changed: "creator",
 };
@@ -620,6 +621,50 @@ serve(async (req: Request): Promise<Response> => {
         </body>
         </html>
       `;
+    } else if (type === "new_message_from_guest") {
+      // Email to creator when guest sends them a message
+      toEmail = creatorEmail || "";
+      emailSubject = `💬 New message from ${requesterName} about your collaboration`;
+      
+      emailHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 32px;">
+            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #d9826b, #c9946d); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
+              <span style="color: white; font-size: 24px;">💬</span>
+            </div>
+            <h1 style="margin: 0; font-size: 24px; color: #1e293b;">New Message</h1>
+          </div>
+
+          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${creatorName},</p>
+          
+          <p style="font-size: 16px; margin-bottom: 24px;">
+            <strong>${requesterName}</strong> sent you a message about your collaboration${requestedDate ? ` on <strong>${formattedDate}</strong>` : ""}:
+          </p>
+
+          <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #d9826b;">
+            <p style="margin: 0; color: #1e293b; white-space: pre-line; font-size: 16px;">${messageContent || ""}</p>
+          </div>
+
+          <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
+            <a href="${buildDashboardRequestLink(requestId)}" 
+               style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+              View Request & Reply
+            </a>
+          </div>
+
+          <p style="font-size: 14px; color: #64748b; margin-top: 32px;">
+            Happy collaborating!<br>
+            The DraftKit Team
+          </p>
+        </body>
+        </html>
+      `;
     } else if (type === "collab_reminder") {
       // Send reminders to BOTH host and guest
       const hostEmailHtml = `
@@ -824,6 +869,7 @@ serve(async (req: Request): Promise<Response> => {
       "request_cancelled_by_guest",
       "collab_cancelled_by_host",
       "new_message",
+      "new_message_from_guest",
       "collab_type_changed"
     ];
 

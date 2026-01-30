@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Send, Calendar, Clock, ExternalLink, Inbox, ArrowRight, X, CalendarClock, Trash2 } from 'lucide-react';
+import { Send, Calendar, Clock, ExternalLink, Inbox, ArrowRight, X, CalendarClock, Trash2, MessageSquare } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { toast } from 'sonner';
@@ -22,6 +22,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { GuestMessageModal } from '@/components/requests/GuestMessageModal';
 
 interface SentRequest {
   id: string;
@@ -54,6 +55,7 @@ export default function MyRequests() {
   const [requests, setRequests] = useState<SentRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [messageModalRequest, setMessageModalRequest] = useState<SentRequest | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -316,6 +318,20 @@ export default function MyRequests() {
                       </div>
                     )}
 
+                    {/* Message button for approved requests */}
+                    {request.status === 'approved' && (
+                      <div className="flex gap-2 pt-3 border-t mt-3">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => setMessageModalRequest(request)}
+                        >
+                          <MessageSquare className="h-4 w-4 mr-1" />
+                          Message {request.creator?.name?.split(' ')[0] || 'Creator'}
+                        </Button>
+                      </div>
+                    )}
+
                     {/* Delete button for cancelled requests */}
                     {request.status === 'cancelled' && (
                       <div className="flex gap-2 pt-3 border-t mt-3">
@@ -336,6 +352,17 @@ export default function MyRequests() {
               );
             })}
           </div>
+        )}
+
+        {/* Guest Message Modal */}
+        {messageModalRequest && (
+          <GuestMessageModal
+            open={!!messageModalRequest}
+            onOpenChange={(open) => !open && setMessageModalRequest(null)}
+            requestId={messageModalRequest.id}
+            creatorName={messageModalRequest.creator?.name || 'Creator'}
+            requesterEmail={messageModalRequest.requester_email}
+          />
         )}
       </div>
     </DashboardLayout>
