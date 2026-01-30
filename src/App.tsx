@@ -20,6 +20,7 @@ import Demo from "./pages/Demo";
 import AdminAnalytics from "./pages/AdminAnalytics";
 import MyRequests from "./pages/MyRequests";
 import Transparency from "./pages/Transparency";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -40,6 +41,7 @@ const App = () => (
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/transparency" element={<Transparency />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/demo" element={<Demo />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/dashboard/availability" element={<Availability />} />
