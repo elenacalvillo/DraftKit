@@ -1,59 +1,43 @@
 
-# Ultra-Bright Theme Presets + Authentic DraftKit Coral
 
-## Problem Analysis
+# Fix DraftKit Coral to Match Landing Page Gradient
 
-Looking at the screenshots, there are two distinct issues:
+## The Problem
 
-1. **Pastel presets are still too dark** (80-88% lightness) - The Ocean Breeze and Forest Mist examples show backgrounds that still feel heavy and saturated
-2. **DraftKit Coral isn't using the real brand colors** - You want the default preset to show the authentic DraftKit coral gradient as seen in the HeroSection, not a softened version
+I completely misunderstood. The **DraftKit Coral** preset should NOT be the intense coral gradient. It should match the **landing page hero background** - which is a **soft, warm cream** gradient, not the saturated coral/terracotta.
+
+Looking at the CSS:
+- `--gradient-hero` (landing page background): `hsl(39 33% 97%)` → `hsl(25 30% 96%)` → `hsl(8 40% 96%)`
+- `--gradient-primary` (intense coral for buttons): `hsl(8 65% 65%)` → `hsl(24 58% 60%)`
+
+I wrongly used `--gradient-primary` for the profile background when it should use `--gradient-hero`.
+
+---
 
 ## Solution
 
-### Part 1: Default Preset = Real DraftKit Colors
+Update **DraftKit Coral** to use the soft cream tones from `--gradient-hero`:
+- Primary: `39 33% 97%` (warm cream)
+- Secondary: `8 40% 96%` (hint of coral warmth)
 
-Use the actual brand gradient from `index.css`:
-```css
---gradient-primary: linear-gradient(135deg, hsl(8 65% 65%) 0%, hsl(12 60% 72%) 50%, hsl(24 58% 60%) 100%)
-```
-
-So `default` preset will use:
-- Primary: `8 65% 65%` (the authentic DraftKit coral)
-- Secondary: `24 58% 60%` (terracotta end of gradient)
-
-This gives you the real DraftKit look on your profile by default.
+This matches exactly what you see on the landing page - a soft, sophisticated background that lets content shine.
 
 ---
 
-### Part 2: Pro Presets = Ultra-Bright 95% Lightness
+## Updated Color Values
 
-All other presets get pushed to 93-96% lightness with minimal saturation (12-20%), creating barely-there watercolor washes:
-
-| Preset | New HSL Values | Visual Effect |
-|--------|----------------|---------------|
-| **Ocean Breeze** | `200 20% 95%` → `190 15% 96%` | Near-white with hint of sky |
-| **Sunset Glow** | `20 22% 95%` → `35 18% 96%` | Near-white with hint of peach |
-| **Forest Mist** | `145 18% 94%` → `155 14% 95%` | Near-white with hint of mint |
-| **Lavender Dream** | `255 18% 95%` → `270 14% 96%` | Near-white with hint of lavender |
-| **Silver Slate** | `220 8% 95%` → `220 5% 97%` | Near-white with hint of silver |
-
----
-
-### Part 3: Hyperlink Theming (Consideration)
-
-Currently, the coral/salmon hyperlinks use `text-primary` (coral). On the non-default themes, this creates visual contrast. Two options:
-
-**Option A (Keep as-is)**: The coral links act as a brand anchor, reminding users this is DraftKit even with a custom theme. This creates consistency across all profiles.
-
-**Option B (Theme-adaptive)**: Links could inherit from the theme's accent color. This would require:
-- Adding a CSS variable `--theme-accent` 
-- Updating link classes to use `text-[hsl(var(--theme-accent))]` or a darker variant
-
-**Recommendation**: Keep the coral links as brand anchors for now. The primary/coral color is DraftKit's identity, and having it consistent across all themes reinforces brand recognition when users share their links.
+| Preset | HSL Values | Description |
+|--------|------------|-------------|
+| **DraftKit Coral** | `39 33% 97%` → `8 40% 96%` | Soft cream with coral warmth (matches landing) |
+| **Ocean Breeze** | `200 20% 95%` → `190 15% 96%` | Near-white with sky hint |
+| **Sunset Glow** | `20 22% 95%` → `35 18% 96%` | Near-white with peach hint |
+| **Forest Mist** | `145 18% 94%` → `155 14% 95%` | Near-white with mint hint |
+| **Lavender Dream** | `255 18% 95%` → `270 14% 96%` | Near-white with lavender hint |
+| **Silver Slate** | `220 8% 95%` → `220 5% 97%` | Near-white with silver hint |
 
 ---
 
-## Technical Implementation
+## Implementation
 
 ### File: `src/lib/theme-presets.ts`
 
@@ -62,82 +46,18 @@ export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
   default: {
     id: 'default',
     name: 'DraftKit Coral',
-    description: 'Our signature warm coral gradient',
+    description: 'Our signature warm cream gradient',
     colors: {
-      // REAL DraftKit brand colors from --gradient-primary
-      primary: '8 65% 65%',      // Authentic coral
-      secondary: '24 58% 60%',   // Terracotta end
-      accent: '8 65% 65%',
-      glow: '12 60% 72%',        // Mid-gradient for glow
+      // Matches --gradient-hero from landing page
+      primary: '39 33% 97%',     // Warm cream (same as background)
+      secondary: '8 40% 96%',    // Subtle coral warmth
+      accent: '8 65% 65%',       // Coral for interactive elements
+      glow: '8 50% 90%',         // Soft coral glow
     },
     angle: 135,
     isPro: false,
   },
-  ocean: {
-    id: 'ocean',
-    name: 'Ocean Breeze',
-    description: 'Whisper of sky blue',
-    colors: {
-      primary: '200 20% 95%',    // Near-white sky
-      secondary: '190 15% 96%',  // Softer aqua
-      accent: '200 20% 95%',
-      glow: '200 20% 93%',
-    },
-    angle: 135,
-    isPro: true,
-  },
-  sunset: {
-    id: 'sunset',
-    name: 'Sunset Glow',
-    description: 'Whisper of peach warmth',
-    colors: {
-      primary: '20 22% 95%',     // Near-white peach
-      secondary: '35 18% 96%',   // Softer cream
-      accent: '20 22% 95%',
-      glow: '20 22% 93%',
-    },
-    angle: 135,
-    isPro: true,
-  },
-  forest: {
-    id: 'forest',
-    name: 'Forest Mist',
-    description: 'Whisper of mint',
-    colors: {
-      primary: '145 18% 94%',    // Near-white mint
-      secondary: '155 14% 95%',  // Softer sage
-      accent: '145 18% 94%',
-      glow: '145 18% 92%',
-    },
-    angle: 135,
-    isPro: true,
-  },
-  midnight: {
-    id: 'midnight',
-    name: 'Lavender Dream',
-    description: 'Whisper of lavender',
-    colors: {
-      primary: '255 18% 95%',    // Near-white lavender
-      secondary: '270 14% 96%',  // Softer lilac
-      accent: '255 18% 95%',
-      glow: '255 18% 93%',
-    },
-    angle: 135,
-    isPro: true,
-  },
-  monochrome: {
-    id: 'monochrome',
-    name: 'Silver Slate',
-    description: 'Whisper of silver',
-    colors: {
-      primary: '220 8% 95%',     // Near-white silver
-      secondary: '220 5% 97%',   // Almost white
-      accent: '220 8% 95%',
-      glow: '220 8% 93%',
-    },
-    angle: 135,
-    isPro: true,
-  },
+  // ... other presets stay the same (ultra-bright near-white)
 };
 ```
 
@@ -145,21 +65,17 @@ export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
 
 ## Visual Result
 
-| Preset | Before (Screenshot) | After |
-|--------|---------------------|-------|
-| **DraftKit Coral** | Soft pastel blush | Rich, authentic coral gradient (brand identity) |
-| **Ocean Breeze** | Too saturated green-blue | Barely-there sky wash, near-white |
-| **Sunset Glow** | Still visible peach | Whisper of warmth, near-white |
-| **Forest Mist** | Heavy mint | Hint of freshness, near-white |
-| **Lavender Dream** | Strong purple | Subtle lavender tint, near-white |
-| **Silver Slate** | Visible gray | Nearly invisible silver, almost white |
-
-The Pro presets become sophisticated, barely-there backgrounds that let the creator's content and the glass cards truly shine. Meanwhile, the default DraftKit Coral shows the brand's signature look.
+The DraftKit Coral default will now:
+- Match the soft cream landing page background exactly
+- Feel cohesive with the rest of the DraftKit brand
+- Allow the coral hyperlinks and buttons to pop as intended
+- All Pro presets remain ultra-soft near-white pastels
 
 ---
 
-## Files to Modify
+## File to Modify
 
 | File | Change |
 |------|--------|
-| `src/lib/theme-presets.ts` | Update default to real brand colors; push Pro presets to 95%+ lightness |
+| `src/lib/theme-presets.ts` | Update default preset to match `--gradient-hero` values |
+
