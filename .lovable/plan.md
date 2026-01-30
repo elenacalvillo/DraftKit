@@ -1,101 +1,43 @@
 
 
-# Fix Theme Preview Text Contrast + Compact Process Steps
+# Google Search Console Domain Verification
 
-## Issues Identified
+## What Google Needs
 
-### Issue 1: Theme Preview Card (ProfileStyleSection.tsx)
-Looking at the screenshot and code:
-- **Line 164**: Username text uses `text-white` which is invisible on ultra-bright 95% lightness backgrounds
-- **Lines 156-163**: Avatar only shows initial letter (`creator?.name?.charAt(0)`) but doesn't use the user's profile image (`creator.profile_image_url`)
+Google requires a specific HTML file to exist at your site root:
+- **URL**: `https://draftkit.app/google5ef7232f709cd511.html`
+- **Content**: `google-site-verification: google5ef7232f709cd511.html`
 
-### Issue 2: Process Steps on Creator Profile (PublicBooking.tsx)
-Looking at the screenshot vs homepage:
-- **Current styling** (lines 682-687): Coral filled circle with white number, plain muted text - low contrast, looks chunky
-- **Homepage styling**: White circles with subtle border and coral numbered text - high contrast, elegant
+## Implementation
 
----
+### Step 1: Copy Verification File to Public Folder
 
-## Solution
+Copy the uploaded HTML file to the `public` folder. Files in `public` are served at the root of your site without any processing.
 
-### Part 1: Fix Theme Preview (ProfileStyleSection.tsx)
+| Source | Destination |
+|--------|-------------|
+| `user-uploads://Google_Search_Console.html` | `public/google5ef7232f709cd511.html` |
 
-**Change the username text color** to use dark `text-foreground` instead of `text-white`:
-```tsx
-// Before
-<div className="mt-2 text-sm font-medium text-white drop-shadow-md">
+### Step 2: Publish the Site
 
-// After  
-<div className="mt-2 text-sm font-medium text-foreground">
+After the file is added, you need to click **Publish → Update** to deploy the change to your live site at `draftkit.app`.
+
+### Step 3: Verify in Google Search Console
+
+Once published, visit:
+```
+https://draftkit.app/google5ef7232f709cd511.html
 ```
 
-**Add profile image support** using the Avatar component:
-```tsx
-// Replace the letter-only avatar with a full Avatar that shows image when available
-<Avatar className="w-12 h-12 ring-2 ring-white/50">
-  <AvatarImage src={creator?.profile_image_url || undefined} />
-  <AvatarFallback className="bg-background/90 text-foreground font-bold">
-    {creator?.name?.charAt(0) || 'A'}
-  </AvatarFallback>
-</Avatar>
-```
+If you see the verification text, go back to Google Search Console and click **Verify**.
 
-### Part 2: Restyle Process Steps (PublicBooking.tsx)
+## Files to Create
 
-**New styling** - Match homepage aesthetic but compact:
-
-| Property | Before | After |
-|----------|--------|-------|
-| Circle size | `w-8 h-8` | `w-8 h-8` (keep compact) |
-| Circle style | Filled coral | White with subtle border (`bg-card border border-border`) |
-| Number style | White text on coral | Coral text (`text-primary`) |
-| Step 1 highlight | Filled coral | Same as others (consistent) |
-| Connector | Flat gray bar | Subtle dashed or lighter |
-
-**Updated markup:**
-```tsx
-<div className="flex items-center justify-center gap-4">
-  {COLLAB_MODE_METADATA[creator.collab_mode].processSteps.map((step, index) => (
-    <div key={step.step} className="flex items-center">
-      <div className="flex flex-col items-center">
-        {/* White circle with border, coral number - matches homepage */}
-        <div className="w-8 h-8 rounded-full bg-card border border-border flex items-center justify-center">
-          <span className="text-xs font-semibold text-primary">{step.step}</span>
-        </div>
-        <span className="text-xs text-muted-foreground mt-1.5 whitespace-nowrap">{step.label}</span>
-      </div>
-      {/* Chevron arrow connector like homepage */}
-      {index < COLLAB_MODE_METADATA[creator.collab_mode!].processSteps.length - 1 && (
-        <ChevronRight className="w-4 h-4 text-muted-foreground/40 mx-1 mb-4" />
-      )}
-    </div>
-  ))}
-</div>
-```
-
----
-
-## Visual Comparison
-
-### Theme Preview
-| Before | After |
-|--------|-------|
-| White "Elena Calvillo" invisible on light bg | Dark text readable on all themes |
-| Letter initial only "E" | Shows actual profile photo |
-
-### Process Steps
-| Before | After |
-|--------|-------|
-| Coral filled circle with white "1" | White circle with coral "1" |
-| Gray bar connector | Chevron arrow (like homepage) |
-| Low contrast, chunky | High contrast, elegant |
-
----
-
-## Files to Modify
-
-| File | Changes |
+| File | Purpose |
 |------|---------|
-| `src/components/settings/ProfileStyleSection.tsx` | Fix text color, add Avatar with profile image |
-| `src/pages/PublicBooking.tsx` | Restyle process steps to match homepage aesthetic |
+| `public/google5ef7232f709cd511.html` | Google Search Console verification file |
+
+## After Verification
+
+Once verified in Search Console, Google's OAuth review team can confirm you own the domain. This should clear the "Your home page website is not registered to you" blocker in your OAuth consent screen verification.
 
