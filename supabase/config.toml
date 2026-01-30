@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.send-release-notes]
 verify_jwt = false
+
+[functions.send-feedback-notification]
+verify_jwt = false

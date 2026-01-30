@@ -37,16 +37,32 @@ export function FeedbackWidget() {
     setIsSubmitting(true);
 
     try {
+      const feedbackEmail = email.trim() || user?.email || null;
+      const pageUrl = window.location.pathname;
+
       const { error } = await supabase.from("user_feedback").insert({
         user_id: user?.id || null,
-        email: email.trim() || user?.email || null,
+        email: feedbackEmail,
         rating: rating || null,
         feedback_type: feedbackType,
         message: message.trim(),
-        page_url: window.location.pathname,
+        page_url: pageUrl,
       });
 
       if (error) throw error;
+
+      // Send email notification (fire and forget - don't block the user)
+      supabase.functions.invoke("send-feedback-notification", {
+        body: {
+          feedbackType,
+          message: message.trim(),
+          rating: rating || null,
+          email: feedbackEmail,
+          pageUrl,
+        },
+      }).catch((err) => {
+        console.error("Failed to send feedback notification:", err);
+      });
 
       toast.success("Thank you for your feedback! 💜");
       setIsOpen(false);
