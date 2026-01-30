@@ -1,46 +1,44 @@
 
-# Fix Theme Preset Color Palette
+
+# Brighten Theme Presets - Soft Watercolor Pastels
 
 ## Problem
 
-The current theme presets use overly saturated colors that clash with DraftKit's light cream interface. The screenshot shows a harsh coral/terracotta gradient that overwhelms the page and creates poor contrast with UI elements like the calendar and collaboration badges.
+The current pastel tones are still too saturated and dark. The screenshots show:
+- Purple preset: Overwhelming, harsh violet that dominates the page
+- Blue preset: Better but still feels heavy and muted
+
+The gradients need to feel like **soft watercolor washes** - bright, airy, and barely-there.
 
 ---
 
 ## Solution
 
-Redesign the color palette to:
-1. Match the **DraftKit brand** for the default preset (use actual `--primary` HSL value)
-2. Convert all Pro presets to **soft pastel tones** with lower saturation and higher lightness
-3. Maintain visual distinction between presets while ensuring harmony with the interface
+Increase **lightness to 82-90%** and reduce **saturation to 20-35%** for all presets. The goal is bright, luminous backgrounds that feel like natural light washing over the page.
 
 ---
 
 ## Color Changes
 
-### Before vs After
+### Current vs Proposed
 
-| Preset | Before (Saturated) | After (Pastel) |
-|--------|-------------------|----------------|
-| **Default** | `12 76% 61%` (harsh coral) | `8 65% 65%` (DraftKit primary) |
-| **Ocean** | `210 80% 50%` (intense blue) | `210 40% 70%` (soft sky blue) |
-| **Sunset** | `35 90% 55%` (harsh orange) | `25 50% 72%` (soft peach) |
-| **Forest** | `150 60% 40%` (dark emerald) | `150 35% 65%` (soft sage) |
-| **Midnight** | `270 60% 50%` (vivid purple) | `260 35% 68%` (soft lavender) |
-| **Monochrome** | `220 10% 50%` (flat gray) | `220 15% 75%` (soft silver) |
+| Preset | Current HSL | Proposed HSL | Visual Effect |
+|--------|-------------|--------------|---------------|
+| **Default** | `8 65% 65%` | `8 55% 80%` | Soft blush coral |
+| **Ocean** | `210 40% 70%` | `200 35% 85%` | Airy sky blue |
+| **Sunset** | `25 50% 72%` | `20 40% 85%` | Light peach glow |
+| **Forest** | `150 35% 65%` | `145 30% 82%` | Mint whisper |
+| **Midnight** | `260 35% 68%` | `255 28% 85%` | Pale lavender mist |
+| **Monochrome** | `220 15% 75%` | `220 12% 88%` | Soft cloud gray |
 
-### Design Principles Applied:
-- **Saturation**: Reduced from 60-90% down to 30-50%
-- **Lightness**: Increased to 65-75% for pastel effect
-- **Gradients**: Subtle transitions between similar tones (not contrasting hues)
+### Design Principles:
+- **Lightness**: 82-90% (bright, luminous)
+- **Saturation**: 20-35% (whisper-soft color)
+- **Gradient difference**: Only 3-5% lightness shift between start/end colors for subtle effect
 
 ---
 
-## Implementation
-
-### File: `src/lib/theme-presets.ts`
-
-Update the `THEME_PRESETS` object with pastel-friendly HSL values:
+## Updated Presets
 
 ```typescript
 export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
@@ -49,10 +47,10 @@ export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
     name: 'DraftKit Coral',
     description: 'Our signature warm coral gradient',
     colors: {
-      primary: '8 65% 65%',      // Matches --primary exactly
-      secondary: '12 55% 70%',   // Softer coral
-      accent: '8 65% 65%',
-      glow: '8 65% 65%',
+      primary: '8 55% 80%',      // Soft blush
+      secondary: '12 45% 84%',   // Lighter blush
+      accent: '8 55% 80%',
+      glow: '8 55% 78%',
     },
     angle: 135,
     isPro: false,
@@ -60,12 +58,12 @@ export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
   ocean: {
     id: 'ocean',
     name: 'Ocean Breeze',
-    description: 'Calm, professional soft blue',
+    description: 'Calm, airy sky blue',
     colors: {
-      primary: '210 40% 70%',    // Soft sky blue
-      secondary: '195 35% 75%', // Soft aqua
-      accent: '210 40% 70%',
-      glow: '195 40% 75%',
+      primary: '200 35% 85%',    // Pale sky
+      secondary: '190 30% 88%',  // Softer aqua
+      accent: '200 35% 85%',
+      glow: '200 35% 83%',
     },
     angle: 135,
     isPro: true,
@@ -73,12 +71,12 @@ export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
   sunset: {
     id: 'sunset',
     name: 'Sunset Glow',
-    description: 'Warm, inviting peach tones',
+    description: 'Warm peach whisper',
     colors: {
-      primary: '25 50% 72%',    // Soft peach
-      secondary: '340 40% 75%', // Soft rose
-      accent: '25 50% 72%',
-      glow: '25 50% 72%',
+      primary: '20 40% 85%',     // Pale peach
+      secondary: '35 35% 88%',   // Soft cream
+      accent: '20 40% 85%',
+      glow: '20 40% 83%',
     },
     angle: 135,
     isPro: true,
@@ -86,12 +84,12 @@ export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
   forest: {
     id: 'forest',
     name: 'Forest Mist',
-    description: 'Natural, balanced sage',
+    description: 'Light mint whisper',
     colors: {
-      primary: '150 35% 65%',   // Soft sage
-      secondary: '140 30% 72%', // Soft mint
-      accent: '150 35% 65%',
-      glow: '150 35% 70%',
+      primary: '145 30% 82%',    // Pale mint
+      secondary: '155 25% 86%',  // Softer sage
+      accent: '145 30% 82%',
+      glow: '145 30% 80%',
     },
     angle: 135,
     isPro: true,
@@ -99,12 +97,12 @@ export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
   midnight: {
     id: 'midnight',
     name: 'Lavender Dream',
-    description: 'Soft, elegant purple',
+    description: 'Soft lavender mist',
     colors: {
-      primary: '260 35% 68%',   // Soft lavender
-      secondary: '280 30% 75%', // Soft lilac
-      accent: '260 35% 68%',
-      glow: '260 35% 72%',
+      primary: '255 28% 85%',    // Pale lavender
+      secondary: '270 22% 88%',  // Softer lilac
+      accent: '255 28% 85%',
+      glow: '255 28% 83%',
     },
     angle: 135,
     isPro: true,
@@ -112,12 +110,12 @@ export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
   monochrome: {
     id: 'monochrome',
     name: 'Silver Slate',
-    description: 'Minimal, elegant neutral',
+    description: 'Soft cloud gray',
     colors: {
-      primary: '220 15% 75%',   // Soft silver
-      secondary: '220 12% 80%', // Light gray
-      accent: '220 15% 75%',
-      glow: '220 15% 78%',
+      primary: '220 12% 88%',    // Pale silver
+      secondary: '220 8% 91%',   // Near white
+      accent: '220 12% 88%',
+      glow: '220 12% 86%',
     },
     angle: 135,
     isPro: true,
@@ -129,25 +127,17 @@ export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
 
 ## Visual Result
 
-The new pastel palette will:
-- **Blend smoothly** with the cream background (`39 33% 97%`)
-- **Reduce visual strain** by avoiding high saturation colors
-- **Allow UI elements** (cards, buttons, badges) to remain readable
-- **Feel premium** through subtle, sophisticated color choices
+The new ultra-soft palette will:
+- Feel **bright and luminous** like natural daylight
+- Create **barely-there gradients** that don't compete with content
+- Let **profile photos and UI elements** pop against the soft background
+- Look **premium and sophisticated** through restraint
 
 ---
 
-## Files to Modify
+## File to Modify
 
 | File | Change |
 |------|--------|
-| `src/lib/theme-presets.ts` | Update all 6 preset color values to pastel tones |
+| `src/lib/theme-presets.ts` | Update all preset HSL values to brighter, softer tones |
 
----
-
-## Why This Works
-
-1. **Brand Consistency**: Default now uses the exact DraftKit `--primary` color
-2. **Interface Harmony**: Pastel tones don't compete with UI elements
-3. **Professional Aesthetic**: Soft gradients feel more sophisticated than saturated ones
-4. **Creator-Friendly**: The subtle palette lets profile photos and content stand out
