@@ -51,125 +51,129 @@ function formatDraftAsPlainText(draft: CollabDraft, requesterName: string): stri
 }
 
 /**
- * Export draft to Google Docs by opening a new document with pre-filled content
- * Uses the Google Docs URL scheme - no API key required
+ * Export draft to Google Docs by copying content to clipboard and opening a new document
+ * Returns a promise that resolves when content is copied
  */
-export function exportToGoogleDocs(draft: CollabDraft, requesterName: string): void {
+export async function exportToGoogleDocs(draft: CollabDraft, requesterName: string): Promise<void> {
   const content = formatDraftAsPlainText(draft, requesterName);
-  const encodedContent = encodeURIComponent(content);
   
-  // Google Docs URL scheme for creating a new document with content
-  const googleDocsUrl = `https://docs.google.com/document/create?body=${encodedContent}`;
+  // Copy content to clipboard first
+  await navigator.clipboard.writeText(content);
   
-  // Open in new tab
-  window.open(googleDocsUrl, "_blank");
+  // Open blank Google Docs
+  window.open("https://docs.google.com/document/create", "_blank");
 }
 
 /**
  * Export draft as a formatted Word document (.docx)
  */
 export async function exportToDocx(draft: CollabDraft, requesterName: string): Promise<void> {
-  const contributorLabel = (contributor: "creator" | "requester" | "both") => {
-    switch (contributor) {
-      case "creator":
-        return "You";
-      case "requester":
-        return requesterName;
-      case "both":
-        return "Both";
-    }
-  };
+  try {
+    const contributorLabel = (contributor: "creator" | "requester" | "both") => {
+      switch (contributor) {
+        case "creator":
+          return "You";
+        case "requester":
+          return requesterName;
+        case "both":
+          return "Both";
+      }
+    };
 
-  const doc = new Document({
-    sections: [
-      {
-        children: [
-          // Title
-          new Paragraph({
-            heading: HeadingLevel.HEADING_1,
-            children: [new TextRun({ text: draft.title, bold: true })],
-            spacing: { after: 200 },
-          }),
-          
-          // Metadata
-          new Paragraph({
-            children: [
-              new TextRun({ text: `Format: ${draft.suggestedFormat}`, italics: true }),
-              new TextRun({ text: "  |  " }),
-              new TextRun({ text: `Estimated Read Time: ${draft.estimatedReadTime}`, italics: true }),
-            ],
-            spacing: { after: 400 },
-          }),
-          
-          // Opening Hook section
-          new Paragraph({
-            heading: HeadingLevel.HEADING_2,
-            children: [new TextRun({ text: "Opening Hook", bold: true })],
-            spacing: { before: 400, after: 200 },
-          }),
-          new Paragraph({
-            children: [new TextRun({ text: draft.hook, italics: true })],
-            spacing: { after: 400 },
-            indent: { left: 400 },
-          }),
-          
-          // Outline section
-          new Paragraph({
-            heading: HeadingLevel.HEADING_2,
-            children: [new TextRun({ text: "Outline", bold: true })],
-            spacing: { before: 400, after: 200 },
-          }),
-          
-          // Outline items
-          ...draft.outline.flatMap((section, index) => [
+    const doc = new Document({
+      sections: [
+        {
+          children: [
+            // Title
+            new Paragraph({
+              heading: HeadingLevel.HEADING_1,
+              children: [new TextRun({ text: draft.title, bold: true })],
+              spacing: { after: 200 },
+            }),
+            
+            // Metadata
             new Paragraph({
               children: [
-                new TextRun({ text: `${index + 1}. `, bold: true }),
-                new TextRun({ text: section.section, bold: true }),
-                new TextRun({ text: ` [${contributorLabel(section.contributor)}]`, italics: true }),
-                new TextRun({ text: ` (~${section.suggestedLength})` }),
+                new TextRun({ text: `Format: ${draft.suggestedFormat}`, italics: true }),
+                new TextRun({ text: "  |  " }),
+                new TextRun({ text: `Estimated Read Time: ${draft.estimatedReadTime}`, italics: true }),
               ],
-              spacing: { before: 200 },
+              spacing: { after: 400 },
+            }),
+            
+            // Opening Hook section
+            new Paragraph({
+              heading: HeadingLevel.HEADING_2,
+              children: [new TextRun({ text: "Opening Hook", bold: true })],
+              spacing: { before: 400, after: 200 },
             }),
             new Paragraph({
-              children: [new TextRun({ text: section.description })],
+              children: [new TextRun({ text: draft.hook, italics: true })],
+              spacing: { after: 400 },
               indent: { left: 400 },
-              spacing: { after: 100 },
             }),
-          ]),
-          
-          // Talking Points section
-          new Paragraph({
-            heading: HeadingLevel.HEADING_2,
-            children: [new TextRun({ text: "Talking Points", bold: true })],
-            spacing: { before: 400, after: 200 },
-          }),
-          
-          // Talking points items
-          ...draft.talkingPoints.map((point) =>
+            
+            // Outline section
             new Paragraph({
-              children: [new TextRun({ text: `• ${point}` })],
+              heading: HeadingLevel.HEADING_2,
+              children: [new TextRun({ text: "Outline", bold: true })],
+              spacing: { before: 400, after: 200 },
+            }),
+            
+            // Outline items
+            ...draft.outline.flatMap((section, index) => [
+              new Paragraph({
+                children: [
+                  new TextRun({ text: `${index + 1}. `, bold: true }),
+                  new TextRun({ text: section.section, bold: true }),
+                  new TextRun({ text: ` [${contributorLabel(section.contributor)}]`, italics: true }),
+                  new TextRun({ text: ` (~${section.suggestedLength})` }),
+                ],
+                spacing: { before: 200 },
+              }),
+              new Paragraph({
+                children: [new TextRun({ text: section.description })],
+                indent: { left: 400 },
+                spacing: { after: 100 },
+              }),
+            ]),
+            
+            // Talking Points section
+            new Paragraph({
+              heading: HeadingLevel.HEADING_2,
+              children: [new TextRun({ text: "Talking Points", bold: true })],
+              spacing: { before: 400, after: 200 },
+            }),
+            
+            // Talking points items
+            ...draft.talkingPoints.map((point) =>
+              new Paragraph({
+                children: [new TextRun({ text: `• ${point}` })],
+                indent: { left: 400 },
+                spacing: { after: 100 },
+              })
+            ),
+            
+            // Tone Notes section
+            new Paragraph({
+              heading: HeadingLevel.HEADING_2,
+              children: [new TextRun({ text: "Tone Notes", bold: true })],
+              spacing: { before: 400, after: 200 },
+            }),
+            new Paragraph({
+              children: [new TextRun({ text: draft.toneNotes })],
               indent: { left: 400 },
-              spacing: { after: 100 },
-            })
-          ),
-          
-          // Tone Notes section
-          new Paragraph({
-            heading: HeadingLevel.HEADING_2,
-            children: [new TextRun({ text: "Tone Notes", bold: true })],
-            spacing: { before: 400, after: 200 },
-          }),
-          new Paragraph({
-            children: [new TextRun({ text: draft.toneNotes })],
-            indent: { left: 400 },
-          }),
-        ],
-      },
-    ],
-  });
+            }),
+          ],
+        },
+      ],
+    });
 
-  const blob = await Packer.toBlob(doc);
-  const filename = sanitizeFilename(draft.title) + ".docx";
-  saveAs(blob, filename);
+    const blob = await Packer.toBlob(doc);
+    const filename = sanitizeFilename(draft.title) + ".docx";
+    saveAs(blob, filename);
+  } catch (error) {
+    console.error("Error generating Word document:", error);
+    throw error;
+  }
 }
