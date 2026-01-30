@@ -44,17 +44,38 @@ const GOOGLE_CLIENT_ID = "861292583943-nlc181v5rufgrgf86b6vh92jjkdkc1fa.apps.goo
 // Required scope for creating Google Docs
 const DOCS_SCOPE = "https://www.googleapis.com/auth/documents";
 
+// Detect if running inside an iframe (Lovable preview environment)
+const isInIframe = (): boolean => {
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true; // Cross-origin iframes throw errors, assume iframe
+  }
+};
+
 interface UseGoogleDocsReturn {
   isLoading: boolean;
   error: string | null;
   isGisLoaded: boolean;
+  isIframeBlocked: boolean;
   createGoogleDoc: (draft: CollabDraft, requesterName: string) => Promise<string | null>;
+  openInNewTab: () => void;
+}
+
+// Storage key for pending OAuth draft data
+const PENDING_OAUTH_DRAFT_KEY = "pending_google_docs_draft";
+
+interface PendingDraftData {
+  draft: CollabDraft;
+  requesterName: string;
+  timestamp: number;
 }
 
 export function useGoogleDocs(): UseGoogleDocsReturn {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isGisLoaded, setIsGisLoaded] = useState(false);
+  const [isIframeBlocked] = useState(() => isInIframe());
 
   // Check if GIS SDK is loaded
   useEffect(() => {
@@ -89,8 +110,30 @@ export function useGoogleDocs(): UseGoogleDocsReturn {
     };
   }, []);
 
+  // Store draft data for retrieval after OAuth redirect/popup
+  const storePendingDraft = useCallback((draft: CollabDraft, requesterName: string) => {
+    const data: PendingDraftData = {
+      draft,
+      requesterName,
+      timestamp: Date.now(),
+    };
+    localStorage.setItem(PENDING_OAUTH_DRAFT_KEY, JSON.stringify(data));
+  }, []);
+
+  // Open the current page in a new tab (for iframe workaround)
+  const openInNewTab = useCallback(() => {
+    window.open(window.location.href, "_blank");
+  }, []);
+
   const createGoogleDoc = useCallback(
     async (draft: CollabDraft, requesterName: string): Promise<string | null> => {
+      // If in iframe, store draft and prompt user to open in new tab
+      if (isIframeBlocked) {
+        storePendingDraft(draft, requesterName);
+        setError("iframe_blocked");
+        return null;
+      }
+
       setIsLoading(true);
       setError(null);
 
@@ -171,13 +214,15 @@ export function useGoogleDocs(): UseGoogleDocsReturn {
         tokenClient.requestAccessToken({ prompt: "" });
       });
     },
-    []
+    [isIframeBlocked, storePendingDraft]
   );
 
   return {
     isLoading,
     error,
     isGisLoaded,
+    isIframeBlocked,
     createGoogleDoc,
+    openInNewTab,
   };
 }
