@@ -87,8 +87,8 @@ export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
     name: "Lavender Dream",
     description: "Whisper of lavender",
     colors: {
-      primary: "255 18% 95%", // Near-white lavender
-      secondary: "270 14% 96%", // Softer lilac
+      primary: "255 18% 93%", // Near-white lavender
+      secondary: "270 14% 94%", // Softer lilac
       accent: "255 18% 95%",
       glow: "255 18% 93%",
     },
