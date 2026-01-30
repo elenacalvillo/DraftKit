@@ -1,75 +1,84 @@
 
-# Fix Google OAuth Popup Blocked in Preview (ERR_BLOCKED_BY_RESPONSE)
 
-## Problem
+# Add Privacy Policy Page for Google OAuth Verification
 
-Google's OAuth consent page refuses to load inside iframes for security reasons. The Lovable preview environment loads your app in an iframe, causing the `ERR_BLOCKED_BY_RESPONSE` error when the Google Identity Services SDK tries to open its consent popup.
+## Why This Is Needed
 
-## Solution
+Google requires a formal Privacy Policy page for OAuth app verification. The existing `/transparency` page is great for explaining your privacy philosophy, but Google's verification process specifically looks for a privacy policy that covers:
 
-Modify the OAuth flow to detect when running inside an iframe and handle it appropriately:
+- What data is collected
+- How data is used
+- Third-party services used
+- User rights (access, deletion)
+- Contact information
+- Last updated date
 
-1. **Detect iframe environment** - Check if the app is running inside an iframe
-2. **Use `window.open()` with proper targeting** - Force the OAuth flow to open in a new top-level window/tab instead of within the current context
-3. **Implement message passing** - After authorization completes in the new window, pass the token back to the parent window to continue the document creation flow
+## Implementation
 
-## Technical Implementation
+### 1. Create Privacy Policy Page
 
-### File: `src/hooks/useGoogleDocs.ts`
+**New file: `src/pages/PrivacyPolicy.tsx`**
 
-**Changes:**
-1. Add iframe detection helper
-2. Create a dedicated popup window for OAuth when in iframe context
-3. Handle the OAuth callback via `postMessage` communication between windows
-4. Keep the existing flow for non-iframe environments (production)
+A formal but still on-brand privacy policy page that covers all required sections:
 
-**Key code changes:**
+| Section | Content |
+|---------|---------|
+| Information We Collect | Account info, public newsletter data, collaboration requests, usage analytics |
+| How We Use Your Information | Provide services, improve features, communication |
+| Third-Party Services | Google APIs (Docs export), analytics tools |
+| Data Security | RLS, encryption, secure authentication |
+| Your Rights | Access, correction, deletion requests |
+| Google API Disclosure | Required disclosure about limited use of Google data |
+| Contact | hello@draftkit.app |
+| Updates | Last updated date, notification policy |
 
+The page will follow the same design pattern as Transparency (Navbar, motion animations, glass-card sections) to maintain brand consistency.
+
+### 2. Add Route
+
+**File: `src/App.tsx`**
+
+Add new route:
 ```typescript
-// Detect if running inside an iframe
-const isInIframe = (): boolean => {
-  try {
-    return window.self !== window.top;
-  } catch {
-    return true; // Cross-origin iframes throw errors
-  }
-};
-
-// When requesting the token, explicitly open in a new window
-if (isInIframe()) {
-  // Use a popup approach that works around iframe restrictions
-  const popup = window.open(
-    'about:blank',
-    'google-oauth-popup',
-    'width=500,height=600,scrollbars=yes'
-  );
-  // The GIS SDK will redirect to this popup
-}
+<Route path="/privacy" element={<PrivacyPolicy />} />
 ```
 
-**Alternative approach - Full page redirect:**
-If popups are blocked by the browser, implement a redirect-based flow:
-1. Store draft data in localStorage before redirect
-2. Redirect to Google OAuth
-3. On return, retrieve draft from localStorage and complete document creation
+### 3. Update Footer
 
-### File: `src/components/requests/CollabDraftModal.tsx`
+**File: `src/components/layout/Footer.tsx`**
 
-**Changes:**
-- Add user feedback when OAuth is blocked
-- Show clear messaging about opening in a new tab/window
-- Add a "Try in new tab" fallback button if popup fails
+Add a "Privacy Policy" link next to the existing "How we protect you" link:
+```typescript
+<Link to="/privacy">Privacy Policy</Link>
+<Link to="/transparency">How we protect you</Link>
+```
 
-## Verification Steps
+### 4. Cross-Link Between Pages
 
-1. Open the preview in Lovable
-2. Navigate to a collab request with a generated draft
-3. Click "Open in Google Docs" from the dropdown
-4. A new browser tab/window should open with Google's consent screen
-5. After granting permission, the Google Doc should be created with content
+- Add a link from Privacy Policy to Transparency for the human-readable version
+- Add a link from Transparency to Privacy Policy for the formal legal version
 
-## Fallback Behavior
+## Google-Required Disclosures
 
-If the popup/redirect approach still fails (e.g., aggressive popup blockers):
-- The existing fallback (copy to clipboard + open blank doc) remains available
-- User sees a helpful toast message explaining what happened
+For Google API verification, the Privacy Policy must include specific language about:
+
+1. **Limited Use Disclosure**: "DraftKit's use and transfer of information received from Google APIs adheres to the Google API Services User Data Policy, including the Limited Use requirements."
+
+2. **Scope Explanation**: Explain that the app only accesses Google Docs to create documents with user-initiated content, and does not store or access other Google data.
+
+## Files to Create/Modify
+
+| File | Action |
+|------|--------|
+| `src/pages/PrivacyPolicy.tsx` | Create new page |
+| `src/App.tsx` | Add route |
+| `src/components/layout/Footer.tsx` | Add link |
+
+## After Implementation
+
+Once the Privacy Policy page is live at `https://draftkit.app/privacy`:
+
+1. Go to Google Cloud Console > APIs & Services > OAuth consent screen
+2. Add the Privacy Policy URL: `https://draftkit.app/privacy`
+3. Submit for verification review
+
