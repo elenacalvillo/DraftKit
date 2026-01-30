@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Copy, ExternalLink, Check, AlertTriangle, ArrowLeft, User, BookOpen } from "lucide-react";
+import { Copy, ExternalLink, Check, AlertTriangle, ArrowLeft, User, BookOpen, Crown } from "lucide-react";
 import { Link } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
+import { usePro } from "@/hooks/usePro";
 import { supabase } from "@/integrations/supabase/client";
 import { settingsSchema, COLLAB_TYPE_METADATA, COLLAB_MODE_METADATA, COLLAB_MODE_OPTIONS, type CollabStyle, type DateMeaning, type CollabMode } from "@/lib/validations";
 import { useNavigate } from "react-router-dom";
@@ -41,6 +42,7 @@ const DISCOVERY_RECOMMENDED_TYPES = ['Virtual Coffee', 'Live Event / Webinar'];
 export default function Settings() {
   const navigate = useNavigate();
   const { user, creator, loading, refreshCreator, signOut } = useAuth();
+  const { isPro } = usePro();
   const [copied, setCopied] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isFetchingImage, setIsFetchingImage] = useState(false);
@@ -524,52 +526,77 @@ export default function Settings() {
 
             {/* Collaboration Mode Selector */}
             <div className="space-y-3">
-              <Label>How do you prefer to collaborate?</Label>
-              <div className="grid gap-3">
-                {COLLAB_MODE_OPTIONS.map((mode) => {
-                  const metadata = COLLAB_MODE_METADATA[mode];
-                  const isSelected = formData.collabMode === mode;
-                  return (
-                    <div
-                      key={mode}
-                      className={`p-5 rounded-xl border-2 cursor-pointer transition-all ${
-                        isSelected
-                          ? "bg-primary/10 border-primary shadow-sm"
-                          : "bg-muted/50 border-transparent hover:border-muted-foreground/20"
-                      }`}
-                      onClick={() => setFormData({ ...formData, collabMode: mode })}
-                    >
-                      <div className="flex items-start gap-3">
-                        <span className="text-2xl">{metadata.icon}</span>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-semibold">{metadata.label}</span>
-                            {mode === 'async' && (
-                              <Badge variant="secondary" className="text-xs">Recommended</Badge>
-                            )}
+              <div className="flex items-center gap-2">
+                <Label>How do you prefer to collaborate?</Label>
+                {!isPro && (
+                  <Badge variant="outline" className="text-xs border-primary/50 text-primary">
+                    <Crown className="w-3 h-3 mr-1" />
+                    Pro
+                  </Badge>
+                )}
+              </div>
+              {isPro ? (
+                <div className="grid gap-3">
+                  {COLLAB_MODE_OPTIONS.map((mode) => {
+                    const metadata = COLLAB_MODE_METADATA[mode];
+                    const isSelected = formData.collabMode === mode;
+                    return (
+                      <div
+                        key={mode}
+                        className={`p-5 rounded-xl border-2 cursor-pointer transition-all ${
+                          isSelected
+                            ? "bg-primary/10 border-primary shadow-sm"
+                            : "bg-muted/50 border-transparent hover:border-muted-foreground/20"
+                        }`}
+                        onClick={() => setFormData({ ...formData, collabMode: mode })}
+                      >
+                        <div className="flex items-start gap-3">
+                          <span className="text-2xl">{metadata.icon}</span>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-semibold">{metadata.label}</span>
+                              {mode === 'async' && (
+                                <Badge variant="secondary" className="text-xs">Recommended</Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground mb-2">{metadata.description}</p>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge 
+                                    variant="outline" 
+                                    className={`text-xs ${isSelected ? 'border-primary/50 text-primary' : ''}`}
+                                  >
+                                    {metadata.badge}
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="text-xs max-w-[200px]">{metadata.badgeTooltip}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           </div>
-                          <p className="text-sm text-muted-foreground mb-2">{metadata.description}</p>
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Badge 
-                                  variant="outline" 
-                                  className={`text-xs ${isSelected ? 'border-primary/50 text-primary' : ''}`}
-                                >
-                                  {metadata.badge}
-                                </Badge>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p className="text-xs max-w-[200px]">{metadata.badgeTooltip}</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="p-4 bg-muted/50 rounded-xl border border-dashed">
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Free accounts use <span className="font-medium text-foreground">"100% Async"</span> mode with Target Publication Dates.
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => navigate("/dashboard/settings?upgrade=true")}
+                    className="border-primary/30 text-primary hover:bg-primary/10"
+                  >
+                    <Crown className="w-3.5 h-3.5 mr-2" />
+                    Upgrade to customize your collaboration style
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* Date Meaning Selector - Only show for async mode */}
@@ -597,7 +624,7 @@ export default function Settings() {
                           {option.label}
                         </label>
                         <p className="text-sm text-muted-foreground">{option.description}</p>
-                      </div>
+            </div>
                     </div>
                   ))}
                 </RadioGroup>

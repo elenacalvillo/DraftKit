@@ -16,6 +16,8 @@ interface RequestCardProps {
   request: CollabRequest;
   creatorEmail?: string;
   creatorCollabStyles?: string[];
+  canApprove?: boolean;
+  isPro?: boolean;
   onApprove?: (id: string) => void;
   onDecline?: (id: string) => void;
   onCancel?: (id: string) => void;
@@ -26,7 +28,7 @@ interface RequestCardProps {
 
 const COLLAB_STYLE_OPTIONS = ["Virtual Coffee", "Async Drafting", "Interview Style", "Custom"];
 
-export function RequestCard({ request, creatorEmail, creatorCollabStyles, onApprove, onDecline, onCancel, onDraftGenerated, onCollabTypeChanged, onDelete }: RequestCardProps) {
+export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApprove = true, isPro = false, onApprove, onDecline, onCancel, onDraftGenerated, onCollabTypeChanged, onDelete }: RequestCardProps) {
   const { trackEvent } = useAnalytics();
   const [imageError, setImageError] = useState(false);
   const [showDraftModal, setShowDraftModal] = useState(false);
@@ -327,8 +329,9 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, onAppr
               variant="gradient"
               className="flex-1"
               onClick={() => onApprove?.(request.id)}
+              disabled={!canApprove}
             >
-              Approve
+              {canApprove ? "Approve" : "Limit Reached"}
             </Button>
             <Button
               variant="outline"

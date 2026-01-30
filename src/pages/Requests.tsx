@@ -8,6 +8,8 @@ import { CollabDraft } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useAnalytics } from "@/hooks/useAnalytics";
+import { usePro } from "@/hooks/usePro";
+import { useActiveCollabs } from "@/hooks/useActiveCollabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -36,6 +38,8 @@ export default function Requests() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, creator, loading } = useAuth();
   const { trackEvent } = useAnalytics();
+  const { isPro } = usePro();
+  const { activeCount, canApprove, refetch: refetchActiveCollabs } = useActiveCollabs();
   const [requests, setRequests] = useState<DbCollabRequest[]>([]);
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
@@ -119,6 +123,18 @@ export default function Requests() {
   const handleApprove = async (id: string) => {
     if (!creator) return;
 
+    // Free tier limit: only 1 active collaboration
+    if (!isPro && !canApprove) {
+      toast.error("Free tier is limited to 1 active collaboration", {
+        description: "Upgrade to Pro for unlimited collaborations",
+        action: {
+          label: "Go Pro",
+          onClick: () => navigate("/dashboard/settings?upgrade=true"),
+        },
+      });
+      return;
+    }
+
     const request = requests.find((r) => r.id === id);
     if (!request) return;
 
@@ -156,6 +172,9 @@ export default function Requests() {
     setRequests(
       requests.map((r) => (r.id === id ? { ...r, status: 'approved', approved_at: new Date().toISOString() } : r))
     );
+
+    // Refresh active collab count
+    refetchActiveCollabs();
 
     toast.success(`Collaboration with ${request.requester_name} approved!`, {
       description: "Click 'Generate Draft' to create a collaboration outline.",
@@ -409,6 +428,8 @@ export default function Requests() {
                   <RequestCard
                     request={request}
                     creatorEmail={user?.email || ""}
+                    canApprove={canApprove}
+                    isPro={isPro}
                     onApprove={handleApprove}
                     onDecline={handleDecline}
                     onCancel={handleCancel}

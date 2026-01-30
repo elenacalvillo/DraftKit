@@ -291,7 +291,11 @@ export type Database = {
           newsletter_url: string | null
           profile_image_url: string | null
           reminder_days_before: number | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          subscription_tier: string | null
           substack_url: string | null
+          trial_ends_at: string | null
           updated_at: string
           user_id: string
           username: string
@@ -310,7 +314,11 @@ export type Database = {
           newsletter_url?: string | null
           profile_image_url?: string | null
           reminder_days_before?: number | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_tier?: string | null
           substack_url?: string | null
+          trial_ends_at?: string | null
           updated_at?: string
           user_id: string
           username: string
@@ -329,7 +337,11 @@ export type Database = {
           newsletter_url?: string | null
           profile_image_url?: string | null
           reminder_days_before?: number | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_tier?: string | null
           substack_url?: string | null
+          trial_ends_at?: string | null
           updated_at?: string
           user_id?: string
           username?: string
@@ -513,6 +525,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_pro_user: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "user" | "pro"
