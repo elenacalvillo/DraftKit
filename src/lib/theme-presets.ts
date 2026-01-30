@@ -74,8 +74,8 @@ export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
     name: "Forest Mist",
     description: "Whisper of mint",
     colors: {
-      primary: "145 18% 94%", // Near-white mint
-      secondary: "155 14% 95%", // Softer sage
+      primary: "145 18% 93%", // Near-white mint
+      secondary: "155 14% 94%", // Softer sage
       accent: "145 18% 94%",
       glow: "145 18% 92%",
     },
@@ -100,8 +100,8 @@ export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
     name: "Silver Slate",
     description: "Whisper of silver",
     colors: {
-      primary: "220 8% 95%", // Near-white silver
-      secondary: "220 5% 97%", // Almost white
+      primary: "220 8% 93%", // Near-white silver
+      secondary: "220 5% 94%", // Almost white
       accent: "220 8% 95%",
       glow: "220 8% 93%",
     },
