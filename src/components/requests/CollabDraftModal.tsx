@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Copy, RefreshCw, Sparkles, User, Users, Clock, CheckCircle } from "lucide-react";
+import { Copy, RefreshCw, Sparkles, User, Users, Clock, CheckCircle, ChevronDown, FileText, FileIcon } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -9,10 +9,17 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { CollabDraft } from "@/lib/storage";
 import { useAnalytics } from "@/hooks/useAnalytics";
+import { exportToDocx, exportToGoogleDocs } from "@/lib/export-draft";
 
 interface CollabDraftModalProps {
   open: boolean;
@@ -204,19 +211,52 @@ Estimated Read Time: ${draft.estimatedReadTime}`;
 
             {/* Actions */}
             <div className="flex gap-3 pt-2">
-              <Button onClick={copyToClipboard} className="flex-1">
-                {copied ? (
-                  <>
-                    <CheckCircle className="w-4 h-4 mr-2" />
-                    Copied!
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-4 h-4 mr-2" />
-                    Copy Draft
-                  </>
-                )}
-              </Button>
+              <div className="flex-1 flex">
+                <Button onClick={copyToClipboard} className="flex-1 rounded-r-none">
+                  {copied ? (
+                    <>
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4 mr-2" />
+                      Copy Draft
+                    </>
+                  )}
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button className="rounded-l-none border-l border-primary-foreground/20 px-2">
+                      <ChevronDown className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="bg-popover border shadow-md z-50">
+                    <DropdownMenuItem 
+                      onClick={async () => {
+                        await exportToDocx(draft, requesterName);
+                        toast.success("Word document downloaded!");
+                        trackEvent("draft_exported_docx", { draft_title: draft.title });
+                      }}
+                      className="cursor-pointer"
+                    >
+                      <FileText className="w-4 h-4 mr-2" />
+                      Download as Word (.docx)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => {
+                        exportToGoogleDocs(draft, requesterName);
+                        toast.success("Opening Google Docs...");
+                        trackEvent("draft_exported_google_docs", { draft_title: draft.title });
+                      }}
+                      className="cursor-pointer"
+                    >
+                      <FileIcon className="w-4 h-4 mr-2" />
+                      Open in Google Docs
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
               {onRegenerate && (
                 <Button variant="outline" onClick={() => {
                   // Track regeneration request
