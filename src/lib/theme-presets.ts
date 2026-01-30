@@ -34,10 +34,11 @@ export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
     name: 'DraftKit Coral',
     description: 'Our signature warm coral gradient',
     colors: {
-      primary: '8 55% 80%', // Soft blush
-      secondary: '12 45% 84%', // Lighter blush
-      accent: '8 55% 80%',
-      glow: '8 55% 78%',
+      // REAL DraftKit brand colors from --gradient-primary
+      primary: '8 65% 65%',      // Authentic coral
+      secondary: '24 58% 60%',   // Terracotta end
+      accent: '8 65% 65%',
+      glow: '12 60% 72%',        // Mid-gradient for glow
     },
     angle: 135,
     isPro: false,
@@ -45,12 +46,12 @@ export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
   ocean: {
     id: 'ocean',
     name: 'Ocean Breeze',
-    description: 'Calm, airy sky blue',
+    description: 'Whisper of sky blue',
     colors: {
-      primary: '200 35% 85%', // Pale sky
-      secondary: '190 30% 88%', // Softer aqua
-      accent: '200 35% 85%',
-      glow: '200 35% 83%',
+      primary: '200 20% 95%',    // Near-white sky
+      secondary: '190 15% 96%',  // Softer aqua
+      accent: '200 20% 95%',
+      glow: '200 20% 93%',
     },
     angle: 135,
     isPro: true,
@@ -58,12 +59,12 @@ export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
   sunset: {
     id: 'sunset',
     name: 'Sunset Glow',
-    description: 'Warm peach whisper',
+    description: 'Whisper of peach warmth',
     colors: {
-      primary: '20 40% 85%', // Pale peach
-      secondary: '35 35% 88%', // Soft cream
-      accent: '20 40% 85%',
-      glow: '20 40% 83%',
+      primary: '20 22% 95%',     // Near-white peach
+      secondary: '35 18% 96%',   // Softer cream
+      accent: '20 22% 95%',
+      glow: '20 22% 93%',
     },
     angle: 135,
     isPro: true,
@@ -71,12 +72,12 @@ export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
   forest: {
     id: 'forest',
     name: 'Forest Mist',
-    description: 'Light mint whisper',
+    description: 'Whisper of mint',
     colors: {
-      primary: '145 30% 82%', // Pale mint
-      secondary: '155 25% 86%', // Softer sage
-      accent: '145 30% 82%',
-      glow: '145 30% 80%',
+      primary: '145 18% 94%',    // Near-white mint
+      secondary: '155 14% 95%',  // Softer sage
+      accent: '145 18% 94%',
+      glow: '145 18% 92%',
     },
     angle: 135,
     isPro: true,
@@ -84,12 +85,12 @@ export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
   midnight: {
     id: 'midnight',
     name: 'Lavender Dream',
-    description: 'Soft lavender mist',
+    description: 'Whisper of lavender',
     colors: {
-      primary: '255 28% 85%', // Pale lavender
-      secondary: '270 22% 88%', // Softer lilac
-      accent: '255 28% 85%',
-      glow: '255 28% 83%',
+      primary: '255 18% 95%',    // Near-white lavender
+      secondary: '270 14% 96%',  // Softer lilac
+      accent: '255 18% 95%',
+      glow: '255 18% 93%',
     },
     angle: 135,
     isPro: true,
@@ -97,12 +98,12 @@ export const THEME_PRESETS: Record<ThemePresetId, ThemePreset> = {
   monochrome: {
     id: 'monochrome',
     name: 'Silver Slate',
-    description: 'Soft cloud gray',
+    description: 'Whisper of silver',
     colors: {
-      primary: '220 12% 88%', // Pale silver
-      secondary: '220 8% 91%', // Near white
-      accent: '220 12% 88%',
-      glow: '220 12% 86%',
+      primary: '220 8% 95%',     // Near-white silver
+      secondary: '220 5% 97%',   // Almost white
+      accent: '220 8% 95%',
+      glow: '220 8% 93%',
     },
     angle: 135,
     isPro: true,
