@@ -1,6 +1,8 @@
 
 # Cloudflare Turnstile Anti-Bot Protection
 
+## Status: ✅ IMPLEMENTED (using test keys)
+
 ## Overview
 
 Add invisible/managed Cloudflare Turnstile protection to public-facing forms to prevent automated abuse while maintaining a seamless user experience. Turnstile is privacy-focused and less intrusive than reCAPTCHA.

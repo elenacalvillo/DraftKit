@@ -29,6 +29,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { signupStep1Schema, signupStep2Schema } from "@/lib/validations";
 import { toast } from "sonner";
 import { GoogleIcon } from "@/components/icons/GoogleIcon";
+import { TurnstileWidget } from "@/components/turnstile/TurnstileWidget";
+import { verifyTurnstileToken } from "@/lib/turnstile";
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -49,7 +51,7 @@ export default function Signup() {
   const [createdUser, setCreatedUser] = useState<CreatorData | null>(null);
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
-
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   // Check if coming from a collab request submission
   const prefillEmail = searchParams.get('email') || '';
   const prefillName = searchParams.get('name') || '';
@@ -106,7 +108,22 @@ export default function Signup() {
       return;
     }
 
+    // Verify Turnstile token
+    if (!turnstileToken) {
+      toast.error("Please complete the security check");
+      return;
+    }
+
     setIsLoading(true);
+
+    // Verify token with backend
+    const verifyResult = await verifyTurnstileToken(turnstileToken);
+    if (!verifyResult.success) {
+      toast.error("Security verification failed. Please try again.");
+      setTurnstileToken(null);
+      setIsLoading(false);
+      return;
+    }
 
     const { error, data } = await signUp(formData.email, formData.password);
 
@@ -461,12 +478,22 @@ export default function Signup() {
                     )}
                   </div>
 
+                  {/* Turnstile Widget */}
+                  <div className="flex justify-center">
+                    <TurnstileWidget
+                      onVerify={setTurnstileToken}
+                      onExpire={() => setTurnstileToken(null)}
+                      onError={() => setTurnstileToken(null)}
+                      theme="auto"
+                    />
+                  </div>
+
                   <Button
                     type="submit"
                     variant="hero"
                     size="lg"
                     className="w-full"
-                    disabled={isLoading}
+                    disabled={isLoading || !turnstileToken}
                   >
                     {isLoading ? (
                       <motion.div

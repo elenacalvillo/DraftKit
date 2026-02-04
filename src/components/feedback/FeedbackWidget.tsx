@@ -15,6 +15,8 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { TurnstileWidget } from "@/components/turnstile/TurnstileWidget";
+import { verifyTurnstileToken } from "@/lib/turnstile";
 
 export function FeedbackWidget() {
   const { user } = useAuth();
@@ -25,6 +27,7 @@ export function FeedbackWidget() {
   const [feedbackType, setFeedbackType] = useState<string>("");
   const [message, setMessage] = useState("");
   const [email, setEmail] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,7 +37,22 @@ export function FeedbackWidget() {
       return;
     }
 
+    // Verify Turnstile token
+    if (!turnstileToken) {
+      toast.error("Please complete the security check");
+      return;
+    }
+
     setIsSubmitting(true);
+
+    // Verify token with backend
+    const verifyResult = await verifyTurnstileToken(turnstileToken);
+    if (!verifyResult.success) {
+      toast.error("Security verification failed. Please try again.");
+      setTurnstileToken(null);
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
       const feedbackEmail = email.trim() || user?.email || null;
@@ -70,12 +88,18 @@ export function FeedbackWidget() {
       setFeedbackType("");
       setMessage("");
       setEmail("");
+      setTurnstileToken(null);
     } catch (e) {
       console.error("Failed to submit feedback:", e);
       toast.error("Failed to submit feedback. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleClose = () => {
+    setIsOpen(false);
+    setTurnstileToken(null); // Reset token when closing
   };
 
   return (
@@ -101,7 +125,7 @@ export function FeedbackWidget() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setIsOpen(false)}
+              onClick={handleClose}
               className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50"
             />
 
@@ -115,7 +139,7 @@ export function FeedbackWidget() {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold text-lg">Send Feedback</h3>
                 <button
-                  onClick={() => setIsOpen(false)}
+                  onClick={handleClose}
                   className="p-1 rounded-lg hover:bg-muted transition-colors"
                 >
                   <X className="w-5 h-5" />
@@ -195,11 +219,22 @@ export function FeedbackWidget() {
                   </div>
                 )}
 
+                {/* Turnstile Widget */}
+                <div className="flex justify-center">
+                  <TurnstileWidget
+                    onVerify={setTurnstileToken}
+                    onExpire={() => setTurnstileToken(null)}
+                    onError={() => setTurnstileToken(null)}
+                    theme="auto"
+                    size="compact"
+                  />
+                </div>
+
                 <Button
                   type="submit"
                   variant="gradient"
                   className="w-full"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !turnstileToken}
                 >
                   {isSubmitting ? (
                     <motion.div
