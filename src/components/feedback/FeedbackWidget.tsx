@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, X, Send, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -22,12 +22,19 @@ export function FeedbackWidget() {
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
   const [rating, setRating] = useState<number>(0);
   const [hoveredRating, setHoveredRating] = useState<number>(0);
   const [feedbackType, setFeedbackType] = useState<string>("");
   const [message, setMessage] = useState("");
   const [email, setEmail] = useState("");
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileTokenRef = useRef<string | null>(null);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    turnstileTokenRef.current = turnstileToken;
+  }, [turnstileToken]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,16 +44,36 @@ export function FeedbackWidget() {
       return;
     }
 
-    // Verify Turnstile token
-    if (!turnstileToken) {
-      toast.error("Please complete the security check");
-      return;
+    // If token not ready yet, show verifying state and wait
+    if (!turnstileTokenRef.current) {
+      setIsVerifying(true);
+      // Wait up to 3 seconds for the token
+      const token = await new Promise<string | null>((resolve) => {
+        let attempts = 0;
+        const checkToken = setInterval(() => {
+          attempts++;
+          if (turnstileTokenRef.current) {
+            clearInterval(checkToken);
+            resolve(turnstileTokenRef.current);
+          } else if (attempts >= 30) { // 3 seconds
+            clearInterval(checkToken);
+            resolve(null);
+          }
+        }, 100);
+      });
+      
+      setIsVerifying(false);
+      
+      if (!token) {
+        toast.error("Security verification is taking longer than expected. Please try again.");
+        return;
+      }
     }
 
     setIsSubmitting(true);
 
     // Verify token with backend
-    const verifyResult = await verifyTurnstileToken(turnstileToken);
+    const verifyResult = await verifyTurnstileToken(turnstileTokenRef.current!);
     if (!verifyResult.success) {
       toast.error("Security verification failed. Please try again.");
       setTurnstileToken(null);
@@ -230,9 +257,18 @@ export function FeedbackWidget() {
                   type="submit"
                   variant="gradient"
                   className="w-full"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isVerifying}
                 >
-                  {isSubmitting ? (
+                  {isVerifying ? (
+                    <>
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full mr-2"
+                      />
+                      Verifying...
+                    </>
+                  ) : isSubmitting ? (
                     <motion.div
                       animate={{ rotate: 360 }}
                       transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
