@@ -10,6 +10,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { loginSchema } from "@/lib/validations";
 import { toast } from "sonner";
 import { GoogleIcon } from "@/components/icons/GoogleIcon";
+import { TurnstileWidget } from "@/components/turnstile/TurnstileWidget";
+import { verifyTurnstileToken } from "@/lib/turnstile";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -23,6 +25,7 @@ export default function Login() {
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [authError, setAuthError] = useState<string | null>(null);
   const [shake, setShake] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && user && creator) {
@@ -47,7 +50,22 @@ export default function Login() {
       return;
     }
 
+    // Verify Turnstile token
+    if (!turnstileToken) {
+      toast.error("Please complete the security check");
+      return;
+    }
+
     setIsLoading(true);
+
+    // Verify token with backend
+    const verifyResult = await verifyTurnstileToken(turnstileToken);
+    if (!verifyResult.success) {
+      toast.error("Security verification failed. Please try again.");
+      setTurnstileToken(null);
+      setIsLoading(false);
+      return;
+    }
 
     const { error } = await signIn(formData.email, formData.password);
 
@@ -65,6 +83,7 @@ export default function Login() {
       toast.error(errorMessage);
       setShake(true);
       setTimeout(() => setShake(false), 500);
+      setTurnstileToken(null); // Reset token on error
       setIsLoading(false);
       return;
     }
@@ -204,12 +223,22 @@ export default function Login() {
               </div>
             )}
 
+            {/* Turnstile Widget */}
+            <div className="flex justify-center">
+              <TurnstileWidget
+                onVerify={setTurnstileToken}
+                onExpire={() => setTurnstileToken(null)}
+                onError={() => setTurnstileToken(null)}
+                theme="auto"
+              />
+            </div>
+
             <Button
               type="submit"
               variant="hero"
               size="lg"
               className="w-full"
-              disabled={isLoading}
+              disabled={isLoading || !turnstileToken}
             >
               {isLoading ? (
                 <motion.div

@@ -15,6 +15,8 @@ import { analyzeCollabMatch, type CollabSuggestion, type CollabMatchResult } fro
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { useAuth } from "@/hooks/useAuth";
 import { parseProfileTheme, getThemeStyles, type ProfileTheme } from "@/lib/theme-presets";
+import { TurnstileWidget } from "@/components/turnstile/TurnstileWidget";
+import { verifyTurnstileToken } from "@/lib/turnstile";
 
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -112,6 +114,8 @@ export default function PublicBooking() {
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [selectedAiSuggestion, setSelectedAiSuggestion] = useState<CollabSuggestion | null>(null);
 
+  // Turnstile state
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -373,6 +377,23 @@ export default function PublicBooking() {
       return;
     }
 
+    // Verify Turnstile token
+    if (!turnstileToken) {
+      toast.error("Please complete the security check");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    // Verify token with backend
+    const verifyResult = await verifyTurnstileToken(turnstileToken);
+    if (!verifyResult.success) {
+      toast.error("Security verification failed. Please try again.");
+      setTurnstileToken(null); // Reset to trigger widget refresh
+      setIsSubmitting(false);
+      return;
+    }
+
     // Normalize the newsletter URL before storing (ensures canonical format)
     const normalizedUrl = normalizeSubstackUrl(formData.substackUrl.trim());
     const normalizedSubstackUrl = normalizedUrl.normalized || formData.substackUrl.trim();
@@ -389,11 +410,10 @@ export default function PublicBooking() {
       if (existingRequest) {
         toast.error("This date has just been booked. Please select another date.");
         setSelectedDate(null);
+        setIsSubmitting(false);
         return;
       }
     }
-
-    setIsSubmitting(true);
 
     // Fetch requester's Substack profile image
     let requesterProfileImageUrl: string | null = null;
@@ -1217,12 +1237,22 @@ export default function PublicBooking() {
                     )}
                   </div>
 
+                  {/* Turnstile Widget */}
+                  <div className="flex justify-center">
+                    <TurnstileWidget
+                      onVerify={setTurnstileToken}
+                      onExpire={() => setTurnstileToken(null)}
+                      onError={() => setTurnstileToken(null)}
+                      theme="auto"
+                    />
+                  </div>
+
                   <Button
                     type="submit"
                     variant="hero"
                     size="lg"
                     className="w-full"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || !turnstileToken}
                   >
                     {isSubmitting ? (
                       <motion.div
