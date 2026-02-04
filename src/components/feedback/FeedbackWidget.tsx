@@ -219,22 +219,18 @@ export function FeedbackWidget() {
                   </div>
                 )}
 
-                {/* Turnstile Widget */}
-                <div className="flex justify-center">
-                  <TurnstileWidget
-                    onVerify={setTurnstileToken}
-                    onExpire={() => setTurnstileToken(null)}
-                    onError={() => setTurnstileToken(null)}
-                    theme="auto"
-                    size="compact"
-                  />
-                </div>
+                {/* Turnstile Widget (invisible) */}
+                <TurnstileWidget
+                  onVerify={setTurnstileToken}
+                  onExpire={() => setTurnstileToken(null)}
+                  onError={() => setTurnstileToken(null)}
+                />
 
                 <Button
                   type="submit"
                   variant="gradient"
                   className="w-full"
-                  disabled={isSubmitting || !turnstileToken}
+                  disabled={isSubmitting}
                 >
                   {isSubmitting ? (
                     <motion.div

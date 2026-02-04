@@ -22,7 +22,7 @@ interface TurnstileRenderOptions {
   'error-callback'?: () => void;
   'expired-callback'?: () => void;
   theme?: 'light' | 'dark' | 'auto';
-  size?: 'normal' | 'compact' | 'flexible';
+  size?: 'normal' | 'compact' | 'flexible' | 'invisible';
   appearance?: 'always' | 'execute' | 'interaction-only';
 }
 
@@ -31,7 +31,7 @@ export interface TurnstileWidgetProps {
   onError?: () => void;
   onExpire?: () => void;
   theme?: 'light' | 'dark' | 'auto';
-  size?: 'normal' | 'compact' | 'flexible';
+  size?: 'normal' | 'compact' | 'flexible' | 'invisible';
   appearance?: 'always' | 'execute' | 'interaction-only';
   className?: string;
 }
@@ -77,7 +77,7 @@ export function TurnstileWidget({
   onError,
   onExpire,
   theme = 'auto',
-  size = 'flexible',
+  size = 'invisible',
   appearance = 'always',
   className = '',
 }: TurnstileWidgetProps) {

@@ -1237,22 +1237,19 @@ export default function PublicBooking() {
                     )}
                   </div>
 
-                  {/* Turnstile Widget */}
-                  <div className="flex justify-center">
-                    <TurnstileWidget
-                      onVerify={setTurnstileToken}
-                      onExpire={() => setTurnstileToken(null)}
-                      onError={() => setTurnstileToken(null)}
-                      theme="auto"
-                    />
-                  </div>
+                  {/* Turnstile Widget (invisible) */}
+                  <TurnstileWidget
+                    onVerify={setTurnstileToken}
+                    onExpire={() => setTurnstileToken(null)}
+                    onError={() => setTurnstileToken(null)}
+                  />
 
                   <Button
                     type="submit"
                     variant="hero"
                     size="lg"
                     className="w-full"
-                    disabled={isSubmitting || !turnstileToken}
+                    disabled={isSubmitting}
                   >
                     {isSubmitting ? (
                       <motion.div
