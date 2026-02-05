@@ -30,6 +30,7 @@ export interface TurnstileWidgetProps {
   onVerify: (token: string) => void;
   onError?: () => void;
   onExpire?: () => void;
+  onBypass?: (reason: string) => void;
   theme?: 'light' | 'dark' | 'auto';
   size?: 'normal' | 'compact' | 'flexible';
   appearance?: 'always' | 'execute' | 'interaction-only';
@@ -115,6 +116,7 @@ const loadCallbacks: (() => void)[] = [];
    onVerify,
    onError,
    onExpire,
+  onBypass,
    theme = 'auto',
    size = 'flexible',
    appearance = 'interaction-only',
@@ -130,12 +132,14 @@ const loadCallbacks: (() => void)[] = [];
   const onVerifyRef = useRef(onVerify);
   const onErrorRef = useRef(onError);
   const onExpireRef = useRef(onExpire);
+  const onBypassRef = useRef(onBypass);
   
   // Update refs when props change (no effect re-run)
   useEffect(() => {
     onVerifyRef.current = onVerify;
     onErrorRef.current = onError;
     onExpireRef.current = onExpire;
+    onBypassRef.current = onBypass;
   });
  
    // Expose reset method to parent
@@ -186,6 +190,8 @@ const loadCallbacks: (() => void)[] = [];
           console.error('[Turnstile] Site key not configured in backend');
           setErrorType('config_missing');
           setIsLoading(false);
+          console.warn('Security bypassed due to load failure: config_missing');
+          onBypassRef.current?.('config_missing');
           onErrorRef.current?.();
           return;
         }
@@ -201,6 +207,8 @@ const loadCallbacks: (() => void)[] = [];
         console.error('[Turnstile] Failed to fetch config:', err);
         setErrorType('fetch_error');
         setIsLoading(false);
+        console.warn('Security bypassed due to load failure: fetch_error');
+        onBypassRef.current?.('fetch_error');
         onErrorRef.current?.();
       }
     };
@@ -228,8 +236,12 @@ const loadCallbacks: (() => void)[] = [];
         
         if (errMsg.includes('timed out')) {
           setErrorType('script_timeout');
+          console.warn('Security bypassed due to load failure: script_timeout');
+          onBypassRef.current?.('script_timeout');
         } else {
           setErrorType('script_blocked');
+          console.warn('Security bypassed due to load failure: script_blocked');
+          onBypassRef.current?.('script_blocked');
         }
         onErrorRef.current?.();
         return;
