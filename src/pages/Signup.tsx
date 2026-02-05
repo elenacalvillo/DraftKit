@@ -579,10 +579,6 @@ export default function Signup() {
                     )}
                   </Button>
 
-                  <p className="text-center text-xs text-muted-foreground mt-4 flex items-center justify-center gap-1.5">
-                    <Shield className="w-3.5 h-3.5 text-primary/60" />
-                    We respect your privacy. No data selling. We never train on your private drafts.
-                  </p>
                 </form>
 
                 {/* Divider */}
@@ -623,6 +619,11 @@ export default function Signup() {
                   <Link to="/login" className="text-primary hover:underline font-medium">
                     Sign in
                   </Link>
+                </p>
+
+                <p className="text-center text-xs text-muted-foreground mt-4 flex items-center justify-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5 text-primary/60" />
+                  We respect your privacy. No data selling. We never train on your private drafts.
                 </p>
               </motion.div>
             )}
