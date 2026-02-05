@@ -1,12 +1,8 @@
  import React, { useEffect, useRef, useCallback, forwardRef, useImperativeHandle, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
  
- // Cloudflare Turnstile site key - NO FALLBACK in production to catch misconfig
- const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY;
- 
- // Dev-only logging
- if (import.meta.env.DEV && TURNSTILE_SITE_KEY) {
-   console.log(`[Turnstile] Site key prefix: ${TURNSTILE_SITE_KEY.slice(0, 8)}... | Host: ${window.location.hostname}`);
- }
+// Error types for specific messaging
+type TurnstileErrorType = 'config_missing' | 'script_blocked' | 'script_timeout' | 'fetch_error' | null;
 
 declare global {
   interface Window {
@@ -49,8 +45,8 @@ export interface TurnstileWidgetProps {
 }
 
  // Track script load state globally
- let scriptState: ScriptState = 'idle';
- let scriptError: string | null = null;
+let scriptState: ScriptState = 'idle';
+let scriptError: string | null = null;
 const loadCallbacks: (() => void)[] = [];
  const errorCallbacks: ((error: string) => void)[] = [];
 
@@ -126,7 +122,9 @@ const loadCallbacks: (() => void)[] = [];
  }, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
-   const [loadError, setLoadError] = useState<string | null>(null);
+  const [siteKey, setSiteKey] = useState<string | null>(null);
+  const [errorType, setErrorType] = useState<TurnstileErrorType>(null);
+  const [isLoading, setIsLoading] = useState(true);
   
   // Store callbacks in refs to prevent effect re-runs
   const onVerifyRef = useRef(onVerify);
@@ -166,29 +164,76 @@ const loadCallbacks: (() => void)[] = [];
     onExpireRef.current?.();
   }, []);
 
+  // Fetch site key from backend on mount
   useEffect(() => {
     let mounted = true;
 
+    const fetchSiteKey = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('turnstile-config');
+        
+        if (!mounted) return;
+        
+        if (error) {
+          console.error('[Turnstile] Config fetch error:', error);
+          setErrorType('fetch_error');
+          setIsLoading(false);
+          onErrorRef.current?.();
+          return;
+        }
+        
+        if (!data?.siteKey) {
+          console.error('[Turnstile] Site key not configured in backend');
+          setErrorType('config_missing');
+          setIsLoading(false);
+          onErrorRef.current?.();
+          return;
+        }
+        
+        if (import.meta.env.DEV) {
+          console.log(`[Turnstile] Site key fetched: ${data.siteKey.slice(0, 8)}... | Host: ${window.location.hostname}`);
+        }
+        
+        setSiteKey(data.siteKey);
+        setIsLoading(false);
+      } catch (err) {
+        if (!mounted) return;
+        console.error('[Turnstile] Failed to fetch config:', err);
+        setErrorType('fetch_error');
+        setIsLoading(false);
+        onErrorRef.current?.();
+      }
+    };
+
+    fetchSiteKey();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Initialize widget once we have the site key
+  useEffect(() => {
+    if (!siteKey) return;
+    
+    let mounted = true;
+
     const initWidget = async () => {
-       // Check site key is configured
-       if (!TURNSTILE_SITE_KEY) {
-         const err = 'Turnstile site key not configured';
-         console.error('[Turnstile]', err);
-         setLoadError(err);
-         onErrorRef.current?.();
-         return;
-       }
- 
-       try {
-         await loadTurnstileScript();
-       } catch (err) {
-         if (!mounted) return;
-         const errMsg = err instanceof Error ? err.message : 'Script load failed';
-         console.error('[Turnstile]', errMsg);
-         setLoadError(errMsg);
-         onErrorRef.current?.();
-         return;
-       }
+      try {
+        await loadTurnstileScript();
+      } catch (err) {
+        if (!mounted) return;
+        const errMsg = err instanceof Error ? err.message : 'Script load failed';
+        console.error('[Turnstile]', errMsg);
+        
+        if (errMsg.includes('timed out')) {
+          setErrorType('script_timeout');
+        } else {
+          setErrorType('script_blocked');
+        }
+        onErrorRef.current?.();
+        return;
+      }
 
       if (!mounted || !containerRef.current || !window.turnstile) {
         return;
@@ -208,7 +253,7 @@ const loadCallbacks: (() => void)[] = [];
 
       // Render new widget
       widgetIdRef.current = window.turnstile.render(containerRef.current, {
-        sitekey: TURNSTILE_SITE_KEY,
+        sitekey: siteKey,
         callback: handleVerify,
         'error-callback': handleError,
         'expired-callback': handleExpire,
@@ -231,32 +276,48 @@ const loadCallbacks: (() => void)[] = [];
         widgetIdRef.current = null;
       }
     };
-  }, [theme, size, appearance]); // Only re-run on config changes, not callbacks
+  }, [siteKey, theme, size, appearance, handleVerify, handleError, handleExpire]);
 
-   // Show error state if script failed
-   if (loadError) {
-     return (
-       <div className={`min-h-[65px] flex items-center justify-center text-sm text-muted-foreground ${className}`}>
-         <span className="text-destructive">⚠️ Security check unavailable</span>
-       </div>
-     );
-   }
- 
-   return <div ref={containerRef} className={`min-h-[65px] ${className}`} />;
- });
- 
- TurnstileWidget.displayName = 'TurnstileWidget';
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className={`min-h-[65px] flex items-center justify-center text-sm text-muted-foreground ${className}`}>
+        <span>Loading security check...</span>
+      </div>
+    );
+  }
+
+  // Show specific error states
+  if (errorType) {
+    const errorMessages: Record<TurnstileErrorType & string, string> = {
+      config_missing: '⚠️ Security check misconfigured',
+      script_blocked: '⚠️ Security check blocked (ad blocker/network)',
+      script_timeout: '⚠️ Security check timed out',
+      fetch_error: '⚠️ Security check unavailable',
+    };
+    
+    return (
+      <div className={`min-h-[65px] flex items-center justify-center text-sm text-muted-foreground ${className}`}>
+        <span className="text-destructive">{errorMessages[errorType]}</span>
+      </div>
+    );
+  }
+
+  return <div ref={containerRef} className={`min-h-[65px] ${className}`} />;
+});
+
+TurnstileWidget.displayName = 'TurnstileWidget';
 
 // Hook for imperative control
- // Deprecated - use ref.reset() instead
- export function useTurnstileReset() {
-   return useCallback((widgetId: string | null) => {
-     if (widgetId && window.turnstile) {
-       try {
-         window.turnstile.reset(widgetId);
-       } catch {
-         // Ignore reset errors
-       }
-     }
-   }, []);
- }
+// Deprecated - use ref.reset() instead
+export function useTurnstileReset() {
+  return useCallback((widgetId: string | null) => {
+    if (widgetId && window.turnstile) {
+      try {
+        window.turnstile.reset(widgetId);
+      } catch {
+        // Ignore reset errors
+      }
+    }
+  }, []);
+}

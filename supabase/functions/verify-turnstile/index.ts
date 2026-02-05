@@ -6,8 +6,7 @@ const corsHeaders = {
 };
 
 // Cloudflare Turnstile test secret key (always passes)
-// Replace with real key from TURNSTILE_SECRET_KEY env var for production
-const TURNSTILE_SECRET_KEY = Deno.env.get('TURNSTILE_SECRET_KEY') || '1x0000000000000000000000000000000AA';
+const TURNSTILE_SECRET_KEY = Deno.env.get('TURNSTILE_SECRET_KEY');
 
 interface TurnstileVerifyResponse {
   success: boolean;
@@ -32,6 +31,15 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Check secret key is configured
+    if (!TURNSTILE_SECRET_KEY) {
+      console.error('[verify-turnstile] TURNSTILE_SECRET_KEY not configured');
+      return new Response(
+        JSON.stringify({ success: false, error: 'Turnstile secret key not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { token } = await req.json();
 
     if (!token) {
