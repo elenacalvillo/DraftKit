@@ -546,12 +546,14 @@ export default function Signup() {
                   </div>
 
                   {/* Turnstile Widget (invisible) */}
-                  <TurnstileWidget
-                    onVerify={handleTurnstileVerify}
-                    onExpire={handleTurnstileExpireOrError}
-                    onError={handleTurnstileError}
-                    onBypass={handleTurnstileBypass}
-                  />
+                   {!securityBypassed && (
+                     <TurnstileWidget
+                       onVerify={handleTurnstileVerify}
+                       onExpire={handleTurnstileExpireOrError}
+                       onError={handleTurnstileError}
+                       onBypass={handleTurnstileBypass}
+                     />
+                   )}
 
                   <Button
                     type="submit"
