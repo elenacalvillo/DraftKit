@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Mail, Lock, Sparkles, AlertCircle } from "lucide-react";
+import { ArrowLeft, Mail, Lock, Sparkles, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,6 +29,7 @@ export default function Login() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [securityError, setSecurityError] = useState<string | null>(null);
   const turnstileTokenRef = useRef<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Keep ref in sync with state
   const handleTurnstileVerify = useCallback((token: string) => {
@@ -232,9 +233,10 @@ export default function Login() {
                   Forgot password?
                 </Link>
               </div>
+              <div className="relative">
               <Input
                 id="password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 required
                 value={formData.password}
                 onChange={(e) => {
@@ -242,8 +244,21 @@ export default function Login() {
                   setAuthError(null);
                 }}
                 placeholder="••••••••"
-                className="h-12"
+                className="h-12 pr-10"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                tabIndex={-1}
+              >
+                {showPassword ? (
+                  <EyeOff className="w-4 h-4" />
+                ) : (
+                  <Eye className="w-4 h-4" />
+                )}
+              </button>
+              </div>
               {errors.password && (
                 <p className="text-sm text-destructive">{errors.password}</p>
               )}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Lock, Sparkles, CheckCircle, AlertCircle } from "lucide-react";
+import { ArrowLeft, Lock, Sparkles, CheckCircle, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +21,8 @@ export default function ResetPassword() {
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSession, setHasSession] = useState<boolean | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
     // Check if user arrived via password reset link
@@ -175,9 +177,10 @@ export default function ResetPassword() {
                   <Lock className="w-4 h-4" />
                   New Password
                 </Label>
-                <Input
+                <div className="relative">
+                  <Input
                   id="password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   required
                   value={password}
                   onChange={(e) => {
@@ -185,8 +188,21 @@ export default function ResetPassword() {
                     setError(null);
                   }}
                   placeholder="••••••••"
-                  className="h-12"
+                  className="h-12 pr-10"
                 />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -194,9 +210,10 @@ export default function ResetPassword() {
                   <Lock className="w-4 h-4" />
                   Confirm New Password
                 </Label>
-                <Input
+                <div className="relative">
+                  <Input
                   id="confirmPassword"
-                  type="password"
+                  type={showConfirmPassword ? "text" : "password"}
                   required
                   value={confirmPassword}
                   onChange={(e) => {
@@ -204,8 +221,21 @@ export default function ResetPassword() {
                     setError(null);
                   }}
                   placeholder="••••••••"
-                  className="h-12"
+                  className="h-12 pr-10"
                 />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    tabIndex={-1}
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
               </div>
 
               {error && (
