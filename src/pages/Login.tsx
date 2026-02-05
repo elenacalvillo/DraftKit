@@ -288,12 +288,14 @@ export default function Login() {
             )}
 
             {/* Turnstile Widget (invisible) */}
-            <TurnstileWidget
-              onVerify={handleTurnstileVerify}
-              onExpire={handleTurnstileExpireOrError}
-              onError={handleTurnstileError}
-              onBypass={handleTurnstileBypass}
-            />
+             {!securityBypassed && (
+               <TurnstileWidget
+                 onVerify={handleTurnstileVerify}
+                 onExpire={handleTurnstileExpireOrError}
+                 onError={handleTurnstileError}
+                 onBypass={handleTurnstileBypass}
+               />
+             )}
 
             <Button
               type="submit"
