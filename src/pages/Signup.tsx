@@ -16,6 +16,8 @@ import {
   Users,
   Shield,
   AlertCircle,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,6 +58,7 @@ export default function Signup() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [securityError, setSecurityError] = useState<string | null>(null);
   const turnstileTokenRef = useRef<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Keep ref in sync with state
   const handleTurnstileVerify = useCallback((token: string) => {
@@ -496,9 +499,10 @@ export default function Signup() {
                       <Lock className="w-4 h-4" />
                       Password
                     </Label>
+                    <div className="relative">
                     <Input
                       id="password"
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       required
                       minLength={6}
                       value={formData.password}
@@ -506,8 +510,21 @@ export default function Signup() {
                         setFormData({ ...formData, password: e.target.value })
                       }
                       placeholder="••••••••"
-                      className="h-12"
+                      className="h-12 pr-10"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      tabIndex={-1}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
+                    </button>
+                    </div>
                     {errors.password && (
                       <p className="text-sm text-destructive">{errors.password}</p>
                     )}
