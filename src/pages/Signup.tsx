@@ -1,4 +1,4 @@
- import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -15,6 +15,7 @@ import {
   Copy,
   Users,
   Shield,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,18 +54,20 @@ export default function Signup() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [securityError, setSecurityError] = useState<string | null>(null);
   const turnstileTokenRef = useRef<string | null>(null);
 
   // Keep ref in sync with state
-  const handleTurnstileVerify = (token: string) => {
+  const handleTurnstileVerify = useCallback((token: string) => {
     turnstileTokenRef.current = token;
     setTurnstileToken(token);
-  };
+    setSecurityError(null);
+  }, []);
 
-  const handleTurnstileExpireOrError = () => {
+  const handleTurnstileExpireOrError = useCallback(() => {
     turnstileTokenRef.current = null;
     setTurnstileToken(null);
-  };
+  }, []);
 
   // Check if coming from a collab request submission
   const prefillEmail = searchParams.get('email') || '';
@@ -105,6 +108,7 @@ export default function Signup() {
   const handleStep1 = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
+    setSecurityError(null);
     
     const result = signupStep1Schema.safeParse({
       email: formData.email,
@@ -127,7 +131,7 @@ export default function Signup() {
     let token = turnstileTokenRef.current;
     if (!token) {
       setIsVerifying(true);
-      const maxWait = 3000;
+      const maxWait = 10000;
       const interval = 100;
       let waited = 0;
       while (!turnstileTokenRef.current && waited < maxWait) {
@@ -138,7 +142,9 @@ export default function Signup() {
       setIsVerifying(false);
       
       if (!token) {
-        toast.error("Security verification timed out. Please try again.");
+        const errorMsg = "Security check took too long. If you're using a VPN or ad blocker, try disabling it temporarily.";
+        setSecurityError(errorMsg);
+        toast.error(errorMsg);
         setIsLoading(false);
         return;
       }
@@ -146,7 +152,9 @@ export default function Signup() {
 
     const verifyResult = await verifyTurnstileToken(token);
     if (!verifyResult.success) {
-      toast.error("Security verification failed. Please try again.");
+      const errorMsg = "Security check failed. Please refresh the page and try again. If the issue persists, try a different browser.";
+      setSecurityError(errorMsg);
+      toast.error(errorMsg);
       handleTurnstileExpireOrError();
       setIsLoading(false);
       return;
@@ -512,6 +520,14 @@ export default function Signup() {
                     onError={handleTurnstileExpireOrError}
                   />
 
+                  {/* Inline Security Error */}
+                  {securityError && (
+                    <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                      {securityError}
+                    </div>
+                  )}
+
                   <Button
                     type="submit"
                     variant="hero"
@@ -520,11 +536,14 @@ export default function Signup() {
                     disabled={isLoading || isVerifying}
                   >
                     {isLoading || isVerifying ? (
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                        className="w-5 h-5 border-2 border-primary-foreground border-t-transparent rounded-full"
-                      />
+                      <>
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                          className="w-5 h-5 border-2 border-primary-foreground border-t-transparent rounded-full mr-2"
+                        />
+                        {isVerifying ? "Verifying security..." : "Creating account..."}
+                      </>
                     ) : (
                       <>
                         Continue

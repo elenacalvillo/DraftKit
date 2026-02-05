@@ -117,12 +117,14 @@ export default function PublicBooking() {
   // Turnstile state
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [securityError, setSecurityError] = useState<string | null>(null);
   const turnstileTokenRef = useRef<string | null>(null);
 
   // Keep ref in sync with state
   const handleTurnstileVerify = useCallback((token: string) => {
     turnstileTokenRef.current = token;
     setTurnstileToken(token);
+    setSecurityError(null);
   }, []);
 
   const handleTurnstileExpireOrError = useCallback(() => {
@@ -371,6 +373,9 @@ export default function PublicBooking() {
     e.preventDefault();
     if ((!selectedDate && !isFlexibleDate) || !username || !creator) return;
     
+    // Clear security error on new attempt
+    setSecurityError(null);
+    
     // Require collab type selection if multiple available
     if (availableCollabTypes.length > 1 && !selectedCollabType) {
       setErrors(prev => ({ ...prev, collabType: "Please select a collaboration type" }));
@@ -397,7 +402,7 @@ export default function PublicBooking() {
     let token = turnstileTokenRef.current;
     if (!token) {
       setIsVerifying(true);
-      const maxWait = 3000;
+      const maxWait = 10000;
       const interval = 100;
       let waited = 0;
       while (!turnstileTokenRef.current && waited < maxWait) {
@@ -408,7 +413,9 @@ export default function PublicBooking() {
       setIsVerifying(false);
       
       if (!token) {
-        toast.error("Security verification timed out. Please try again.");
+        const errorMsg = "Security check took too long. If you're using a VPN or ad blocker, try disabling it temporarily.";
+        setSecurityError(errorMsg);
+        toast.error(errorMsg);
         setIsSubmitting(false);
         return;
       }
@@ -416,7 +423,9 @@ export default function PublicBooking() {
 
     const verifyResult = await verifyTurnstileToken(token);
     if (!verifyResult.success) {
-      toast.error("Security verification failed. Please try again.");
+      const errorMsg = "Security check failed. Please refresh the page and try again. If the issue persists, try a different browser.";
+      setSecurityError(errorMsg);
+      toast.error(errorMsg);
       handleTurnstileExpireOrError();
       setIsSubmitting(false);
       return;
@@ -1267,24 +1276,35 @@ export default function PublicBooking() {
 
                   {/* Turnstile Widget (invisible) */}
                   <TurnstileWidget
-              onVerify={handleTurnstileVerify}
-              onExpire={handleTurnstileExpireOrError}
-              onError={handleTurnstileExpireOrError}
+                    onVerify={handleTurnstileVerify}
+                    onExpire={handleTurnstileExpireOrError}
+                    onError={handleTurnstileExpireOrError}
                   />
+
+                  {/* Inline Security Error */}
+                  {securityError && (
+                    <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                      {securityError}
+                    </div>
+                  )}
 
                   <Button
                     type="submit"
                     variant="hero"
                     size="lg"
                     className="w-full"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || isVerifying}
                   >
-                    {isSubmitting ? (
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                        className="w-5 h-5 border-2 border-primary-foreground border-t-transparent rounded-full"
-                      />
+                    {isSubmitting || isVerifying ? (
+                      <>
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                          className="w-5 h-5 border-2 border-primary-foreground border-t-transparent rounded-full mr-2"
+                        />
+                        {isVerifying ? "Verifying security..." : "Submitting..."}
+                      </>
                     ) : (
                       <>
                         <Sparkles className="w-5 h-5 mr-2" />

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageCircle, X, Send, Star } from "lucide-react";
+import { MessageCircle, X, Send, Star, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,7 @@ export function FeedbackWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [securityError, setSecurityError] = useState<string | null>(null);
   const [rating, setRating] = useState<number>(0);
   const [hoveredRating, setHoveredRating] = useState<number>(0);
   const [feedbackType, setFeedbackType] = useState<string>("");
@@ -38,6 +39,7 @@ export function FeedbackWidget() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSecurityError(null);
 
     if (!feedbackType || !message.trim()) {
       toast.error("Please select a type and enter your feedback");
@@ -47,7 +49,7 @@ export function FeedbackWidget() {
     // If token not ready yet, show verifying state and wait
     if (!turnstileTokenRef.current) {
       setIsVerifying(true);
-      // Wait up to 3 seconds for the token
+      // Wait up to 10 seconds for the token
       const token = await new Promise<string | null>((resolve) => {
         let attempts = 0;
         const checkToken = setInterval(() => {
@@ -55,7 +57,7 @@ export function FeedbackWidget() {
           if (turnstileTokenRef.current) {
             clearInterval(checkToken);
             resolve(turnstileTokenRef.current);
-          } else if (attempts >= 30) { // 3 seconds
+          } else if (attempts >= 100) { // 10 seconds
             clearInterval(checkToken);
             resolve(null);
           }
@@ -65,7 +67,9 @@ export function FeedbackWidget() {
       setIsVerifying(false);
       
       if (!token) {
-        toast.error("Security verification is taking longer than expected. Please try again.");
+        const errorMsg = "Security check took too long. If you're using a VPN or ad blocker, try disabling it temporarily.";
+        setSecurityError(errorMsg);
+        toast.error(errorMsg);
         return;
       }
     }
@@ -75,7 +79,9 @@ export function FeedbackWidget() {
     // Verify token with backend
     const verifyResult = await verifyTurnstileToken(turnstileTokenRef.current!);
     if (!verifyResult.success) {
-      toast.error("Security verification failed. Please try again.");
+      const errorMsg = "Security check failed. Please refresh the page and try again.";
+      setSecurityError(errorMsg);
+      toast.error(errorMsg);
       setTurnstileToken(null);
       setIsSubmitting(false);
       return;
@@ -116,6 +122,7 @@ export function FeedbackWidget() {
       setMessage("");
       setEmail("");
       setTurnstileToken(null);
+      setSecurityError(null);
     } catch (e) {
       console.error("Failed to submit feedback:", e);
       toast.error("Failed to submit feedback. Please try again.");
@@ -127,6 +134,7 @@ export function FeedbackWidget() {
   const handleClose = () => {
     setIsOpen(false);
     setTurnstileToken(null); // Reset token when closing
+    setSecurityError(null);
   };
 
   return (
@@ -252,6 +260,14 @@ export function FeedbackWidget() {
                   onExpire={() => setTurnstileToken(null)}
                   onError={() => setTurnstileToken(null)}
                 />
+
+                {/* Inline Security Error */}
+                {securityError && (
+                  <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    {securityError}
+                  </div>
+                )}
 
                 <Button
                   type="submit"

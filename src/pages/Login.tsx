@@ -1,4 +1,4 @@
- import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Mail, Lock, Sparkles, AlertCircle } from "lucide-react";
@@ -27,18 +27,20 @@ export default function Login() {
   const [shake, setShake] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [securityError, setSecurityError] = useState<string | null>(null);
   const turnstileTokenRef = useRef<string | null>(null);
 
   // Keep ref in sync with state
-  const handleTurnstileVerify = (token: string) => {
+  const handleTurnstileVerify = useCallback((token: string) => {
     turnstileTokenRef.current = token;
     setTurnstileToken(token);
-  };
+    setSecurityError(null);
+  }, []);
 
-  const handleTurnstileExpireOrError = () => {
+  const handleTurnstileExpireOrError = useCallback(() => {
     turnstileTokenRef.current = null;
     setTurnstileToken(null);
-  };
+  }, []);
 
   useEffect(() => {
     if (!loading && user && creator) {
@@ -50,6 +52,7 @@ export default function Login() {
     e.preventDefault();
     setErrors({});
     setAuthError(null);
+    setSecurityError(null);
     
     const result = loginSchema.safeParse(formData);
     if (!result.success) {
@@ -68,8 +71,8 @@ export default function Login() {
     let token = turnstileTokenRef.current;
     if (!token) {
       setIsVerifying(true);
-      // Poll for token (invisible mode generates it in background)
-      const maxWait = 3000;
+      // Poll for token (10 second timeout)
+      const maxWait = 10000;
       const interval = 100;
       let waited = 0;
       while (!turnstileTokenRef.current && waited < maxWait) {
@@ -80,7 +83,9 @@ export default function Login() {
       setIsVerifying(false);
       
       if (!token) {
-        toast.error("Security verification timed out. Please try again.");
+        const errorMsg = "Security check took too long. If you're using a VPN or ad blocker, try disabling it temporarily.";
+        setSecurityError(errorMsg);
+        toast.error(errorMsg);
         setIsLoading(false);
         return;
       }
@@ -88,7 +93,9 @@ export default function Login() {
 
     const verifyResult = await verifyTurnstileToken(token);
     if (!verifyResult.success) {
-      toast.error("Security verification failed. Please try again.");
+      const errorMsg = "Security check failed. Please refresh the page and try again. If the issue persists, try a different browser.";
+      setSecurityError(errorMsg);
+      toast.error(errorMsg);
       handleTurnstileExpireOrError();
       setIsLoading(false);
       return;
@@ -250,6 +257,14 @@ export default function Login() {
               </div>
             )}
 
+            {/* Inline Security Error */}
+            {securityError && (
+              <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                {securityError}
+              </div>
+            )}
+
             {/* Turnstile Widget (invisible) */}
             <TurnstileWidget
               onVerify={handleTurnstileVerify}
@@ -265,11 +280,14 @@ export default function Login() {
               disabled={isLoading || isVerifying}
             >
               {isLoading || isVerifying ? (
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                  className="w-5 h-5 border-2 border-primary-foreground border-t-transparent rounded-full"
-                />
+                <>
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    className="w-5 h-5 border-2 border-primary-foreground border-t-transparent rounded-full mr-2"
+                  />
+                  {isVerifying ? "Verifying security..." : "Signing in..."}
+                </>
               ) : (
                 "Sign In"
               )}
