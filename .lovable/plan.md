@@ -1,42 +1,66 @@
 
-# Emergency Turnstile Bypass (Circuit Breaker)
+# Final Turnstile Fixes
 
 ## Objective
-Enable the "Continue" button on Signup and Login even when Turnstile fails, so your 119 visitors can sign up immediately. Log bypassed events for tracking.
+Complete the emergency bypass with three fixes:
+1. Backend circuit breaker in the edge function
+2. Hide the TurnstileWidget container when bypassed to remove spacing gap
+3. Ensure Continue button is always enabled from page load
 
 ---
 
-## Implementation Summary
+## Implementation Details
 
-### 1. Add Kill Switch Secret
-Create a new backend secret `TURNSTILE_BYPASS_ENABLED` (value: `true` or `false`). When `true`, the bypass logic is active. When you want to enforce security later, set it to `false` without any code changes.
+### 1. Update verify-turnstile Edge Function (Circuit Breaker)
 
-### 2. Update TurnstileWidget.tsx
-Add a new prop `onBypass` that fires when the widget encounters any error (load failure, script blocked, config fetch error, etc.). This callback will pass a reason string for logging.
+**File:** `supabase/functions/verify-turnstile/index.ts`
 
-Current behavior: Shows error message and blocks submission
-New behavior: Shows error message AND calls `onBypass("reason")` so parent can enable submission
+Add logic at the top of the function to check the `TURNSTILE_BYPASS_ENABLED` secret. If it's `true`, immediately return success without calling Cloudflare.
 
-### 3. Update Signup.tsx
-- Add `securityBypassed` state (boolean)
-- When `handleTurnstileError` fires, set `securityBypassed = true` and log: `console.warn('Security bypassed due to load failure')`
-- In `handleStep1` submit handler:
-  - If `securityBypassed === true`, skip the token polling and verification entirely
-  - Log: `console.warn('Signup proceeding without security check')`
-  - Proceed directly to `signUp()`
-- Keep "Continue" button enabled (remove the check for turnstile token in disabled state)
+**Changes:**
+- Read `TURNSTILE_BYPASS_ENABLED` from environment
+- If enabled, log a warning and return `{ success: true, bypassed: true }` immediately
+- Skip all Cloudflare verification when bypass is active
 
-### 4. Update Login.tsx
-Same pattern:
-- Add `securityBypassed` state
-- When `handleTurnstileError` fires, set `securityBypassed = true` and log bypass
-- In `handleSubmit`:
-  - If `securityBypassed === true`, skip token check and verification
-  - Log warning and proceed to `signIn()`
-- Keep "Sign In" button enabled
+```text
+Request arrives
+      |
+      v
+Check TURNSTILE_BYPASS_ENABLED env var
+      |
+      +-- "true" --> console.warn("[verify-turnstile] Security bypassed via Kill Switch")
+      |              --> Return { success: true, bypassed: true }
+      |
+      +-- "false" or missing --> Continue normal verification flow
+```
 
-### 5. Update verify-turnstile Edge Function (Optional Enhancement)
-Add logic to read `TURNSTILE_BYPASS_ENABLED`. If bypass is enabled and token is missing/invalid, return `{ success: true, bypassed: true }` instead of failing. This is a belt-and-suspenders approach in case the frontend check is somehow circumvented.
+### 2. Fix Spacing: Hide TurnstileWidget When Bypassed
+
+**File:** `src/pages/Signup.tsx` and `src/pages/Login.tsx`
+
+Currently the TurnstileWidget always renders (even with an error message), which creates a 65px gap. When `securityBypassed` is true, we should not render it at all.
+
+**Changes:**
+- Wrap the `<TurnstileWidget>` in a conditional: `{!securityBypassed && <TurnstileWidget ... />}`
+- This removes the 65px min-height container when bypass is active
+- The button snaps up to just below the password field
+
+### 3. Unblock the Button: Always Enabled from Page Load
+
+**Current state:** The button is already only disabled by `isLoading` (line 561 in Signup.tsx, line 238 in Login.tsx shown in provided code). The Turnstile token is NOT blocking the button.
+
+**Verification:** Looking at line 556-561:
+```tsx
+<Button
+  type="submit"
+  variant="hero"
+  size="lg"
+  className="w-full"
+  disabled={isLoading}  // Only isLoading controls disabled state
+>
+```
+
+The button is already fully active and orange when the page loads. No changes needed here, but I'll verify the same pattern exists in Login.tsx.
 
 ---
 
@@ -44,75 +68,53 @@ Add logic to read `TURNSTILE_BYPASS_ENABLED`. If bypass is enabled and token is 
 
 | File | Changes |
 |------|---------|
-| `src/components/turnstile/TurnstileWidget.tsx` | Add `onBypass` prop that fires on any error with reason |
-| `src/pages/Signup.tsx` | Add `securityBypassed` state, skip verification when true, log warnings |
-| `src/pages/Login.tsx` | Same bypass logic as Signup |
-| `supabase/functions/verify-turnstile/index.ts` | Optional: respect `TURNSTILE_BYPASS_ENABLED` flag |
+| `supabase/functions/verify-turnstile/index.ts` | Add kill switch check at top, return early if `TURNSTILE_BYPASS_ENABLED=true` |
+| `src/pages/Signup.tsx` | Wrap TurnstileWidget in `{!securityBypassed && ...}` conditional |
+| `src/pages/Login.tsx` | Same conditional rendering for TurnstileWidget |
 
 ---
 
-## How It Works
+## Edge Function Change Detail
 
-```text
-User visits /signup
-       |
-       v
-TurnstileWidget mounts
-       |
-       +-- Fetch siteKey from backend
-       |       |
-       |       +-- Fails? --> onBypass("fetch_error") --> securityBypassed = true
-       |       |              console.warn('Security bypassed due to load failure')
-       |       v
-       +-- Load Cloudflare script
-       |       |
-       |       +-- Blocked/Timeout? --> onBypass("script_blocked") 
-       |       |                        --> securityBypassed = true
-       |       v
-       +-- Render widget
-               |
-               +-- Error callback? --> onBypass("widget_error")
-                                       --> securityBypassed = true
+```typescript
+// At the top of the handler, before any other logic:
+const BYPASS_ENABLED = Deno.env.get("TURNSTILE_BYPASS_ENABLED") === "true";
 
-User clicks "Continue"
-       |
-       v
-Check securityBypassed?
-       |
-       +-- true --> console.warn('Signup proceeding without security check')
-       |            --> Skip token verification
-       |            --> Call signUp() directly
-       |
-       +-- false --> Normal flow (wait for token, verify, then signUp)
+if (BYPASS_ENABLED) {
+  console.warn("[verify-turnstile] Security bypassed via Kill Switch");
+  return new Response(
+    JSON.stringify({ success: true, bypassed: true }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
+// Then continue with normal verification...
 ```
 
 ---
 
-## Kill Switch Usage
+## Visual Result After Fix
 
-To disable bypass later:
-1. Go to your backend secrets
-2. Set `TURNSTILE_BYPASS_ENABLED` to `false`
-3. No code deploy needed - the backend will enforce verification again
+**Before (current):**
+```
+[Password field]
+[65px gap - "Security check blocked" message]
+[Continue button]
+```
 
-To re-enable bypass during another outage:
-1. Set `TURNSTILE_BYPASS_ENABLED` to `true`
-
-Note: The frontend bypass is always active when the widget fails. The kill switch controls whether the backend also accepts requests without valid tokens.
-
----
-
-## Console Logging
-
-When bypass is triggered, you'll see:
-- `console.warn('Security bypassed due to load failure')` - when widget fails to load
-- `console.warn('Signup proceeding without security check')` - when form is submitted with bypass active
-- `console.warn('Login proceeding without security check')` - same for login
-
-This lets you track bypass events in any log aggregator.
+**After (with bypass active):**
+```
+[Password field]
+[Continue button]  <-- snaps up, no gap
+```
 
 ---
 
-## Security Note
+## Testing Checklist
 
-This bypass is a calculated tradeoff: you're accepting slightly higher bot risk in exchange for not blocking real users. With the kill switch, you can re-enable strict security once Cloudflare/DNS stabilizes.
+1. Enable an ad blocker or block Cloudflare domains
+2. Visit /signup - the Continue button should be orange and clickable immediately
+3. No visible gap between password field and button
+4. Submit the form - it should proceed without errors
+5. Check console for "Security bypassed" warnings
+6. Check edge function logs for "[verify-turnstile] Security bypassed via Kill Switch"
