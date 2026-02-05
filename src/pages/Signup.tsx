@@ -59,6 +59,7 @@ export default function Signup() {
   const [securityError, setSecurityError] = useState<string | null>(null);
   const turnstileTokenRef = useRef<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [securityBypassed, setSecurityBypassed] = useState(false);
 
   // Keep ref in sync with state
   const handleTurnstileVerify = useCallback((token: string) => {
@@ -76,8 +77,13 @@ export default function Signup() {
    const handleTurnstileError = useCallback(() => {
      turnstileTokenRef.current = null;
      setTurnstileToken(null);
-     const errorMsg = "Security check couldn't load. If you use an ad blocker or strict privacy mode, try disabling it or use another browser.";
-     setSecurityError(errorMsg);
+     setSecurityBypassed(true);
+   }, []);
+
+   // Callback when bypass is triggered
+   const handleTurnstileBypass = useCallback((reason: string) => {
+     console.warn('Security bypassed due to load failure:', reason);
+     setSecurityBypassed(true);
    }, []);
 
   // Check if coming from a collab request submission
@@ -138,43 +144,38 @@ export default function Signup() {
 
     setIsLoading(true);
 
-    // Wait for turnstile token if not ready yet (invisible mode may still be processing)
-    let token = turnstileTokenRef.current;
-    if (!token) {
-      setIsVerifying(true);
-      const maxWait = 10000;
-      const interval = 100;
-      let waited = 0;
-      while (!turnstileTokenRef.current && waited < maxWait) {
-        await new Promise(r => setTimeout(r, interval));
-        waited += interval;
-      }
-      token = turnstileTokenRef.current;
-      setIsVerifying(false);
-      
+    // If security was bypassed (Turnstile failed to load), skip verification entirely
+    if (securityBypassed) {
+      console.warn('Signup proceeding without security check');
+    } else {
+      // Wait for turnstile token if not ready yet (invisible mode may still be processing)
+      let token = turnstileTokenRef.current;
       if (!token) {
-        const errorMsg = "Security check took too long. If you're using a VPN or ad blocker, try disabling it temporarily.";
-        setSecurityError(errorMsg);
-        toast.error(errorMsg);
-        setIsLoading(false);
-        return;
+        setIsVerifying(true);
+        const maxWait = 10000;
+        const interval = 100;
+        let waited = 0;
+        while (!turnstileTokenRef.current && waited < maxWait) {
+          await new Promise(r => setTimeout(r, interval));
+          waited += interval;
+        }
+        token = turnstileTokenRef.current;
+        setIsVerifying(false);
+        
+        if (!token) {
+          // Token still not available - bypass and proceed
+          console.warn('Signup proceeding without security check (token timeout)');
+        }
       }
-    }
 
-    const verifyResult = await verifyTurnstileToken(token);
-    if (!verifyResult.success) {
-       // Check for configuration issues vs user issues
-       const isConfigError = verifyResult.codes?.some(c => 
-         ['invalid-input-secret', 'invalid-input-response', 'bad-request'].includes(c)
-       );
-       const errorMsg = isConfigError
-         ? "Security verification error. Please try again in a moment."
-         : "Security check failed. Please refresh the page and try again. If the issue persists, try a different browser.";
-      setSecurityError(errorMsg);
-      toast.error(errorMsg);
-      handleTurnstileExpireOrError();
-      setIsLoading(false);
-      return;
+      // Only verify if we have a token
+      if (token) {
+        const verifyResult = await verifyTurnstileToken(token);
+        if (!verifyResult.success) {
+          // Log but proceed anyway - bypass mode
+          console.warn('Turnstile verification failed, proceeding anyway:', verifyResult.codes);
+        }
+      }
     }
 
     const { error, data } = await signUp(formData.email, formData.password);
@@ -548,32 +549,25 @@ export default function Signup() {
                   <TurnstileWidget
                     onVerify={handleTurnstileVerify}
                     onExpire={handleTurnstileExpireOrError}
-                   onError={handleTurnstileError}
+                    onError={handleTurnstileError}
+                    onBypass={handleTurnstileBypass}
                   />
-
-                  {/* Inline Security Error */}
-                  {securityError && (
-                    <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                      {securityError}
-                    </div>
-                  )}
 
                   <Button
                     type="submit"
                     variant="hero"
                     size="lg"
                     className="w-full"
-                    disabled={isLoading || isVerifying}
+                    disabled={isLoading}
                   >
-                    {isLoading || isVerifying ? (
+                    {isLoading ? (
                       <>
                         <motion.div
                           animate={{ rotate: 360 }}
                           transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                           className="w-5 h-5 border-2 border-primary-foreground border-t-transparent rounded-full mr-2"
                         />
-                        {isVerifying ? "Verifying security..." : "Creating account..."}
+                        Creating account...
                       </>
                     ) : (
                       <>
