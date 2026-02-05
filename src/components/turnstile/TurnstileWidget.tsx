@@ -301,18 +301,8 @@ const loadCallbacks: (() => void)[] = [];
 
   // Show specific error states
   if (errorType) {
-    const errorMessages: Record<TurnstileErrorType & string, string> = {
-      config_missing: '⚠️ Security check misconfigured',
-      script_blocked: '⚠️ Security check blocked (ad blocker/network)',
-      script_timeout: '⚠️ Security check timed out',
-      fetch_error: '⚠️ Security check unavailable',
-    };
-    
-    return (
-      <div className={`min-h-[65px] flex items-center justify-center text-sm text-muted-foreground ${className}`}>
-        <span className="text-destructive">{errorMessages[errorType]}</span>
-      </div>
-    );
+    // When error occurs, render nothing - bypass is active
+    return null;
   }
 
   return <div ref={containerRef} className={`min-h-[65px] ${className}`} />;
