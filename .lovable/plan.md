@@ -1,66 +1,15 @@
 
-# Final Turnstile Fixes
 
-## Objective
-Complete the emergency bypass with three fixes:
-1. Backend circuit breaker in the edge function
-2. Hide the TurnstileWidget container when bypassed to remove spacing gap
-3. Ensure Continue button is always enabled from page load
+# Fix Turnstile Layout Gap
 
----
+## Problem
+When Turnstile fails, there's still a 65px gap between the password field and the Continue button. This happens because:
+1. The TurnstileWidget renders with `min-h-[65px]` in all states (loading, error, success)
+2. When an error occurs, the widget calls `onBypass` but still renders the error message div
+3. The parent's `securityBypassed` state updates, but there's a brief moment where the error div is visible
 
-## Implementation Details
-
-### 1. Update verify-turnstile Edge Function (Circuit Breaker)
-
-**File:** `supabase/functions/verify-turnstile/index.ts`
-
-Add logic at the top of the function to check the `TURNSTILE_BYPASS_ENABLED` secret. If it's `true`, immediately return success without calling Cloudflare.
-
-**Changes:**
-- Read `TURNSTILE_BYPASS_ENABLED` from environment
-- If enabled, log a warning and return `{ success: true, bypassed: true }` immediately
-- Skip all Cloudflare verification when bypass is active
-
-```text
-Request arrives
-      |
-      v
-Check TURNSTILE_BYPASS_ENABLED env var
-      |
-      +-- "true" --> console.warn("[verify-turnstile] Security bypassed via Kill Switch")
-      |              --> Return { success: true, bypassed: true }
-      |
-      +-- "false" or missing --> Continue normal verification flow
-```
-
-### 2. Fix Spacing: Hide TurnstileWidget When Bypassed
-
-**File:** `src/pages/Signup.tsx` and `src/pages/Login.tsx`
-
-Currently the TurnstileWidget always renders (even with an error message), which creates a 65px gap. When `securityBypassed` is true, we should not render it at all.
-
-**Changes:**
-- Wrap the `<TurnstileWidget>` in a conditional: `{!securityBypassed && <TurnstileWidget ... />}`
-- This removes the 65px min-height container when bypass is active
-- The button snaps up to just below the password field
-
-### 3. Unblock the Button: Always Enabled from Page Load
-
-**Current state:** The button is already only disabled by `isLoading` (line 561 in Signup.tsx, line 238 in Login.tsx shown in provided code). The Turnstile token is NOT blocking the button.
-
-**Verification:** Looking at line 556-561:
-```tsx
-<Button
-  type="submit"
-  variant="hero"
-  size="lg"
-  className="w-full"
-  disabled={isLoading}  // Only isLoading controls disabled state
->
-```
-
-The button is already fully active and orange when the page loads. No changes needed here, but I'll verify the same pattern exists in Login.tsx.
+## Solution
+Update TurnstileWidget to return `null` (render nothing) when it has an error, instead of showing the error message. The bypass logic already works - we just need to hide the visual element.
 
 ---
 
@@ -68,53 +17,65 @@ The button is already fully active and orange when the page loads. No changes ne
 
 | File | Changes |
 |------|---------|
-| `supabase/functions/verify-turnstile/index.ts` | Add kill switch check at top, return early if `TURNSTILE_BYPASS_ENABLED=true` |
-| `src/pages/Signup.tsx` | Wrap TurnstileWidget in `{!securityBypassed && ...}` conditional |
-| `src/pages/Login.tsx` | Same conditional rendering for TurnstileWidget |
+| `src/components/turnstile/TurnstileWidget.tsx` | Return `null` instead of error div when `errorType` is set |
 
 ---
 
-## Edge Function Change Detail
+## Implementation Detail
 
-```typescript
-// At the top of the handler, before any other logic:
-const BYPASS_ENABLED = Deno.env.get("TURNSTILE_BYPASS_ENABLED") === "true";
-
-if (BYPASS_ENABLED) {
-  console.warn("[verify-turnstile] Security bypassed via Kill Switch");
-  return new Response(
-    JSON.stringify({ success: true, bypassed: true }),
-    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+**Current code (line 302-316):**
+```tsx
+// Show specific error states
+if (errorType) {
+  const errorMessages = { ... };
+  
+  return (
+    <div className="min-h-[65px] flex items-center justify-center ...">
+      <span className="text-destructive">{errorMessages[errorType]}</span>
+    </div>
   );
 }
-
-// Then continue with normal verification...
 ```
+
+**New code:**
+```tsx
+// When error occurs, render nothing - bypass is active
+if (errorType) {
+  return null;
+}
+```
+
+This removes the 65px container entirely when the security check fails. Combined with the existing `{!securityBypassed && <TurnstileWidget />}` in Signup/Login, this ensures:
+- No error message shown (since bypass is handling it)
+- No min-height container taking up space
+- Standard `space-y-6` gap flows naturally between password and button
 
 ---
 
-## Visual Result After Fix
+## Visual Result
 
-**Before (current):**
+**Before:**
 ```
 [Password field]
-[65px gap - "Security check blocked" message]
+[65px gap with "Security check blocked" message]
 [Continue button]
 ```
 
-**After (with bypass active):**
+**After:**
 ```
 [Password field]
-[Continue button]  <-- snaps up, no gap
+[Continue button]  <-- standard space-y-6 gap only
 ```
 
 ---
 
-## Testing Checklist
+## Why This Works
 
-1. Enable an ad blocker or block Cloudflare domains
-2. Visit /signup - the Continue button should be orange and clickable immediately
-3. No visible gap between password field and button
-4. Submit the form - it should proceed without errors
-5. Check console for "Security bypassed" warnings
-6. Check edge function logs for "[verify-turnstile] Security bypassed via Kill Switch"
+The flow is:
+1. TurnstileWidget mounts, shows "Loading security check..." (65px)
+2. Error occurs → `onBypass("reason")` is called → parent sets `securityBypassed = true`
+3. **Immediately**: Widget returns `null` (no error div rendered)
+4. **Next render**: Parent's conditional `{!securityBypassed && ...}` removes the widget entirely
+
+Both paths lead to the widget being removed from DOM with no gap.
+
