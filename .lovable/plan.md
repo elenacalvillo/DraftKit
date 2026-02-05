@@ -1,57 +1,120 @@
 
-# Update Turnstile to Invisible Mode
 
-## Overview
+# Fix Turnstile Re-rendering and Verification Issues
 
-Since you've switched your Cloudflare Turnstile widget to **Invisible** mode in the dashboard, we need to update the code to match. With invisible mode, there's no visible widget - verification happens silently in the background.
+## Root Cause Analysis
 
-## What Changes
+### Issue 1: Form "Jumping" on Every Keystroke
+The `TurnstileWidget` component re-renders and re-initializes on every keystroke because:
+- `onVerify={setTurnstileToken}` creates a new function reference on each parent render
+- The widget's `useEffect` depends on `handleVerify`, which changes when `onVerify` changes
+- This causes the widget to be destroyed and recreated, causing the visual "jump"
 
-| Aspect | Before (Visible) | After (Invisible) |
-|--------|------------------|-------------------|
-| Widget UI | Shows checkbox or challenge | Nothing visible |
-| Token timing | User completes challenge first | Token generated automatically |
-| Submit button | Disabled until token exists | Always enabled |
-| Verification | Token ready before submit | Token checked on submit |
-| UX | User sees security widget | Zero friction |
+### Issue 2: "Security verification failed" Error
+The constant re-rendering invalidates the Turnstile token:
+- Each time the widget re-renders, the old token is discarded
+- By the time the user submits, the token stored in state may be stale or from a reset widget
+- The backend verification fails because the token doesn't match
 
-## Files to Update
+### Issue 3: Widget Showing as Visible (Test Mode Badge)
+The screenshot shows "Testing only, always passes" - this indicates the test key is being used. Test keys always show visible UI. The production key should make it invisible.
 
-### 1. TurnstileWidget.tsx
-- Add `'invisible'` as a valid size option
-- Change default size from `'flexible'` to `'invisible'`
-- Ensure container collapses (no ghost gap) when invisible
+## Solution
 
-### 2. Login.tsx
-- Remove the visible widget wrapper `<div className="flex justify-center">`
-- Remove the `disabled={!turnstileToken}` requirement from submit button
-- Keep verification on submit (backend still validates)
+### 1. Memoize the TurnstileWidget Component
+Wrap the component with `React.memo` to prevent re-renders when props haven't changed:
 
-### 3. Signup.tsx
-- Same changes as Login - remove visible wrapper, enable submit button
+```typescript
+export const TurnstileWidget = React.memo(function TurnstileWidget({...}) {
+  // existing implementation
+});
+```
 
-### 4. PublicBooking.tsx
-- Same changes - remove visible wrapper, enable submit button
+### 2. Stabilize Callback References
+Use `useRef` to store the callbacks and access them via refs inside the effect:
 
-### 5. FeedbackWidget.tsx
-- Remove the visible widget wrapper
-- Enable submit button (only disable during submission)
-- Remove the `size="compact"` prop (invisible doesn't need compact)
+```typescript
+const onVerifyRef = useRef(onVerify);
+const onErrorRef = useRef(onError);
+const onExpireRef = useRef(onExpire);
+
+// Update refs when props change (no effect re-run)
+useEffect(() => {
+  onVerifyRef.current = onVerify;
+  onErrorRef.current = onError;
+  onExpireRef.current = onExpire;
+});
+
+// Use stable callbacks
+const handleVerify = useCallback((token: string) => {
+  onVerifyRef.current(token);
+}, []); // Empty deps - never changes
+```
+
+### 3. Remove Callbacks from useEffect Dependencies
+With stable refs, the effect only runs once on mount:
+
+```typescript
+useEffect(() => {
+  // initialization code
+}, [theme, size, appearance]); // Only re-run on config changes
+```
+
+### 4. Fix Token Capture with useRef in Forms
+Use a ref alongside state to ensure the token is always captured correctly at submission time (same pattern as FeedbackWidget):
+
+| File | Change |
+|------|--------|
+| `Login.tsx` | Add `turnstileTokenRef` to capture token reliably |
+| `Signup.tsx` | Add `turnstileTokenRef` to capture token reliably |
+| `PublicBooking.tsx` | Add `turnstileTokenRef` to capture token reliably |
+
+## Files to Modify
+
+### TurnstileWidget.tsx
+- Add `React.memo` wrapper
+- Use refs for callback props to prevent effect re-runs
+- Stabilize `handleVerify`, `handleError`, `handleExpire` with empty dependency arrays
+
+### Login.tsx
+- Add `turnstileTokenRef` alongside `turnstileToken` state
+- Update submit handler to read from ref
+- Add "Verifying..." state for edge case (matches FeedbackWidget pattern)
+
+### Signup.tsx
+- Same changes as Login.tsx
+
+### PublicBooking.tsx
+- Same changes as Login.tsx
 
 ## Technical Details
 
-For invisible mode, the Turnstile script:
-1. Loads silently in the background
-2. Analyzes browser telemetry (mouse, window, headers)
-3. Generates a token automatically when it's confident the user is human
-4. Passes token to your `onVerify` callback
+The fix uses a common React pattern for stable callbacks:
 
-The form flow becomes:
-1. User fills form normally (no widget visible)
-2. On submit, check if token exists
-3. If no token yet, show a brief "Verifying..." state
-4. Once token arrives, verify with backend and proceed
+```text
++------------------+      +------------------+
+|   Parent Form    |      |  TurnstileWidget |
++------------------+      +------------------+
+|                  |      |                  |
+| formData state   |      | onVerifyRef      |
+| changes on type  |----->| (stable ref)     |
+|                  |      |                  |
+| onVerify prop    |      | useEffect only   |
+| (new reference)  |      | runs on mount    |
+|                  |      |                  |
++------------------+      +------------------+
+```
 
-## Safety Note
+With refs:
+- Parent re-renders on keystroke (normal)
+- TurnstileWidget receives new `onVerify` prop reference
+- But the ref is updated without triggering the effect
+- Widget stays mounted, no visual jump
+- Token remains valid
 
-If Cloudflare can't verify silently (noisy network, VPN), users may see an error. If you get complaints from real users, you can switch to **Managed** mode with `appearance: 'interaction-only'` as a fallback - this only shows the widget when needed.
+## Expected Outcome
+- No more form "jumping" on keystrokes
+- Token captured reliably at submission time
+- "Security verification failed" errors eliminated
+- Invisible mode works correctly with production keys
+
