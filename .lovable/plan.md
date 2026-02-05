@@ -1,139 +1,118 @@
 
+# Emergency Turnstile Bypass (Circuit Breaker)
 
-# Runtime Turnstile Site Key Fetching
-
-## Problem
-
-The `VITE_TURNSTILE_SITE_KEY` environment variable exists in backend secrets but is not being injected into the frontend build. Vite injects `import.meta.env.*` values at **build time**, so if the build didn't have access to the secret, it will always be `undefined` at runtime.
-
-This causes the immediate "Security check unavailable" error for all users visiting signup/login.
+## Objective
+Enable the "Continue" button on Signup and Login even when Turnstile fails, so your 119 visitors can sign up immediately. Log bypassed events for tracking.
 
 ---
 
-## Solution
+## Implementation Summary
 
-Fetch the Turnstile site key from the backend at runtime instead of relying on build-time injection. This is safe because the site key is **public** (it's designed to be embedded in client-side code).
+### 1. Add Kill Switch Secret
+Create a new backend secret `TURNSTILE_BYPASS_ENABLED` (value: `true` or `false`). When `true`, the bypass logic is active. When you want to enforce security later, set it to `false` without any code changes.
+
+### 2. Update TurnstileWidget.tsx
+Add a new prop `onBypass` that fires when the widget encounters any error (load failure, script blocked, config fetch error, etc.). This callback will pass a reason string for logging.
+
+Current behavior: Shows error message and blocks submission
+New behavior: Shows error message AND calls `onBypass("reason")` so parent can enable submission
+
+### 3. Update Signup.tsx
+- Add `securityBypassed` state (boolean)
+- When `handleTurnstileError` fires, set `securityBypassed = true` and log: `console.warn('Security bypassed due to load failure')`
+- In `handleStep1` submit handler:
+  - If `securityBypassed === true`, skip the token polling and verification entirely
+  - Log: `console.warn('Signup proceeding without security check')`
+  - Proceed directly to `signUp()`
+- Keep "Continue" button enabled (remove the check for turnstile token in disabled state)
+
+### 4. Update Login.tsx
+Same pattern:
+- Add `securityBypassed` state
+- When `handleTurnstileError` fires, set `securityBypassed = true` and log bypass
+- In `handleSubmit`:
+  - If `securityBypassed === true`, skip token check and verification
+  - Log warning and proceed to `signIn()`
+- Keep "Sign In" button enabled
+
+### 5. Update verify-turnstile Edge Function (Optional Enhancement)
+Add logic to read `TURNSTILE_BYPASS_ENABLED`. If bypass is enabled and token is missing/invalid, return `{ success: true, bypassed: true }` instead of failing. This is a belt-and-suspenders approach in case the frontend check is somehow circumvented.
 
 ---
 
-## Implementation
+## Files to Modify
 
-### Step 1: Create new edge function `turnstile-config`
+| File | Changes |
+|------|---------|
+| `src/components/turnstile/TurnstileWidget.tsx` | Add `onBypass` prop that fires on any error with reason |
+| `src/pages/Signup.tsx` | Add `securityBypassed` state, skip verification when true, log warnings |
+| `src/pages/Login.tsx` | Same bypass logic as Signup |
+| `supabase/functions/verify-turnstile/index.ts` | Optional: respect `TURNSTILE_BYPASS_ENABLED` flag |
 
-**File:** `supabase/functions/turnstile-config/index.ts`
+---
 
-This function returns the public site key to the frontend:
+## How It Works
 
 ```text
-Request:  GET or POST (no body needed)
-Response: { "siteKey": "0x4AAAAAA...", "source": "env" }
-          or { "siteKey": null, "error": "..." } if not configured
-```
+User visits /signup
+       |
+       v
+TurnstileWidget mounts
+       |
+       +-- Fetch siteKey from backend
+       |       |
+       |       +-- Fails? --> onBypass("fetch_error") --> securityBypassed = true
+       |       |              console.warn('Security bypassed due to load failure')
+       |       v
+       +-- Load Cloudflare script
+       |       |
+       |       +-- Blocked/Timeout? --> onBypass("script_blocked") 
+       |       |                        --> securityBypassed = true
+       |       v
+       +-- Render widget
+               |
+               +-- Error callback? --> onBypass("widget_error")
+                                       --> securityBypassed = true
 
-The function reads `VITE_TURNSTILE_SITE_KEY` from backend environment and returns it. No secrets are exposed.
-
-### Step 2: Update config.toml
-
-Add the new function configuration:
-
-```toml
-[functions.turnstile-config]
-verify_jwt = false
-```
-
-### Step 3: Update TurnstileWidget.tsx
-
-Replace the static `import.meta.env` read with a runtime fetch:
-
-| Current | New |
-|---------|-----|
-| `const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY;` | Fetch from `turnstile-config` on mount, store in state |
-
-Changes:
-- Add `siteKey` state (starts as `null`)
-- Add `isLoading` state to show loading indicator
-- On mount: call `supabase.functions.invoke("turnstile-config")`
-- If `siteKey` is returned: proceed to load Turnstile script
-- If missing: show "Security misconfigured" error
-- If script blocked: show "Security blocked (ad blocker)" error
-
-### Step 4: Improve verify-turnstile robustness
-
-Remove the fallback test secret key so configuration errors are caught:
-
-```text
-Current:  const TURNSTILE_SECRET_KEY = Deno.env.get('TURNSTILE_SECRET_KEY') || '1x000...AA';
-New:      const TURNSTILE_SECRET_KEY = Deno.env.get('TURNSTILE_SECRET_KEY');
-          if (!TURNSTILE_SECRET_KEY) return error response
+User clicks "Continue"
+       |
+       v
+Check securityBypassed?
+       |
+       +-- true --> console.warn('Signup proceeding without security check')
+       |            --> Skip token verification
+       |            --> Call signUp() directly
+       |
+       +-- false --> Normal flow (wait for token, verify, then signUp)
 ```
 
 ---
 
-## Files to Create/Modify
+## Kill Switch Usage
 
-| File | Action |
-|------|--------|
-| `supabase/functions/turnstile-config/index.ts` | Create new |
-| `supabase/config.toml` | Add function config |
-| `src/components/turnstile/TurnstileWidget.tsx` | Fetch site key at runtime |
-| `supabase/functions/verify-turnstile/index.ts` | Remove fallback secret |
+To disable bypass later:
+1. Go to your backend secrets
+2. Set `TURNSTILE_BYPASS_ENABLED` to `false`
+3. No code deploy needed - the backend will enforce verification again
 
----
+To re-enable bypass during another outage:
+1. Set `TURNSTILE_BYPASS_ENABLED` to `true`
 
-## Error State Improvements
-
-After this change, users will see specific error messages:
-
-| Condition | Message |
-|-----------|---------|
-| Site key not configured in backend | "Security check misconfigured" |
-| Turnstile script blocked by ad blocker | "Security check blocked (ad blocker/network)" |
-| Script load timeout | "Security check timed out" |
-| Verification failed (key mismatch) | Specific error from backend |
+Note: The frontend bypass is always active when the widget fails. The kill switch controls whether the backend also accepts requests without valid tokens.
 
 ---
 
-## Technical Details
+## Console Logging
 
-### turnstile-config edge function
+When bypass is triggered, you'll see:
+- `console.warn('Security bypassed due to load failure')` - when widget fails to load
+- `console.warn('Signup proceeding without security check')` - when form is submitted with bypass active
+- `console.warn('Login proceeding without security check')` - same for login
 
-```typescript
-// Reads VITE_TURNSTILE_SITE_KEY from Deno.env
-// Returns { siteKey: string | null }
-// CORS enabled, no JWT required
-```
-
-### TurnstileWidget state flow
-
-```text
-Mount
-  |
-  v
-Fetch turnstile-config
-  |
-  +-- Error? --> Show "Security misconfigured"
-  |
-  v
-Got siteKey
-  |
-  v
-Load Turnstile script
-  |
-  +-- Blocked/Timeout? --> Show "Security blocked"
-  |
-  v
-Render widget with siteKey
-  |
-  v
-User interaction --> Token callback
-```
+This lets you track bypass events in any log aggregator.
 
 ---
 
-## Expected Outcome
+## Security Note
 
-- The "Security check unavailable" error disappears for users
-- Turnstile widget loads and renders correctly
-- If there's still a configuration issue (wrong keys), the error messages will be specific and actionable
-- No more reliance on build-time environment variable injection
-
+This bypass is a calculated tradeoff: you're accepting slightly higher bot risk in exchange for not blocking real users. With the kill switch, you can re-enable strict security once Cloudflare/DNS stabilizes.
