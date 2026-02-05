@@ -1,161 +1,139 @@
 
-## What’s actually happening (based on your current logs + code)
 
-The error you’re seeing is **not** “script blocked by an ad blocker” right now.
+# Runtime Turnstile Site Key Fetching
 
-Your browser console shows:
+## Problem
 
-- **`[Turnstile] Turnstile site key not configured`**
+The `VITE_TURNSTILE_SITE_KEY` environment variable exists in backend secrets but is not being injected into the frontend build. Vite injects `import.meta.env.*` values at **build time**, so if the build didn't have access to the secret, it will always be `undefined` at runtime.
 
-That message is thrown in `TurnstileWidget.tsx` *before* we even try to load Cloudflare’s script. It happens when:
-
-- `import.meta.env.VITE_TURNSTILE_SITE_KEY` is **undefined** in the running frontend build.
-
-At the same time, the backend secrets list confirms the key **does exist**:
-
-- `VITE_TURNSTILE_SITE_KEY` (present)
-- `TURNSTILE_SECRET_KEY` (present)
-
-So the issue is: **the frontend build is not receiving the site key at runtime**, even though the project has the secret stored.
-
-This is a common Vite behavior: `import.meta.env.*` values are injected at **build time**, not dynamically. If the platform doesn’t pass that secret into the frontend build environment (or it didn’t rebuild in the right way), the code will always see it as missing.
+This causes the immediate "Security check unavailable" error for all users visiting signup/login.
 
 ---
 
-## Goal
+## Solution
 
-Make Turnstile work even if the frontend build doesn’t have `VITE_TURNSTILE_SITE_KEY` injected, and make the UI show the *right* failure reason:
-
-- “Site key missing” (configuration issue) vs
-- “Turnstile script blocked” (adblock/network issue) vs
-- “Verification failed” (key mismatch, hostname mismatch, etc.)
+Fetch the Turnstile site key from the backend at runtime instead of relying on build-time injection. This is safe because the site key is **public** (it's designed to be embedded in client-side code).
 
 ---
 
-## Proposed solution (robust + future-proof)
+## Implementation
 
-### Core change: stop relying on `import.meta.env` for the Turnstile site key
-Instead, fetch the **public site key** from the backend at runtime.
+### Step 1: Create new edge function `turnstile-config`
 
-This is safe because:
-- The **site key is not a secret** (it’s meant to be public)
-- Only the secret key must remain private (and it already lives in backend secrets)
+**File:** `supabase/functions/turnstile-config/index.ts`
 
----
+This function returns the public site key to the frontend:
 
-## Implementation steps (code changes)
-
-### 1) Add a backend function: `turnstile-config` (new)
-Create a backend function (edge function) that returns:
-
-- `siteKey` from environment (we will read `VITE_TURNSTILE_SITE_KEY`)
-- optionally a `mode` or `env` field for debugging
-
-**Response example**
-```json
-{ "siteKey": "0x4AAAAAA....", "source": "env" }
+```text
+Request:  GET or POST (no body needed)
+Response: { "siteKey": "0x4AAAAAA...", "source": "env" }
+          or { "siteKey": null, "error": "..." } if not configured
 ```
 
-**Behavior**
-- If `VITE_TURNSTILE_SITE_KEY` is missing in the backend env, return `{ siteKey: null }` and log a clear error.
-- No secrets (no secret key, no tokens) are ever returned.
+The function reads `VITE_TURNSTILE_SITE_KEY` from backend environment and returns it. No secrets are exposed.
 
-Why this fixes your situation:
-- The backend environment *does* have that secret (confirmed).
-- The frontend can always retrieve it at runtime, even if the Vite build didn’t inject it.
+### Step 2: Update config.toml
 
----
+Add the new function configuration:
 
-### 2) Update `src/components/turnstile/TurnstileWidget.tsx`
-Replace the top-level constant:
-
-- Current:
-  - `const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY;`
-
-- New:
-  - Maintain a `siteKey` state inside the component (or a small shared module-level cache)
-  - On mount:
-    - call `supabase.functions.invoke("turnstile-config")`
-    - store `siteKey` in state
-    - if missing → set `loadError` to “Security misconfigured (site key missing)”
-
-Also update the UI copy so it’s not generic:
-- If `siteKey` missing: show “Security check misconfigured”
-- If script blocked/timed out: show “Security check blocked (ad blocker/network)”
-
-This will let you immediately know which category you’re in.
-
----
-
-### 3) Keep the script loader improvements (already present) and make them reachable
-Your script loader is good now (timeout + `onerror`), but currently the widget bails out earlier due to missing site key.
-
-Once we fetch the key at runtime, we’ll actually reach:
-- script loading
-- render call
-- callback token flow
-
----
-
-### 4) Optional but recommended: remove backend fallback test secret
-In `supabase/functions/verify-turnstile/index.ts`, the code currently does:
-
-```ts
-const TURNSTILE_SECRET_KEY =
-  Deno.env.get("TURNSTILE_SECRET_KEY") || "1x0000000000000000000000000000000AA";
+```toml
+[functions.turnstile-config]
+verify_jwt = false
 ```
 
-That fallback can mask config errors and produce confusing results.
+### Step 3: Update TurnstileWidget.tsx
 
-Change it to:
-- if missing secret key → return `{ success:false, error:"Turnstile secret key not configured" }` (HTTP 500 or HTTP 200 with codes, depending on your preferred pattern)
+Replace the static `import.meta.env` read with a runtime fetch:
 
-This makes misconfiguration impossible to miss.
+| Current | New |
+|---------|-----|
+| `const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY;` | Fetch from `turnstile-config` on mount, store in state |
 
----
+Changes:
+- Add `siteKey` state (starts as `null`)
+- Add `isLoading` state to show loading indicator
+- On mount: call `supabase.functions.invoke("turnstile-config")`
+- If `siteKey` is returned: proceed to load Turnstile script
+- If missing: show "Security misconfigured" error
+- If script blocked: show "Security blocked (ad blocker)" error
 
-## Cloudflare/hostname reality check (what might happen after we fix site key injection)
+### Step 4: Improve verify-turnstile robustness
 
-Once the site key is being used correctly, you may still run into:
-- `invalid-input-response`
-- hostname mismatch problems (if Cloudflare widget is locked to certain domains)
+Remove the fallback test secret key so configuration errors are caught:
 
-So in testing we will validate on:
-- your custom domain (e.g. `draftkit.app`)
-- your published Lovable domain (if used)
-- the preview domain (if you want Turnstile to work there too)
-
-If you want Turnstile to work on preview, you must ensure Cloudflare’s allowed hostnames include that preview hostname OR temporarily allow broader hostnames during testing.
-
----
-
-## Testing checklist (end-to-end)
-
-1) Open `/signup` and confirm the widget no longer immediately says “site key not configured”.
-2) Confirm the Turnstile script request loads (no blocking).
-3) Submit signup:
-   - You should either proceed, or get a meaningful inline message:
-     - blocked script vs verification failure vs config issue
-4) Repeat in:
-   - Incognito
-   - Mobile on cellular
+```text
+Current:  const TURNSTILE_SECRET_KEY = Deno.env.get('TURNSTILE_SECRET_KEY') || '1x000...AA';
+New:      const TURNSTILE_SECRET_KEY = Deno.env.get('TURNSTILE_SECRET_KEY');
+          if (!TURNSTILE_SECRET_KEY) return error response
+```
 
 ---
 
-## Success criteria
+## Files to Create/Modify
 
-- The “Security check unavailable” message disappears for the **site-key-missing** reason.
-- If something still fails, the UI now tells us *exactly* whether it’s:
-  1) missing site key
-  2) blocked Turnstile script
-  3) verification/key/hostname mismatch
+| File | Action |
+|------|--------|
+| `supabase/functions/turnstile-config/index.ts` | Create new |
+| `supabase/config.toml` | Add function config |
+| `src/components/turnstile/TurnstileWidget.tsx` | Fetch site key at runtime |
+| `supabase/functions/verify-turnstile/index.ts` | Remove fallback secret |
 
 ---
 
-## Files involved
+## Error State Improvements
 
-- New: `supabase/functions/turnstile-config/index.ts`
-- Update: `src/components/turnstile/TurnstileWidget.tsx`
-- Update (recommended): `supabase/functions/verify-turnstile/index.ts`
-- (No changes required to Signup/Login pages beyond what you already have, unless we want even more tailored messaging)
+After this change, users will see specific error messages:
+
+| Condition | Message |
+|-----------|---------|
+| Site key not configured in backend | "Security check misconfigured" |
+| Turnstile script blocked by ad blocker | "Security check blocked (ad blocker/network)" |
+| Script load timeout | "Security check timed out" |
+| Verification failed (key mismatch) | Specific error from backend |
+
+---
+
+## Technical Details
+
+### turnstile-config edge function
+
+```typescript
+// Reads VITE_TURNSTILE_SITE_KEY from Deno.env
+// Returns { siteKey: string | null }
+// CORS enabled, no JWT required
+```
+
+### TurnstileWidget state flow
+
+```text
+Mount
+  |
+  v
+Fetch turnstile-config
+  |
+  +-- Error? --> Show "Security misconfigured"
+  |
+  v
+Got siteKey
+  |
+  v
+Load Turnstile script
+  |
+  +-- Blocked/Timeout? --> Show "Security blocked"
+  |
+  v
+Render widget with siteKey
+  |
+  v
+User interaction --> Token callback
+```
+
+---
+
+## Expected Outcome
+
+- The "Security check unavailable" error disappears for users
+- Turnstile widget loads and renders correctly
+- If there's still a configuration issue (wrong keys), the error messages will be specific and actionable
+- No more reliance on build-time environment variable injection
 
