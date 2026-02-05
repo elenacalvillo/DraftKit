@@ -1,7 +1,6 @@
  import React, { useEffect, useRef, useCallback } from "react";
 
-// Cloudflare Turnstile test site key (always passes)
-// Replace with real key for production
+// Cloudflare Turnstile site key
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '1x00000000000000000000AA';
 
 declare global {
@@ -31,7 +30,7 @@ export interface TurnstileWidgetProps {
   onError?: () => void;
   onExpire?: () => void;
   theme?: 'light' | 'dark' | 'auto';
-  size?: 'normal' | 'compact' | 'flexible' | 'invisible';
+  size?: 'normal' | 'compact' | 'flexible';
   appearance?: 'always' | 'execute' | 'interaction-only';
   className?: string;
 }
@@ -77,8 +76,8 @@ export const TurnstileWidget = React.memo(function TurnstileWidget({
   onError,
   onExpire,
   theme = 'auto',
-  size = 'invisible',
-  appearance = 'always',
+  size = 'flexible',
+  appearance = 'interaction-only',
   className = '',
 }: TurnstileWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -158,7 +157,7 @@ export const TurnstileWidget = React.memo(function TurnstileWidget({
     };
   }, [theme, size, appearance]); // Only re-run on config changes, not callbacks
 
-  return <div ref={containerRef} className={className} />;
+  return <div ref={containerRef} className={`min-h-[65px] ${className}`} />;
 });
 
 // Hook for imperative control
