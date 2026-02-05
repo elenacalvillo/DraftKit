@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 export interface TurnstileVerifyResult {
   success: boolean;
   error?: string;
+   codes?: string[];
 }
 
 /**
@@ -19,7 +20,11 @@ export async function verifyTurnstileToken(token: string): Promise<TurnstileVeri
       return { success: false, error: error.message };
     }
 
-    return { success: data?.success ?? false, error: data?.error };
+     return { 
+       success: data?.success ?? false, 
+       error: data?.error,
+       codes: data?.codes,
+     };
   } catch (err) {
     console.error('Turnstile verification failed:', err);
     return { success: false, error: 'Verification request failed' };

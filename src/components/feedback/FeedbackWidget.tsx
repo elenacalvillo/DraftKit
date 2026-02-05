@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+ import { useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, X, Send, Star, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,26 @@ export function FeedbackWidget() {
   useEffect(() => {
     turnstileTokenRef.current = turnstileToken;
   }, [turnstileToken]);
+ 
+   // Handle token from Turnstile
+   const handleTurnstileVerify = useCallback((token: string) => {
+     turnstileTokenRef.current = token;
+     setTurnstileToken(token);
+     setSecurityError(null);
+   }, []);
+ 
+   const handleTurnstileExpire = useCallback(() => {
+     turnstileTokenRef.current = null;
+     setTurnstileToken(null);
+   }, []);
+ 
+   // Immediate error when widget fails to load
+   const handleTurnstileError = useCallback(() => {
+     turnstileTokenRef.current = null;
+     setTurnstileToken(null);
+     const errorMsg = "Security check couldn't load. If you use an ad blocker or strict privacy mode, try disabling it or use another browser.";
+     setSecurityError(errorMsg);
+   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,7 +100,13 @@ export function FeedbackWidget() {
     // Verify token with backend
     const verifyResult = await verifyTurnstileToken(turnstileTokenRef.current!);
     if (!verifyResult.success) {
-      const errorMsg = "Security check failed. Please refresh the page and try again.";
+       // Check for configuration issues vs user issues
+       const isConfigError = verifyResult.codes?.some(c => 
+         ['invalid-input-secret', 'invalid-input-response', 'bad-request'].includes(c)
+       );
+       const errorMsg = isConfigError
+         ? "Security verification error. Please try again in a moment."
+         : "Security check failed. Please refresh the page and try again.";
       setSecurityError(errorMsg);
       toast.error(errorMsg);
       setTurnstileToken(null);
@@ -256,9 +283,9 @@ export function FeedbackWidget() {
 
                 {/* Turnstile Widget (invisible) */}
                 <TurnstileWidget
-                  onVerify={setTurnstileToken}
-                  onExpire={() => setTurnstileToken(null)}
-                  onError={() => setTurnstileToken(null)}
+                 onVerify={handleTurnstileVerify}
+                 onExpire={handleTurnstileExpire}
+                 onError={handleTurnstileError}
                 />
 
                 {/* Inline Security Error */}
@@ -282,7 +309,7 @@ export function FeedbackWidget() {
                         transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                         className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full mr-2"
                       />
-                      Verifying...
+                     Verifying security...
                     </>
                   ) : isSubmitting ? (
                     <motion.div

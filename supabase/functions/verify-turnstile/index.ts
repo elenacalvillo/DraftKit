@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
           error: 'Verification failed',
           codes: result['error-codes'],
         }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
   } catch (error) {

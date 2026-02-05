@@ -71,6 +71,14 @@ export default function Signup() {
     turnstileTokenRef.current = null;
     setTurnstileToken(null);
   }, []);
+ 
+   // Immediate error when widget fails to load
+   const handleTurnstileError = useCallback(() => {
+     turnstileTokenRef.current = null;
+     setTurnstileToken(null);
+     const errorMsg = "Security check couldn't load. If you use an ad blocker or strict privacy mode, try disabling it or use another browser.";
+     setSecurityError(errorMsg);
+   }, []);
 
   // Check if coming from a collab request submission
   const prefillEmail = searchParams.get('email') || '';
@@ -155,7 +163,13 @@ export default function Signup() {
 
     const verifyResult = await verifyTurnstileToken(token);
     if (!verifyResult.success) {
-      const errorMsg = "Security check failed. Please refresh the page and try again. If the issue persists, try a different browser.";
+       // Check for configuration issues vs user issues
+       const isConfigError = verifyResult.codes?.some(c => 
+         ['invalid-input-secret', 'invalid-input-response', 'bad-request'].includes(c)
+       );
+       const errorMsg = isConfigError
+         ? "Security verification error. Please try again in a moment."
+         : "Security check failed. Please refresh the page and try again. If the issue persists, try a different browser.";
       setSecurityError(errorMsg);
       toast.error(errorMsg);
       handleTurnstileExpireOrError();
@@ -534,7 +548,7 @@ export default function Signup() {
                   <TurnstileWidget
                     onVerify={handleTurnstileVerify}
                     onExpire={handleTurnstileExpireOrError}
-                    onError={handleTurnstileExpireOrError}
+                   onError={handleTurnstileError}
                   />
 
                   {/* Inline Security Error */}
