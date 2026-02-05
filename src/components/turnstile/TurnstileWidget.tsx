@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react";
+ import React, { useEffect, useRef, useCallback } from "react";
 
 // Cloudflare Turnstile test site key (always passes)
 // Replace with real key for production
@@ -72,7 +72,7 @@ function loadTurnstileScript(): Promise<void> {
   });
 }
 
-export function TurnstileWidget({
+export const TurnstileWidget = React.memo(function TurnstileWidget({
   onVerify,
   onError,
   onExpire,
@@ -83,18 +83,31 @@ export function TurnstileWidget({
 }: TurnstileWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
+  
+  // Store callbacks in refs to prevent effect re-runs
+  const onVerifyRef = useRef(onVerify);
+  const onErrorRef = useRef(onError);
+  const onExpireRef = useRef(onExpire);
+  
+  // Update refs when props change (no effect re-run)
+  useEffect(() => {
+    onVerifyRef.current = onVerify;
+    onErrorRef.current = onError;
+    onExpireRef.current = onExpire;
+  });
 
+  // Stable callbacks that never change
   const handleVerify = useCallback((token: string) => {
-    onVerify(token);
-  }, [onVerify]);
+    onVerifyRef.current(token);
+  }, []);
 
   const handleError = useCallback(() => {
-    onError?.();
-  }, [onError]);
+    onErrorRef.current?.();
+  }, []);
 
   const handleExpire = useCallback(() => {
-    onExpire?.();
-  }, [onExpire]);
+    onExpireRef.current?.();
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -143,10 +156,10 @@ export function TurnstileWidget({
         widgetIdRef.current = null;
       }
     };
-  }, [handleVerify, handleError, handleExpire, theme, size, appearance]);
+  }, [theme, size, appearance]); // Only re-run on config changes, not callbacks
 
   return <div ref={containerRef} className={className} />;
-}
+});
 
 // Hook for imperative control
 export function useTurnstileReset() {

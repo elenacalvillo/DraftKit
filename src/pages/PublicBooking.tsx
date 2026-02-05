@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useMemo } from "react";
+ import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Calendar, Check, ChevronRight, ExternalLink, Sparkles, Mail, User, MessageSquare, Lightbulb, Loader2, AlertCircle, RefreshCw, Info } from "lucide-react";
@@ -116,6 +116,20 @@ export default function PublicBooking() {
 
   // Turnstile state
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const turnstileTokenRef = useRef<string | null>(null);
+
+  // Keep ref in sync with state
+  const handleTurnstileVerify = useCallback((token: string) => {
+    turnstileTokenRef.current = token;
+    setTurnstileToken(token);
+  }, []);
+
+  const handleTurnstileExpireOrError = useCallback(() => {
+    turnstileTokenRef.current = null;
+    setTurnstileToken(null);
+  }, []);
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -377,19 +391,33 @@ export default function PublicBooking() {
       return;
     }
 
-    // Verify Turnstile token
-    if (!turnstileToken) {
-      toast.error("Please complete the security check");
-      return;
-    }
-
     setIsSubmitting(true);
 
-    // Verify token with backend
-    const verifyResult = await verifyTurnstileToken(turnstileToken);
+    // Wait for turnstile token if not ready yet (invisible mode may still be processing)
+    let token = turnstileTokenRef.current;
+    if (!token) {
+      setIsVerifying(true);
+      const maxWait = 3000;
+      const interval = 100;
+      let waited = 0;
+      while (!turnstileTokenRef.current && waited < maxWait) {
+        await new Promise(r => setTimeout(r, interval));
+        waited += interval;
+      }
+      token = turnstileTokenRef.current;
+      setIsVerifying(false);
+      
+      if (!token) {
+        toast.error("Security verification timed out. Please try again.");
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
+    const verifyResult = await verifyTurnstileToken(token);
     if (!verifyResult.success) {
       toast.error("Security verification failed. Please try again.");
-      setTurnstileToken(null); // Reset to trigger widget refresh
+      handleTurnstileExpireOrError();
       setIsSubmitting(false);
       return;
     }
@@ -1239,9 +1267,9 @@ export default function PublicBooking() {
 
                   {/* Turnstile Widget (invisible) */}
                   <TurnstileWidget
-                    onVerify={setTurnstileToken}
-                    onExpire={() => setTurnstileToken(null)}
-                    onError={() => setTurnstileToken(null)}
+              onVerify={handleTurnstileVerify}
+              onExpire={handleTurnstileExpireOrError}
+              onError={handleTurnstileExpireOrError}
                   />
 
                   <Button
