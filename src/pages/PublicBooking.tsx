@@ -1335,7 +1335,7 @@ export default function PublicBooking() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
               >
-                <div className="text-center mb-8">
+                <div className="text-center mb-6">
                   <h2 className="text-xl font-semibold mb-2">
                     {creator.collab_mode 
                       ? COLLAB_MODE_METADATA[creator.collab_mode].calendarHeader
@@ -1344,14 +1344,30 @@ export default function PublicBooking() {
                   <p className="text-muted-foreground">
                     {creator.collab_mode === 'discovery'
                       ? 'When are you available for a quick intro call?'
-                      : 'When do you want this collaboration to go live?'}
+                      : 'Select your target publish date'}
                   </p>
-                  {creator.collab_mode === 'async' && (
-                    <p className="text-xs text-muted-foreground/70 mt-2 max-w-sm mx-auto">
-                      This is not a meeting. It's the date we aim to publish on Substack.
-                    </p>
-                  )}
                 </div>
+
+                {/* Async Mode Explainer - Prominent */}
+                {creator.collab_mode === 'async' && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mb-6 p-4 bg-accent/30 border border-accent/50 rounded-xl"
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className="text-xl">✍️</span>
+                      <div>
+                        <h4 className="font-semibold text-sm mb-2">How async collaboration works</h4>
+                        <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+                          <li>You pick a <span className="font-medium text-foreground">target publish date</span> (not a meeting)</li>
+                          <li>{creator.name} shares a draft for your review</li>
+                          <li>Refine together asynchronously — no calls needed</li>
+                        </ol>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
 
                 <CollabCalendar
                   availableDates={availability?.available_dates || []}
@@ -1361,7 +1377,9 @@ export default function PublicBooking() {
                   availableLegendText={
                     creator.collab_mode === 'discovery' 
                       ? 'Available for call' 
-                      : getCalendarLegendText(creator.date_meaning)
+                      : creator.collab_mode === 'async'
+                        ? 'Open for publishing'
+                        : getCalendarLegendText(creator.date_meaning)
                   }
                   collabMode={creator.collab_mode as 'async' | 'discovery' | null}
                 />
