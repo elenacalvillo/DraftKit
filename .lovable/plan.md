@@ -1,93 +1,110 @@
 
-# Clarify Async Collaboration Model for Better User Understanding
 
-## Problem Statement
-User feedback from Dinah reveals a fundamental intent mismatch: users see a calendar and assume they're scheduling a meeting (like Calendly), but DraftKit's async mode is about setting **target publication dates**, not scheduling calls. The current copy doesn't make this distinction prominent enough.
+# Improve Date Clarity for Creators Setting Their Calendar
 
-## Root Cause Analysis
-Looking at the current implementation, I found:
+## Problem
+While the guest-facing booking page now clearly explains async collaboration, **creators setting their own availability lack context** about what their date selections mean to guests. This creates a disconnect between creator intent and guest expectations.
 
-1. **Calendar header says**: "Select a Target Publication Date" - but users skim past this
-2. **Small disclaimer exists** (line 1349-1352): "This is not a meeting. It's the date we aim to publish on Substack" - but it's too subtle (tiny text, low contrast)
-3. **"Availability" terminology** in the creator's dashboard and instructions reinforces the meeting mental model
-4. **No visual differentiation** between async mode (publication dates) and discovery mode (call slots)
+## What's Already Working
+- Guest booking page has the "How async collaboration works" explainer
+- Mode-aware headers and legend text on public pages
+- Availability page title says "Publishing Windows" for async mode
+
+## Gaps Identified
+
+### 1. Availability Page - No Guest Preview Context
+**Current state**: Instructions explain *how* to click dates, but not *what guests see*
+**Problem**: Creators don't understand the downstream effect of their date selections
+
+### 2. Dashboard Calendar - Vague Empty State
+**Current state**: "No availability set yet. Click 'Edit Availability' to mark dates when you can ship."
+**Problem**: "when you can ship" is internal jargon, not clear what guests experience
+
+### 3. Calendar Legend - Not Mode-Aware in Edit Mode
+**Current state**: Default legend says "Available" even in async mode
+**Problem**: Inconsistent terminology between edit view and guest view
+
+### 4. Settings Page - Disconnected Date Meaning
+**Current state**: "What do your available dates represent?" with Kick-off/Publishing options
+**Problem**: No preview of how this affects the guest's booking experience
 
 ---
 
 ## Proposed Changes
 
-### 1. Add "How This Works" Explainer Banner Above Calendar
+### 1. Add "Guest Preview" Context to Availability Page
 
-**Location**: `src/pages/PublicBooking.tsx` (before the calendar, around line 1337)
+**File**: `src/pages/Availability.tsx`
 
-Add a prominent, always-visible explainer card when `collab_mode === 'async'`:
+Add a new info card below the instructions that shows what guests will see:
 
 ```
-+------------------------------------------------------------+
-|  ✍️  How async collaboration works                         |
-|                                                            |
-|  1. You pick a target ship date (not a meeting)            |
-|  2. [Creator] shares a draft for your review               |  
-|  3. You refine together asynchronously — no calls needed   |
-+------------------------------------------------------------+
++---------------------------------------------------------------+
+| 👁️ What guests will see                                       |
+|                                                                |
+| When someone visits your booking page, they'll be asked to:   |
+| "When should this go live?" and pick from your green dates.   |
+|                                                                |
+| They'll see a note explaining this is a TARGET PUBLISH DATE,  |
+| not a meeting.                                                 |
++---------------------------------------------------------------+
 ```
 
-This uses Dinah's exact concern ("without scheduling a time to meet") and addresses it directly.
+For discovery mode, the text changes to explain guests will see "call slots".
 
-### 2. Rename "Availability" to "Publishing Windows" for Async Mode
+### 2. Update Dashboard Empty State Copy
 
-**Files to update**:
-- `src/pages/Availability.tsx` - Header and descriptions
-- `src/lib/validations.ts` - Mode metadata
-
-**Current**:
-- Page title: "Availability"
-- Description: "Set the dates when you're available for collaborations"
-
-**Proposed (when async mode)**:
-- Page title: "Publishing Windows"
-- Description: "Set the dates when you can target a collaboration publish date"
-
-### 3. Improve Calendar Legend Text
-
-**File**: `src/lib/validations.ts` (line 80-86 in PublicBooking.tsx helper)
-
-**Current legend text for async**:
-- "Available" or "Available to publish"
-
-**Proposed**:
-- "Open for publishing" or "Target ship dates"
-
-### 4. Add Tooltip to "100% Async" Badge
-
-**File**: `src/pages/PublicBooking.tsx` (line 707-709)
-
-**Current tooltip**: "No calls required – we'll start drafting right away"
-
-**Proposed enhanced tooltip**: 
-"This creator works 100% asynchronously — you'll collaborate on a shared draft, not schedule calls. Pick a target publish date to get started."
-
-### 5. Update Process Steps Labels for Clarity
-
-**File**: `src/lib/validations.ts` (lines 149-153)
+**File**: `src/pages/Dashboard.tsx`
 
 **Current**:
 ```
-processSteps: [
-  { step: 1, label: 'Topic' },
-  { step: 2, label: 'Ship Date' },
-  { step: 3, label: 'Drafting' },
-]
+"No availability set yet. Click 'Edit Availability' to mark dates when you can ship."
 ```
 
-**Proposed**:
+**Proposed (async mode)**:
 ```
-processSteps: [
-  { step: 1, label: 'Your Idea' },
-  { step: 2, label: 'Target Date' },
-  { step: 3, label: 'Draft Review' },
-]
+"No publishing windows set. Click 'Edit Availability' to set dates when you can ship — guests will pick from these as target publish dates."
 ```
+
+**Proposed (discovery mode)**:
+```
+"No call slots set. Click 'Edit Availability' to mark when you're free — guests will book intro calls on these dates."
+```
+
+### 3. Pass collabMode to Calendar Legend in Edit Mode
+
+**File**: `src/pages/Availability.tsx`
+
+Currently the `CollabCalendar` in edit mode doesn't receive `availableLegendText`. Add mode-aware legend:
+
+```tsx
+<CollabCalendar
+  ...existing props...
+  availableLegendText={
+    creator.collab_mode === 'discovery' 
+      ? 'Available for calls' 
+      : 'Open for publishing'
+  }
+  collabMode={creator.collab_mode as 'async' | 'discovery' | null}
+/>
+```
+
+### 4. Add Settings Preview Card
+
+**File**: `src/pages/Settings.tsx`
+
+Below the "What do your available dates represent?" selector, add a preview of what guests see:
+
+```
++---------------------------------------------------------------+
+| Preview: How guests will interpret your dates                  |
+|                                                                |
+| Calendar header: "When Should This Go Live?"                   |
+| Selected date means: "This is our target publish date"         |
++---------------------------------------------------------------+
+```
+
+This updates dynamically based on the selected date_meaning option.
 
 ---
 
@@ -95,126 +112,122 @@ processSteps: [
 
 | File | Changes |
 |------|---------|
-| `src/pages/PublicBooking.tsx` | Add "How This Works" explainer card above calendar for async mode |
-| `src/lib/validations.ts` | Update async mode metadata (processSteps, calendarHeader, badgeTooltip) |
-| `src/pages/Availability.tsx` | Add mode-aware title/description (would require passing collab_mode from creator) |
-| `src/components/calendar/CollabCalendar.tsx` | Update fallback legend text and toast messages |
+| `src/pages/Availability.tsx` | Add "What guests will see" info card, pass mode-aware legend to calendar |
+| `src/pages/Dashboard.tsx` | Update empty state text to explain guest experience |
+| `src/pages/Settings.tsx` | Add preview card showing guest-facing date interpretation |
 
 ---
 
 ## Detailed Implementation
 
-### PublicBooking.tsx - Add Explainer Card
+### Availability.tsx - Guest Preview Card
 
-Insert before the calendar (around line 1337):
-
-```tsx
-{/* Async Mode Explainer - Prominent */}
-{creator.collab_mode === 'async' && (
-  <motion.div
-    initial={{ opacity: 0, y: 10 }}
-    animate={{ opacity: 1, y: 0 }}
-    className="mb-6 p-4 bg-accent/30 border border-accent/50 rounded-xl"
-  >
-    <div className="flex items-start gap-3">
-      <span className="text-xl">✍️</span>
-      <div>
-        <h4 className="font-semibold text-sm mb-2">How async collaboration works</h4>
-        <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
-          <li>You pick a <span className="font-medium text-foreground">target publish date</span> (not a meeting)</li>
-          <li>{creator.name} shares a draft for your review</li>
-          <li>Refine together asynchronously — no calls needed</li>
-        </ol>
-      </div>
-    </div>
-  </motion.div>
-)}
-```
-
-### validations.ts - Update Async Metadata
-
-```typescript
-async: {
-  label: 'Async Workspace',
-  description: 'Skip the calls. Guests pick a topic, you start drafting. Calendar shows target publish dates.',
-  badge: '100% Async',
-  badgeTooltip: 'No meetings — you\'ll collaborate on a shared draft. Pick a target date to publish.',
-  calendarHeader: 'When Should This Go Live?',
-  confirmationText: 'Great! This is our target publish date. Check your email for next steps on drafting.',
-  processSteps: [
-    { step: 1, label: 'Your Idea' },
-    { step: 2, label: 'Target Date' },
-    { step: 3, label: 'Draft Review' },
-  ],
-  icon: '✍️',
-},
-```
-
-### Availability.tsx - Mode-Aware Title
-
-This requires fetching the creator's collab_mode (already available in the creator object):
+Insert after the existing instructions card (around line 235):
 
 ```tsx
-<h1 className="text-3xl font-bold mb-2">
-  <span className="gradient-text">
-    {creator.collab_mode === 'discovery' ? 'Availability' : 'Publishing Windows'}
-  </span>
-</h1>
-<p className="text-muted-foreground">
-  {creator.collab_mode === 'discovery' 
-    ? 'Set the dates when you\'re available for intro calls'
-    : 'Set the dates when collaborations can target going live'}
-</p>
+{/* Guest Preview Context */}
+<motion.div
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ delay: 0.15 }}
+  className="glass-card p-4 mb-6 flex items-start gap-3 bg-accent/10 border border-accent/20"
+>
+  <span className="text-lg">👁️</span>
+  <div className="text-sm text-muted-foreground">
+    <p className="font-medium text-foreground mb-1">What guests will see</p>
+    {creator.collab_mode === 'discovery' ? (
+      <p>Guests will pick from your <span className="text-available font-medium">green dates</span> to schedule an intro call. They'll receive a calendar invite after booking.</p>
+    ) : (
+      <p>Guests will pick from your <span className="text-available font-medium">green dates</span> as a target publish date. They'll understand this is when you aim to ship — not a meeting.</p>
+    )}
+  </div>
+</motion.div>
+```
+
+### Availability.tsx - Mode-Aware Calendar
+
+Update the CollabCalendar component (around line 243):
+
+```tsx
+<CollabCalendar
+  availableDates={availableDates}
+  blockedDates={blockedDates}
+  bookedDates={bookedDates}
+  bookingDetails={bookingDetails}
+  isEditable={true}
+  onToggleAvailable={handleToggleAvailable}
+  onToggleBlocked={handleToggleBlocked}
+  availableLegendText={
+    creator.collab_mode === 'discovery' 
+      ? 'Available for calls' 
+      : 'Open for publishing'
+  }
+  collabMode={creator.collab_mode as 'async' | 'discovery' | null}
+/>
+```
+
+### Dashboard.tsx - Updated Empty State
+
+Update the emptyStateText (around line 177-179):
+
+```tsx
+const emptyStateText = creator.collab_mode === 'discovery'
+  ? "No call slots set. Click 'Edit Availability' to mark when you're free — guests will book intro calls on these dates."
+  : "No publishing windows set. Click 'Edit Availability' to set dates when you can ship — guests will pick from these as target publish dates.";
+```
+
+### Settings.tsx - Date Meaning Preview
+
+Add a preview card after the date meaning selector (around line 638):
+
+```tsx
+{/* Preview of guest experience */}
+<div className="p-3 bg-muted/50 rounded-lg border border-border/50 mt-3">
+  <p className="text-xs text-muted-foreground">
+    <span className="font-medium text-foreground">Guest will see:</span>{" "}
+    "{formData.dateMeaning === 'kickoff' 
+      ? 'This is the day we start working together' 
+      : 'This is our target publish date'}"
+  </p>
+</div>
 ```
 
 ---
 
 ## Visual Comparison
 
-**Before (current state):**
+### Availability Page - Before vs After
+
+**Before:**
 ```
-[100% Async badge]
+Publishing Windows
+Set the dates when collaborations can target going live
 
-Select a Target Publication Date
-When do you want this collaboration to go live?
-(tiny text) This is not a meeting...
+[Instructions: How to click dates...]
 
-[Calendar grid]
+[Calendar]
 ```
 
-**After (proposed):**
+**After:**
 ```
-[100% Async badge with enhanced tooltip]
+Publishing Windows  
+Set the dates when collaborations can target going live
 
-+------------------------------------------+
-| ✍️ How async collaboration works         |
-|   1. Pick a target publish date (not a   |
-|      meeting)                            |
-|   2. Creator shares a draft for review   |
-|   3. Refine together — no calls needed   |
-+------------------------------------------+
+[Instructions: How to click dates...]
 
-When Should This Go Live?
-Select your target publish date
+[👁️ What guests will see]
+Guests will pick from your green dates as a target publish date.
+They'll understand this is when you aim to ship — not a meeting.
 
-[Calendar grid with "Open for publishing" legend]
+[Calendar with "Open for publishing" legend]
 ```
 
 ---
 
-## Technical Notes
+## Why This Matters
 
-1. **No database changes required** - This is purely UI/copy changes
-2. **No new components needed** - Uses existing motion.div patterns
-3. **Respects existing collab_mode logic** - Discovery mode remains unchanged
-4. **Follows Sam Filter brand principle** - Uses "Professional Utility" language, no AI buzzwords
-
----
-
-## Success Metrics
-
-After implementation, monitor:
-- Reduction in support questions about "what the date means"
-- Increased completion rate on async mode bookings
-- User feedback mentioning clarity about async workflow
+By showing creators **what guests experience**, we:
+1. Reduce confusion about async vs sync mental models
+2. Build confidence that their calendar setup communicates correctly
+3. Close the feedback loop between creator intent and guest perception
 
