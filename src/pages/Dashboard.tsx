@@ -280,7 +280,7 @@ export default function Dashboard() {
                 size="sm" 
                 onClick={() => navigate('/dashboard/availability')}
               >
-                Edit Availability
+                {creator.collab_mode === 'discovery' ? 'Edit Availability' : 'Edit Publishing Dates'}
               </Button>
             </div>
             <CollabCalendar
@@ -296,8 +296,10 @@ export default function Dashboard() {
                 className="mt-4 p-4 rounded-lg bg-accent/10 border border-accent/20"
               >
                 <p className="text-sm text-muted-foreground">
-                  <span className="font-medium text-foreground">No availability set yet.</span>{" "}
-                  {emptyStateText.replace("No availability set yet. ", "")}
+                  <span className="font-medium text-foreground">
+                    {creator.collab_mode === 'discovery' ? 'No availability set yet.' : 'No publishing dates set.'}
+                  </span>{" "}
+                  {emptyStateText.split('. ').slice(1).join('. ')}
                 </p>
               </motion.div>
             )}
