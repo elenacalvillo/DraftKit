@@ -1,122 +1,86 @@
 
-# Scrub "Availability" Terminology from Async Mode Views
+
+# Fix Text Contrast in Availability Instructions
 
 ## Problem
-The word "Availability" still appears in several places when creators are in async mode, reinforcing the meeting/scheduling mental model we're trying to avoid.
+The current instructions use colored text (`text-available`, `text-booked`) which creates poor contrast and is hard to read. Additionally, the text says "purple" when the actual booked color is coral/soft red.
 
-## Locations to Update
+**Current Issues:**
+1. `text-available` (bright green) applied directly to text - poor readability
+2. `text-booked` (coral) applied directly to text - poor readability  
+3. Text says "purple" but the actual color is coral/soft red
 
-| File | Line | Current Text | Proposed Text (Async Mode) |
-|------|------|-------------|---------------------------|
-| `src/pages/Dashboard.tsx` | 283 | `Edit Availability` button | `Edit Publishing Dates` |
-| `src/pages/Dashboard.tsx` | 299 | `No availability set yet.` | `No publishing dates set.` |
-| `src/pages/Availability.tsx` | 132 | Toast: `Availability updated` | `Publishing dates updated` |
-| `src/pages/Availability.tsx` | 287 | Stats: `Available dates` | `Publishing dates` |
+## Solution
+Use the same pattern as the calendar legend: colored indicator squares with readable text labels.
 
-For discovery mode, the button and text should remain as-is since "Availability" makes sense for call scheduling.
-
----
-
-## Detailed Changes
-
-### 1. Dashboard.tsx - Mode-Aware Button Text
-
-**Line 283** - Update button to be mode-aware:
-
+**Pattern to follow (from CollabCalendar.tsx legend):**
 ```tsx
-<Button 
-  variant="outline" 
-  size="sm" 
-  onClick={() => navigate('/dashboard/availability')}
->
-  {creator.collab_mode === 'discovery' ? 'Edit Availability' : 'Edit Publishing Dates'}
-</Button>
-```
-
-### 2. Dashboard.tsx - Mode-Aware Empty State
-
-**Line 299** - Update the bold heading text:
-
-```tsx
-<span className="font-medium text-foreground">
-  {creator.collab_mode === 'discovery' ? 'No availability set yet.' : 'No publishing dates set.'}
-</span>
-```
-
-Also update `emptyStateText` (lines 177-179) to remove redundant "No availability set yet" since we're now handling it separately.
-
-### 3. Availability.tsx - Mode-Aware Toast
-
-**Line 132** - Update the success toast:
-
-```tsx
-toast.success(
-  creator.collab_mode === 'discovery' 
-    ? "Availability updated" 
-    : "Publishing dates updated"
-);
-```
-
-### 4. Availability.tsx - Mode-Aware Stats Label
-
-**Line 287** - Update "Available dates" stat label:
-
-```tsx
-<p className="text-sm text-muted-foreground">
-  {creator.collab_mode === 'discovery' ? 'Available dates' : 'Publishing dates'}
-</p>
+<div className="w-3 h-3 rounded-full bg-available" />
+<span className="text-sm text-muted-foreground">Available</span>
 ```
 
 ---
 
 ## Files to Modify
 
-| File | Changes |
-|------|---------|
-| `src/pages/Dashboard.tsx` | Mode-aware button text, mode-aware empty state heading |
-| `src/pages/Availability.tsx` | Mode-aware toast message, mode-aware stats label |
+| File | Location | Change |
+|------|----------|--------|
+| `src/pages/Availability.tsx` | Lines 233-236 | Replace colored text with indicator squares |
+| `src/pages/Availability.tsx` | Lines 251-254 | Replace colored text with indicator squares |
+
+---
+
+## Detailed Changes
+
+### 1. "How to use" Instructions (Lines 233-236)
+
+**Current:**
+```tsx
+<li>Click on a date to mark it as <span className="text-available font-medium">open for publishing</span></li>
+<li>Dates with <span className="text-booked font-medium">purple</span> background are already booked</li>
+```
+
+**Proposed:**
+```tsx
+<li>Click on a date to mark it as <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-available inline-block" />open for publishing</span></li>
+<li>Dates with <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-booked inline-block" />coral</span> background are already booked</li>
+```
+
+### 2. "What guests will see" Card (Lines 251-254)
+
+**Current:**
+```tsx
+<p>Guests will pick from your <span className="text-available font-medium">green dates</span> as a target publish date...</p>
+```
+
+**Proposed:**
+```tsx
+<p>Guests will pick from your <span className="inline-flex items-center gap-1.5 align-baseline"><span className="w-2.5 h-2.5 rounded bg-available inline-block" /><span className="font-medium">highlighted dates</span></span> as a target publish date...</p>
+```
 
 ---
 
 ## Visual Comparison
 
-### Dashboard (Async Mode) - Before vs After
-
 **Before:**
 ```
-[Your Publication Schedule]              [Edit Availability]
-                                         ^^^^^^^^^^^^^^^^^^
-                                         ❌ Wrong terminology
-
-No availability set yet. Click 'Edit Availability'...
-   ^^^^^^^^^^^^^^^            ^^^^^^^^^^^^^^^^^^^
-   ❌ Wrong                   ❌ Wrong
+• Click on a date to mark it as [open for publishing] ← bright green text, hard to read
+• Dates with [purple] background are already booked  ← wrong color name + poor contrast
 ```
 
 **After:**
 ```
-[Your Publication Schedule]              [Edit Publishing Dates]
-                                         ^^^^^^^^^^^^^^^^^^^^^^
-                                         ✅ Consistent
-
-No publishing dates set. Click 'Edit Publishing Dates'...
-   ^^^^^^^^^^^^^^^^^^        ^^^^^^^^^^^^^^^^^^^^^^^
-   ✅ Matches mode           ✅ Consistent
+• Click on a date to mark it as [■] open for publishing ← green square + readable text
+• Dates with [■] coral background are already booked   ← coral square + correct name + readable text
 ```
 
-### Availability Page Toast - Before vs After
-
-**Before:** `✓ Availability updated`
-**After:** `✓ Publishing dates updated`
-
 ---
 
-## Why Mode-Aware?
+## Technical Notes
 
-Discovery mode creators ARE scheduling calls, so "availability" is the right term for them. Only async mode needs the terminology shift to "publishing dates" to match the "Publishing Windows" page title.
+1. Using `inline-flex items-center gap-1.5` to align the square with the text baseline
+2. Using `w-2.5 h-2.5 rounded` for a small square that matches the calendar aesthetic
+3. Using `inline-block` to ensure the square displays correctly within inline text
+4. Changing "purple" to "coral" to match the actual `--booked` color (hsl 8 65% 65%)
+5. Changing "green dates" to "highlighted dates" since the square already shows the color
 
----
-
-## Summary
-
-4 text changes across 2 files to fully scrub "Availability" from async mode views while keeping it for discovery mode where it makes sense.
