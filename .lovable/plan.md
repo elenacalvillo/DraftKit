@@ -1,110 +1,71 @@
 
-
-# Improve Date Clarity for Creators Setting Their Calendar
+# Scrub "Availability" Terminology from Async Mode Views
 
 ## Problem
-While the guest-facing booking page now clearly explains async collaboration, **creators setting their own availability lack context** about what their date selections mean to guests. This creates a disconnect between creator intent and guest expectations.
+The word "Availability" still appears in several places when creators are in async mode, reinforcing the meeting/scheduling mental model we're trying to avoid.
 
-## What's Already Working
-- Guest booking page has the "How async collaboration works" explainer
-- Mode-aware headers and legend text on public pages
-- Availability page title says "Publishing Windows" for async mode
+## Locations to Update
 
-## Gaps Identified
+| File | Line | Current Text | Proposed Text (Async Mode) |
+|------|------|-------------|---------------------------|
+| `src/pages/Dashboard.tsx` | 283 | `Edit Availability` button | `Edit Publishing Dates` |
+| `src/pages/Dashboard.tsx` | 299 | `No availability set yet.` | `No publishing dates set.` |
+| `src/pages/Availability.tsx` | 132 | Toast: `Availability updated` | `Publishing dates updated` |
+| `src/pages/Availability.tsx` | 287 | Stats: `Available dates` | `Publishing dates` |
 
-### 1. Availability Page - No Guest Preview Context
-**Current state**: Instructions explain *how* to click dates, but not *what guests see*
-**Problem**: Creators don't understand the downstream effect of their date selections
-
-### 2. Dashboard Calendar - Vague Empty State
-**Current state**: "No availability set yet. Click 'Edit Availability' to mark dates when you can ship."
-**Problem**: "when you can ship" is internal jargon, not clear what guests experience
-
-### 3. Calendar Legend - Not Mode-Aware in Edit Mode
-**Current state**: Default legend says "Available" even in async mode
-**Problem**: Inconsistent terminology between edit view and guest view
-
-### 4. Settings Page - Disconnected Date Meaning
-**Current state**: "What do your available dates represent?" with Kick-off/Publishing options
-**Problem**: No preview of how this affects the guest's booking experience
+For discovery mode, the button and text should remain as-is since "Availability" makes sense for call scheduling.
 
 ---
 
-## Proposed Changes
+## Detailed Changes
 
-### 1. Add "Guest Preview" Context to Availability Page
+### 1. Dashboard.tsx - Mode-Aware Button Text
 
-**File**: `src/pages/Availability.tsx`
-
-Add a new info card below the instructions that shows what guests will see:
-
-```
-+---------------------------------------------------------------+
-| 👁️ What guests will see                                       |
-|                                                                |
-| When someone visits your booking page, they'll be asked to:   |
-| "When should this go live?" and pick from your green dates.   |
-|                                                                |
-| They'll see a note explaining this is a TARGET PUBLISH DATE,  |
-| not a meeting.                                                 |
-+---------------------------------------------------------------+
-```
-
-For discovery mode, the text changes to explain guests will see "call slots".
-
-### 2. Update Dashboard Empty State Copy
-
-**File**: `src/pages/Dashboard.tsx`
-
-**Current**:
-```
-"No availability set yet. Click 'Edit Availability' to mark dates when you can ship."
-```
-
-**Proposed (async mode)**:
-```
-"No publishing windows set. Click 'Edit Availability' to set dates when you can ship — guests will pick from these as target publish dates."
-```
-
-**Proposed (discovery mode)**:
-```
-"No call slots set. Click 'Edit Availability' to mark when you're free — guests will book intro calls on these dates."
-```
-
-### 3. Pass collabMode to Calendar Legend in Edit Mode
-
-**File**: `src/pages/Availability.tsx`
-
-Currently the `CollabCalendar` in edit mode doesn't receive `availableLegendText`. Add mode-aware legend:
+**Line 283** - Update button to be mode-aware:
 
 ```tsx
-<CollabCalendar
-  ...existing props...
-  availableLegendText={
-    creator.collab_mode === 'discovery' 
-      ? 'Available for calls' 
-      : 'Open for publishing'
-  }
-  collabMode={creator.collab_mode as 'async' | 'discovery' | null}
-/>
+<Button 
+  variant="outline" 
+  size="sm" 
+  onClick={() => navigate('/dashboard/availability')}
+>
+  {creator.collab_mode === 'discovery' ? 'Edit Availability' : 'Edit Publishing Dates'}
+</Button>
 ```
 
-### 4. Add Settings Preview Card
+### 2. Dashboard.tsx - Mode-Aware Empty State
 
-**File**: `src/pages/Settings.tsx`
+**Line 299** - Update the bold heading text:
 
-Below the "What do your available dates represent?" selector, add a preview of what guests see:
-
-```
-+---------------------------------------------------------------+
-| Preview: How guests will interpret your dates                  |
-|                                                                |
-| Calendar header: "When Should This Go Live?"                   |
-| Selected date means: "This is our target publish date"         |
-+---------------------------------------------------------------+
+```tsx
+<span className="font-medium text-foreground">
+  {creator.collab_mode === 'discovery' ? 'No availability set yet.' : 'No publishing dates set.'}
+</span>
 ```
 
-This updates dynamically based on the selected date_meaning option.
+Also update `emptyStateText` (lines 177-179) to remove redundant "No availability set yet" since we're now handling it separately.
+
+### 3. Availability.tsx - Mode-Aware Toast
+
+**Line 132** - Update the success toast:
+
+```tsx
+toast.success(
+  creator.collab_mode === 'discovery' 
+    ? "Availability updated" 
+    : "Publishing dates updated"
+);
+```
+
+### 4. Availability.tsx - Mode-Aware Stats Label
+
+**Line 287** - Update "Available dates" stat label:
+
+```tsx
+<p className="text-sm text-muted-foreground">
+  {creator.collab_mode === 'discovery' ? 'Available dates' : 'Publishing dates'}
+</p>
+```
 
 ---
 
@@ -112,122 +73,50 @@ This updates dynamically based on the selected date_meaning option.
 
 | File | Changes |
 |------|---------|
-| `src/pages/Availability.tsx` | Add "What guests will see" info card, pass mode-aware legend to calendar |
-| `src/pages/Dashboard.tsx` | Update empty state text to explain guest experience |
-| `src/pages/Settings.tsx` | Add preview card showing guest-facing date interpretation |
-
----
-
-## Detailed Implementation
-
-### Availability.tsx - Guest Preview Card
-
-Insert after the existing instructions card (around line 235):
-
-```tsx
-{/* Guest Preview Context */}
-<motion.div
-  initial={{ opacity: 0, y: 20 }}
-  animate={{ opacity: 1, y: 0 }}
-  transition={{ delay: 0.15 }}
-  className="glass-card p-4 mb-6 flex items-start gap-3 bg-accent/10 border border-accent/20"
->
-  <span className="text-lg">👁️</span>
-  <div className="text-sm text-muted-foreground">
-    <p className="font-medium text-foreground mb-1">What guests will see</p>
-    {creator.collab_mode === 'discovery' ? (
-      <p>Guests will pick from your <span className="text-available font-medium">green dates</span> to schedule an intro call. They'll receive a calendar invite after booking.</p>
-    ) : (
-      <p>Guests will pick from your <span className="text-available font-medium">green dates</span> as a target publish date. They'll understand this is when you aim to ship — not a meeting.</p>
-    )}
-  </div>
-</motion.div>
-```
-
-### Availability.tsx - Mode-Aware Calendar
-
-Update the CollabCalendar component (around line 243):
-
-```tsx
-<CollabCalendar
-  availableDates={availableDates}
-  blockedDates={blockedDates}
-  bookedDates={bookedDates}
-  bookingDetails={bookingDetails}
-  isEditable={true}
-  onToggleAvailable={handleToggleAvailable}
-  onToggleBlocked={handleToggleBlocked}
-  availableLegendText={
-    creator.collab_mode === 'discovery' 
-      ? 'Available for calls' 
-      : 'Open for publishing'
-  }
-  collabMode={creator.collab_mode as 'async' | 'discovery' | null}
-/>
-```
-
-### Dashboard.tsx - Updated Empty State
-
-Update the emptyStateText (around line 177-179):
-
-```tsx
-const emptyStateText = creator.collab_mode === 'discovery'
-  ? "No call slots set. Click 'Edit Availability' to mark when you're free — guests will book intro calls on these dates."
-  : "No publishing windows set. Click 'Edit Availability' to set dates when you can ship — guests will pick from these as target publish dates.";
-```
-
-### Settings.tsx - Date Meaning Preview
-
-Add a preview card after the date meaning selector (around line 638):
-
-```tsx
-{/* Preview of guest experience */}
-<div className="p-3 bg-muted/50 rounded-lg border border-border/50 mt-3">
-  <p className="text-xs text-muted-foreground">
-    <span className="font-medium text-foreground">Guest will see:</span>{" "}
-    "{formData.dateMeaning === 'kickoff' 
-      ? 'This is the day we start working together' 
-      : 'This is our target publish date'}"
-  </p>
-</div>
-```
+| `src/pages/Dashboard.tsx` | Mode-aware button text, mode-aware empty state heading |
+| `src/pages/Availability.tsx` | Mode-aware toast message, mode-aware stats label |
 
 ---
 
 ## Visual Comparison
 
-### Availability Page - Before vs After
+### Dashboard (Async Mode) - Before vs After
 
 **Before:**
 ```
-Publishing Windows
-Set the dates when collaborations can target going live
+[Your Publication Schedule]              [Edit Availability]
+                                         ^^^^^^^^^^^^^^^^^^
+                                         ❌ Wrong terminology
 
-[Instructions: How to click dates...]
-
-[Calendar]
+No availability set yet. Click 'Edit Availability'...
+   ^^^^^^^^^^^^^^^            ^^^^^^^^^^^^^^^^^^^
+   ❌ Wrong                   ❌ Wrong
 ```
 
 **After:**
 ```
-Publishing Windows  
-Set the dates when collaborations can target going live
+[Your Publication Schedule]              [Edit Publishing Dates]
+                                         ^^^^^^^^^^^^^^^^^^^^^^
+                                         ✅ Consistent
 
-[Instructions: How to click dates...]
-
-[👁️ What guests will see]
-Guests will pick from your green dates as a target publish date.
-They'll understand this is when you aim to ship — not a meeting.
-
-[Calendar with "Open for publishing" legend]
+No publishing dates set. Click 'Edit Publishing Dates'...
+   ^^^^^^^^^^^^^^^^^^        ^^^^^^^^^^^^^^^^^^^^^^^
+   ✅ Matches mode           ✅ Consistent
 ```
+
+### Availability Page Toast - Before vs After
+
+**Before:** `✓ Availability updated`
+**After:** `✓ Publishing dates updated`
 
 ---
 
-## Why This Matters
+## Why Mode-Aware?
 
-By showing creators **what guests experience**, we:
-1. Reduce confusion about async vs sync mental models
-2. Build confidence that their calendar setup communicates correctly
-3. Close the feedback loop between creator intent and guest perception
+Discovery mode creators ARE scheduling calls, so "availability" is the right term for them. Only async mode needs the terminology shift to "publishing dates" to match the "Publishing Windows" page title.
 
+---
+
+## Summary
+
+4 text changes across 2 files to fully scrub "Availability" from async mode views while keeping it for discovery mode where it makes sense.
