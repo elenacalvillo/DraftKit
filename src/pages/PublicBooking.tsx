@@ -15,6 +15,7 @@ import { analyzeCollabMatch, type CollabSuggestion, type CollabMatchResult } fro
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { useAuth } from "@/hooks/useAuth";
 import { parseProfileTheme, getThemeStyles, type ProfileTheme } from "@/lib/theme-presets";
+import { parseDateString } from "@/lib/utils";
 import { TurnstileWidget } from "@/components/turnstile/TurnstileWidget";
 import { verifyTurnstileToken } from "@/lib/turnstile";
 
@@ -560,7 +561,7 @@ export default function PublicBooking() {
   };
 
   const formatSelectedDate = (dateStr: string) => {
-    const date = new Date(dateStr);
+    const date = parseDateString(dateStr);
     return date.toLocaleDateString("en-US", {
       weekday: "long",
       month: "long",

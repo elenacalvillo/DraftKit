@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn, parseDateString } from "@/lib/utils";
 import { toast } from "sonner";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -56,7 +56,7 @@ export function CollabCalendar({
     
     // Find first available date that's not in the past
     for (const dateStr of sortedDates) {
-      const date = new Date(dateStr);
+      const date = parseDateString(dateStr);
       if (date >= today) {
         return date;
       }
