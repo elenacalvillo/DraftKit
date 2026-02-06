@@ -205,10 +205,14 @@ export default function Availability() {
             </Button>
           </div>
           <h1 className="text-3xl font-bold mb-2">
-            <span className="gradient-text">Availability</span>
+            <span className="gradient-text">
+              {creator.collab_mode === 'discovery' ? 'Availability' : 'Publishing Windows'}
+            </span>
           </h1>
           <p className="text-muted-foreground">
-            Set the dates when you're available for collaborations
+            {creator.collab_mode === 'discovery' 
+              ? "Set the dates when you're available for intro calls"
+              : 'Set the dates when collaborations can target going live'}
           </p>
         </motion.div>
 
@@ -223,8 +227,8 @@ export default function Availability() {
           <div className="text-sm text-muted-foreground">
             <p className="font-medium text-foreground mb-1">How to use:</p>
             <ul className="list-disc list-inside space-y-1">
-              <li>Click on a date to mark it as <span className="text-available font-medium">available</span></li>
-              <li>Click again to remove availability</li>
+              <li>Click on a date to mark it as <span className="text-available font-medium">{creator.collab_mode === 'discovery' ? 'available for calls' : 'open for publishing'}</span></li>
+              <li>Click again to remove {creator.collab_mode === 'discovery' ? 'availability' : 'the date'}</li>
               <li>Dates with <span className="text-booked font-medium">purple</span> background are already booked</li>
             </ul>
           </div>

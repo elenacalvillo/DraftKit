@@ -141,15 +141,15 @@ export const COLLAB_MODE_METADATA: Record<CollabMode, {
 }> = {
   async: {
     label: 'Async Workspace',
-    description: 'Skip the calls. Guests request a topic, you start drafting. Calendar shows publication deadlines.',
+    description: 'Skip the calls. Guests pick a topic, you start drafting. Calendar shows target publish dates.',
     badge: '100% Async',
-    badgeTooltip: 'No calls required – we\'ll start drafting right away',
-    calendarHeader: 'Select a Target Publication Date',
-    confirmationText: 'Great! This is our target ship date. Check your email for the first draft.',
+    badgeTooltip: 'No meetings — you\'ll collaborate on a shared draft. Pick a target date to publish.',
+    calendarHeader: 'When Should This Go Live?',
+    confirmationText: 'Great! This is our target publish date. Check your email for next steps on drafting.',
     processSteps: [
-      { step: 1, label: 'Topic' },
-      { step: 2, label: 'Ship Date' },
-      { step: 3, label: 'Drafting' },
+      { step: 1, label: 'Your Idea' },
+      { step: 2, label: 'Target Date' },
+      { step: 3, label: 'Draft Review' },
     ],
     icon: '✍️',
   },
