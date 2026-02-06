@@ -231,9 +231,9 @@ export default function Availability() {
           <div className="text-sm text-muted-foreground">
             <p className="font-medium text-foreground mb-1">How to use:</p>
             <ul className="list-disc list-inside space-y-1">
-              <li>Click on a date to mark it as <span className="text-available font-medium">{creator.collab_mode === 'discovery' ? 'available for calls' : 'open for publishing'}</span></li>
+              <li>Click on a date to mark it as <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-available inline-block" />{creator.collab_mode === 'discovery' ? 'available for calls' : 'open for publishing'}</span></li>
               <li>Click again to remove {creator.collab_mode === 'discovery' ? 'availability' : 'the date'}</li>
-              <li>Dates with <span className="text-booked font-medium">purple</span> background are already booked</li>
+              <li>Dates with a <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-booked inline-block" />coral</span> background are already booked</li>
             </ul>
           </div>
         </motion.div>
@@ -249,9 +249,9 @@ export default function Availability() {
           <div className="text-sm text-muted-foreground">
             <p className="font-medium text-foreground mb-1">What guests will see</p>
             {creator.collab_mode === 'discovery' ? (
-              <p>Guests will pick from your <span className="text-available font-medium">green dates</span> to schedule an intro call. They'll receive a calendar invite after booking.</p>
+              <p>Guests will pick from your <span className="inline-flex items-center gap-1.5 align-baseline"><span className="w-2.5 h-2.5 rounded bg-available inline-block" /><span className="font-medium">highlighted dates</span></span> to schedule an intro call. They'll receive a calendar invite after booking.</p>
             ) : (
-              <p>Guests will pick from your <span className="text-available font-medium">green dates</span> as a target publish date. They'll understand this is when you aim to ship — not a meeting.</p>
+              <p>Guests will pick from your <span className="inline-flex items-center gap-1.5 align-baseline"><span className="w-2.5 h-2.5 rounded bg-available inline-block" /><span className="font-medium">highlighted dates</span></span> as a target publish date. They'll understand this is when you aim to ship — not a meeting.</p>
             )}
           </div>
         </motion.div>
