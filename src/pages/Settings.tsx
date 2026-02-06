@@ -632,7 +632,16 @@ export default function Settings() {
                     </div>
                   ))}
                 </RadioGroup>
-                <p className="text-xs text-muted-foreground">
+                {/* Preview of guest experience */}
+                <div className="p-3 bg-muted/50 rounded-lg border border-border/50 mt-3">
+                  <p className="text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">Guest will see:</span>{" "}
+                    "{formData.dateMeaning === 'kickoff' 
+                      ? 'This is the day we start working together' 
+                      : 'This is our target publish date'}"
+                  </p>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
                   This context is shown to collaborators on your booking page
                 </p>
               </div>

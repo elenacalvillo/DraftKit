@@ -234,6 +234,24 @@ export default function Availability() {
           </div>
         </motion.div>
 
+        {/* Guest Preview Context */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="glass-card p-4 mb-6 flex items-start gap-3 bg-accent/10 border border-accent/20"
+        >
+          <span className="text-lg">👁️</span>
+          <div className="text-sm text-muted-foreground">
+            <p className="font-medium text-foreground mb-1">What guests will see</p>
+            {creator.collab_mode === 'discovery' ? (
+              <p>Guests will pick from your <span className="text-available font-medium">green dates</span> to schedule an intro call. They'll receive a calendar invite after booking.</p>
+            ) : (
+              <p>Guests will pick from your <span className="text-available font-medium">green dates</span> as a target publish date. They'll understand this is when you aim to ship — not a meeting.</p>
+            )}
+          </div>
+        </motion.div>
+
         {/* Calendar */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -248,6 +266,12 @@ export default function Availability() {
             isEditable={true}
             onToggleAvailable={handleToggleAvailable}
             onToggleBlocked={handleToggleBlocked}
+            availableLegendText={
+              creator.collab_mode === 'discovery' 
+                ? 'Available for calls' 
+                : 'Open for publishing'
+            }
+            collabMode={creator.collab_mode as 'async' | 'discovery' | null}
           />
         </motion.div>
 
