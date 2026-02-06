@@ -175,8 +175,8 @@ export default function Dashboard() {
     : "Your Publication Schedule";
 
   const emptyStateText = creator.collab_mode === 'discovery'
-    ? "No availability set yet. Click 'Edit Availability' to mark dates when you're free for calls."
-    : "No availability set yet. Click 'Edit Availability' to mark dates when you can ship.";
+    ? "No call slots set. Click 'Edit Availability' to mark when you're free — guests will book intro calls on these dates."
+    : "No publishing windows set. Click 'Edit Availability' to set dates when you can ship — guests will pick from these as target publish dates.";
 
   return (
     <DashboardLayout>
