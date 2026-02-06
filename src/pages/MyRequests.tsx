@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { parseDateString } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -257,7 +258,7 @@ export default function MyRequests() {
                         <div className="flex items-center gap-1.5">
                           <Calendar className="h-4 w-4" />
                           <span>
-                            Requested: {format(new Date(request.requested_date), 'MMM d, yyyy')}
+                            Requested: {format(parseDateString(request.requested_date), 'MMM d, yyyy')}
                           </span>
                         </div>
                       )}

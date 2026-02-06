@@ -1,6 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
+// Parse YYYY-MM-DD without timezone shifting (uses local time components)
+function parseDateString(dateStr: string): Date {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -64,7 +70,7 @@ serve(async (req: Request): Promise<Response> => {
     let sentCount = 0;
 
     for (const request of requests) {
-      const requestedDate = new Date(request.requested_date);
+      const requestedDate = parseDateString(request.requested_date);
       const reminderDaysBefore = (request.creators as any)?.reminder_days_before ?? 3;
       
       // Calculate the reminder date

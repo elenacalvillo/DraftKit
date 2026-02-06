@@ -1,6 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
+// Parse YYYY-MM-DD without timezone shifting (uses local time components)
+function parseDateString(dateStr: string): Date {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
 // Dynamic import for Resend to avoid npm: specifier issues
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const RESEND_FROM = Deno.env.get("RESEND_FROM") || "DraftKit Notifications <notifications@draftkit.app>";
@@ -235,7 +241,7 @@ serve(async (req: Request): Promise<Response> => {
 
     // Format the requested date nicely
     const formattedDate = requestedDate 
-      ? new Date(requestedDate).toLocaleDateString("en-US", {
+      ? parseDateString(requestedDate).toLocaleDateString("en-US", {
           weekday: "long",
           month: "long", 
           day: "numeric",
