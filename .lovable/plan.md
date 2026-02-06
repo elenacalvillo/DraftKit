@@ -1,84 +1,88 @@
 
 
-# Fix Button Hover Contrast Issue
+# Fix: Dinah's Profile Not Visible to Public
 
-## Problem
-The `outline` button variant on hover has poor text contrast. When hovered, it uses:
-- Background: `hover:bg-accent` → `hsl(24 58% 60%)` (coral/orange)
-- Text: `hover:text-accent-foreground` → `hsl(8 50% 35%)` (dark brown)
+## Problem Summary
+Dinah created her account and her profile exists in the database with username `codelikeagirl`, but visitors to `draftkit.app/codelikeagirl` see "Creator Not Found".
 
-Both colors are warm-toned, creating insufficient contrast for readability.
+## Root Cause
+The `public_creator_profiles` view uses `security_invoker = on`, which means it runs with the permissions of the user making the request. When anyone visits the public booking page, they're querying through this view, which in turn queries the `creators` table. However, the `creators` table RLS only allows users to see **their own** profile:
 
-## Solution Options
-
-### Option A: Use White Text on Hover (Recommended)
-Change the outline button hover to use `primary-foreground` (white) for text, similar to how `default` and `gradient` variants work. This provides high contrast on the coral background.
-
-**Change in `src/components/ui/button.tsx`:**
-```tsx
-// Line 14 - Current:
-outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
-
-// Proposed:
-outline: "border border-input bg-background hover:bg-accent hover:text-primary-foreground",
+```sql
+Policy: "Creators can view own profile"
+USING: (auth.uid() = user_id)
 ```
 
-### Option B: Keep Border Style on Hover (More Subtle)
-Instead of filling the background, keep the outline style but just darken the border and text slightly.
-
-**Change in `src/components/ui/button.tsx`:**
-```tsx
-// Line 14 - Current:
-outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
-
-// Proposed:
-outline: "border border-input bg-background hover:border-primary hover:text-primary",
-```
-
-### Option C: Use Lighter Background with Dark Text
-Use a very light tint of the accent color so the dark text remains readable.
-
-**Change in `src/components/ui/button.tsx`:**
-```tsx
-// Line 14 - Current:
-outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
-
-// Proposed:
-outline: "border border-input bg-background hover:bg-accent/20 hover:text-foreground",
-```
+Since visitors aren't Dinah, they can't see her profile - the RLS blocks it.
 
 ---
 
-## Recommendation
+## Solution
+Add a new RLS policy on the `creators` table that allows public SELECT access for profiles with a non-null username. This follows the existing pattern in the `availability` table which already has a similar policy.
 
-**Option A (white text on coral)** provides the strongest visual feedback while maintaining high contrast. This matches the pattern used by `default`, `gradient`, and `hero` variants.
+### New Policy
+```sql
+CREATE POLICY "Public can view public creator profiles"
+ON public.creators
+FOR SELECT
+USING (username IS NOT NULL);
+```
 
-**Option C (light tint)** is more subtle and keeps the outline button feeling "lighter" than primary buttons, which may be preferred for secondary actions.
+This policy allows anyone (anon or authenticated) to read creator records where the username is set, which indicates the creator has completed their public profile setup.
+
+---
+
+## Technical Details
+
+### Why the current setup fails
+
+| Step | What Happens |
+|------|--------------|
+| 1 | Visitor loads `/codelikeagirl` |
+| 2 | App queries `public_creator_profiles` view |
+| 3 | View (with `security_invoker=on`) queries `creators` table |
+| 4 | RLS checks: `auth.uid() = user_id` → FALSE (visitor ≠ Dinah) |
+| 5 | Query returns empty array `[]` |
+| 6 | App shows "Creator Not Found" |
+
+### After the fix
+
+| Step | What Happens |
+|------|--------------|
+| 1 | Visitor loads `/codelikeagirl` |
+| 2 | App queries `public_creator_profiles` view |
+| 3 | View queries `creators` table |
+| 4 | RLS checks: `username IS NOT NULL` → TRUE |
+| 5 | Query returns Dinah's profile (without email - view excludes it) |
+| 6 | App shows Dinah's public booking page |
+
+---
+
+## Security Considerations
+
+1. The `public_creator_profiles` VIEW already excludes sensitive data like email addresses - it only exposes public profile fields
+2. The `creator_contacts` table (which has the email) has separate strict RLS policies
+3. This follows the same pattern as the `availability` table which allows public SELECT for creators with non-null usernames
+4. The policy only enables SELECT, not INSERT/UPDATE/DELETE
 
 ---
 
 ## Files to Modify
 
-| File | Change |
-|------|--------|
-| `src/components/ui/button.tsx` | Update line 14 - outline variant hover styles |
+| Change | Description |
+|--------|-------------|
+| Database Migration | Add RLS policy allowing public SELECT on creators with non-null username |
 
 ---
 
-## Visual Comparison
+## Migration SQL
 
-**Current (poor contrast):**
-```
-[Edit Publishing Dates] ← coral bg + dark brown text = hard to read
-```
-
-**Option A - White text:**
-```
-[Edit Publishing Dates] ← coral bg + white text = high contrast ✓
-```
-
-**Option C - Light tint:**
-```
-[Edit Publishing Dates] ← light coral tint + dark text = subtle but readable ✓
+```sql
+-- Allow public access to creator profiles that have a username set
+-- The public_creator_profiles view already filters out sensitive data (email)
+CREATE POLICY "Public can view public creator profiles"
+ON public.creators
+FOR SELECT
+USING (username IS NOT NULL);
 ```
 
