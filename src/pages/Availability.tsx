@@ -129,7 +129,11 @@ export default function Availability() {
       }
     }
 
-    toast.success("Availability updated");
+    toast.success(
+      creator.collab_mode === 'discovery' 
+        ? "Availability updated" 
+        : "Publishing dates updated"
+    );
   };
 
   const handleToggleAvailable = (date: string) => {
@@ -284,7 +288,9 @@ export default function Availability() {
         >
           <div className="glass-card p-4 text-center">
             <p className="text-2xl font-bold text-available">{availableDates.length}</p>
-            <p className="text-sm text-muted-foreground">Available dates</p>
+            <p className="text-sm text-muted-foreground">
+              {creator.collab_mode === 'discovery' ? 'Available dates' : 'Publishing dates'}
+            </p>
           </div>
           <div className="glass-card p-4 text-center">
             <p className="text-2xl font-bold text-booked">{bookedDates.length}</p>
