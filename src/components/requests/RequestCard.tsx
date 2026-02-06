@@ -4,7 +4,7 @@ import { Calendar, ExternalLink, Mail, Link as LinkIcon, Sparkles, MessageSquare
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CollabRequest, CollabDraft } from "@/lib/storage";
-import { cn } from "@/lib/utils";
+import { cn, parseDateString } from "@/lib/utils";
 import { CollabDraftModal } from "./CollabDraftModal";
 import { SendMessageModal } from "./SendMessageModal";
 import { supabase } from "@/integrations/supabase/client";
@@ -85,7 +85,7 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
   
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return null;
-    const date = new Date(dateStr);
+    const date = parseDateString(dateStr);
     return date.toLocaleDateString("en-US", {
       weekday: "short",
       month: "short",
