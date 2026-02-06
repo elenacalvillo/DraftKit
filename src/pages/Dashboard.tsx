@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
+import { parseDateString } from "@/lib/utils";
 import { Calendar, Clock, Copy, ExternalLink, MessageSquare, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -118,7 +119,7 @@ export default function Dashboard() {
   const pendingCount = requests.filter((r) => r.status === "pending").length;
   const draftsCreatedCount = requests.filter((r) => r.ai_draft !== null).length;
   const thisMonthCollabs = requests.filter((r) => {
-    const date = new Date(r.requested_date);
+    const date = parseDateString(r.requested_date);
     const now = new Date();
     return (
       r.status === "approved" &&
@@ -352,7 +353,7 @@ export default function Dashboard() {
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate">{request.requester_name}</p>
                       <p className="text-sm text-muted-foreground truncate">
-                        {new Date(request.requested_date).toLocaleDateString()}
+                        {parseDateString(request.requested_date).toLocaleDateString()}
                       </p>
                     </div>
                     <span
