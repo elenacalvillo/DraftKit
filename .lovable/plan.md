@@ -1,88 +1,157 @@
 
 
-# Fix: Dinah's Profile Not Visible to Public
+# Fix Timezone-Related Date Shift Bug
 
-## Problem Summary
-Dinah created her account and her profile exists in the database with username `codelikeagirl`, but visitors to `draftkit.app/codelikeagirl` see "Creator Not Found".
+## Problem
 
-## Root Cause
-The `public_creator_profiles` view uses `security_invoker = on`, which means it runs with the permissions of the user making the request. When anyone visits the public booking page, they're querying through this view, which in turn queries the `creators` table. However, the `creators` table RLS only allows users to see **their own** profile:
+When a user selects **April 1st** in the calendar, the displayed "Target Publication Date" shows **March 31st**. This is a timezone bug affecting all users west of UTC.
 
-```sql
-Policy: "Creators can view own profile"
-USING: (auth.uid() = user_id)
+### Root Cause
+
+Date strings like `"2026-04-01"` are being parsed with `new Date(dateStr)`, which interprets them as **UTC midnight**. When the browser then displays this date using `toLocaleDateString()`, it converts to local time, causing the date to shift backwards for users in western timezones.
+
+**Example flow:**
+```text
+1. User clicks April 1st
+2. Calendar stores: "2026-04-01"
+3. Display code runs: new Date("2026-04-01")
+4. JavaScript interprets: 2026-04-01T00:00:00.000Z (UTC midnight)
+5. User in Pacific Time (UTC-7): Converts to March 31, 2026 at 5:00 PM local
+6. toLocaleDateString() outputs: "March 31, 2026" - WRONG!
 ```
-
-Since visitors aren't Dinah, they can't see her profile - the RLS blocks it.
 
 ---
 
 ## Solution
-Add a new RLS policy on the `creators` table that allows public SELECT access for profiles with a non-null username. This follows the existing pattern in the `availability` table which already has a similar policy.
 
-### New Policy
-```sql
-CREATE POLICY "Public can view public creator profiles"
-ON public.creators
-FOR SELECT
-USING (username IS NOT NULL);
+Parse date strings by splitting them into year/month/day components, then create a `Date` object with local time components. This ensures the date stays anchored to the user's local timezone.
+
+### Helper Function
+
+Create a reusable date parsing utility in `src/lib/utils.ts`:
+
+```typescript
+/**
+ * Parse a YYYY-MM-DD date string without timezone shifting.
+ * Uses local time components to prevent UTC conversion issues.
+ */
+export function parseDateString(dateStr: string): Date {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day); // Month is 0-indexed
+}
 ```
-
-This policy allows anyone (anon or authenticated) to read creator records where the username is set, which indicates the creator has completed their public profile setup.
-
----
-
-## Technical Details
-
-### Why the current setup fails
-
-| Step | What Happens |
-|------|--------------|
-| 1 | Visitor loads `/codelikeagirl` |
-| 2 | App queries `public_creator_profiles` view |
-| 3 | View (with `security_invoker=on`) queries `creators` table |
-| 4 | RLS checks: `auth.uid() = user_id` → FALSE (visitor ≠ Dinah) |
-| 5 | Query returns empty array `[]` |
-| 6 | App shows "Creator Not Found" |
-
-### After the fix
-
-| Step | What Happens |
-|------|--------------|
-| 1 | Visitor loads `/codelikeagirl` |
-| 2 | App queries `public_creator_profiles` view |
-| 3 | View queries `creators` table |
-| 4 | RLS checks: `username IS NOT NULL` → TRUE |
-| 5 | Query returns Dinah's profile (without email - view excludes it) |
-| 6 | App shows Dinah's public booking page |
-
----
-
-## Security Considerations
-
-1. The `public_creator_profiles` VIEW already excludes sensitive data like email addresses - it only exposes public profile fields
-2. The `creator_contacts` table (which has the email) has separate strict RLS policies
-3. This follows the same pattern as the `availability` table which allows public SELECT for creators with non-null usernames
-4. The policy only enables SELECT, not INSERT/UPDATE/DELETE
 
 ---
 
 ## Files to Modify
 
-| Change | Description |
-|--------|-------------|
-| Database Migration | Add RLS policy allowing public SELECT on creators with non-null username |
+| File | Change |
+|------|--------|
+| `src/lib/utils.ts` | Add `parseDateString()` helper function |
+| `src/pages/PublicBooking.tsx` | Update `formatSelectedDate()` to use `parseDateString()` |
+| `src/components/requests/RequestCard.tsx` | Update `formatDate()` to use `parseDateString()` |
+| `src/components/calendar/CollabCalendar.tsx` | Update date comparisons in `firstAvailableDate` logic to use `parseDateString()` |
 
 ---
 
-## Migration SQL
+## Detailed Changes
 
-```sql
--- Allow public access to creator profiles that have a username set
--- The public_creator_profiles view already filters out sensitive data (email)
-CREATE POLICY "Public can view public creator profiles"
-ON public.creators
-FOR SELECT
-USING (username IS NOT NULL);
+### 1. src/lib/utils.ts
+
+Add the helper function after the existing `cn` function:
+
+```typescript
+/**
+ * Parse a YYYY-MM-DD date string without timezone shifting.
+ * Uses local time components to prevent UTC conversion issues.
+ */
+export function parseDateString(dateStr: string): Date {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
 ```
+
+### 2. src/pages/PublicBooking.tsx (line 562-564)
+
+**Before:**
+```typescript
+const formatSelectedDate = (dateStr: string) => {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString("en-US", { ... });
+};
+```
+
+**After:**
+```typescript
+const formatSelectedDate = (dateStr: string) => {
+  const date = parseDateString(dateStr);
+  return date.toLocaleDateString("en-US", { ... });
+};
+```
+
+### 3. src/components/requests/RequestCard.tsx (line 86-89)
+
+**Before:**
+```typescript
+const formatDate = (dateStr: string | null) => {
+  if (!dateStr) return null;
+  const date = new Date(dateStr);
+  return date.toLocaleDateString("en-US", { ... });
+};
+```
+
+**After:**
+```typescript
+const formatDate = (dateStr: string | null) => {
+  if (!dateStr) return null;
+  const date = parseDateString(dateStr);
+  return date.toLocaleDateString("en-US", { ... });
+};
+```
+
+### 4. src/components/calendar/CollabCalendar.tsx (lines 59-60)
+
+**Before:**
+```typescript
+for (const dateStr of sortedDates) {
+  const date = new Date(dateStr);
+  if (date >= today) {
+    return date;
+  }
+}
+```
+
+**After:**
+```typescript
+for (const dateStr of sortedDates) {
+  const date = parseDateString(dateStr);
+  if (date >= today) {
+    return date;
+  }
+}
+```
+
+---
+
+## Why This Works
+
+When you call `new Date(year, month, day)` with numeric components, JavaScript creates a Date object in **local time**, not UTC. This means:
+
+```text
+parseDateString("2026-04-01")
+→ new Date(2026, 3, 1)  // April 1st in LOCAL timezone
+→ 2026-04-01T07:00:00.000Z (if UTC-7)
+→ toLocaleDateString() shows "April 1, 2026" ✓
+```
+
+---
+
+## Impact
+
+This fix will correct date display across:
+- Public booking page (date confirmation panel)
+- Request cards in dashboard
+- Calendar navigation (jumping to first available date)
+
+All 17 creators and their visitors will see correct dates after this fix.
 
