@@ -1,140 +1,237 @@
 
-# Fix: Complete Timezone Date Shift Bug
 
-## Problem Summary
+# Add Draft Management & Collaboration Link Features
 
-You selected **April 3rd** in the calendar, but Dinah sees "**Thu, Apr 2, 2026**" in her dashboard. The database correctly stores `2026-04-03`, but the display is shifting the date backward by one day.
+## Overview
 
-**Root Cause:** Multiple files are still using `new Date(dateString)` which interprets dates as UTC midnight, causing a backward shift for users in western timezones.
+This feature addresses Dinah's feedback about wanting more control over collaboration workflows. Currently, once an AI draft is generated, the creator is limited to regenerating it. We'll add the ability to delete drafts entirely and link to external documents (like Google Docs) for the actual collaborative work.
 
----
+## Features to Implement
 
-## Scope of the Bug
+### 1. Delete Draft Button
+Allow creators to clear the AI-generated draft and return to the "Generate Draft" state.
 
-The `parseDateString` fix was applied to some files, but missed several others:
+### 2. Collaboration Link Field
+Add a new input where creators can paste a URL to their shared working document (e.g., Google Doc, Notion page).
 
-| File | Lines | Issue |
-|------|-------|-------|
-| `src/pages/Dashboard.tsx` | 121, 355 | "This Month Collabs" calculation and date display |
-| `src/pages/MyRequests.tsx` | 260 | Guest's view of their sent requests |
-| `supabase/functions/send-collab-email/index.ts` | 238 | Email notifications show wrong date |
-| `supabase/functions/send-collab-reminder/index.ts` | 67, 71 | Reminder timing could fire on wrong day |
+### 3. Open Shared Document Button
+When a collab_link exists, display a prominent button for both the creator and guest to quickly access the shared workspace.
 
 ---
 
-## Solution
+## Database Changes
 
-Apply the same `parseDateString` pattern to all remaining locations. For edge functions (Deno environment), we'll add the helper function inline since they don't share code with the frontend.
+Add a new column `collab_link` to the `collab_requests` table:
+
+```sql
+ALTER TABLE collab_requests
+ADD COLUMN collab_link text;
+```
+
+This column will store the URL to an external collaboration document.
 
 ---
 
-## Files to Modify
+## UI/UX Changes
 
-### 1. src/pages/Dashboard.tsx
+### CollabDraftModal Component
 
-**Line 121** - This Month Collabs calculation:
-```typescript
-// Before
-const date = new Date(r.requested_date);
+**Current state:**
+- Shows draft content with "Copy Draft" and "Regenerate" buttons
 
-// After
-const date = parseDateString(r.requested_date);
-```
+**New state:**
+- Add "Delete Draft" button next to "Regenerate"
+- Clicking "Delete Draft" clears the `ai_draft` column and closes the modal
 
-**Line 355** - Date display in request list:
-```typescript
-// Before
-{new Date(request.requested_date).toLocaleDateString()}
+### RequestCard Component
 
-// After  
-{parseDateString(request.requested_date).toLocaleDateString()}
-```
+**Current state:**
+- Shows "Generate Draft" or "View Draft" button
+- Draft preview box when draft exists
 
-Also add import at top of file:
-```typescript
-import { parseDateString } from "@/lib/utils";
-```
+**New state:**
+- Add "Collaboration Link" input field (appears for approved requests)
+- Shows "Open Shared Document" button when link exists
+- Both creator and guest can see/click the link
 
 ---
 
-### 2. src/pages/MyRequests.tsx
+## Technical Details
 
-**Line 260** - Guest's sent requests view:
-```typescript
-// Before
-{format(new Date(request.requested_date), 'MMM d, yyyy')}
+### Files to Modify
 
-// After
-{format(parseDateString(request.requested_date), 'MMM d, yyyy')}
-```
+| File | Change |
+|------|--------|
+| Database | Add `collab_link` column via migration |
+| `src/components/requests/CollabDraftModal.tsx` | Add `onDelete` prop and "Delete Draft" button |
+| `src/components/requests/RequestCard.tsx` | Add collab link input, save handler, and display logic |
+| `src/pages/Requests.tsx` | Add `handleDraftDeleted` handler and pass to RequestCard |
+| `src/pages/MyRequests.tsx` | Show "Open Shared Document" button for guests |
 
-Also add import:
-```typescript
-import { parseDateString } from "@/lib/utils";
-```
+### CollabDraftModal Changes
 
----
-
-### 3. supabase/functions/send-collab-email/index.ts
-
-Add helper function and fix date formatting:
+Add new prop and button:
 
 ```typescript
-// Add helper function (Deno environment, can't import from @/lib)
-function parseDateString(dateStr: string): Date {
-  const [year, month, day] = dateStr.split("-").map(Number);
-  return new Date(year, month - 1, day);
+interface CollabDraftModalProps {
+  // ... existing props
+  onDelete?: () => void;  // NEW
 }
-
-// Line 238 - Before
-const formattedDate = requestedDate 
-  ? new Date(requestedDate).toLocaleDateString("en-US", {...})
-  : "Flexible date";
-
-// After
-const formattedDate = requestedDate 
-  ? parseDateString(requestedDate).toLocaleDateString("en-US", {...})
-  : "Flexible date";
 ```
 
----
+Add "Delete Draft" button in the actions area:
 
-### 4. supabase/functions/send-collab-reminder/index.ts
+```tsx
+{onDelete && (
+  <Button 
+    variant="outline" 
+    onClick={onDelete}
+    className="text-destructive hover:bg-destructive/10"
+  >
+    <Trash2 className="w-4 h-4 mr-2" />
+    Delete Draft
+  </Button>
+)}
+```
 
-Add helper function and fix date comparisons:
+### RequestCard Changes
 
+1. **Add local state for collab link:**
 ```typescript
-// Add helper function
-function parseDateString(dateStr: string): Date {
-  const [year, month, day] = dateStr.split("-").map(Number);
-  return new Date(year, month - 1, day);
-}
+const [collabLink, setCollabLink] = useState<string>(
+  (request as any).collab_link || ""
+);
+const [isEditingLink, setIsEditingLink] = useState(false);
+const [isSavingLink, setIsSavingLink] = useState(false);
+```
 
-// Lines 67-71 - Before
-const requestedDate = new Date(request.requested_date);
-const reminderDate = new Date(requestedDate);
+2. **Add save handler:**
+```typescript
+const handleSaveCollabLink = async () => {
+  setIsSavingLink(true);
+  try {
+    const { error } = await supabase
+      .from('collab_requests')
+      .update({ collab_link: collabLink || null })
+      .eq('id', request.id);
+    
+    if (error) throw error;
+    toast.success("Collaboration link saved");
+    setIsEditingLink(false);
+  } catch (error) {
+    toast.error("Failed to save link");
+  } finally {
+    setIsSavingLink(false);
+  }
+};
+```
 
-// After
-const requestedDate = parseDateString(request.requested_date);
-const reminderDate = new Date(requestedDate);
+3. **Add delete draft handler:**
+```typescript
+const handleDeleteDraft = async () => {
+  try {
+    const { error } = await supabase
+      .from('collab_requests')
+      .update({ ai_draft: null })
+      .eq('id', request.id);
+    
+    if (error) throw error;
+    
+    setLocalDraft(null);
+    setShowDraftModal(false);
+    toast.success("Draft deleted");
+    trackEvent("draft_deleted", { request_id: request.id });
+  } catch (error) {
+    toast.error("Failed to delete draft");
+  }
+};
+```
+
+4. **Add UI for collab link (in approved section):**
+```tsx
+{/* Collaboration Link Section */}
+{request.status === "approved" && (
+  <div className="mt-4 space-y-2">
+    {collabLink && !isEditingLink ? (
+      <div className="flex gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className="flex-1"
+          onClick={() => window.open(collabLink, "_blank")}
+        >
+          <ExternalLink className="w-4 h-4 mr-2" />
+          Open Shared Document
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setIsEditingLink(true)}
+        >
+          <Edit2 className="w-4 h-4" />
+        </Button>
+      </div>
+    ) : (
+      <div className="flex gap-2">
+        <Input
+          placeholder="Paste collaboration doc link (Google Docs, Notion...)"
+          value={collabLink}
+          onChange={(e) => setCollabLink(e.target.value)}
+        />
+        <Button onClick={handleSaveCollabLink} disabled={isSavingLink}>
+          Save
+        </Button>
+        {isEditingLink && (
+          <Button variant="ghost" onClick={() => setIsEditingLink(false)}>
+            Cancel
+          </Button>
+        )}
+      </div>
+    )}
+  </div>
+)}
+```
+
+### Guest View (MyRequests.tsx)
+
+Add "Open Shared Document" button for approved requests when `collab_link` exists:
+
+```tsx
+{request.status === 'approved' && (request as any).collab_link && (
+  <Button 
+    variant="default" 
+    size="sm"
+    onClick={() => window.open((request as any).collab_link, "_blank")}
+  >
+    <ExternalLink className="h-4 w-4 mr-1" />
+    Open Shared Document
+  </Button>
+)}
 ```
 
 ---
 
-## Summary of Changes
+## User Flow
 
-| Location | Impact |
-|----------|--------|
-| Dashboard | Fixes date display in request previews + stats accuracy |
-| MyRequests | Fixes guest's view of their sent request dates |
-| Email Function | Fixes all email notifications showing correct date |
-| Reminder Function | Ensures reminders fire on correct day |
+### Creator Flow
+1. Approve a collaboration request
+2. Click "Generate Draft" → AI draft appears
+3. Optionally: Click "Delete Draft" to remove it and start fresh
+4. Paste a Google Doc (or other) link in the "Collaboration Link" field
+5. Click "Save" → Link is stored
+6. "Open Shared Document" button appears for quick access
+
+### Guest Flow
+1. See their approved request in "Sent Requests"
+2. If creator has added a collaboration link, see "Open Shared Document" button
+3. Click to jump directly to the shared workspace
 
 ---
 
-## After This Fix
+## Summary
 
-- Dinah will see "Fri, Apr 3, 2026" (the correct date you selected)
-- All emails will show correct dates
-- The "This Month Collabs" stat will calculate correctly
-- Reminders will trigger on the right day
+This implementation gives creators like Dinah full control over their collaboration workflow:
+- **Delete AI drafts** when they want to use their own approach
+- **Link external documents** to centralize the collaboration
+- **Quick access** for both parties to jump into the shared workspace
+
