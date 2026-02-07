@@ -91,6 +91,7 @@ export type Database = {
           ai_draft: Json | null
           ai_suggestion_used: Json | null
           approved_at: string | null
+          collab_link: string | null
           created_at: string
           creator_id: string
           creator_notes: string | null
@@ -112,6 +113,7 @@ export type Database = {
           ai_draft?: Json | null
           ai_suggestion_used?: Json | null
           approved_at?: string | null
+          collab_link?: string | null
           created_at?: string
           creator_id: string
           creator_notes?: string | null
@@ -133,6 +135,7 @@ export type Database = {
           ai_draft?: Json | null
           ai_suggestion_used?: Json | null
           approved_at?: string | null
+          collab_link?: string | null
           created_at?: string
           creator_id?: string
           creator_notes?: string | null
