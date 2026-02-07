@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Calendar, ExternalLink, Mail, Link as LinkIcon, Sparkles, MessageSquare, FileText, XCircle, Ban, Edit2, Check, X, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CollabRequest, CollabDraft } from "@/lib/storage";
 import { cn, parseDateString } from "@/lib/utils";
@@ -37,6 +38,13 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
   const [localDraft, setLocalDraft] = useState<CollabDraft | null>(
     request.aiDraft as CollabDraft | null
   );
+  
+  // Collab link state
+  const [collabLink, setCollabLink] = useState<string>(
+    (request as any).collab_link || ""
+  );
+  const [isEditingLink, setIsEditingLink] = useState(false);
+  const [isSavingLink, setIsSavingLink] = useState(false);
   
   // Collab type editing
   const [isEditingCollabType, setIsEditingCollabType] = useState(false);
@@ -80,6 +88,44 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
     } finally {
       setIsSavingCollabType(false);
       setIsEditingCollabType(false);
+    }
+  };
+
+  const handleSaveCollabLink = async () => {
+    setIsSavingLink(true);
+    try {
+      const { error } = await supabase
+        .from('collab_requests')
+        .update({ collab_link: collabLink || null })
+        .eq('id', request.id);
+      
+      if (error) throw error;
+      toast.success("Collaboration link saved");
+      setIsEditingLink(false);
+    } catch (error) {
+      console.error("Failed to save collab link:", error);
+      toast.error("Failed to save link");
+    } finally {
+      setIsSavingLink(false);
+    }
+  };
+
+  const handleDeleteDraft = async () => {
+    try {
+      const { error } = await supabase
+        .from('collab_requests')
+        .update({ ai_draft: null })
+        .eq('id', request.id);
+      
+      if (error) throw error;
+      
+      setLocalDraft(null);
+      setShowDraftModal(false);
+      toast.success("Draft deleted");
+      trackEvent("draft_deleted", { request_id: request.id });
+    } catch (error) {
+      console.error("Failed to delete draft:", error);
+      toast.error("Failed to delete draft");
     }
   };
   
@@ -345,34 +391,89 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
 
         {/* Post-approval actions */}
         {request.status === "approved" && (
-          <div className="flex gap-2 flex-wrap">
-            <Button
-              variant={localDraft ? "outline" : "gradient"}
-              size="sm"
-              onClick={handleViewDraft}
-              className="flex-1"
-            >
-              <FileText className="w-4 h-4 mr-2" />
-              {localDraft ? "View Draft" : "Generate Draft"}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowMessageModal(true)}
-              className="flex-1"
-            >
-              <MessageSquare className="w-4 h-4 mr-2" />
-              Message
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onCancel?.(request.id)}
-              className="text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30"
-            >
-              <XCircle className="w-4 h-4 mr-1" />
-              Cancel
-            </Button>
+          <div className="space-y-4">
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                variant={localDraft ? "outline" : "gradient"}
+                size="sm"
+                onClick={handleViewDraft}
+                className="flex-1"
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                {localDraft ? "View Draft" : "Generate Draft"}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowMessageModal(true)}
+                className="flex-1"
+              >
+                <MessageSquare className="w-4 h-4 mr-2" />
+                Message
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onCancel?.(request.id)}
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30"
+              >
+                <XCircle className="w-4 h-4 mr-1" />
+                Cancel
+              </Button>
+            </div>
+
+            {/* Collaboration Link Section */}
+            <div className="space-y-2">
+              {collabLink && !isEditingLink ? (
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => window.open(collabLink, "_blank")}
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Open Shared Document
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9"
+                    onClick={() => setIsEditingLink(true)}
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Paste collaboration doc link (Google Docs, Notion...)"
+                    value={collabLink}
+                    onChange={(e) => setCollabLink(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button 
+                    onClick={handleSaveCollabLink} 
+                    disabled={isSavingLink}
+                    size="sm"
+                  >
+                    Save
+                  </Button>
+                  {isEditingLink && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => {
+                        setIsEditingLink(false);
+                        setCollabLink((request as any).collab_link || "");
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -406,6 +507,7 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
         requesterName={request.requesterName}
         isLoading={isGeneratingDraft}
         onRegenerate={generateDraft}
+        onDelete={handleDeleteDraft}
       />
 
       <SendMessageModal

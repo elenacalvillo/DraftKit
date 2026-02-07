@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Copy, RefreshCw, Sparkles, User, Users, Clock, CheckCircle, ChevronDown, FileText, FileIcon, Loader2, ExternalLink, Crown } from "lucide-react";
+import { Copy, RefreshCw, Sparkles, User, Users, Clock, CheckCircle, ChevronDown, FileText, FileIcon, Loader2, ExternalLink, Crown, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -31,6 +31,7 @@ interface CollabDraftModalProps {
   requesterName: string;
   isLoading?: boolean;
   onRegenerate?: () => void;
+  onDelete?: () => void;
 }
 
 export function CollabDraftModal({
@@ -40,6 +41,7 @@ export function CollabDraftModal({
   requesterName,
   isLoading,
   onRegenerate,
+  onDelete,
 }: CollabDraftModalProps) {
   const [copied, setCopied] = useState(false);
   const [isExportingToGoogleDocs, setIsExportingToGoogleDocs] = useState(false);
@@ -322,6 +324,16 @@ Estimated Read Time: ${draft.estimatedReadTime}`;
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
+              {onDelete && (
+                <Button 
+                  variant="outline" 
+                  onClick={onDelete}
+                  className="text-destructive hover:bg-destructive/10"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Draft
+                </Button>
+              )}
               {onRegenerate && (
                 <Button variant="outline" onClick={() => {
                   // Track regeneration request

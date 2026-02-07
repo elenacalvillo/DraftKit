@@ -35,6 +35,7 @@ interface SentRequest {
   requested_date: string | null;
   status: string;
   created_at: string;
+  collab_link: string | null;
   creator: {
     name: string;
     username: string;
@@ -82,7 +83,8 @@ export default function MyRequests() {
           message,
           requested_date,
           status,
-          created_at
+          created_at,
+          collab_link
         `)
         .eq('requester_user_id', user?.id)
         .eq('hidden_by_requester', false)
@@ -322,6 +324,16 @@ export default function MyRequests() {
                     {/* Message button for approved requests */}
                     {request.status === 'approved' && (
                       <div className="flex gap-2 pt-3 border-t mt-3">
+                        {request.collab_link && (
+                          <Button 
+                            variant="default" 
+                            size="sm"
+                            onClick={() => window.open(request.collab_link!, "_blank")}
+                          >
+                            <ExternalLink className="h-4 w-4 mr-1" />
+                            Open Shared Document
+                          </Button>
+                        )}
                         <Button 
                           variant="outline" 
                           size="sm"
