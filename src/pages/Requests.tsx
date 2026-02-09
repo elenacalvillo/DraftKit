@@ -29,6 +29,9 @@ interface DbCollabRequest {
   ai_draft: unknown;
   approved_at: string | null;
   creator_notes: string | null;
+  shared_content: string | null;
+  content_last_edited_by: string | null;
+  content_last_edited_at: string | null;
 }
 
 type FilterTab = "all" | "pending" | "approved" | "declined" | "cancelled";
@@ -328,6 +331,11 @@ export default function Requests() {
     createdAt: r.created_at,
     aiDraft: r.ai_draft as CollabDraft | null,
     approvedAt: r.approved_at,
+    // Workspace fields
+    shared_content: r.shared_content,
+    content_last_edited_by: r.content_last_edited_by,
+    content_last_edited_at: r.content_last_edited_at,
+    _currentUserName: creator.name,
   }));
 
   return (

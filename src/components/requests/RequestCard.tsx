@@ -8,6 +8,7 @@ import { CollabRequest, CollabDraft } from "@/lib/storage";
 import { cn, parseDateString } from "@/lib/utils";
 import { CollabDraftModal } from "./CollabDraftModal";
 import { SendMessageModal } from "./SendMessageModal";
+import { SharedWorkspace } from "./SharedWorkspace";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAnalytics } from "@/hooks/useAnalytics";
@@ -422,6 +423,22 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
               </Button>
             </div>
 
+            {/* Shared Workspace */}
+            <SharedWorkspace
+              requestId={request.id}
+              sharedContent={(request as any).shared_content ?? null}
+              lastEditedBy={(request as any).content_last_edited_by ?? null}
+              lastEditedAt={(request as any).content_last_edited_at ?? null}
+              currentUserName={(request as any)._currentUserName || "Creator"}
+              canEdit={true}
+              onContentSaved={(content, editedBy, editedAt) => {
+                // Update local state via parent callback if needed
+                (request as any).shared_content = content;
+                (request as any).content_last_edited_by = editedBy;
+                (request as any).content_last_edited_at = editedAt;
+              }}
+            />
+
             {/* Collaboration Link Section */}
             <div className="space-y-2">
               {collabLink && !isEditingLink ? (
@@ -433,7 +450,7 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
                     onClick={() => window.open(collabLink, "_blank")}
                   >
                     <ExternalLink className="w-4 h-4 mr-2" />
-                    Open Shared Document
+                    Open External Document
                   </Button>
                   <Button
                     variant="ghost"
@@ -447,7 +464,7 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
               ) : (
                 <div className="flex gap-2">
                   <Input
-                    placeholder="Paste collaboration doc link (Google Docs, Notion...)"
+                    placeholder="Optional: link an external doc (Google Docs, Notion...)"
                     value={collabLink}
                     onChange={(e) => setCollabLink(e.target.value)}
                     className="flex-1"

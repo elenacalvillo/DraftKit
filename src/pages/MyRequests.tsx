@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Send, Calendar, Clock, ExternalLink, Inbox, ArrowRight, X, CalendarClock, Trash2, MessageSquare } from 'lucide-react';
+import { SharedWorkspace } from '@/components/requests/SharedWorkspace';
 import { format, formatDistanceToNow } from 'date-fns';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { toast } from 'sonner';
@@ -36,6 +37,9 @@ interface SentRequest {
   status: string;
   created_at: string;
   collab_link: string | null;
+  shared_content: string | null;
+  content_last_edited_by: string | null;
+  content_last_edited_at: string | null;
   creator: {
     name: string;
     username: string;
@@ -84,7 +88,10 @@ export default function MyRequests() {
           requested_date,
           status,
           created_at,
-          collab_link
+          collab_link,
+          shared_content,
+          content_last_edited_by,
+          content_last_edited_at
         `)
         .eq('requester_user_id', user?.id)
         .eq('hidden_by_requester', false)
@@ -321,27 +328,45 @@ export default function MyRequests() {
                       </div>
                     )}
 
-                    {/* Message button for approved requests */}
                     {request.status === 'approved' && (
-                      <div className="flex gap-2 pt-3 border-t mt-3">
-                        {request.collab_link && (
+                      <div className="space-y-4 pt-3 border-t mt-3">
+                        {/* Shared Workspace */}
+                        <SharedWorkspace
+                          requestId={request.id}
+                          sharedContent={request.shared_content}
+                          lastEditedBy={request.content_last_edited_by}
+                          lastEditedAt={request.content_last_edited_at}
+                          currentUserName={request.requester_name}
+                          canEdit={true}
+                          onContentSaved={(content, editedBy, editedAt) => {
+                            setRequests(prev => prev.map(r =>
+                              r.id === request.id
+                                ? { ...r, shared_content: content, content_last_edited_by: editedBy, content_last_edited_at: editedAt }
+                                : r
+                            ));
+                          }}
+                        />
+
+                        <div className="flex gap-2">
+                          {request.collab_link && (
+                            <Button 
+                              variant="default" 
+                              size="sm"
+                              onClick={() => window.open(request.collab_link!, "_blank")}
+                            >
+                              <ExternalLink className="h-4 w-4 mr-1" />
+                              Open External Document
+                            </Button>
+                          )}
                           <Button 
-                            variant="default" 
+                            variant="outline" 
                             size="sm"
-                            onClick={() => window.open(request.collab_link!, "_blank")}
+                            onClick={() => setMessageModalRequest(request)}
                           >
-                            <ExternalLink className="h-4 w-4 mr-1" />
-                            Open Shared Document
+                            <MessageSquare className="h-4 w-4 mr-1" />
+                            Message {request.creator?.name?.split(' ')[0] || 'Creator'}
                           </Button>
-                        )}
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => setMessageModalRequest(request)}
-                        >
-                          <MessageSquare className="h-4 w-4 mr-1" />
-                          Message {request.creator?.name?.split(' ')[0] || 'Creator'}
-                        </Button>
+                        </div>
                       </div>
                     )}
 

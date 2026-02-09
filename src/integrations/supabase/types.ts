@@ -92,6 +92,8 @@ export type Database = {
           ai_suggestion_used: Json | null
           approved_at: string | null
           collab_link: string | null
+          content_last_edited_at: string | null
+          content_last_edited_by: string | null
           created_at: string
           creator_id: string
           creator_notes: string | null
@@ -107,6 +109,7 @@ export type Database = {
           requester_substack_url: string | null
           requester_user_id: string | null
           selected_collab_type: string | null
+          shared_content: string | null
           status: string
         }
         Insert: {
@@ -114,6 +117,8 @@ export type Database = {
           ai_suggestion_used?: Json | null
           approved_at?: string | null
           collab_link?: string | null
+          content_last_edited_at?: string | null
+          content_last_edited_by?: string | null
           created_at?: string
           creator_id: string
           creator_notes?: string | null
@@ -129,6 +134,7 @@ export type Database = {
           requester_substack_url?: string | null
           requester_user_id?: string | null
           selected_collab_type?: string | null
+          shared_content?: string | null
           status?: string
         }
         Update: {
@@ -136,6 +142,8 @@ export type Database = {
           ai_suggestion_used?: Json | null
           approved_at?: string | null
           collab_link?: string | null
+          content_last_edited_at?: string | null
+          content_last_edited_by?: string | null
           created_at?: string
           creator_id?: string
           creator_notes?: string | null
@@ -151,6 +159,7 @@ export type Database = {
           requester_substack_url?: string | null
           requester_user_id?: string | null
           selected_collab_type?: string | null
+          shared_content?: string | null
           status?: string
         }
         Relationships: [
