@@ -8,8 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Send, Calendar, Clock, ExternalLink, Inbox, ArrowRight, X, CalendarClock, Trash2, MessageSquare } from 'lucide-react';
-import { SharedWorkspace } from '@/components/requests/SharedWorkspace';
+import { Send, Calendar, Clock, ExternalLink, Inbox, ArrowRight, X, CalendarClock, Trash2, MessageSquare, PenLine } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { toast } from 'sonner';
@@ -329,28 +328,20 @@ export default function MyRequests() {
                     )}
 
                     {request.status === 'approved' && (
-                      <div className="space-y-4 pt-3 border-t mt-3">
-                        {/* Shared Workspace */}
-                        <SharedWorkspace
-                          requestId={request.id}
-                          sharedContent={request.shared_content}
-                          lastEditedBy={request.content_last_edited_by}
-                          lastEditedAt={request.content_last_edited_at}
-                          currentUserName={request.requester_name}
-                          canEdit={true}
-                          onContentSaved={(content, editedBy, editedAt) => {
-                            setRequests(prev => prev.map(r =>
-                              r.id === request.id
-                                ? { ...r, shared_content: content, content_last_edited_by: editedBy, content_last_edited_at: editedAt }
-                                : r
-                            ));
-                          }}
-                        />
+                      <div className="space-y-3 pt-3 border-t mt-3">
+                        <Button
+                          variant="default"
+                          className="w-full"
+                          onClick={() => navigate(`/dashboard/workspace/${request.id}`)}
+                        >
+                          <PenLine className="h-4 w-4 mr-2" />
+                          Enter Workspace
+                        </Button>
 
                         <div className="flex gap-2">
                           {request.collab_link && (
                             <Button 
-                              variant="default" 
+                              variant="outline" 
                               size="sm"
                               onClick={() => window.open(request.collab_link!, "_blank")}
                             >

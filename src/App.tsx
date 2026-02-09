@@ -22,6 +22,7 @@ import MyRequests from "./pages/MyRequests";
 import Transparency from "./pages/Transparency";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import NotFound from "./pages/NotFound";
+import Workspace from "./pages/Workspace";
 
 const queryClient = new QueryClient();
 
@@ -48,6 +49,7 @@ const App = () => (
             <Route path="/dashboard/requests" element={<Requests />} />
             <Route path="/dashboard/my-requests" element={<MyRequests />} />
             <Route path="/dashboard/settings" element={<Settings />} />
+            <Route path="/dashboard/workspace/:requestId" element={<Workspace />} />
             <Route path="/admin/analytics" element={<AdminAnalytics />} />
             <Route path="/:username" element={<PublicBooking />} />
             <Route path="*" element={<NotFound />} />

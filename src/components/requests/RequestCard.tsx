@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Calendar, ExternalLink, Mail, Link as LinkIcon, Sparkles, MessageSquare, FileText, XCircle, Ban, Edit2, Check, X, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Calendar, ExternalLink, Mail, Link as LinkIcon, Sparkles, MessageSquare, FileText, XCircle, Ban, Edit2, Check, X, Trash2, PenLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -8,7 +9,6 @@ import { CollabRequest, CollabDraft } from "@/lib/storage";
 import { cn, parseDateString } from "@/lib/utils";
 import { CollabDraftModal } from "./CollabDraftModal";
 import { SendMessageModal } from "./SendMessageModal";
-import { SharedWorkspace } from "./SharedWorkspace";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAnalytics } from "@/hooks/useAnalytics";
@@ -31,6 +31,7 @@ interface RequestCardProps {
 const COLLAB_STYLE_OPTIONS = ["Virtual Coffee", "Async Drafting", "Interview Style", "Custom"];
 
 export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApprove = true, isPro = false, onApprove, onDecline, onCancel, onDraftGenerated, onCollabTypeChanged, onDelete }: RequestCardProps) {
+  const navigate = useNavigate();
   const { trackEvent } = useAnalytics();
   const [imageError, setImageError] = useState(false);
   const [showDraftModal, setShowDraftModal] = useState(false);
@@ -423,21 +424,15 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
               </Button>
             </div>
 
-            {/* Shared Workspace */}
-            <SharedWorkspace
-              requestId={request.id}
-              sharedContent={(request as any).shared_content ?? null}
-              lastEditedBy={(request as any).content_last_edited_by ?? null}
-              lastEditedAt={(request as any).content_last_edited_at ?? null}
-              currentUserName={(request as any)._currentUserName || "Creator"}
-              canEdit={true}
-              onContentSaved={(content, editedBy, editedAt) => {
-                // Update local state via parent callback if needed
-                (request as any).shared_content = content;
-                (request as any).content_last_edited_by = editedBy;
-                (request as any).content_last_edited_at = editedAt;
-              }}
-            />
+            {/* Enter Workspace Button */}
+            <Button
+              variant="gradient"
+              className="w-full"
+              onClick={() => navigate(`/dashboard/workspace/${request.id}`)}
+            >
+              <PenLine className="w-4 h-4 mr-2" />
+              Enter Workspace
+            </Button>
 
             {/* Collaboration Link Section */}
             <div className="space-y-2">
