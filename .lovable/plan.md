@@ -1,138 +1,170 @@
 
 
-# Shared Workspace: "Claim to Edit" Collaborative Writing
+# Dedicated Workspace Page
 
 ## Overview
 
-Add an in-app async writing workspace to approved collaboration requests. Instead of linking out to Google Docs, creators and guests can write directly inside DraftKit using a turn-based "Claim to Edit" model -- one person edits at a time, saves, and the other sees the latest version.
+Move the SharedWorkspace out of the crowded RequestCard and into its own focused route at `/dashboard/workspace/:requestId`. The Requests page stays clean for management; the Workspace page becomes a distraction-free writing environment.
 
-## Database Changes
+## New Route
 
-Add two new columns to `collab_requests`:
-
-```sql
-ALTER TABLE collab_requests
-  ADD COLUMN shared_content text,
-  ADD COLUMN content_last_edited_by text,
-  ADD COLUMN content_last_edited_at timestamptz;
+```
+/dashboard/workspace/:requestId
 ```
 
-- `shared_content` -- the master draft text, editable by both parties
-- `content_last_edited_by` -- display name of the last editor (e.g., "Dinah" or "Karo")
-- `content_last_edited_at` -- timestamp of the last save
+## Layout
 
-No new RLS policies needed -- existing creator and requester UPDATE/SELECT policies on `collab_requests` already cover both parties.
+A two-panel layout inside `DashboardLayout`:
 
-**Important RLS note:** The requester UPDATE policy currently only allows updating `status` and `hidden_by_requester`. A new policy is needed to let the requester update the workspace fields:
-
-```sql
-CREATE POLICY "Requesters can edit shared workspace"
-  ON collab_requests FOR UPDATE
-  USING (requester_user_id = auth.uid() AND status = 'approved')
-  WITH CHECK (
-    shared_content IS NOT DISTINCT FROM shared_content
-    AND content_last_edited_by IS NOT DISTINCT FROM content_last_edited_by
-    AND content_last_edited_at IS NOT DISTINCT FROM content_last_edited_at
-  );
+```text
++-------------------------------------------+
+| Left Panel (320px)     | Right Panel      |
+|                        |                  |
+| Collaboration Context  | Shared Workspace |
+| - Requester name/pic   | (full height)    |
+| - Substack link        |                  |
+| - Requested date       | [Edit Draft]     |
+| - Message quote        |                  |
+| - Status badge         | textarea or      |
+| - AI Draft button      | rendered content |
+| - External doc link    |                  |
+| - Message button       | Last edited by   |
+|                        | [Name] at [Time] |
+| [Back to Requests]     |                  |
++-------------------------------------------+
 ```
 
-This will be refined during implementation to ensure only the three workspace columns can be modified by the requester on approved requests.
+On mobile, the left panel stacks above the workspace.
 
-## New Component: SharedWorkspace
+---
 
-Create `src/components/requests/SharedWorkspace.tsx`
+## Files to Create
 
-### Props
+### 1. `src/pages/Workspace.tsx`
+
+The dedicated workspace page. It will:
+
+- Accept `:requestId` from the URL params
+- Fetch the `collab_request` row from the database (with creator details)
+- Determine if the current user is the **creator** or the **guest** (requester)
+- Render a two-panel layout:
+  - **Left panel**: Request context card (name, avatar, Substack link, date, message, status, AI draft button, collab link, message button)
+  - **Right panel**: The existing `SharedWorkspace` component, rendered large and prominent
+- Handle the `onContentSaved` callback to update local state
+- Redirect to `/login` if not authenticated, or show 404 if the request doesn't belong to the user
+
+### Key data fetch logic:
+
 ```typescript
-interface SharedWorkspaceProps {
-  requestId: string;
-  sharedContent: string | null;
-  lastEditedBy: string | null;
-  lastEditedAt: string | null;
-  currentUserName: string;
-  canEdit: boolean; // true for both creator and guest on approved requests
-  onContentSaved: (content: string, editedBy: string) => void;
-}
+// Determine role
+const isCreator = creator?.id === request.creator_id;
+const isGuest = user?.id === request.requester_user_id;
+
+// Set current user name accordingly
+const currentUserName = isCreator ? creator.name : request.requester_name;
 ```
 
-### Two Modes
+---
 
-**View Mode (default):**
-- Renders `shared_content` as clean formatted text (preserving line breaks, whitespace)
-- Shows "Last updated by [Name] at [Time]" footer
-- Prominent "Edit Draft" button
-- If no content exists yet, shows an empty state with "Start Writing" button
+## Files to Modify
 
-**Edit Mode (after clicking "Edit Draft"):**
-- A clean, auto-resizing `<textarea>` styled to feel like a writing tool (generous padding, readable font size, no distracting borders)
-- Prominent banner at top: "You are currently editing. Remember to Save so [other person] can see your changes."
-- "Save and Sync" primary button + "Cancel" secondary button
-- Save writes to Supabase and switches back to View Mode
-- Cancel discards unsaved changes and returns to View Mode
+### 2. `src/App.tsx`
 
-### Visual Design
-- The workspace sits inside the RequestCard for approved requests, replacing the current "Collaboration Link" section as the primary workspace
-- The existing collab link input remains as an optional "External Link" below the workspace (for cases where they still want to link a Google Doc alongside)
-- Minimum textarea height of 300px for a real writing feel
-- Monospace or serif font option for the editing area to feel like a document editor
+Add the new route:
 
-## Changes to Existing Files
+```typescript
+import Workspace from "./pages/Workspace";
 
-### 1. src/components/requests/RequestCard.tsx
+// Inside Routes:
+<Route path="/dashboard/workspace/:requestId" element={<Workspace />} />
+```
 
-- Import and render `SharedWorkspace` inside the approved section, between the action buttons and the collab link
-- Pass `shared_content`, `content_last_edited_by`, `content_last_edited_at` from the request
-- Add `handleContentSaved` handler that updates Supabase and local state
-- Access the new fields via the request object (update `(request as any)` pattern or extend the interface)
+### 3. `src/components/requests/RequestCard.tsx`
 
-### 2. src/pages/Requests.tsx
+For approved requests, replace the inline `SharedWorkspace` component with an "Enter Workspace" button:
 
-- Add `shared_content`, `content_last_edited_by`, `content_last_edited_at` to `DbCollabRequest` interface
-- Pass these through in the `mappedRequests` mapping (or as raw DB fields)
-- Add a `handleCollabTypeChanged` handler (currently missing from props passed to RequestCard)
+```tsx
+{/* Replace SharedWorkspace embed with navigation button */}
+{request.status === "approved" && (
+  <div className="space-y-4">
+    {/* existing draft/message/cancel buttons */}
+    
+    <Button
+      variant="gradient"
+      className="w-full"
+      onClick={() => navigate(`/dashboard/workspace/${request.id}`)}
+    >
+      <PenLine className="w-4 h-4 mr-2" />
+      Enter Workspace
+    </Button>
+    
+    {/* collab link section stays */}
+  </div>
+)}
+```
 
-### 3. src/pages/MyRequests.tsx (Guest View)
+Remove the `SharedWorkspace` import and inline rendering from this file.
 
-- Fetch `shared_content`, `content_last_edited_by`, `content_last_edited_at` in the query
-- Render the same `SharedWorkspace` component for approved requests
-- Guest can also click "Edit Draft", write, and save
-- The `currentUserName` will be the guest's `requester_name`
+### 4. `src/pages/MyRequests.tsx`
 
-### 4. src/lib/storage.ts
+Same change for the guest view: replace the inline `SharedWorkspace` with an "Enter Workspace" button that navigates to `/dashboard/workspace/:requestId`.
 
-- Extend `CollabRequest` interface with optional `sharedContent`, `contentLastEditedBy`, `contentLastEditedAt` fields
+```tsx
+{request.status === 'approved' && (
+  <div className="space-y-3 pt-3 border-t mt-3">
+    <Button
+      variant="default"
+      className="w-full"
+      onClick={() => navigate(`/dashboard/workspace/${request.id}`)}
+    >
+      <PenLine className="w-4 h-4 mr-2" />
+      Enter Workspace
+    </Button>
+    
+    {/* Keep collab link + message buttons */}
+  </div>
+)}
+```
 
-## User Flow
+---
 
-### Creator (Dinah) Flow
-1. Approves a collaboration request
-2. Sees an empty Shared Workspace with "Start Writing" button
-3. Clicks "Start Writing" -- textarea appears with editing banner
-4. Pastes or writes her content
-5. Clicks "Save and Sync" -- content is saved to database, view switches back
-6. Footer shows: "Last updated by Dinah at 2:30 PM"
+## Workspace Page Design Details
 
-### Guest (Karo) Flow
-1. Goes to "Sent Requests" page, sees the approved request
-2. Sees Dinah's content rendered in the workspace
-3. Footer shows: "Last updated by Dinah at 2:30 PM"
-4. Clicks "Edit Draft" -- content loads into textarea
-5. Edits/adds their section
-6. Clicks "Save and Sync" -- saved, Dinah will see updates next time she opens
+The page uses `DashboardLayout` for consistent navigation, with a clean two-column interior:
 
-## What This Does NOT Include (By Design)
-- No real-time sync / WebSockets (avoids credit drain)
-- No version history (keeps it simple for v1)
-- No Markdown rendering (plain text with whitespace preservation -- avoids complexity)
-- No locking mechanism (the "banner + last edited by" is the anti-collision pattern)
+**Left panel (context sidebar):**
+- Back arrow link to `/dashboard/requests` or `/dashboard/my-requests` depending on role
+- Avatar + requester/creator name
+- Substack link
+- Requested date
+- Original message (blockquote style)
+- AI Draft actions (Generate/View Draft button + modal -- reuse existing logic)
+- External doc link (if set)
+- Message button
 
-## Technical Summary
+**Right panel (writing area):**
+- The existing `SharedWorkspace` component, given full width and breathing room
+- No changes needed to `SharedWorkspace.tsx` itself -- it already handles view/edit modes, save logic, and anti-collision banners
 
-| Item | Detail |
+**Mobile layout:**
+- Single column: context card collapsed/summary at top, workspace below
+
+---
+
+## What Stays the Same
+
+- `SharedWorkspace.tsx` -- no changes needed, it's already a self-contained component
+- `CollabDraftModal.tsx` -- reused as-is on the workspace page
+- `SendMessageModal.tsx` -- reused as-is on the workspace page
+- Database schema -- no changes needed
+- RLS policies -- no changes needed
+
+## Summary of Changes
+
+| File | Action |
 |------|--------|
-| New DB columns | `shared_content`, `content_last_edited_by`, `content_last_edited_at` on `collab_requests` |
-| New RLS policy | Allow requester to update workspace columns on approved requests |
-| New component | `SharedWorkspace.tsx` |
-| Modified files | `RequestCard.tsx`, `Requests.tsx`, `MyRequests.tsx`, `storage.ts` |
-| Cost model | Standard SELECT/UPDATE queries only -- no Realtime subscriptions |
+| `src/pages/Workspace.tsx` | **Create** -- dedicated workspace page |
+| `src/App.tsx` | **Edit** -- add route |
+| `src/components/requests/RequestCard.tsx` | **Edit** -- replace inline workspace with "Enter Workspace" button |
+| `src/pages/MyRequests.tsx` | **Edit** -- replace inline workspace with "Enter Workspace" button |
 
