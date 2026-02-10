@@ -94,7 +94,7 @@ export function WorkspaceEditor({ content, onChange, editable }: WorkspaceEditor
     <div className="flex flex-col">
       {/* Toolbar */}
       {editable && (
-        <div className="flex items-center gap-0.5 px-3 py-2 border-b border-border/50 bg-muted/20 flex-wrap sticky top-[48px] z-10 shadow-sm">
+        <div className="flex items-center gap-0.5 px-3 py-2 border-b border-border/50 bg-card flex-wrap sticky top-[48px] z-10 shadow-sm">
           {/* Heading dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

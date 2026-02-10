@@ -241,7 +241,7 @@ export default function Workspace() {
   return (
     <DashboardLayout zenMode zenTitle={`Drafting with ${partnerName}`} zenBackPath={backPath}>
       <div className="max-w-6xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
           {/* Left Panel — Context Sidebar */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
