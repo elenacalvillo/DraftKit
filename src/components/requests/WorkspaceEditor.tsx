@@ -6,6 +6,7 @@ import {
   Italic,
   Strikethrough,
   Code,
+  SquareCode,
   Link as LinkIcon,
   List,
   ListOrdered,
@@ -30,7 +31,6 @@ interface WorkspaceEditorProps {
 const extensions = [
   StarterKit.configure({
     heading: { levels: [1, 2, 3] },
-    codeBlock: false,
     blockquote: false,
     horizontalRule: false,
   }),
@@ -155,12 +155,19 @@ export function WorkspaceEditor({ content, onChange, editable }: WorkspaceEditor
           >
             <Strikethrough className="w-4 h-4" />
           </ToolbarButton>
-          <ToolbarButton
+           <ToolbarButton
             active={editor.isActive("code")}
             onClick={() => editor.chain().focus().toggleCode().run()}
             title="Inline code"
           >
             <Code className="w-4 h-4" />
+          </ToolbarButton>
+          <ToolbarButton
+            active={editor.isActive("codeBlock")}
+            onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+            title="Code block"
+          >
+            <SquareCode className="w-4 h-4" />
           </ToolbarButton>
 
           <div className="w-px h-5 bg-border/50 mx-1" />

@@ -239,7 +239,7 @@ export default function Workspace() {
   }
 
   return (
-    <DashboardLayout>
+    <DashboardLayout zenMode zenTitle={`Workspace · ${partnerName}`} zenBackPath={backPath}>
       <div className="max-w-6xl mx-auto">
         {/* Back link */}
         <button
