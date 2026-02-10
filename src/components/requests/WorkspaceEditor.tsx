@@ -91,7 +91,7 @@ export function WorkspaceEditor({ content, onChange, editable }: WorkspaceEditor
     : "Normal";
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col min-w-0 overflow-hidden">
       {/* Toolbar */}
       {editable && (
         <div className="flex items-center gap-0.5 px-3 py-2 border-b border-border/50 bg-card flex-wrap sticky top-[48px] z-10 shadow-sm">
