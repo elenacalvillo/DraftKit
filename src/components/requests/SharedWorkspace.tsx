@@ -223,7 +223,7 @@ export function SharedWorkspace({
             {hasContent ? (
               <>
                 <div
-                  className="workspace-prose px-5 py-4 min-h-[120px] text-[15px] leading-relaxed"
+                  className="workspace-prose px-5 py-4 min-h-[120px] text-[15px] leading-relaxed overflow-hidden break-words"
                   style={{ fontFamily: "'Georgia', 'Times New Roman', serif" }}
                   dangerouslySetInnerHTML={{ __html: sanitize(sharedContent!) }}
                 />

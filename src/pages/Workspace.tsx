@@ -240,7 +240,7 @@ export default function Workspace() {
 
   return (
     <DashboardLayout zenMode zenTitle={`Drafting with ${partnerName}`} zenBackPath={backPath}>
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-6xl mx-auto min-w-0">
         <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
           {/* Left Panel — Context Sidebar */}
           <motion.div
@@ -357,6 +357,7 @@ export default function Workspace() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
+            className="min-w-0"
           >
             <SharedWorkspace
               requestId={request.id}
