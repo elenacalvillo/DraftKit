@@ -1,170 +1,196 @@
 
 
-# Dedicated Workspace Page
+# Rich Text Editor + Smart Notifications for Shared Workspace
 
 ## Overview
 
-Move the SharedWorkspace out of the crowded RequestCard and into its own focused route at `/dashboard/workspace/:requestId`. The Requests page stays clean for management; the Workspace page becomes a distraction-free writing environment.
+Upgrade the plain textarea in SharedWorkspace to a Substack-lite rich text editor using **Tiptap**, and add opt-in email notifications on save. The editor will support only text formatting -- no images, no videos, no undo/redo buttons. Content is stored as sanitized HTML.
 
-## New Route
+---
 
-```
-/dashboard/workspace/:requestId
-```
+## 1. New Dependencies
 
-## Layout
+Install the following npm packages:
 
-A two-panel layout inside `DashboardLayout`:
+| Package | Purpose |
+|---------|---------|
+| `@tiptap/react` | React integration for the editor |
+| `@tiptap/starter-kit` | Bundles Bold, Italic, Strikethrough, Headings, Lists, Code, etc. |
+| `@tiptap/pm` | Required peer dependency (ProseMirror engine) |
+| `@tiptap/extension-link` | Clickable, validated hyperlinks |
+| `dompurify` | Sanitize HTML before saving to prevent XSS |
+| `@types/dompurify` | TypeScript types |
+
+StarterKit already includes: Bold, Italic, Strike, Code, Headings (H1-H3), Bullet List, Ordered List, Blockquote, Code Block, Hard Break, and more. We disable what we don't need.
+
+---
+
+## 2. Database Changes
+
+**None.** The existing `shared_content` column (type: text) will now store sanitized HTML instead of plain text. No migration needed.
+
+---
+
+## 3. New Component: `WorkspaceEditor.tsx`
+
+Create `src/components/requests/WorkspaceEditor.tsx` -- a self-contained Tiptap editor with a toolbar.
+
+### Toolbar Buttons (matching the pink-circled Substack features)
 
 ```text
-+-------------------------------------------+
-| Left Panel (320px)     | Right Panel      |
-|                        |                  |
-| Collaboration Context  | Shared Workspace |
-| - Requester name/pic   | (full height)    |
-| - Substack link        |                  |
-| - Requested date       | [Edit Draft]     |
-| - Message quote        |                  |
-| - Status badge         | textarea or      |
-| - AI Draft button      | rendered content |
-| - External doc link    |                  |
-| - Message button       | Last edited by   |
-|                        | [Name] at [Time] |
-| [Back to Requests]     |                  |
-+-------------------------------------------+
+[ Style dropdown (H1, H2, H3, Paragraph) ] | [ B ] [ I ] [ S ] [ <> ] | [ Link ] | [ Bullet List ] [ Numbered List ]
 ```
 
-On mobile, the left panel stacks above the workspace.
+- **Style dropdown**: Heading 1, Heading 2, Heading 3, Paragraph (Normal text)
+- **Bold** (B), **Italic** (I), **Strikethrough** (S), **Inline Code** (<>)
+- **Link**: Prompts for URL, validates it starts with `https://`
+- **Bullet List**, **Numbered List**
+- **No**: Undo/Redo, images, videos, embeds, blockquote, code block
 
----
-
-## Files to Create
-
-### 1. `src/pages/Workspace.tsx`
-
-The dedicated workspace page. It will:
-
-- Accept `:requestId` from the URL params
-- Fetch the `collab_request` row from the database (with creator details)
-- Determine if the current user is the **creator** or the **guest** (requester)
-- Render a two-panel layout:
-  - **Left panel**: Request context card (name, avatar, Substack link, date, message, status, AI draft button, collab link, message button)
-  - **Right panel**: The existing `SharedWorkspace` component, rendered large and prominent
-- Handle the `onContentSaved` callback to update local state
-- Redirect to `/login` if not authenticated, or show 404 if the request doesn't belong to the user
-
-### Key data fetch logic:
+### Editor Configuration
 
 ```typescript
-// Determine role
-const isCreator = creator?.id === request.creator_id;
-const isGuest = user?.id === request.requester_user_id;
+import StarterKit from '@tiptap/starter-kit';
+import Link from '@tiptap/extension-link';
 
-// Set current user name accordingly
-const currentUserName = isCreator ? creator.name : request.requester_name;
+const extensions = [
+  StarterKit.configure({
+    heading: { levels: [1, 2, 3] },
+    // Disable features we don't want
+    codeBlock: false,
+    blockquote: false,
+    horizontalRule: false,
+  }),
+  Link.configure({
+    openOnClick: false,
+    HTMLAttributes: { rel: 'noopener noreferrer', target: '_blank' },
+    validate: (href) => /^https?:\/\//.test(href), // Only allow http/https links
+  }),
+];
 ```
 
----
-
-## Files to Modify
-
-### 2. `src/App.tsx`
-
-Add the new route:
+### Props
 
 ```typescript
-import Workspace from "./pages/Workspace";
-
-// Inside Routes:
-<Route path="/dashboard/workspace/:requestId" element={<Workspace />} />
+interface WorkspaceEditorProps {
+  content: string;          // HTML string
+  onChange: (html: string) => void;
+  editable: boolean;
+}
 ```
 
-### 3. `src/components/requests/RequestCard.tsx`
+### Styling
 
-For approved requests, replace the inline `SharedWorkspace` component with an "Enter Workspace" button:
-
-```tsx
-{/* Replace SharedWorkspace embed with navigation button */}
-{request.status === "approved" && (
-  <div className="space-y-4">
-    {/* existing draft/message/cancel buttons */}
-    
-    <Button
-      variant="gradient"
-      className="w-full"
-      onClick={() => navigate(`/dashboard/workspace/${request.id}`)}
-    >
-      <PenLine className="w-4 h-4 mr-2" />
-      Enter Workspace
-    </Button>
-    
-    {/* collab link section stays */}
-  </div>
-)}
-```
-
-Remove the `SharedWorkspace` import and inline rendering from this file.
-
-### 4. `src/pages/MyRequests.tsx`
-
-Same change for the guest view: replace the inline `SharedWorkspace` with an "Enter Workspace" button that navigates to `/dashboard/workspace/:requestId`.
-
-```tsx
-{request.status === 'approved' && (
-  <div className="space-y-3 pt-3 border-t mt-3">
-    <Button
-      variant="default"
-      className="w-full"
-      onClick={() => navigate(`/dashboard/workspace/${request.id}`)}
-    >
-      <PenLine className="w-4 h-4 mr-2" />
-      Enter Workspace
-    </Button>
-    
-    {/* Keep collab link + message buttons */}
-  </div>
-)}
-```
+- The editor area uses serif font (Georgia) to match the current writing feel
+- Toolbar has a clean, minimal design with icon buttons and a heading dropdown
+- Prose-style content rendering using Tailwind typography classes applied to the editor's `.ProseMirror` element
+- Minimum height of 300px for the editing area
 
 ---
 
-## Workspace Page Design Details
+## 4. Updated `SharedWorkspace.tsx`
 
-The page uses `DashboardLayout` for consistent navigation, with a clean two-column interior:
+Major rewrite to use the new editor:
 
-**Left panel (context sidebar):**
-- Back arrow link to `/dashboard/requests` or `/dashboard/my-requests` depending on role
-- Avatar + requester/creator name
-- Substack link
-- Requested date
-- Original message (blockquote style)
-- AI Draft actions (Generate/View Draft button + modal -- reuse existing logic)
-- External doc link (if set)
-- Message button
+### View Mode
+- Renders `shared_content` as sanitized HTML using `dangerouslySetInnerHTML` with DOMPurify
+- Shows "Last updated by" footer
+- "Edit Draft" button
 
-**Right panel (writing area):**
-- The existing `SharedWorkspace` component, given full width and breathing room
-- No changes needed to `SharedWorkspace.tsx` itself -- it already handles view/edit modes, save logic, and anti-collision banners
+### Edit Mode
+- Replaces the textarea with `WorkspaceEditor`
+- Anti-collision banner stays the same
+- **New**: "Notify collaborator via email" checkbox next to Save button (defaults to **unchecked**)
+- Save flow:
+  1. Sanitize HTML with DOMPurify before saving
+  2. Update `shared_content`, `content_last_edited_by`, `content_last_edited_at` in database
+  3. If "Notify" checkbox is checked, call `send-collab-email` with a new `workspace_updated` type
+  4. Switch back to View Mode
 
-**Mobile layout:**
-- Single column: context card collapsed/summary at top, workspace below
+### Security: HTML Sanitization
+
+```typescript
+import DOMPurify from 'dompurify';
+
+// Before saving
+const cleanHtml = DOMPurify.sanitize(editor.getHTML(), {
+  ALLOWED_TAGS: ['p', 'h1', 'h2', 'h3', 'strong', 'em', 's', 'code', 'a', 'ul', 'ol', 'li', 'br'],
+  ALLOWED_ATTR: ['href', 'target', 'rel'],
+});
+
+// Before rendering in view mode
+<div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(sharedContent) }} />
+```
+
+### Link Security
+- Tiptap's Link extension validates URLs must start with `https://`
+- DOMPurify strips any `javascript:` or data URIs
+- Only `href`, `target`, and `rel` attributes allowed on links
 
 ---
 
-## What Stays the Same
+## 5. Email Notification: `workspace_updated` Type
 
-- `SharedWorkspace.tsx` -- no changes needed, it's already a self-contained component
-- `CollabDraftModal.tsx` -- reused as-is on the workspace page
-- `SendMessageModal.tsx` -- reused as-is on the workspace page
-- Database schema -- no changes needed
-- RLS policies -- no changes needed
+### Edge Function Update (`send-collab-email/index.ts`)
 
-## Summary of Changes
+Add a new email type `workspace_updated` to the existing email function:
+
+- **Role**: Either `creator` or `requester` can trigger it (both can edit)
+- **Recipient**: The "other" party (if creator saves, email goes to guest; if guest saves, email goes to creator)
+- **Subject**: "[Name] updated the shared workspace"
+- **Body**: Simple notification with a CTA button linking to the workspace page
+- **No content preview** in the email (keeps it clean, avoids leaking draft content via email)
+
+Add to the `EMAIL_TYPE_ROLES` map:
+
+```typescript
+workspace_updated: "creator", // Will need special handling: either party can trigger
+```
+
+Actually, since either party can trigger this, we'll add two types:
+- `workspace_updated_by_creator` (role: `creator`, sends to guest)
+- `workspace_updated_by_guest` (role: `requester`, sends to creator)
+
+### Frontend: Checkbox UI
+
+In the Save footer area of SharedWorkspace:
+
+```text
+[ ] Notify [Partner Name] via email     [Cancel] [Save & Sync]
+```
+
+The checkbox label dynamically shows the partner's name. When checked, the save handler fires the email after a successful database update (fire-and-forget, like existing message emails).
+
+---
+
+## 6. Files Summary
 
 | File | Action |
 |------|--------|
-| `src/pages/Workspace.tsx` | **Create** -- dedicated workspace page |
-| `src/App.tsx` | **Edit** -- add route |
-| `src/components/requests/RequestCard.tsx` | **Edit** -- replace inline workspace with "Enter Workspace" button |
-| `src/pages/MyRequests.tsx` | **Edit** -- replace inline workspace with "Enter Workspace" button |
+| `src/components/requests/WorkspaceEditor.tsx` | **Create** -- Tiptap editor with toolbar |
+| `src/components/requests/SharedWorkspace.tsx` | **Rewrite** -- Replace textarea with Tiptap, add notify checkbox, render HTML |
+| `src/pages/Workspace.tsx` | **Minor edit** -- Pass partner name to SharedWorkspace for the notify checkbox label |
+| `supabase/functions/send-collab-email/index.ts` | **Edit** -- Add `workspace_updated_by_creator` and `workspace_updated_by_guest` email types |
+
+### No changes needed to:
+- Database schema (reusing existing `shared_content` text column for HTML)
+- RLS policies
+- `App.tsx` routing
+
+---
+
+## Technical Notes
+
+### Why Tiptap over alternatives
+- **Headless**: We control the UI entirely -- no imposed styles to fight
+- **StarterKit**: One package gives us all the formatting we need
+- **Link extension**: Built-in URL validation
+- **ProseMirror-based**: Battle-tested, same engine Substack uses internally
+
+### Content Migration
+- Any existing plain text in `shared_content` will render as-is inside the Tiptap editor (it treats plain text as a paragraph). No migration needed.
+
+### Performance
+- Tiptap adds ~50-80KB gzipped to the bundle. This is only loaded on the Workspace page (code-split via React Router lazy loading if desired later).
+- No WebSockets or Realtime subscriptions -- still uses standard GET/POST.
 
