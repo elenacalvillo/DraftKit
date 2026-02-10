@@ -169,6 +169,10 @@ export function SharedWorkspace({
                     </span>
                   </label>
                 )}
+                <Button variant="ghost" size="sm" onClick={handleCancel} disabled={isSaving} className="h-8 text-xs">
+                  <X className="w-3.5 h-3.5 mr-1" />
+                  Cancel
+                </Button>
                 <Button variant="gradient" size="sm" onClick={handleSave} disabled={isSaving} className="h-8 text-xs">
                   <Save className="w-3.5 h-3.5 mr-1" />
                   {isSaving ? "Saving…" : "Save & Sync"}
