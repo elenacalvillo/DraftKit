@@ -111,6 +111,7 @@ export default function Dashboard() {
           date: r.requested_date,
           requesterName: r.requester_name,
           requesterProfileImageUrl: r.requester_profile_image_url,
+          requestId: r.id,
         }))
       );
     }
