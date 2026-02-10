@@ -10,6 +10,7 @@ import {
   LogOut,
   Menu,
   X,
+  ArrowLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -42,7 +43,14 @@ const navItems = [
   { icon: Settings, label: "Settings", path: "/dashboard/settings" },
 ];
 
-export function DashboardLayout({ children }: { children: React.ReactNode }) {
+interface DashboardLayoutProps {
+  children: React.ReactNode;
+  zenMode?: boolean;
+  zenTitle?: string;
+  zenBackPath?: string;
+}
+
+export function DashboardLayout({ children, zenMode, zenTitle, zenBackPath }: DashboardLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -68,19 +76,37 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       {/* Mobile header */}
       <div className="xl:hidden fixed top-0 left-0 right-0 z-50 px-4 py-3 glass-card rounded-none border-x-0 border-t-0">
         <div className="flex items-center justify-between">
-          <Link to="/dashboard" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <span className="text-lg font-bold gradient-text">DraftKit</span>
-          </Link>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          >
-            {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </Button>
+          {zenMode ? (
+            <>
+              <button
+                onClick={() => navigate(zenBackPath || "/dashboard")}
+                className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5" />
+                <span className="text-sm font-medium">Back</span>
+              </button>
+              {zenTitle && (
+                <span className="text-sm font-medium truncate max-w-[200px]">{zenTitle}</span>
+              )}
+              <div className="w-16" />
+            </>
+          ) : (
+            <>
+              <Link to="/dashboard" className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
+                  <Sparkles className="w-4 h-4 text-primary-foreground" />
+                </div>
+                <span className="text-lg font-bold gradient-text">DraftKit</span>
+              </Link>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              >
+                {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              </Button>
+            </>
+          )}
         </div>
       </div>
 

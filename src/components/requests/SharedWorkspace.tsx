@@ -9,7 +9,7 @@ import { formatDistanceToNow } from "date-fns";
 import DOMPurify from "dompurify";
 import { WorkspaceEditor } from "./WorkspaceEditor";
 
-const ALLOWED_TAGS = ["p", "h1", "h2", "h3", "strong", "em", "s", "code", "a", "ul", "ol", "li", "br"];
+const ALLOWED_TAGS = ["p", "h1", "h2", "h3", "strong", "em", "s", "code", "pre", "a", "ul", "ol", "li", "br"];
 const ALLOWED_ATTR = ["href", "target", "rel"];
 
 function sanitize(html: string): string {
