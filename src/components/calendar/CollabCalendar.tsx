@@ -133,7 +133,13 @@ export function CollabCalendar({
 
     if (isEditable) {
       const status = getDateStatus(dateStr);
-      if (status === "booked") return;
+      if (status === "booked") {
+        const booking = getBookingInfo(dateStr);
+        if (booking?.requestId && onBookedDateClick) {
+          onBookedDateClick(booking.requestId);
+        }
+        return;
+      }
       
       if (status === "available") {
         onToggleAvailable?.(dateStr);
