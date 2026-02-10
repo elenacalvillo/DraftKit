@@ -28,6 +28,7 @@ interface CollabCalendarProps {
   isEditable?: boolean;
   onToggleAvailable?: (date: string) => void;
   onToggleBlocked?: (date: string) => void;
+  onBookedDateClick?: (requestId: string) => void;
   availableLegendText?: string;
   collabMode?: 'async' | 'discovery' | null;
 }
