@@ -1,61 +1,51 @@
 
 
-# Fix Zen Mode: Toolbar Visibility, Horizontal Overflow, and Layout
+# Fix: Workspace Content Overflowing the Viewport
 
-## What went wrong
+## Problem
 
-From the screenshot, three problems are visible:
+The shared workspace content (both in view mode and edit mode) extends beyond the right edge of the screen. Long lines of text are not wrapping, causing the entire layout to overflow horizontally. The user can't see the right side of the content.
 
-1. **The editor toolbar vanishes on scroll** -- it scrolls away instead of staying pinned below the zen header.
-2. **Horizontal scrollbar appeared** -- the two-column grid (320px sidebar + editor) combined with page padding overflows the viewport.
-3. **The left context panel shouldn't be visible during editing** -- in "full focus" zen mode, showing the partner card and buttons beside the editor wastes horizontal space and causes the overflow.
+## Root Cause
 
-## Root cause
+Three missing constraints:
 
-The workspace page uses `grid-cols-[320px_1fr]` inside a `max-w-6xl` container with `p-6 xl:p-10` padding. This worked fine with the old sidebar layout (which gave `ml-64` on desktop), but in zen mode the content area is now full-width, yet the two-column grid with fixed 320px still creates awkward proportions and overflow on smaller screens.
+1. **SharedWorkspace root div** -- has no `overflow-hidden` on the content area (we removed it earlier to fix sticky toolbar, but now text overflows).
+2. **The prose/editor content** -- no `overflow-wrap: break-word` or `max-width` to force long text to wrap.
+3. **The grid column** -- the `1fr` column in the grid has no `min-width: 0` (a common CSS Grid gotcha where `1fr` defaults to `min-width: auto`, allowing children to push the column wider than the available space).
 
-More importantly, the editor toolbar has `sticky top-[48px]` but the parent container structure prevents it from actually sticking (the `overflow-hidden` on the card wrapper clips it).
+## Fix (3 files, surgical changes)
 
-## The fix (3 files)
+### 1. Workspace.tsx -- Add `min-w-0` to the right panel
 
-### 1. SharedWorkspace.tsx -- Remove overflow-hidden from wrapper
+The right column in the grid (`motion.div` wrapping `SharedWorkspace`) needs `min-w-0` to prevent the `1fr` column from expanding beyond viewport. This is the classic CSS Grid fix.
 
-The root `div` has `overflow-hidden` which prevents `position: sticky` from working on the toolbar inside.
+```
+// Line 356: Add min-w-0 to the right panel motion.div
+className="min-w-0"
+```
 
-**Change:** Replace `overflow-hidden` with `overflow-visible` on the outer wrapper div so the sticky toolbar can stick to the viewport.
+Also add `min-w-0` to the outer grid container div (`max-w-6xl mx-auto`) to ensure nothing escapes.
 
-### 2. WorkspaceEditor.tsx -- Confirm sticky toolbar setup
+### 2. SharedWorkspace.tsx -- Add `overflow-hidden` back, but only on the content areas (not the sticky toolbar parent)
 
-The toolbar already has `sticky top-[48px] z-10`. Add a `bg-card` (or `bg-background`) class so the toolbar has an opaque background when content scrolls behind it. This prevents text bleeding through.
+The trick: keep the root wrapper without `overflow-hidden` (so sticky toolbar works), but add `overflow-hidden` to the **content display area** and constrain the prose.
 
-### 3. Workspace.tsx -- Collapse the two-column layout when editing
+- Add `overflow-hidden` to the view-mode prose div (line 225)
+- Add `break-words` / `overflow-wrap: break-word` to the workspace-prose class
 
-The left context panel (partner card, buttons) is useful context but should not compete with the editor for space. Two options, and I recommend Option A:
+### 3. WorkspaceEditor.tsx -- Add word-wrap constraints to the editor
 
-**Option A -- Hide the left panel entirely in zen mode on smaller screens:**
-- On `lg` and above: keep the two-column grid as-is (there's enough room).
-- Below `lg`: stack vertically, but move the context panel below the editor (or collapse it into an expandable section).
-- Reduce the fixed `320px` column to `280px` to reclaim space.
+- Add `overflow-hidden` and `break-words` to the editor wrapper div
+- Add `overflow-wrap: break-word` and `word-break: break-word` to the editor prose attributes so the Tiptap content wraps properly
 
-**Option B -- Make the left panel collapsible:**
-- Add a toggle button in the zen header to show/hide the context sidebar.
-- Default to hidden so the editor gets full width.
+## Technical Details
 
-I recommend **Option A** as it's simpler and matches the "clear the decks" philosophy.
+| File | Line(s) | Change |
+|------|---------|--------|
+| `src/pages/Workspace.tsx` | 356 | Add `min-w-0` to right panel `motion.div` |
+| `src/components/requests/SharedWorkspace.tsx` | 225-226 | Add `overflow-hidden` and word-wrap to prose view area |
+| `src/components/requests/WorkspaceEditor.tsx` | 54-56 | Add `overflow-wrap: break-word` to editor prose attributes |
+| `src/components/requests/WorkspaceEditor.tsx` | 94 | Add `min-w-0 overflow-hidden` to editor flex container |
 
-Additionally, add `overflow-x-hidden` to the main content wrapper in `DashboardLayout.tsx` to prevent any horizontal scroll as a safety net.
-
-### 4. DashboardLayout.tsx -- Add overflow protection
-
-Add `overflow-x-hidden` to the zen mode main content area to prevent horizontal scrollbar.
-
-## Files changed
-
-| File | Change |
-|------|--------|
-| `src/components/requests/SharedWorkspace.tsx` | Remove `overflow-hidden` from root div so sticky toolbar works |
-| `src/components/requests/WorkspaceEditor.tsx` | Add opaque background (`bg-card`) to sticky toolbar so content doesn't bleed through |
-| `src/pages/Workspace.tsx` | Reduce fixed column from `320px` to `280px`; ensure proper stacking on mobile |
-| `src/components/layout/DashboardLayout.tsx` | Add `overflow-x-hidden` to zen mode main wrapper |
-
-No database, edge function, or dependency changes needed.
+No database, dependency, or edge function changes needed.
