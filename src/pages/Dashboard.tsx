@@ -111,6 +111,7 @@ export default function Dashboard() {
           date: r.requested_date,
           requesterName: r.requester_name,
           requesterProfileImageUrl: r.requester_profile_image_url,
+          requestId: r.id,
         }))
       );
     }
@@ -289,6 +290,7 @@ export default function Dashboard() {
               bookedDates={bookedDates}
               bookingDetails={bookingDetails}
               collabMode={creator.collab_mode as 'async' | 'discovery' | null}
+              onBookedDateClick={(requestId) => navigate(`/dashboard/workspace/${requestId}`)}
             />
             {availability.length === 0 && (
               <motion.div

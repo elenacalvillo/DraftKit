@@ -80,7 +80,7 @@ export default function Availability() {
     
     const { data: reqData } = await supabase
       .from('collab_requests')
-      .select('requested_date, requester_name, requester_profile_image_url')
+      .select('id, requested_date, requester_name, requester_profile_image_url')
       .eq('creator_id', creator.id)
       .eq('status', 'approved');
 
@@ -94,6 +94,7 @@ export default function Availability() {
           date: r.requested_date as string,
           requesterName: r.requester_name,
           requesterProfileImageUrl: r.requester_profile_image_url,
+          requestId: r.id,
         }));
       setBookingDetails(details);
     }
@@ -270,6 +271,7 @@ export default function Availability() {
             isEditable={true}
             onToggleAvailable={handleToggleAvailable}
             onToggleBlocked={handleToggleBlocked}
+            onBookedDateClick={(requestId) => navigate(`/dashboard/workspace/${requestId}`)}
             availableLegendText={
               creator.collab_mode === 'discovery' 
                 ? 'Available for calls' 

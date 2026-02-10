@@ -16,6 +16,7 @@ export interface BookingInfo {
   date: string;
   requesterName: string;
   requesterProfileImageUrl: string | null;
+  requestId?: string;
 }
 
 interface CollabCalendarProps {
@@ -27,6 +28,7 @@ interface CollabCalendarProps {
   isEditable?: boolean;
   onToggleAvailable?: (date: string) => void;
   onToggleBlocked?: (date: string) => void;
+  onBookedDateClick?: (requestId: string) => void;
   availableLegendText?: string;
   collabMode?: 'async' | 'discovery' | null;
 }
@@ -40,6 +42,7 @@ export function CollabCalendar({
   isEditable = false,
   onToggleAvailable,
   onToggleBlocked,
+  onBookedDateClick,
   availableLegendText = "Available",
   collabMode,
 }: CollabCalendarProps) {
@@ -130,7 +133,13 @@ export function CollabCalendar({
 
     if (isEditable) {
       const status = getDateStatus(dateStr);
-      if (status === "booked") return;
+      if (status === "booked") {
+        const booking = getBookingInfo(dateStr);
+        if (booking?.requestId && onBookedDateClick) {
+          onBookedDateClick(booking.requestId);
+        }
+        return;
+      }
       
       if (status === "available") {
         onToggleAvailable?.(dateStr);
@@ -188,7 +197,7 @@ export function CollabCalendar({
           isPast && "opacity-30 cursor-not-allowed",
           !isPast && status === "default" && "hover:bg-muted",
           status === "available" && !isPast && "bg-available/20 text-available hover:bg-available/30 hover:shadow-md",
-          status === "booked" && "bg-booked/20 text-booked cursor-default",
+          status === "booked" && cn("bg-booked/20 text-booked", onBookedDateClick ? "cursor-pointer" : "cursor-default"),
           status === "blocked" && "bg-blocked/20 text-blocked",
           isSelected && "ring-2 ring-primary ring-offset-2"
         )}
