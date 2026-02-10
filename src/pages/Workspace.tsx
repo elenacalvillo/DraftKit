@@ -239,17 +239,8 @@ export default function Workspace() {
   }
 
   return (
-    <DashboardLayout zenMode zenTitle={`Workspace · ${partnerName}`} zenBackPath={backPath}>
+    <DashboardLayout zenMode zenTitle={`Drafting with ${partnerName}`} zenBackPath={backPath}>
       <div className="max-w-6xl mx-auto">
-        {/* Back link */}
-        <button
-          onClick={() => navigate(backPath)}
-          className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Back to Requests</span>
-        </button>
-
         <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6">
           {/* Left Panel — Context Sidebar */}
           <motion.div
