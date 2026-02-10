@@ -16,6 +16,7 @@ export interface BookingInfo {
   date: string;
   requesterName: string;
   requesterProfileImageUrl: string | null;
+  requestId?: string;
 }
 
 interface CollabCalendarProps {
