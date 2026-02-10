@@ -91,7 +91,7 @@ export function DashboardLayout({ children, zenMode, zenTitle, zenBackPath }: Da
           <div id="zen-header-actions" className="flex items-center gap-3 min-w-[72px] justify-end" />
         </div>
 
-        <main className="min-h-screen pt-12">
+        <main className="min-h-screen pt-12 overflow-x-hidden">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
