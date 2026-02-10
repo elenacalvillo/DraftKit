@@ -80,7 +80,7 @@ export default function Availability() {
     
     const { data: reqData } = await supabase
       .from('collab_requests')
-      .select('requested_date, requester_name, requester_profile_image_url')
+      .select('id, requested_date, requester_name, requester_profile_image_url')
       .eq('creator_id', creator.id)
       .eq('status', 'approved');
 
