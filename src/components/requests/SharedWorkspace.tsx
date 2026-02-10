@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { FileText, Save, X, AlertCircle, PenLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,13 @@ export function SharedWorkspace({
   const [editContent, setEditContent] = useState(sharedContent || "");
   const [isSaving, setIsSaving] = useState(false);
   const [notifyPartner, setNotifyPartner] = useState(false);
+  const [headerPortal, setHeaderPortal] = useState<HTMLElement | null>(null);
+
+  // Find the zen header portal target
+  useEffect(() => {
+    const el = document.getElementById("zen-header-actions");
+    setHeaderPortal(el);
+  }, []);
 
   const handleStartEditing = () => {
     setEditContent(sharedContent || "");
@@ -147,20 +155,43 @@ export function SharedWorkspace({
               editable={true}
             />
 
-            {/* Edit actions */}
+            {/* Zen header portal: Save & Notify */}
+            {headerPortal && createPortal(
+              <>
+                {partnerName && (
+                  <label className="hidden sm:flex items-center gap-1.5 cursor-pointer">
+                    <Checkbox
+                      checked={notifyPartner}
+                      onCheckedChange={(v) => setNotifyPartner(v === true)}
+                    />
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      Notify {partnerName.split(" ")[0]}
+                    </span>
+                  </label>
+                )}
+                <Button variant="gradient" size="sm" onClick={handleSave} disabled={isSaving} className="h-8 text-xs">
+                  <Save className="w-3.5 h-3.5 mr-1" />
+                  {isSaving ? "Saving…" : "Save & Sync"}
+                </Button>
+              </>,
+              headerPortal
+            )}
+
+            {/* Bottom bar: word count + cancel */}
             <div className="flex items-center justify-between px-4 py-3 border-t border-border/50 bg-muted/20 flex-wrap gap-2">
               <div className="flex items-center gap-3">
                 <span className="text-xs text-muted-foreground">
                   {wordCount > 0 ? `${wordCount} words` : ""}
                 </span>
+                {/* Mobile fallback for notify */}
                 {partnerName && (
-                  <label className="flex items-center gap-2 cursor-pointer">
+                  <label className="flex sm:hidden items-center gap-2 cursor-pointer">
                     <Checkbox
                       checked={notifyPartner}
                       onCheckedChange={(v) => setNotifyPartner(v === true)}
                     />
                     <span className="text-xs text-muted-foreground">
-                      Notify {partnerName.split(" ")[0]} via email
+                      Notify {partnerName.split(" ")[0]}
                     </span>
                   </label>
                 )}
@@ -170,9 +201,10 @@ export function SharedWorkspace({
                   <X className="w-3.5 h-3.5 mr-1" />
                   Cancel
                 </Button>
-                <Button variant="gradient" size="sm" onClick={handleSave} disabled={isSaving}>
+                {/* Mobile fallback for save */}
+                <Button variant="gradient" size="sm" onClick={handleSave} disabled={isSaving} className="sm:hidden">
                   <Save className="w-3.5 h-3.5 mr-1.5" />
-                  {isSaving ? "Saving..." : "Save & Sync"}
+                  {isSaving ? "Saving…" : "Save"}
                 </Button>
               </div>
             </div>

@@ -76,15 +76,19 @@ export function DashboardLayout({ children, zenMode, zenTitle, zenBackPath }: Da
         <div className="fixed top-0 left-0 right-0 z-50 h-12 glass-card rounded-none border-x-0 border-t-0 px-4 flex items-center">
           <button
             onClick={() => navigate(zenBackPath || "/dashboard")}
-            className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors min-w-[72px]"
           >
             <ArrowLeft className="w-4 h-4" />
             <span className="text-sm">Back</span>
           </button>
-          <span className="flex-1 text-center text-sm font-medium truncate px-4">
+          <span
+            className="flex-1 text-center text-sm font-medium truncate px-4"
+            style={{ fontFamily: "'Georgia', 'Times New Roman', serif" }}
+          >
             {zenTitle || "Workspace"}
           </span>
-          <div className="w-16" />
+          {/* Portal target for save controls rendered by SharedWorkspace */}
+          <div id="zen-header-actions" className="flex items-center gap-3 min-w-[72px] justify-end" />
         </div>
 
         <main className="min-h-screen pt-12">
