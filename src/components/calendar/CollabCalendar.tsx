@@ -197,7 +197,7 @@ export function CollabCalendar({
           isPast && "opacity-30 cursor-not-allowed",
           !isPast && status === "default" && "hover:bg-muted",
           status === "available" && !isPast && "bg-available/20 text-available hover:bg-available/30 hover:shadow-md",
-          status === "booked" && "bg-booked/20 text-booked cursor-default",
+          status === "booked" && cn("bg-booked/20 text-booked", onBookedDateClick ? "cursor-pointer" : "cursor-default"),
           status === "blocked" && "bg-blocked/20 text-blocked",
           isSelected && "ring-2 ring-primary ring-offset-2"
         )}

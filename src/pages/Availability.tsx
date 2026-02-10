@@ -271,6 +271,7 @@ export default function Availability() {
             isEditable={true}
             onToggleAvailable={handleToggleAvailable}
             onToggleBlocked={handleToggleBlocked}
+            onBookedDateClick={(requestId) => navigate(`/dashboard/workspace/${requestId}`)}
             availableLegendText={
               creator.collab_mode === 'discovery' 
                 ? 'Available for calls' 

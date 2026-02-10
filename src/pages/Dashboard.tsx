@@ -290,6 +290,7 @@ export default function Dashboard() {
               bookedDates={bookedDates}
               bookingDetails={bookingDetails}
               collabMode={creator.collab_mode as 'async' | 'discovery' | null}
+              onBookedDateClick={(requestId) => navigate(`/dashboard/workspace/${requestId}`)}
             />
             {availability.length === 0 && (
               <motion.div
