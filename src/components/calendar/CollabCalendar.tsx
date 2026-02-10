@@ -42,6 +42,7 @@ export function CollabCalendar({
   isEditable = false,
   onToggleAvailable,
   onToggleBlocked,
+  onBookedDateClick,
   availableLegendText = "Available",
   collabMode,
 }: CollabCalendarProps) {
