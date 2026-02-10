@@ -11,6 +11,7 @@ import {
   Menu,
   X,
   ArrowLeft,
+  Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -32,8 +33,6 @@ const useIsDesktop = () => {
 
   return isDesktop;
 };
-
-import { Send } from "lucide-react";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
@@ -57,7 +56,6 @@ export function DashboardLayout({ children, zenMode, zenTitle, zenBackPath }: Da
   const { creator, signOut } = useAuth();
   const isDesktop = useIsDesktop();
 
-  // Close sidebar on route change (mobile/tablet)
   useEffect(() => {
     if (!isDesktop) {
       setIsSidebarOpen(false);
@@ -71,55 +69,67 @@ export function DashboardLayout({ children, zenMode, zenTitle, zenBackPath }: Da
     navigate("/");
   };
 
+  // Zen Mode: minimal 48px header, no sidebar, no nav
+  if (zenMode) {
+    return (
+      <div className="min-h-screen gradient-bg">
+        <div className="fixed top-0 left-0 right-0 z-50 h-12 glass-card rounded-none border-x-0 border-t-0 px-4 flex items-center">
+          <button
+            onClick={() => navigate(zenBackPath || "/dashboard")}
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span className="text-sm">Back</span>
+          </button>
+          <span className="flex-1 text-center text-sm font-medium truncate px-4">
+            {zenTitle || "Workspace"}
+          </span>
+          <div className="w-16" />
+        </div>
+
+        <main className="min-h-screen pt-12">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="p-6 xl:p-10"
+          >
+            {children}
+          </motion.div>
+        </main>
+      </div>
+    );
+  }
+
+  // Standard layout with sidebar
   return (
     <div className="min-h-screen gradient-bg">
       {/* Mobile header */}
       <div className="xl:hidden fixed top-0 left-0 right-0 z-50 px-4 py-3 glass-card rounded-none border-x-0 border-t-0">
         <div className="flex items-center justify-between">
-          {zenMode ? (
-            <>
-              <button
-                onClick={() => navigate(zenBackPath || "/dashboard")}
-                className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5" />
-                <span className="text-sm font-medium">Back</span>
-              </button>
-              {zenTitle && (
-                <span className="text-sm font-medium truncate max-w-[200px]">{zenTitle}</span>
-              )}
-              <div className="w-16" />
-            </>
-          ) : (
-            <>
-              <Link to="/dashboard" className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
-                  <Sparkles className="w-4 h-4 text-primary-foreground" />
-                </div>
-                <span className="text-lg font-bold gradient-text">DraftKit</span>
-              </Link>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              >
-                {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-              </Button>
-            </>
-          )}
+          <Link to="/dashboard" className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
+              <Sparkles className="w-4 h-4 text-primary-foreground" />
+            </div>
+            <span className="text-lg font-bold gradient-text">DraftKit</span>
+          </Link>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          >
+            {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </Button>
         </div>
       </div>
 
       {/* Sidebar */}
       <motion.aside
         initial={false}
-        animate={{
-          x: sidebarVisible ? 0 : "-100%",
-        }}
+        animate={{ x: sidebarVisible ? 0 : "-100%" }}
         transition={{ type: "spring", damping: 25, stiffness: 300 }}
         className="fixed top-0 left-0 bottom-0 w-64 z-40 glass-card rounded-none border-y-0 border-l-0 p-6 flex flex-col"
       >
-        {/* Logo */}
         <Link to="/dashboard" className="flex items-center gap-2 mb-10">
           <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-glow">
             <Sparkles className="w-5 h-5 text-primary-foreground" />
@@ -127,7 +137,6 @@ export function DashboardLayout({ children, zenMode, zenTitle, zenBackPath }: Da
           <span className="text-xl font-bold gradient-text">DraftKit</span>
         </Link>
 
-        {/* Navigation */}
         <nav className="flex-1 space-y-2">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path;
@@ -161,7 +170,6 @@ export function DashboardLayout({ children, zenMode, zenTitle, zenBackPath }: Da
           })}
         </nav>
 
-        {/* User section */}
         <div className="border-t border-border pt-6 mt-6">
           {creator && (
             <div className="flex items-center gap-3 mb-4">
