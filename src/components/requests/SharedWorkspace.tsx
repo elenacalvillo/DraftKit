@@ -1,10 +1,20 @@
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FileText, Save, X, AlertCircle, PenLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+import DOMPurify from "dompurify";
+import { WorkspaceEditor } from "./WorkspaceEditor";
+
+const ALLOWED_TAGS = ["p", "h1", "h2", "h3", "strong", "em", "s", "code", "a", "ul", "ol", "li", "br"];
+const ALLOWED_ATTR = ["href", "target", "rel"];
+
+function sanitize(html: string): string {
+  return DOMPurify.sanitize(html, { ALLOWED_TAGS, ALLOWED_ATTR });
+}
 
 interface SharedWorkspaceProps {
   requestId: string;
@@ -14,6 +24,8 @@ interface SharedWorkspaceProps {
   currentUserName: string;
   canEdit: boolean;
   onContentSaved: (content: string, editedBy: string, editedAt: string) => void;
+  partnerName?: string;
+  isCreator?: boolean;
 }
 
 export function SharedWorkspace({
@@ -24,31 +36,13 @@ export function SharedWorkspace({
   currentUserName,
   canEdit,
   onContentSaved,
+  partnerName,
+  isCreator,
 }: SharedWorkspaceProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(sharedContent || "");
   const [isSaving, setIsSaving] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  // Auto-resize textarea
-  useEffect(() => {
-    if (textareaRef.current && isEditing) {
-      const el = textareaRef.current;
-      el.style.height = "auto";
-      el.style.height = Math.max(300, el.scrollHeight) + "px";
-    }
-  }, [editContent, isEditing]);
-
-  // Focus textarea on edit
-  useEffect(() => {
-    if (isEditing && textareaRef.current) {
-      textareaRef.current.focus();
-      textareaRef.current.setSelectionRange(
-        textareaRef.current.value.length,
-        textareaRef.current.value.length
-      );
-    }
-  }, [isEditing]);
+  const [notifyPartner, setNotifyPartner] = useState(false);
 
   const handleStartEditing = () => {
     setEditContent(sharedContent || "");
@@ -58,16 +52,18 @@ export function SharedWorkspace({
   const handleCancel = () => {
     setIsEditing(false);
     setEditContent(sharedContent || "");
+    setNotifyPartner(false);
   };
 
   const handleSave = async () => {
     setIsSaving(true);
     const now = new Date().toISOString();
+    const cleanHtml = sanitize(editContent);
     try {
       const { error } = await supabase
         .from("collab_requests")
         .update({
-          shared_content: editContent || null,
+          shared_content: cleanHtml || null,
           content_last_edited_by: currentUserName,
           content_last_edited_at: now,
         })
@@ -75,9 +71,28 @@ export function SharedWorkspace({
 
       if (error) throw error;
 
-      onContentSaved(editContent, currentUserName, now);
+      onContentSaved(cleanHtml, currentUserName, now);
       setIsEditing(false);
       toast.success("Draft saved & synced");
+
+      // Fire-and-forget email notification if checked
+      if (notifyPartner && partnerName) {
+        const emailType = isCreator
+          ? "workspace_updated_by_creator"
+          : "workspace_updated_by_guest";
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            supabase.functions.invoke("send-collab-email", {
+              body: { type: emailType, requestId },
+              headers: { Authorization: `Bearer ${session.access_token}` },
+            });
+          }
+        } catch {
+          // fire-and-forget
+        }
+      }
+      setNotifyPartner(false);
     } catch (error) {
       console.error("Failed to save workspace content:", error);
       toast.error("Failed to save. Please try again.");
@@ -88,6 +103,11 @@ export function SharedWorkspace({
 
   const hasContent = !!sharedContent?.trim();
 
+  // Count words from HTML content
+  const wordCount = editContent
+    ? new DOMParser().parseFromString(editContent, "text/html").body.textContent?.split(/\s+/).filter(Boolean).length || 0
+    : 0;
+
   return (
     <div className="border border-border/50 rounded-xl overflow-hidden bg-card/50">
       {/* Header */}
@@ -97,12 +117,7 @@ export function SharedWorkspace({
           <span className="text-sm font-medium">Shared Workspace</span>
         </div>
         {canEdit && !isEditing && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleStartEditing}
-            className="h-8"
-          >
+          <Button variant="ghost" size="sm" onClick={handleStartEditing} className="h-8">
             <PenLine className="w-3.5 h-3.5 mr-1.5" />
             {hasContent ? "Edit Draft" : "Start Writing"}
           </Button>
@@ -126,38 +141,36 @@ export function SharedWorkspace({
               </span>
             </div>
 
-            <textarea
-              ref={textareaRef}
-              value={editContent}
-              onChange={(e) => setEditContent(e.target.value)}
-              placeholder="Start writing your collaboration draft here..."
-              className="w-full min-h-[300px] px-5 py-4 bg-transparent text-foreground placeholder:text-muted-foreground/50 focus:outline-none resize-none font-serif text-[15px] leading-relaxed"
-              style={{ fontFamily: "'Georgia', 'Times New Roman', serif" }}
+            <WorkspaceEditor
+              content={editContent}
+              onChange={setEditContent}
+              editable={true}
             />
 
             {/* Edit actions */}
-            <div className="flex items-center justify-between px-4 py-3 border-t border-border/50 bg-muted/20">
-              <span className="text-xs text-muted-foreground">
-                {editContent.length > 0
-                  ? `${editContent.split(/\s+/).filter(Boolean).length} words`
-                  : ""}
-              </span>
+            <div className="flex items-center justify-between px-4 py-3 border-t border-border/50 bg-muted/20 flex-wrap gap-2">
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-muted-foreground">
+                  {wordCount > 0 ? `${wordCount} words` : ""}
+                </span>
+                {partnerName && (
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={notifyPartner}
+                      onCheckedChange={(v) => setNotifyPartner(v === true)}
+                    />
+                    <span className="text-xs text-muted-foreground">
+                      Notify {partnerName.split(" ")[0]} via email
+                    </span>
+                  </label>
+                )}
+              </div>
               <div className="flex gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleCancel}
-                  disabled={isSaving}
-                >
+                <Button variant="ghost" size="sm" onClick={handleCancel} disabled={isSaving}>
                   <X className="w-3.5 h-3.5 mr-1" />
                   Cancel
                 </Button>
-                <Button
-                  variant="gradient"
-                  size="sm"
-                  onClick={handleSave}
-                  disabled={isSaving}
-                >
+                <Button variant="gradient" size="sm" onClick={handleSave} disabled={isSaving}>
                   <Save className="w-3.5 h-3.5 mr-1.5" />
                   {isSaving ? "Saving..." : "Save & Sync"}
                 </Button>
@@ -174,11 +187,10 @@ export function SharedWorkspace({
             {hasContent ? (
               <>
                 <div
-                  className="px-5 py-4 min-h-[120px] text-[15px] leading-relaxed whitespace-pre-wrap text-foreground/90"
+                  className="workspace-prose px-5 py-4 min-h-[120px] text-[15px] leading-relaxed"
                   style={{ fontFamily: "'Georgia', 'Times New Roman', serif" }}
-                >
-                  {sharedContent}
-                </div>
+                  dangerouslySetInnerHTML={{ __html: sanitize(sharedContent!) }}
+                />
                 {lastEditedBy && lastEditedAt && (
                   <div className="px-4 py-2.5 border-t border-border/30 text-xs text-muted-foreground bg-muted/10">
                     Last updated by <span className="font-medium text-foreground/70">{lastEditedBy}</span>

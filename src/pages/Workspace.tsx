@@ -374,6 +374,8 @@ export default function Workspace() {
               lastEditedAt={request.content_last_edited_at}
               currentUserName={currentUserName}
               canEdit={true}
+              partnerName={partnerName || undefined}
+              isCreator={isCreator}
               onContentSaved={(content, editedBy, editedAt) => {
                 setRequest((prev) =>
                   prev
