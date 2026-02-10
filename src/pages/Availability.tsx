@@ -94,6 +94,7 @@ export default function Availability() {
           date: r.requested_date as string,
           requesterName: r.requester_name,
           requesterProfileImageUrl: r.requester_profile_image_url,
+          requestId: r.id,
         }));
       setBookingDetails(details);
     }
