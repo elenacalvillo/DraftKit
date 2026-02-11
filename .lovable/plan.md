@@ -1,79 +1,79 @@
 
 
-# In-Workspace Conversation Feed (Pro Feature)
+# Floating Pill Toolbar
 
-## What this adds
+## What changes
 
-A chronological message thread embedded directly in the workspace sidebar, below the "Message" button. Pro users see the full conversation history in-context. Free users see a teaser with an upgrade prompt.
+Replace the current sticky top toolbar in `WorkspaceEditor.tsx` with a fixed-position "frosted glass" pill anchored to the bottom-center of the viewport.
 
-## Changes
+## Single file change: `WorkspaceEditor.tsx`
 
-### 1. New component: `WorkspaceConversation.tsx`
+### Remove
+- The entire `sticky top-[48px]` toolbar div (lines 96-201) and its inline position in the component tree
 
-A sidebar-friendly conversation feed component that:
-- Fetches all `collaboration_messages` for the given `request_id`, ordered by `created_at`
-- Displays messages in a compact bubble/thread style (sender name, time, content)
-- Visually distinguishes "creator" vs "requester" messages (left/right alignment or color)
-- Auto-scrolls to the latest message
-- Fits within the 280px sidebar width
-- Shows a subtle empty state when no messages exist yet ("No messages yet. Start the conversation!")
+### Add
+- A **React Portal** (`createPortal` to `document.body`) rendering the toolbar as a fixed pill
+- Only rendered when `editable` is true
 
-### 2. Update `Workspace.tsx` sidebar
+### Pill specifications
 
-- Import `usePro` hook and the new `WorkspaceConversation` component
-- Below the "Message [Partner]" button and action buttons section, add the conversation feed
-- **Pro gate logic:**
-  - If `isPro`: render `WorkspaceConversation` with full history
-  - If not Pro: show a teaser (e.g., the 1-2 most recent messages blurred or a locked state) with an `UpgradePrompt` using a new `'workspace'` feature type
-- After a message is sent via the modal, refresh the conversation feed (pass a `refreshKey` or use `react-query` invalidation)
+| Property | Value |
+|----------|-------|
+| Position | `fixed bottom-8 left-1/2 -translate-x-1/2` |
+| Z-index | `z-[100]` |
+| Shape | `rounded-full` (pill) |
+| Background | `bg-background/80 backdrop-blur-md` |
+| Shadow | `shadow-xl border border-border/50` |
+| Padding | `px-3 py-2` |
+| Layout | Single horizontal row with `flex items-center gap-0.5` |
 
-### 3. Update `UpgradePrompt.tsx`
+### Tool groups (same buttons, same Tiptap commands)
 
-- Add a new `'workspace'` feature type to the `FeatureType` union and `FEATURE_COPY` map:
-  - Title: "Workspace Conversation History"
-  - Description: "Keep your collaboration context in one place"
-  - Icon: `MessageSquare`
+1. **Heading dropdown** -- H1/H2/H3/Normal (existing `DropdownMenu`)
+2. **Divider** -- subtle `w-px h-5 bg-border/40`
+3. **Text styles** -- Bold, Italic, Strikethrough, Inline Code
+4. **Divider**
+5. **Code Block**
+6. **Divider**
+7. **Link**
+8. **Divider**
+9. **Bullet List, Ordered List**
 
-### 4. Refresh after sending a message
+### Active states (unchanged logic)
+- Active icon: `bg-primary/10 text-primary`
+- Hover: `hover:text-foreground hover:bg-muted/50`
 
-- In both `SendMessageModal` and `GuestMessageModal`, after a successful send, call an `onMessageSent` callback prop
-- In `Workspace.tsx`, pass `onMessageSent` that increments a counter or invalidates the conversation query, so the feed updates immediately
+### ToolbarButton update
+- Add `hover:scale-105 transition-all` for the interactive feedback requested
 
-## Visual layout (sidebar)
+### Structural result
 
 ```text
-+---------------------------+
-|  [Avatar] Partner Name    |
-|  substack link            |
-|  Badge: Collab Type       |
-|  Date / Email             |
-+---------------------------+
-|  "Original Message"       |
-+---------------------------+
-|  [Generate AI Draft]      |
-|  [Message Partner]        |
-|  [Open External Doc]      |
-+---------------------------+
-|  CONVERSATION             |
-|  ~~~~~~~~~~~~~~~~~~~~~~~~ |
-|  You (2h ago):            |
-|  "Hey, excited to..."     |
-|                           |
-|  Partner (1h ago):        |
-|  "Me too! Let's..."       |
-|                           |
-|  (auto-scroll to bottom)  |
-+---------------------------+
+<div className="flex flex-col min-w-0">
+  {/* Editor content -- no toolbar above it */}
+  <div className="overflow-hidden min-w-0">
+    <EditorContent editor={editor} />
+  </div>
+
+  {/* Floating Pill -- portaled to body */}
+  {editable && createPortal(
+    <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100]
+                    flex items-center gap-0.5 px-3 py-2
+                    bg-background/80 backdrop-blur-md
+                    rounded-full shadow-xl border border-border/50">
+      {/* ...all toolbar buttons... */}
+    </div>,
+    document.body
+  )}
+</div>
 ```
 
-## Technical details
+### Why a portal?
+Using `createPortal(... , document.body)` makes the pill completely independent of the workspace's DOM hierarchy and overflow settings. It cannot be clipped, cannot scroll away, and needs no sticky hacks.
 
-| File | Change |
-|------|--------|
-| `src/components/requests/WorkspaceConversation.tsx` | **New** -- fetches and renders message thread for a request |
-| `src/pages/Workspace.tsx` | Import `usePro`, add conversation feed to sidebar with Pro gate |
-| `src/components/subscription/UpgradePrompt.tsx` | Add `'workspace'` feature type |
-| `src/components/requests/SendMessageModal.tsx` | Add optional `onMessageSent` callback |
-| `src/components/requests/GuestMessageModal.tsx` | Add optional `onMessageSent` callback |
+### Mobile considerations
+- The pill is narrow enough (~400px) to fit on mobile screens
+- `bottom-8` (32px) keeps it above the safe area on iOS
+- It does not overlap the "Save & Sync" button in the Zen header (which is at the top)
 
-No database changes needed -- `collaboration_messages` table and RLS policies already exist.
+No other files need changes.
