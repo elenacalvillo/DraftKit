@@ -131,16 +131,18 @@ export function CollabCalendar({
 
     if (clickedDate < today) return;
 
-    if (isEditable) {
-      const status = getDateStatus(dateStr);
-      if (status === "booked") {
-        const booking = getBookingInfo(dateStr);
-        if (booking?.requestId && onBookedDateClick) {
-          onBookedDateClick(booking.requestId);
-        }
-        return;
+    const status = getDateStatus(dateStr);
+
+    // Handle booked date clicks regardless of isEditable
+    if (status === "booked") {
+      const booking = getBookingInfo(dateStr);
+      if (booking?.requestId && onBookedDateClick) {
+        onBookedDateClick(booking.requestId);
       }
-      
+      return;
+    }
+
+    if (isEditable) {
       if (status === "available") {
         onToggleAvailable?.(dateStr);
       } else if (status === "blocked") {
@@ -149,11 +151,10 @@ export function CollabCalendar({
         onToggleAvailable?.(dateStr);
       }
     } else {
-      const status = getDateStatus(dateStr);
       if (status === "available") {
         setSelectedDate(dateStr);
         onDateSelect?.(dateStr);
-      } else if (status !== "booked") {
+      } else {
         // Show helpful feedback when clicking unavailable dates (mode-aware)
         if (firstAvailableDate) {
           const availMonth = monthNames[firstAvailableDate.getMonth()];
