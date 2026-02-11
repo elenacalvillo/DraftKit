@@ -1,16 +1,19 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Calendar, ExternalLink, LinkIcon, Mail, Sparkles, FileText, MessageSquare, PenLine } from "lucide-react";
+import { ArrowLeft, Calendar, ExternalLink, LinkIcon, Mail, Sparkles, FileText, MessageSquare, PenLine, Lock } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { SharedWorkspace } from "@/components/requests/SharedWorkspace";
 import { CollabDraftModal } from "@/components/requests/CollabDraftModal";
 import { SendMessageModal } from "@/components/requests/SendMessageModal";
 import { GuestMessageModal } from "@/components/requests/GuestMessageModal";
+import { WorkspaceConversation } from "@/components/requests/WorkspaceConversation";
+import { UpgradePrompt } from "@/components/subscription/UpgradePrompt";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/useAuth";
+import { usePro } from "@/hooks/usePro";
 import { supabase } from "@/integrations/supabase/client";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { CollabDraft } from "@/lib/storage";
@@ -50,6 +53,7 @@ export default function Workspace() {
   const { requestId } = useParams<{ requestId: string }>();
   const navigate = useNavigate();
   const { user, creator, loading: authLoading } = useAuth();
+  const { isPro } = usePro();
   const { trackEvent } = useAnalytics();
 
   const [request, setRequest] = useState<WorkspaceRequest | null>(null);
@@ -66,6 +70,11 @@ export default function Workspace() {
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
   const [localDraft, setLocalDraft] = useState<CollabDraft | null>(null);
   const [showMessageModal, setShowMessageModal] = useState(false);
+  const [msgRefreshKey, setMsgRefreshKey] = useState(0);
+
+  const handleMessageSent = useCallback(() => {
+    setMsgRefreshKey((k) => k + 1);
+  }, []);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -350,6 +359,32 @@ export default function Workspace() {
                 </Button>
               )}
             </div>
+
+            {/* Conversation Feed */}
+            <div className="glass-card p-4">
+              <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
+                Conversation
+              </h4>
+              {isPro ? (
+                <WorkspaceConversation
+                  requestId={request.id}
+                  currentUserIsCreator={isCreator}
+                  refreshKey={msgRefreshKey}
+                />
+              ) : (
+                <div className="relative">
+                  <div className="opacity-20 pointer-events-none blur-[2px]">
+                    <div className="space-y-3">
+                      <div className="rounded-lg bg-muted px-3 py-2 text-xs">Sample message…</div>
+                      <div className="rounded-lg bg-primary/10 px-3 py-2 text-xs">Reply message…</div>
+                    </div>
+                  </div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <UpgradePrompt feature="workspace" variant="card" />
+                  </div>
+                </div>
+              )}
+            </div>
           </motion.div>
 
           {/* Right Panel — Workspace */}
@@ -404,6 +439,7 @@ export default function Workspace() {
             requesterName={request.requester_name}
             requesterEmail={request.requester_email}
             creatorEmail={user?.email || ""}
+            onMessageSent={handleMessageSent}
           />
         </>
       )}
@@ -415,6 +451,7 @@ export default function Workspace() {
           requestId={request.id}
           creatorName={creatorInfo?.name || "Creator"}
           requesterEmail={request.requester_email}
+          onMessageSent={handleMessageSent}
         />
       )}
     </DashboardLayout>

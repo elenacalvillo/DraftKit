@@ -1,9 +1,9 @@
-import { Crown, Sparkles, FileText, Users, Calendar, Palette } from "lucide-react";
+import { Crown, Sparkles, FileText, Users, Calendar, Palette, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
-type FeatureType = 'export' | 'collabs' | 'mode' | 'matching' | 'style';
+type FeatureType = 'export' | 'collabs' | 'mode' | 'matching' | 'style' | 'workspace';
 
 interface UpgradePromptProps {
   feature: FeatureType;
@@ -40,6 +40,11 @@ const FEATURE_COPY: Record<FeatureType, {
     title: "Custom Profile Themes",
     description: "Personalize your booking page with brand colors",
     icon: Palette,
+  },
+  workspace: {
+    title: "Workspace Conversation History",
+    description: "Keep your collaboration context in one place",
+    icon: MessageSquare,
   },
 };
 
