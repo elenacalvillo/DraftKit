@@ -1,37 +1,50 @@
 
-# Click Booked Dates to Open Workspace
+# Fix Calendar Click Navigation and Email Reply-To
 
-## What changes
+## Problem 1: Clicking booked dates on the Dashboard calendar does nothing
 
-When you click a booked collaboration date on the calendar, it navigates you to the shared workspace for that request.
+The calendar's click handler only processes booked-date clicks when `isEditable={true}` (used on the Availability page). The Dashboard calendar doesn't set `isEditable`, so booked dates are silently ignored.
 
-## Files to change
+**Fix:** Move the booked-date click handling to run in BOTH the editable and non-editable branches of `handleDateClick`.
 
-### 1. CollabCalendar.tsx -- Add `requestId` to BookingInfo and `onBookedDateClick` callback
+**File:** `src/components/calendar/CollabCalendar.tsx`
 
-- Add `requestId: string` to the `BookingInfo` interface
-- Add `onBookedDateClick?: (requestId: string) => void` to `CollabCalendarProps`
-- In `handleDateClick`, when `status === "booked"` and `isEditable` is true, call `onBookedDateClick` with the request ID instead of doing nothing
-- Change the booked date button from `cursor-default` to `cursor-pointer` when `onBookedDateClick` is provided
+- Extract the booked-date-click logic so it runs regardless of `isEditable`
+- When a booked date is clicked and `onBookedDateClick` is provided, navigate to the workspace
+- This means both Dashboard and Availability calendars will support clicking booked dates
 
-### 2. Availability.tsx -- Pass request IDs and handle navigation
+## Problem 2: Email recipients can't reply directly to their collaborator
 
-- Include `id` in the `collab_requests` select query (line 83)
-- Add `requestId` to the `BookingInfo` mapping (line 93)
-- Pass `onBookedDateClick` to `CollabCalendar` that calls `navigate('/dashboard/workspace/{requestId}')`
+All notification emails currently set `reply_to: "hello@draftkit.app"`. When someone hits "Reply" in their email client, it goes to DraftKit support instead of their collaborator.
 
-### 3. Dashboard.tsx -- Same changes for the dashboard calendar
+**Fix:** Set `reply_to` dynamically based on who the email is about:
 
-- Include `id` in the dashboard's collab_requests query
-- Add `requestId` to its local `BookingInfo` interface and mapping
-- Pass `onBookedDateClick` to `CollabCalendar` that navigates to the workspace
+- Emails TO the guest (from creator actions) -> `reply_to` = creator's email
+- Emails TO the creator (from guest actions) -> `reply_to` = guest's email
+- Service emails (reminders, receipts) -> keep `reply_to: "hello@draftkit.app"`
 
-## Technical details
+**File:** `supabase/functions/send-collab-email/index.ts`
+
+- Update `sendEmail()` to accept an optional `replyTo` parameter
+- For each email type, pass the appropriate collaborator email as `replyTo`:
+  - `request_approved` -> reply_to = creatorEmail
+  - `request_declined` -> reply_to = creatorEmail
+  - `request_received` -> reply_to = requesterEmail
+  - `request_submitted` -> keep hello@draftkit.app
+  - `new_message` -> reply_to = creatorEmail
+  - `new_message_from_guest` -> reply_to = requesterEmail
+  - `collab_reminder` -> host email gets requesterEmail as reply_to, guest email gets creatorEmail
+  - `collab_type_changed` -> reply_to = creatorEmail
+  - `workspace_updated_by_creator` -> reply_to = creatorEmail
+  - `workspace_updated_by_guest` -> reply_to = requesterEmail
+  - `request_cancelled_by_guest` -> reply_to = requesterEmail
+  - `collab_cancelled_by_host` -> reply_to = creatorEmail
+
+## Technical summary
 
 | File | Change |
 |------|--------|
-| `src/components/calendar/CollabCalendar.tsx` | Add `requestId` to `BookingInfo`, add `onBookedDateClick` prop, call it on booked date click |
-| `src/pages/Availability.tsx` | Fetch `id` from requests, map to `BookingInfo.requestId`, pass navigation handler |
-| `src/pages/Dashboard.tsx` | Same as Availability -- fetch ID, map it, pass navigation handler |
+| `src/components/calendar/CollabCalendar.tsx` | Move booked-date click handling before the `isEditable` check so it works on both Dashboard and Availability |
+| `supabase/functions/send-collab-email/index.ts` | Add `replyTo` parameter to `sendEmail()`, set it to the collaborator's email for each email type so recipients can reply directly |
 
-No database or backend changes needed.
+No database or dependency changes needed.
