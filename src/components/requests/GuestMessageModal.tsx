@@ -19,6 +19,7 @@ interface GuestMessageModalProps {
   requestId: string;
   creatorName: string;
   requesterEmail: string;
+  onMessageSent?: () => void;
 }
 
 export function GuestMessageModal({
@@ -27,6 +28,7 @@ export function GuestMessageModal({
   requestId,
   creatorName,
   requesterEmail,
+  onMessageSent,
 }: GuestMessageModalProps) {
   const [message, setMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -62,6 +64,7 @@ export function GuestMessageModal({
       toast.success(`Message sent to ${creatorName}!`);
       setMessage("");
       onOpenChange(false);
+      onMessageSent?.();
     } catch (error) {
       console.error("Failed to send message:", error);
       toast.error("Failed to send message");

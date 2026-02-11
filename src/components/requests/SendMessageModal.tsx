@@ -20,6 +20,7 @@ interface SendMessageModalProps {
   requesterName: string;
   requesterEmail: string;
   creatorEmail: string;
+  onMessageSent?: () => void;
 }
 
 export function SendMessageModal({
@@ -29,6 +30,7 @@ export function SendMessageModal({
   requesterName,
   requesterEmail,
   creatorEmail,
+  onMessageSent,
 }: SendMessageModalProps) {
   const [message, setMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -66,6 +68,7 @@ export function SendMessageModal({
       });
       setMessage("");
       onOpenChange(false);
+      onMessageSent?.();
     } catch (error) {
       console.error("Failed to send message:", error);
       toast.error("Failed to send message");
