@@ -11,7 +11,7 @@ function parseDateString(dateStr: string): Date {
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const RESEND_FROM = Deno.env.get("RESEND_FROM") || "DraftKit Notifications <notifications@draftkit.app>";
 
-async function sendEmail(to: string[], subject: string, html: string) {
+async function sendEmail(to: string[], subject: string, html: string, replyTo?: string) {
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -20,7 +20,7 @@ async function sendEmail(to: string[], subject: string, html: string) {
     },
     body: JSON.stringify({
       from: RESEND_FROM,
-      reply_to: "hello@draftkit.app",
+      reply_to: replyTo || "hello@draftkit.app",
       to,
       subject,
       html,
@@ -776,10 +776,10 @@ serve(async (req: Request): Promise<Response> => {
       const emailPromises = [];
       
       if (creatorEmail) {
-        emailPromises.push(sendEmail([creatorEmail], hostEmailSubject, hostEmailHtml));
+        emailPromises.push(sendEmail([creatorEmail], hostEmailSubject, hostEmailHtml, requesterEmail));
       }
       if (requesterEmail) {
-        emailPromises.push(sendEmail([requesterEmail], guestEmailSubject, guestEmailHtml));
+        emailPromises.push(sendEmail([requesterEmail], guestEmailSubject, guestEmailHtml, creatorEmail || undefined));
       }
 
       await Promise.all(emailPromises);
@@ -993,7 +993,23 @@ serve(async (req: Request): Promise<Response> => {
     // --- END DUPLICATE GUARDRAIL ---
 
     // Send the email
-    const emailResponse = await sendEmail([toEmail], emailSubject, emailHtml);
+    // Determine reply-to based on email type
+    const replyToMap: Record<string, string | undefined> = {
+      request_approved: creatorEmail || undefined,
+      request_declined: creatorEmail || undefined,
+      request_received: requesterEmail,
+      request_submitted: undefined, // keep default hello@draftkit.app
+      new_message: creatorEmail || undefined,
+      new_message_from_guest: requesterEmail,
+      collab_type_changed: creatorEmail || undefined,
+      workspace_updated_by_creator: creatorEmail || undefined,
+      workspace_updated_by_guest: requesterEmail,
+      request_cancelled_by_guest: requesterEmail,
+      collab_cancelled_by_host: creatorEmail || undefined,
+    };
+    const replyTo = replyToMap[type];
+
+    const emailResponse = await sendEmail([toEmail], emailSubject, emailHtml, replyTo);
 
     // Log successful send to email_events
     if (!emailResponse.skipped) {
