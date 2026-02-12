@@ -1,44 +1,57 @@
 
-# Smart "Manage" Button: Three Paths, Zero Errors
+# Final Layout Lock for Subscription.tsx
 
-## Changes (single file: `src/pages/Subscription.tsx`)
+Three surgical edits, one file, no new dependencies.
 
-### 1. Smart `handleManage` with three paths
+## 1. Restore "Manage" button inside the Pro banner (line 131-132)
 
-The function will check the user's state before making any network call:
+Add the button back inside the banner's flex container, right-aligned. Only shows for Pro users who are NOT in trial (trial users should subscribe, not manage).
 
 ```text
-Click "Manage" ->
-  Path A: !isPro          -> smooth-scroll to pricing card
-  Path B: isPro + no stripe_customer_id -> toast "Founding member, no billing needed"
-  Path C: isPro + stripe_customer_id    -> open Stripe Customer Portal
+Banner layout:
+[Status text]                    [Manage ▸]
 ```
 
-- Query `creators.stripe_customer_id` for the current user
-- If null and isPro: friendly founding-member toast
-- If null and !isPro: scroll to pricing section
-- If exists: call `customer-portal` edge function as before
+## 2. Replace bottom button with Free-only "View Plans" (lines 216-223)
 
-### 2. Button always visible with dynamic label
+- If `isPro`: no bottom button at all
+- If not Pro: show "View Plans" that scrolls to `#pricing`
 
-- Move the button out of the `isPro` banner so ALL users see it
-- Place it below the pricing card as a secondary action
-- Label changes based on state:
-  - Free users: "View Plans" (scrolls to pricing)
-  - Pro users: "Manage Billing"
-- The Pro banner keeps its current layout but without the button
+## 3. handleManage logic stays as-is
 
-### 3. Add `id="pricing"` anchor to pricing card
+The current three-path logic (lines 68-97) is already correct:
+- `!isPro` -> scroll to pricing
+- `isPro` + no `stripe_customer_id` -> founding member toast
+- `isPro` + `stripe_customer_id` -> Stripe portal
 
-Add `id="pricing"` to the pricing `Card` so free users get smooth-scrolled there.
+No changes needed here.
 
 ---
 
-## Technical detail
+## Technical Detail
 
-**File:** `src/pages/Subscription.tsx`
+**File: `src/pages/Subscription.tsx`**
 
-- **Line 68-85**: Replace `handleManage` with the three-path version that queries `creators.stripe_customer_id` first
-- **Lines 120-124**: Remove the Manage button from the Pro banner
-- **Line 130**: Add `id="pricing"` to the pricing Card
-- **After line 207**: Add a universal button below the pricing card with dynamic label (`isPro ? "Manage Billing" : "View Plans"`)
+**Edit A — Lines 131-133**: Replace empty space with Manage button inside banner:
+```typescript
+              </div>
+              <Button variant="outline" size="sm" onClick={handleManage} disabled={loading}>
+                Manage
+              </Button>
+            </CardContent>
+```
+
+**Edit B — Lines 216-223**: Conditional bottom button:
+```typescript
+        {!isPro && (
+          <Button
+            variant="outline"
+            className="w-full mt-4"
+            onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })}
+          >
+            View Plans
+          </Button>
+        )}
+```
+
+ProBadge in sidebar: already handled by `DashboardLayout` — no change needed there.
