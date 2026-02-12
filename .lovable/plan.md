@@ -1,79 +1,73 @@
 
 
-# Floating Pill Toolbar
+# Center Floating Pill to the Drafting Area
 
-## What changes
+## Problem
 
-Replace the current sticky top toolbar in `WorkspaceEditor.tsx` with a fixed-position "frosted glass" pill anchored to the bottom-center of the viewport.
+The pill toolbar is currently centered to the full viewport (`left-1/2 -translate-x-1/2`), but the drafting area only occupies the right column of a `[280px_1fr]` grid. This makes the pill appear shifted left relative to where the user is actually writing.
 
-## Single file change: `WorkspaceEditor.tsx`
+## Solution
 
-### Remove
-- The entire `sticky top-[48px]` toolbar div (lines 96-201) and its inline position in the component tree
+Use a `ref` on the editor's container element and track its horizontal bounds (left edge + width) via `ResizeObserver`. Apply those values as inline `left` and `width` styles on the fixed pill, replacing the viewport-center approach.
 
-### Add
-- A **React Portal** (`createPortal` to `document.body`) rendering the toolbar as a fixed pill
-- Only rendered when `editable` is true
+## Changes: `WorkspaceEditor.tsx` only
 
-### Pill specifications
+### 1. Add a container ref + bounding state
 
-| Property | Value |
-|----------|-------|
-| Position | `fixed bottom-8 left-1/2 -translate-x-1/2` |
-| Z-index | `z-[100]` |
-| Shape | `rounded-full` (pill) |
-| Background | `bg-background/80 backdrop-blur-md` |
-| Shadow | `shadow-xl border border-border/50` |
-| Padding | `px-3 py-2` |
-| Layout | Single horizontal row with `flex items-center gap-0.5` |
+- Add a `ref` to the outermost `<div>` wrapping the editor
+- Use a `useEffect` with `ResizeObserver` + `scroll` listener to track the container's `getBoundingClientRect().left` and `width`
+- Store these in state: `{ left: number; width: number } | null`
 
-### Tool groups (same buttons, same Tiptap commands)
+### 2. Update the pill's positioning
 
-1. **Heading dropdown** -- H1/H2/H3/Normal (existing `DropdownMenu`)
-2. **Divider** -- subtle `w-px h-5 bg-border/40`
-3. **Text styles** -- Bold, Italic, Strikethrough, Inline Code
-4. **Divider**
-5. **Code Block**
-6. **Divider**
-7. **Link**
-8. **Divider**
-9. **Bullet List, Ordered List**
-
-### Active states (unchanged logic)
-- Active icon: `bg-primary/10 text-primary`
-- Hover: `hover:text-foreground hover:bg-muted/50`
-
-### ToolbarButton update
-- Add `hover:scale-105 transition-all` for the interactive feedback requested
-
-### Structural result
-
-```text
-<div className="flex flex-col min-w-0">
-  {/* Editor content -- no toolbar above it */}
-  <div className="overflow-hidden min-w-0">
-    <EditorContent editor={editor} />
-  </div>
-
-  {/* Floating Pill -- portaled to body */}
-  {editable && createPortal(
-    <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100]
-                    flex items-center gap-0.5 px-3 py-2
-                    bg-background/80 backdrop-blur-md
-                    rounded-full shadow-xl border border-border/50">
-      {/* ...all toolbar buttons... */}
-    </div>,
-    document.body
-  )}
-</div>
+Replace:
+```
+className="fixed bottom-8 left-1/2 -translate-x-1/2 ..."
 ```
 
-### Why a portal?
-Using `createPortal(... , document.body)` makes the pill completely independent of the workspace's DOM hierarchy and overflow settings. It cannot be clipped, cannot scroll away, and needs no sticky hacks.
+With:
+```
+style={{ left: bounds.left + bounds.width / 2, transform: 'translateX(-50%)' }}
+className="fixed bottom-8 z-[100] ..."
+```
 
-### Mobile considerations
-- The pill is narrow enough (~400px) to fit on mobile screens
-- `bottom-8` (32px) keeps it above the safe area on iOS
-- It does not overlap the "Save & Sync" button in the Zen header (which is at the top)
+This keeps the pill `fixed` (viewport-pinned, never scrolls away) but horizontally aligned to the editor column center.
 
-No other files need changes.
+### 3. Fallback for mobile / no bounds
+
+If `bounds` is null (e.g., SSR or initial render), fall back to the current `left-1/2 -translate-x-1/2` centering. On mobile where the sidebar collapses and the editor spans the full width, the pill naturally centers to the screen since the editor IS the full width.
+
+### Implementation sketch
+
+```typescript
+const containerRef = useRef<HTMLDivElement>(null);
+const [bounds, setBounds] = useState<{ left: number; width: number } | null>(null);
+
+useEffect(() => {
+  const el = containerRef.current;
+  if (!el) return;
+  const update = () => {
+    const rect = el.getBoundingClientRect();
+    setBounds({ left: rect.left, width: rect.width });
+  };
+  update();
+  const ro = new ResizeObserver(update);
+  ro.observe(el);
+  window.addEventListener('scroll', update, true);
+  return () => { ro.disconnect(); window.removeEventListener('scroll', update, true); };
+}, []);
+```
+
+The pill div then uses:
+```typescript
+style={bounds ? {
+  left: bounds.left + bounds.width / 2,
+  transform: 'translateX(-50%)',
+} : {
+  left: '50%',
+  transform: 'translateX(-50%)',
+}}
+```
+
+No other files change. The pill remains portaled to `document.body` and fully independent of overflow/scroll, just now horizontally anchored to the correct column.
+
