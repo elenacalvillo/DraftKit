@@ -43,9 +43,6 @@ serve(async (req) => {
     const successUrl = returnTo
       ? `${origin}${returnTo}?pro_activated=true`
       : `${origin}/dashboard/subscription?success=true`;
-    const successUrl = returnTo
-      ? `${origin}${returnTo}?pro_activated=true`
-      : `${origin}/dashboard/subscription?success=true`;
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -53,6 +50,8 @@ serve(async (req) => {
       line_items: [{ price: priceId, quantity: 1 }],
       mode: "subscription",
       automatic_tax: { enabled: true },
+      tax_id_collection: { enabled: true },
+      allow_promotion_codes: true,
       success_url: successUrl,
       cancel_url: `${origin}/dashboard/subscription?canceled=true`,
       metadata: { user_id: user.id },
