@@ -53,8 +53,8 @@ export function WorkspaceEditor({ content, onChange, editable }: WorkspaceEditor
     editorProps: {
       attributes: {
         class:
-          "workspace-prose min-h-[300px] px-5 py-4 focus:outline-none font-serif text-[15px] leading-relaxed break-words",
-        style: "font-family: 'Georgia', 'Times New Roman', serif; overflow-wrap: break-word; word-break: break-word",
+          "workspace-prose min-h-[300px] px-5 py-4 focus:outline-none font-sans text-[15px] leading-[1.6] break-words",
+        style: "overflow-wrap: break-word; word-break: break-word",
       },
     },
   });

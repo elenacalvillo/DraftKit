@@ -424,16 +424,6 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
               </Button>
             </div>
 
-            {/* Enter Workspace Button */}
-            <Button
-              variant="gradient"
-              className="w-full"
-              onClick={() => navigate(`/dashboard/workspace/${request.id}`)}
-            >
-              <PenLine className="w-4 h-4 mr-2" />
-              Enter Workspace
-            </Button>
-
             {/* Collaboration Link Section */}
             <div className="space-y-2">
               {collabLink && !isEditingLink ? (
@@ -486,6 +476,16 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
                 </div>
               )}
             </div>
+
+            {/* Start Drafting Button */}
+            <Button
+              variant="gradient"
+              className="w-full"
+              onClick={() => navigate(`/dashboard/workspace/${request.id}`)}
+            >
+              <PenLine className="w-4 h-4 mr-2" />
+              Start Drafting
+            </Button>
           </div>
         )}
 

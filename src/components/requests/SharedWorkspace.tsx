@@ -237,10 +237,9 @@ export function SharedWorkspace({
               <div className="relative">
                 <div
                   className={cn(
-                    "workspace-prose px-5 py-4 min-h-[120px] text-[15px] leading-relaxed overflow-hidden break-words",
+                    "workspace-prose px-5 py-4 min-h-[120px] font-sans text-[15px] leading-[1.6] overflow-hidden break-words",
                     !canEdit && "cursor-pointer"
                   )}
-                  style={{ fontFamily: "'Georgia', 'Times New Roman', serif" }}
                   dangerouslySetInnerHTML={{ __html: sanitize(sharedContent!) }}
                   onClick={!canEdit ? handleUpgradeClick : undefined}
                 />
