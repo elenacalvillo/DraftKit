@@ -1,14 +1,16 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { FileText, Save, X, AlertCircle, PenLine } from "lucide-react";
+import { FileText, Save, X, AlertCircle, PenLine, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import DOMPurify from "dompurify";
 import { WorkspaceEditor } from "./WorkspaceEditor";
+import { cn } from "@/lib/utils";
 
 const ALLOWED_TAGS = ["p", "h1", "h2", "h3", "strong", "em", "s", "code", "pre", "a", "ul", "ol", "li", "br"];
 const ALLOWED_ATTR = ["href", "target", "rel"];
@@ -107,6 +109,17 @@ export function SharedWorkspace({
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const navigate = useNavigate();
+
+  const handleUpgradeClick = () => {
+    toast("Upgrade to Pro to edit this draft", {
+      action: {
+        label: "Upgrade",
+        onClick: () => navigate("/dashboard/settings?upgrade=true"),
+      },
+    });
   };
 
   const hasContent = !!sharedContent?.trim();
@@ -221,12 +234,21 @@ export function SharedWorkspace({
             exit={{ opacity: 0 }}
           >
             {hasContent ? (
-              <>
+              <div className="relative">
                 <div
-                  className="workspace-prose px-5 py-4 min-h-[120px] text-[15px] leading-relaxed overflow-hidden break-words"
+                  className={cn(
+                    "workspace-prose px-5 py-4 min-h-[120px] text-[15px] leading-relaxed overflow-hidden break-words",
+                    !canEdit && "cursor-pointer"
+                  )}
                   style={{ fontFamily: "'Georgia', 'Times New Roman', serif" }}
                   dangerouslySetInnerHTML={{ __html: sanitize(sharedContent!) }}
+                  onClick={!canEdit ? handleUpgradeClick : undefined}
                 />
+                {!canEdit && (
+                  <div className="absolute top-3 right-3">
+                    <Lock className="w-4 h-4 text-muted-foreground/50" />
+                  </div>
+                )}
                 {lastEditedBy && lastEditedAt && (
                   <div className="px-4 py-2.5 border-t border-border/30 text-xs text-muted-foreground bg-muted/10">
                     Last updated by <span className="font-medium text-foreground/70">{lastEditedBy}</span>
@@ -234,7 +256,7 @@ export function SharedWorkspace({
                     {formatDistanceToNow(new Date(lastEditedAt), { addSuffix: true })}
                   </div>
                 )}
-              </>
+              </div>
             ) : (
               <div className="px-5 py-10 text-center">
                 <p className="text-sm text-muted-foreground mb-1">

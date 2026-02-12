@@ -273,6 +273,50 @@ function toRSSUrl(substackUrl: string): string {
   }
 }
 
+// Convert structured AI draft into semantic HTML for the workspace
+function draftToHtml(draft: CollabDraft, creatorName: string, requesterName: string): string {
+  const parts: string[] = [];
+
+  if (draft.title) {
+    parts.push(`<h1>${escapeHtml(draft.title)}</h1>`);
+  }
+
+  if (draft.hook) {
+    parts.push(`<p>${escapeHtml(draft.hook)}</p>`);
+  }
+
+  if (draft.outline?.length) {
+    for (const section of draft.outline) {
+      const contributor = section.contributor === "creator"
+        ? creatorName
+        : section.contributor === "requester"
+        ? requesterName
+        : `${creatorName} & ${requesterName}`;
+      parts.push(`<h2>${escapeHtml(section.section)}</h2>`);
+      parts.push(`<p>${escapeHtml(section.description)} <em>(${escapeHtml(contributor)} · ${escapeHtml(section.suggestedLength)})</em></p>`);
+    }
+  }
+
+  if (draft.talkingPoints?.length) {
+    parts.push(`<h2>Talking Points</h2>`);
+    parts.push(`<ul>${draft.talkingPoints.map(tp => `<li>${escapeHtml(tp)}</li>`).join("")}</ul>`);
+  }
+
+  if (draft.toneNotes) {
+    parts.push(`<p><em>Tone: ${escapeHtml(draft.toneNotes)}</em></p>`);
+  }
+
+  return parts.join("\n");
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -613,12 +657,18 @@ Generate a collaboration draft that:
 
     const draft: CollabDraft = JSON.parse(toolCall.function.arguments);
 
-    // Save the draft to the database
+    // Convert draft to HTML for the shared workspace
+    const sharedContentHtml = draftToHtml(draft, creatorName, requesterName);
+
+    // Save the draft and auto-populate workspace
     const { error: updateError } = await supabase
       .from("collab_requests")
       .update({
         ai_draft: draft,
         approved_at: new Date().toISOString(),
+        shared_content: sharedContentHtml,
+        content_last_edited_by: "AI Draft",
+        content_last_edited_at: new Date().toISOString(),
       })
       .eq("id", requestId);
 
@@ -627,7 +677,7 @@ Generate a collaboration draft that:
     }
 
     return new Response(
-      JSON.stringify({ draft, success: true }),
+      JSON.stringify({ draft, shared_content: sharedContentHtml, success: true }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
