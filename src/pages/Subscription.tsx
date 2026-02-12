@@ -129,7 +129,9 @@ export default function Subscription() {
                     : "All features unlocked."}
                 </p>
               </div>
-              
+              <Button variant="outline" size="sm" onClick={handleManage} disabled={loading}>
+                Manage
+              </Button>
             </CardContent>
           </Card>
         )}
@@ -213,14 +215,15 @@ export default function Subscription() {
             </Button>
           </CardContent>
         </Card>
-        <Button
-          variant="outline"
-          className="w-full mt-4"
-          onClick={handleManage}
-          disabled={loading}
-        >
-          {isPro ? "Manage Billing" : "View Plans"}
-        </Button>
+        {!isPro && (
+          <Button
+            variant="outline"
+            className="w-full mt-4"
+            onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })}
+          >
+            View Plans
+          </Button>
+        )}
       </div>
     </DashboardLayout>
   );
