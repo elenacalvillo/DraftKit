@@ -66,14 +66,26 @@ export default function Subscription() {
   };
 
   const handleManage = async () => {
+    if (!isPro) {
+      document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" });
+      return;
+    }
+
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("customer-portal");
-      if (error) throw error;
-      if (data?.error === "no_stripe_customer") {
-        toast({ title: "No subscription found", description: "Subscribe to Pro first to manage your billing.", variant: "destructive" });
+      const { data: creator } = await supabase
+        .from("creators")
+        .select("stripe_customer_id")
+        .eq("user_id", user!.id)
+        .maybeSingle();
+
+      if (!creator?.stripe_customer_id) {
+        toast({ title: "You're a founding member! 🎉", description: "Full access, no billing to manage yet." });
         return;
       }
+
+      const { data, error } = await supabase.functions.invoke("customer-portal");
+      if (error) throw error;
       if (data?.url) {
         window.open(data.url, "_blank");
       }
@@ -117,17 +129,13 @@ export default function Subscription() {
                     : "All features unlocked."}
                 </p>
               </div>
-              {!isInTrial && isPro && (
-                <Button variant="outline" size="sm" onClick={handleManage} disabled={loading}>
-                  Manage
-                </Button>
-              )}
+              
             </CardContent>
           </Card>
         )}
 
         {/* Pricing card */}
-        <Card className="overflow-hidden">
+        <Card id="pricing" className="overflow-hidden">
           {/* Billing toggle */}
           <div className="flex justify-center gap-1 p-1.5 bg-muted rounded-xl mx-auto w-fit">
             <button
@@ -205,6 +213,14 @@ export default function Subscription() {
             </Button>
           </CardContent>
         </Card>
+        <Button
+          variant="outline"
+          className="w-full mt-4"
+          onClick={handleManage}
+          disabled={loading}
+        >
+          {isPro ? "Manage Billing" : "View Plans"}
+        </Button>
       </div>
     </DashboardLayout>
   );
