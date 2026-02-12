@@ -1,90 +1,53 @@
 
 
-# Add Subscription Page with Stripe Checkout
+# Strategic Enhancements to Subscription Flow
 
-## Overview
+Three targeted improvements to make the subscription experience feel premium and conversion-optimized.
 
-Create a dedicated `/dashboard/subscription` page accessible from the sidebar, featuring a clean pricing card with $14.99/month and $149/year options, feature highlights, and Stripe checkout integration.
+## 1. Automatic Tax Calculation
 
-## Changes
+Add `automatic_tax: { enabled: true }` to the Stripe Checkout session in the `create-checkout` edge function. This handles RFC/IVA and other regional tax requirements automatically -- no manual tax logic needed.
 
-### 1. Enable Stripe
+**File:** `supabase/functions/create-checkout/index.ts`
+- Add `automatic_tax: { enabled: true }` to the `stripe.checkout.sessions.create()` call
 
-Before any code changes, we need to enable the Stripe integration to collect the secret key and unlock Stripe-specific tools for creating products/prices.
+## 2. Pro Badge in Sidebar
 
-### 2. Sidebar Navigation -- `DashboardLayout.tsx`
+Show the existing `ProBadge` component next to the creator's name in the sidebar once they're on Pro. The `ProBadge` component already exists and is used in Settings -- we just need to wire it into the sidebar user info section.
 
-Add a "Subscription" nav item between "Settings" and the sign-out button:
+**File:** `src/components/layout/DashboardLayout.tsx`
+- Import `usePro` hook and `ProBadge` component
+- Add `ProBadge` next to the creator name in the sidebar footer (lines 181-189), only when `isPro` is true
+- Small, elegant placement right after the name
 
-```text
-{ icon: Crown, label: "Subscription", path: "/dashboard/subscription" }
-```
+## 3. Success State After Checkout
 
-### 3. New Route -- `App.tsx`
+When the user returns from Stripe with `?success=true`, show a celebratory toast and a visual success banner on the Subscription page.
 
-Add route:
-```text
-<Route path="/dashboard/subscription" element={<Subscription />} />
-```
+**File:** `src/pages/Subscription.tsx`
+- Read `?success=true` from URL params on mount via `useSearchParams`
+- Show a toast: "Welcome to the Engine. Your workspace is now unlocked."
+- Optionally pass a `returnTo` URL through the checkout flow so the success redirect can send them back to the workspace they came from
 
-### 4. New Page -- `src/pages/Subscription.tsx`
+### Redirect-back-to-workspace flow
 
-A clean, focused page with:
-
-- **Pro status indicator**: If already Pro, show current plan details and management options
-- **Pricing toggle**: Monthly ($14.99/mo) vs Yearly ($149/yr -- "2 months free")
-- **Feature bullets**:
-  - Unlimited Collaborative Workspaces
-  - Floating Action Pill (The Editor)
-  - Full Conversation History
-  - AI-Powered First Drafts
-  - Custom Profile Themes
-- **"Early Access" badge**: "Includes future access to Creator Discovery tools"
-- **CTA button**: "Start Pro" triggers Stripe Checkout
-- **Visual savings callout**: Show "$12.42/mo billed annually" next to the yearly option
-
-### 5. Stripe Products and Checkout
-
-Using the Stripe integration tools (available after enabling):
-- Create a "DraftKit Pro" product with two prices: $14.99 monthly recurring and $149 yearly recurring
-- Create a checkout edge function that generates a Stripe Checkout session
-- Handle success/cancel redirects back to the subscription page
-- Webhook to update `creators.subscription_tier` to `'pro'` on successful payment
-
-### 6. Update `UpgradePrompt.tsx` navigation
-
-Change the upgrade destination from `/dashboard/settings?upgrade=true` to `/dashboard/subscription` so all upgrade CTAs (including the workspace view-only toast) route to the new page.
+- Update `UpgradePrompt` and workspace view-only toasts to pass the current path as a query param when navigating to `/dashboard/subscription`
+- Pass that `returnTo` value through to the checkout edge function, which appends it to the Stripe `success_url`
+- On success return, redirect the user back to their workspace instead of staying on the subscription page
 
 ## Technical Details
 
-### Files to create/modify
-
 | File | Change |
 |------|--------|
-| `src/pages/Subscription.tsx` | New page with pricing UI |
-| `src/components/layout/DashboardLayout.tsx` | Add "Subscription" to sidebar nav |
-| `src/App.tsx` | Add `/dashboard/subscription` route |
-| `src/components/subscription/UpgradePrompt.tsx` | Update navigate target |
-| Edge function for Stripe checkout | Created via Stripe integration |
-
-### Pricing structure
-
-```text
-+------------------+--------+------------------+
-| Plan             | Price  | Display          |
-+------------------+--------+------------------+
-| Monthly          | $14.99 | "$14.99/mo"      |
-| Yearly           | $149   | "$12.42/mo"      |
-|                  |        | "billed annually"|
-|                  |        | "Save $30.88"    |
-+------------------+--------+------------------+
-```
+| `supabase/functions/create-checkout/index.ts` | Add `automatic_tax` to session config |
+| `src/components/layout/DashboardLayout.tsx` | Import `usePro` + `ProBadge`, show badge next to name |
+| `src/pages/Subscription.tsx` | Handle `?success=true` with toast + optional redirect |
+| `src/components/subscription/UpgradePrompt.tsx` | Pass `returnTo` param when navigating |
 
 ### Implementation order
 
-1. Enable Stripe (required first -- unlocks tools and knowledge)
-2. Create Stripe products/prices
-3. Build the Subscription page UI
-4. Wire up checkout + webhook
-5. Update sidebar and upgrade prompts
+1. Update `create-checkout` edge function with `automatic_tax`
+2. Add Pro badge to sidebar
+3. Add success state handling to Subscription page
+4. Wire up returnTo redirect flow
 
