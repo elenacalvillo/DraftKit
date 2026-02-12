@@ -25,7 +25,7 @@ const features = [
 export default function Subscription() {
   const [billing, setBilling] = useState<"monthly" | "yearly">("yearly");
   const [loading, setLoading] = useState(false);
-  const { isPro, isInTrial, trialEndsAt } = usePro();
+  const { isPro, isInTrial, trialEndsAt, tier } = usePro();
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -117,7 +117,7 @@ export default function Subscription() {
                     : "All features unlocked."}
                 </p>
               </div>
-              {!isInTrial && (
+              {!isInTrial && tier === 'pro' && (
                 <Button variant="outline" size="sm" onClick={handleManage} disabled={loading}>
                   Manage
                 </Button>
