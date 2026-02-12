@@ -1,34 +1,49 @@
 
 
-# Fix: Dismiss Failing on Requests with Legacy Substack URLs
+# Workspace Overhaul: Typography + Card Reorder
 
-## Root Cause
+Two files changed, zero new dependencies.
 
-A CHECK constraint `collab_requests_requester_url_no_profile` blocks any UPDATE on rows where `requester_substack_url` contains `substack.com/@`. Some older requests were created before this constraint existed and still have that URL format. When you click the trash icon to dismiss them, the UPDATE (setting `hidden_by_creator: true`) triggers the constraint and fails.
+## 1. Typography Kill-Switch (sans-serif everywhere)
 
-## Solution
+Remove all serif/Georgia references from the editor and workspace. Switch to the app's primary font (Inter).
 
-**Drop the CHECK constraint** and replace it with a validation trigger that only runs on INSERT (not on UPDATE). This way:
-- New requests still get validated (no `@` profile URLs allowed)
-- Existing rows can be updated (dismissed, approved, etc.) without error
+**File: `src/components/requests/WorkspaceEditor.tsx`** (line 56-57)
+- Change `font-serif` to `font-sans` in editor class
+- Remove the inline `style` that sets Georgia/serif
+- Set `line-height: 1.6` for premium readability
 
-## Steps
+**File: `src/components/requests/SharedWorkspace.tsx`** (line 243-244)
+- Remove the inline `style={{ fontFamily: "'Georgia', 'Times New Roman', serif" }}` from the read-only content view
 
-### 1. Database migration
-- Drop the `collab_requests_requester_url_no_profile` CHECK constraint
-- Create a trigger function `validate_requester_substack_url()` that rejects INSERTs with `substack.com/@` in the URL
-- Attach it as a BEFORE INSERT trigger on `collab_requests`
+**File: `src/index.css`** (workspace-prose styles)
+- No structural changes needed -- the prose styles already inherit from `--foreground` and don't force a serif font
 
-### 2. No code changes needed
-The frontend logic is correct -- the database constraint is the only blocker.
+## 2. Reorder the Approved Card (Progressive Disclosure)
 
-## Technical Detail
+Current order in `RequestCard.tsx` (lines 396-489):
+1. Draft button + Message + Cancel (row)
+2. "Enter Workspace" button
+3. External link input
+
+New order:
+1. Draft snippet (already exists at lines 357-371, stays)
+2. External link input (moved up)
+3. "Start Drafting" button (renamed, moved to bottom, full-width)
+4. Draft button + Message + Cancel row stays above the link
+
+**File: `src/components/requests/RequestCard.tsx`** (lines 394-489)
+- Move the collaboration link section **above** the "Start Drafting" button
+- Rename "Enter Workspace" to "Start Drafting"
+- Keep the button `variant="gradient"` and `className="w-full"` (already full-width)
+- The action row (View Draft, Message, Cancel) stays at the top of the approved section
+
+### Final card layout for approved requests:
 
 ```text
-Migration SQL:
-  1. ALTER TABLE collab_requests DROP CONSTRAINT collab_requests_requester_url_no_profile;
-  2. CREATE FUNCTION validate_requester_substack_url() -- checks ONLY on INSERT
-  3. CREATE TRIGGER trg_validate_requester_url BEFORE INSERT ON collab_requests
+[Draft snippet preview]          -- the hook
+[View Draft] [Message] [Cancel]  -- secondary actions
+[External doc link input]        -- the resource
+[======= Start Drafting =======] -- the primary CTA
 ```
 
-This follows the project's existing pattern (see `validate_creator_collab_style` trigger).
