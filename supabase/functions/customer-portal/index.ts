@@ -29,7 +29,12 @@ serve(async (req) => {
     });
 
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
-    if (customers.data.length === 0) throw new Error("No Stripe customer found");
+    if (customers.data.length === 0) {
+      return new Response(JSON.stringify({ error: "no_stripe_customer" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
 
     const origin = req.headers.get("origin") || "https://collabstack.lovable.app";
     const portalSession = await stripe.billingPortal.sessions.create({
