@@ -20,7 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 interface WorkspaceEditorProps {
@@ -81,6 +81,23 @@ export function WorkspaceEditor({ content, onChange, editable }: WorkspaceEditor
     editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
   }, [editor]);
 
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [bounds, setBounds] = useState<{ left: number; width: number } | null>(null);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const update = () => {
+      const rect = el.getBoundingClientRect();
+      setBounds({ left: rect.left, width: rect.width });
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    window.addEventListener('scroll', update, true);
+    return () => { ro.disconnect(); window.removeEventListener('scroll', update, true); };
+  }, []);
+
   if (!editor) return null;
 
   const currentHeading = editor.isActive("heading", { level: 1 })
@@ -92,7 +109,7 @@ export function WorkspaceEditor({ content, onChange, editable }: WorkspaceEditor
     : "Normal";
 
   return (
-    <div className="flex flex-col min-w-0">
+    <div className="flex flex-col min-w-0" ref={containerRef}>
       {/* Editor content */}
       <div className="overflow-hidden min-w-0">
         <EditorContent editor={editor} />
@@ -100,7 +117,16 @@ export function WorkspaceEditor({ content, onChange, editable }: WorkspaceEditor
 
       {/* Floating Pill Toolbar -- portaled to body */}
       {editable && createPortal(
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-0.5 px-3 py-2 bg-background/80 backdrop-blur-md rounded-full shadow-xl border border-border/50">
+        <div
+          className="fixed bottom-8 z-[100] flex items-center gap-0.5 px-3 py-2 bg-background/80 backdrop-blur-md rounded-full shadow-xl border border-border/50"
+          style={bounds ? {
+            left: bounds.left + bounds.width / 2,
+            transform: 'translateX(-50%)',
+          } : {
+            left: '50%',
+            transform: 'translateX(-50%)',
+          }}
+        >
           {/* Heading dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
