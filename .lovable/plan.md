@@ -1,57 +1,34 @@
 
-# Final Layout Lock for Subscription.tsx
 
-Three surgical edits, one file, no new dependencies.
+# Fix: Dismiss Failing on Requests with Legacy Substack URLs
 
-## 1. Restore "Manage" button inside the Pro banner (line 131-132)
+## Root Cause
 
-Add the button back inside the banner's flex container, right-aligned. Only shows for Pro users who are NOT in trial (trial users should subscribe, not manage).
+A CHECK constraint `collab_requests_requester_url_no_profile` blocks any UPDATE on rows where `requester_substack_url` contains `substack.com/@`. Some older requests were created before this constraint existed and still have that URL format. When you click the trash icon to dismiss them, the UPDATE (setting `hidden_by_creator: true`) triggers the constraint and fails.
 
-```text
-Banner layout:
-[Status text]                    [Manage ▸]
-```
+## Solution
 
-## 2. Replace bottom button with Free-only "View Plans" (lines 216-223)
+**Drop the CHECK constraint** and replace it with a validation trigger that only runs on INSERT (not on UPDATE). This way:
+- New requests still get validated (no `@` profile URLs allowed)
+- Existing rows can be updated (dismissed, approved, etc.) without error
 
-- If `isPro`: no bottom button at all
-- If not Pro: show "View Plans" that scrolls to `#pricing`
+## Steps
 
-## 3. handleManage logic stays as-is
+### 1. Database migration
+- Drop the `collab_requests_requester_url_no_profile` CHECK constraint
+- Create a trigger function `validate_requester_substack_url()` that rejects INSERTs with `substack.com/@` in the URL
+- Attach it as a BEFORE INSERT trigger on `collab_requests`
 
-The current three-path logic (lines 68-97) is already correct:
-- `!isPro` -> scroll to pricing
-- `isPro` + no `stripe_customer_id` -> founding member toast
-- `isPro` + `stripe_customer_id` -> Stripe portal
-
-No changes needed here.
-
----
+### 2. No code changes needed
+The frontend logic is correct -- the database constraint is the only blocker.
 
 ## Technical Detail
 
-**File: `src/pages/Subscription.tsx`**
-
-**Edit A — Lines 131-133**: Replace empty space with Manage button inside banner:
-```typescript
-              </div>
-              <Button variant="outline" size="sm" onClick={handleManage} disabled={loading}>
-                Manage
-              </Button>
-            </CardContent>
+```text
+Migration SQL:
+  1. ALTER TABLE collab_requests DROP CONSTRAINT collab_requests_requester_url_no_profile;
+  2. CREATE FUNCTION validate_requester_substack_url() -- checks ONLY on INSERT
+  3. CREATE TRIGGER trg_validate_requester_url BEFORE INSERT ON collab_requests
 ```
 
-**Edit B — Lines 216-223**: Conditional bottom button:
-```typescript
-        {!isPro && (
-          <Button
-            variant="outline"
-            className="w-full mt-4"
-            onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })}
-          >
-            View Plans
-          </Button>
-        )}
-```
-
-ProBadge in sidebar: already handled by `DashboardLayout` — no change needed there.
+This follows the project's existing pattern (see `validate_creator_collab_style` trigger).
