@@ -1,19 +1,44 @@
 
-# Fix Subscription Page: Toggle Styling + Manage Button
+# Smart "Manage" Button: Three Paths, Zero Errors
 
-## Problem 1: Toggle looks wrong
-The active toggle uses `bg-primary` which is the coral/salmon brand color -- too bold for a small UI control. The toggle should use a subtle, neutral active state that feels clean.
+## Changes (single file: `src/pages/Subscription.tsx`)
 
-**Fix:** Change the active toggle style to use `bg-background shadow-sm border` instead of `bg-primary text-primary-foreground`. This gives a clean "card popping out of the muted background" look, standard for billing toggles.
+### 1. Smart `handleManage` with three paths
 
-## Problem 2: Manage button hidden for early adopters
-The Manage button only shows when `tier === 'pro'` (Stripe subscription), but early adopters get Pro status via `user_roles`, where `tier` remains `'free'`. These users still need access to billing management if they later subscribe.
+The function will check the user's state before making any network call:
 
-**Fix:** Show the Manage button whenever `isPro && !isInTrial` -- regardless of how they got Pro status. The `handleManage` function already handles the "no Stripe customer" case gracefully with a toast, so there's no risk.
+```text
+Click "Manage" ->
+  Path A: !isPro          -> smooth-scroll to pricing card
+  Path B: isPro + no stripe_customer_id -> toast "Founding member, no billing needed"
+  Path C: isPro + stripe_customer_id    -> open Stripe Customer Portal
+```
 
-## File Changes
+- Query `creators.stripe_customer_id` for the current user
+- If null and isPro: friendly founding-member toast
+- If null and !isPro: scroll to pricing section
+- If exists: call `customer-portal` edge function as before
 
-**`src/pages/Subscription.tsx`**
+### 2. Button always visible with dynamic label
 
-1. Toggle active state: change from `bg-primary text-primary-foreground shadow-md` to `bg-background text-foreground shadow-sm` for both Monthly and Yearly buttons
-2. Manage button condition: change `{!isInTrial && tier === 'pro' && (` to `{!isInTrial && isPro && (`
+- Move the button out of the `isPro` banner so ALL users see it
+- Place it below the pricing card as a secondary action
+- Label changes based on state:
+  - Free users: "View Plans" (scrolls to pricing)
+  - Pro users: "Manage Billing"
+- The Pro banner keeps its current layout but without the button
+
+### 3. Add `id="pricing"` anchor to pricing card
+
+Add `id="pricing"` to the pricing `Card` so free users get smooth-scrolled there.
+
+---
+
+## Technical detail
+
+**File:** `src/pages/Subscription.tsx`
+
+- **Line 68-85**: Replace `handleManage` with the three-path version that queries `creators.stripe_customer_id` first
+- **Lines 120-124**: Remove the Manage button from the Pro banner
+- **Line 130**: Add `id="pricing"` to the pricing Card
+- **After line 207**: Add a universal button below the pricing card with dynamic label (`isPro ? "Manage Billing" : "View Plans"`)
