@@ -24,7 +24,7 @@ serve(async (req) => {
     const user = data.user;
     if (!user?.email) throw new Error("User not authenticated");
 
-    const { priceId } = await req.json();
+    const { priceId, returnTo } = await req.json();
     if (!priceId) throw new Error("priceId is required");
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
@@ -40,12 +40,20 @@ serve(async (req) => {
 
     const origin = req.headers.get("origin") || "https://collabstack.lovable.app";
 
+    const successUrl = returnTo
+      ? `${origin}${returnTo}?pro_activated=true`
+      : `${origin}/dashboard/subscription?success=true`;
+    const successUrl = returnTo
+      ? `${origin}${returnTo}?pro_activated=true`
+      : `${origin}/dashboard/subscription?success=true`;
+
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : user.email,
       line_items: [{ price: priceId, quantity: 1 }],
       mode: "subscription",
-      success_url: `${origin}/dashboard/subscription?success=true`,
+      automatic_tax: { enabled: true },
+      success_url: successUrl,
       cancel_url: `${origin}/dashboard/subscription?canceled=true`,
       metadata: { user_id: user.id },
     });

@@ -1,6 +1,6 @@
 import { Crown, Sparkles, FileText, Users, Calendar, Palette, MessageSquare, PenLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 type FeatureType = 'export' | 'collabs' | 'mode' | 'matching' | 'style' | 'workspace' | 'editor';
@@ -55,10 +55,11 @@ const FEATURE_COPY: Record<FeatureType, {
 
 export function UpgradePrompt({ feature, variant = "inline", className }: UpgradePromptProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { title, description, icon: Icon } = FEATURE_COPY[feature];
 
   const handleUpgrade = () => {
-    navigate("/dashboard/subscription");
+    navigate(`/dashboard/subscription?returnTo=${encodeURIComponent(location.pathname)}`);
   };
 
   if (variant === "inline") {

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { Crown, Sparkles, Users, MessageSquare, PenLine, Palette, Rocket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,6 +27,19 @@ export default function Subscription() {
   const [loading, setLoading] = useState(false);
   const { isPro, isInTrial, trialEndsAt } = usePro();
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (searchParams.get("success") === "true") {
+      toast({
+        title: "Welcome to the Engine 🎉",
+        description: "Your workspace is now unlocked. All Pro features are active.",
+      });
+      searchParams.delete("success");
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, []);
 
   const handleCheckout = async () => {
     if (!user) {
@@ -36,8 +50,9 @@ export default function Subscription() {
     setLoading(true);
     try {
       const priceId = billing === "monthly" ? MONTHLY_PRICE_ID : YEARLY_PRICE_ID;
+      const returnTo = searchParams.get("returnTo") || undefined;
       const { data, error } = await supabase.functions.invoke("create-checkout", {
-        body: { priceId },
+        body: { priceId, returnTo },
       });
       if (error) throw error;
       if (data?.url) {
