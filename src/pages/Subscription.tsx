@@ -129,13 +129,13 @@ export default function Subscription() {
         {/* Pricing card */}
         <Card className="overflow-hidden">
           {/* Billing toggle */}
-          <div className="flex justify-center gap-1 p-4 bg-muted/50">
+          <div className="flex justify-center gap-1 p-1.5 bg-muted rounded-xl mx-auto w-fit">
             <button
               onClick={() => setBilling("monthly")}
               className={cn(
-                "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+                "px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200",
                 billing === "monthly"
-                  ? "bg-background text-foreground shadow-sm"
+                  ? "bg-primary text-primary-foreground shadow-md"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
@@ -144,14 +144,14 @@ export default function Subscription() {
             <button
               onClick={() => setBilling("yearly")}
               className={cn(
-                "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+                "px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 flex items-center gap-2",
                 billing === "yearly"
-                  ? "bg-background text-foreground shadow-sm"
+                  ? "bg-primary text-primary-foreground shadow-md"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
               Yearly
-              <Badge variant="secondary" className="ml-2 text-[10px] px-1.5 py-0">
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-accent text-accent-foreground">
                 Save $30
               </Badge>
             </button>
