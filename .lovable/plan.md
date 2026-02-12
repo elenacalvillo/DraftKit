@@ -1,73 +1,93 @@
 
 
-# Center Floating Pill to the Drafting Area
+# Pro-Gate the Shared Workspace ("View-Only" State)
 
-## Problem
+## Overview
 
-The pill toolbar is currently centered to the full viewport (`left-1/2 -translate-x-1/2`), but the drafting area only occupies the right column of a `[280px_1fr]` grid. This makes the pill appear shifted left relative to where the user is actually writing.
+Turn the Shared Workspace into a conversion lever: free users see the draft content rendered beautifully but cannot edit it. The Floating Pill hides entirely. Clicking the read-only content surfaces an upgrade prompt.
 
-## Solution
+## Changes
 
-Use a `ref` on the editor's container element and track its horizontal bounds (left edge + width) via `ResizeObserver`. Apply those values as inline `left` and `width` styles on the fixed pill, replacing the viewport-center approach.
+### 1. `Workspace.tsx` -- Pass `isPro` to control editability
 
-## Changes: `WorkspaceEditor.tsx` only
+Currently `canEdit={true}` is hardcoded (line 403). Change to:
 
-### 1. Add a container ref + bounding state
-
-- Add a `ref` to the outermost `<div>` wrapping the editor
-- Use a `useEffect` with `ResizeObserver` + `scroll` listener to track the container's `getBoundingClientRect().left` and `width`
-- Store these in state: `{ left: number; width: number } | null`
-
-### 2. Update the pill's positioning
-
-Replace:
 ```
-className="fixed bottom-8 left-1/2 -translate-x-1/2 ..."
+canEdit={isPro}
 ```
 
-With:
-```
-style={{ left: bounds.left + bounds.width / 2, transform: 'translateX(-50%)' }}
-className="fixed bottom-8 z-[100] ..."
-```
+This single prop change cascades through `SharedWorkspace` to disable the "Edit Draft" button and block editing for free users.
 
-This keeps the pill `fixed` (viewport-pinned, never scrolls away) but horizontally aligned to the editor column center.
+### 2. `SharedWorkspace.tsx` -- Upgrade CTA on click for free users
 
-### 3. Fallback for mobile / no bounds
+- When `canEdit` is false AND content exists, wrap the read-only rendered HTML in a clickable container
+- On click, show a toast: "Upgrade to Pro to edit this draft" with an action button linking to settings
+- Add a subtle `Lock` icon badge in the top-right corner of the read-only view to signal the content is protected
+- Hide the "Edit Draft" / "Start Writing" button entirely when `canEdit` is false (already done via existing conditional)
 
-If `bounds` is null (e.g., SSR or initial render), fall back to the current `left-1/2 -translate-x-1/2` centering. On mobile where the sidebar collapses and the editor spans the full width, the pill naturally centers to the screen since the editor IS the full width.
+### 3. `WorkspaceEditor.tsx` -- Hide the Pill for free users
 
-### Implementation sketch
+The Floating Pill currently renders when `editable` is true. Since `SharedWorkspace` only renders `WorkspaceEditor` when `isEditing` is true, and free users can never enter edit mode (the button is hidden), the Pill is already effectively hidden. No changes needed here.
 
-```typescript
-const containerRef = useRef<HTMLDivElement>(null);
-const [bounds, setBounds] = useState<{ left: number; width: number } | null>(null);
+### 4. `generate-collab-draft` edge function -- Auto-populate workspace content
 
-useEffect(() => {
-  const el = containerRef.current;
-  if (!el) return;
-  const update = () => {
-    const rect = el.getBoundingClientRect();
-    setBounds({ left: rect.left, width: rect.width });
-  };
-  update();
-  const ro = new ResizeObserver(update);
-  ro.observe(el);
-  window.addEventListener('scroll', update, true);
-  return () => { ro.disconnect(); window.removeEventListener('scroll', update, true); };
-}, []);
+After the AI draft JSON is saved (line 617-623), also convert the draft into HTML and write it to `shared_content` so it appears in the workspace immediately for both users:
+
+```sql
+shared_content: draftToHtml(draft),
+content_last_edited_by: 'AI Draft',
+content_last_edited_at: new Date().toISOString(),
 ```
 
-The pill div then uses:
-```typescript
-style={bounds ? {
-  left: bounds.left + bounds.width / 2,
-  transform: 'translateX(-50%)',
-} : {
-  left: '50%',
-  transform: 'translateX(-50%)',
-}}
+The `draftToHtml` helper will convert the structured draft into clean HTML:
+- `<h1>` for the title
+- `<p>` for the hook
+- `<h2>` + `<p>` for each outline section (with contributor attribution)
+- `<h2>Talking Points</h2>` + `<ul><li>` for talking points
+- `<p><em>` for tone notes
+
+### 5. `Workspace.tsx` -- Refresh workspace after draft generation
+
+After `generateDraft()` succeeds, update the local `request` state to include the new `shared_content` so the workspace re-renders immediately without a page reload.
+
+### 6. `UpgradePrompt.tsx` -- Add 'editor' feature type
+
+Add a new feature entry for the editor upgrade CTA:
+
+| Key | Value |
+|-----|-------|
+| type | `'editor'` |
+| title | "Edit & Format Drafts" |
+| description | "Take control of the workspace with full editing tools" |
+| icon | `PenLine` |
+
+---
+
+## Technical Details
+
+### Files modified
+
+| File | Change |
+|------|--------|
+| `src/pages/Workspace.tsx` | `canEdit={isPro}`, update state after draft generation |
+| `src/components/requests/SharedWorkspace.tsx` | Add click-to-upgrade overlay for free users on read-only content |
+| `src/components/subscription/UpgradePrompt.tsx` | Add `'editor'` feature type |
+| `supabase/functions/generate-collab-draft/index.ts` | Add `draftToHtml()` helper, write `shared_content` alongside `ai_draft` |
+
+### Free vs Pro experience summary
+
+```text
++---------------------+----------------------------+----------------------------+
+| Feature             | Free (Teaser)              | Pro (Engine)               |
++---------------------+----------------------------+----------------------------+
+| Draft content       | Visible, read-only         | Fully editable             |
+| Pill Toolbar        | Hidden                     | Active, floating           |
+| Conversation        | Blurred teaser             | Full history               |
+| Click on draft      | Toast + upgrade prompt     | Enters edit mode           |
+| "Edit Draft" button | Hidden                     | Visible                    |
++---------------------+----------------------------+----------------------------+
 ```
 
-No other files change. The pill remains portaled to `document.body` and fully independent of overflow/scroll, just now horizontally anchored to the correct column.
+### Edge function draft-to-HTML conversion
 
+The structured JSON draft will be converted to semantic HTML matching the workspace's allowed tags (p, h1, h2, h3, strong, em, ul, ol, li). This ensures the auto-populated content renders correctly in the Tiptap editor and passes DOMPurify sanitization.
