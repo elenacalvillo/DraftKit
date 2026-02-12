@@ -117,7 +117,7 @@ export default function Subscription() {
                     : "All features unlocked."}
                 </p>
               </div>
-              {!isInTrial && tier === 'pro' && (
+              {!isInTrial && isPro && (
                 <Button variant="outline" size="sm" onClick={handleManage} disabled={loading}>
                   Manage
                 </Button>
@@ -135,7 +135,7 @@ export default function Subscription() {
               className={cn(
                 "px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200",
                 billing === "monthly"
-                  ? "bg-primary text-primary-foreground shadow-md"
+                  ? "bg-background text-foreground shadow-sm border"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
@@ -146,7 +146,7 @@ export default function Subscription() {
               className={cn(
                 "px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 flex items-center gap-2",
                 billing === "yearly"
-                  ? "bg-primary text-primary-foreground shadow-md"
+                  ? "bg-background text-foreground shadow-sm border"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
