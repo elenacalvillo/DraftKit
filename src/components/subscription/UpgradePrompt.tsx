@@ -58,7 +58,7 @@ export function UpgradePrompt({ feature, variant = "inline", className }: Upgrad
   const { title, description, icon: Icon } = FEATURE_COPY[feature];
 
   const handleUpgrade = () => {
-    navigate("/dashboard/settings?upgrade=true");
+    navigate("/dashboard/subscription");
   };
 
   if (variant === "inline") {
