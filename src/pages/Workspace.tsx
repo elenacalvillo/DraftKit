@@ -137,6 +137,19 @@ export default function Workspace() {
       if (error) throw error;
       if (data?.draft) {
         setLocalDraft(data.draft);
+        // Update shared_content from the auto-populated workspace
+        if (data.shared_content) {
+          setRequest((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  shared_content: data.shared_content,
+                  content_last_edited_by: "AI Draft",
+                  content_last_edited_at: new Date().toISOString(),
+                }
+              : prev
+          );
+        }
         toast.success("Collaboration draft generated!");
         trackEvent("draft_generated", { request_id: request!.id });
       }
@@ -400,7 +413,7 @@ export default function Workspace() {
               lastEditedBy={request.content_last_edited_by}
               lastEditedAt={request.content_last_edited_at}
               currentUserName={currentUserName}
-              canEdit={true}
+              canEdit={isPro}
               partnerName={partnerName || undefined}
               isCreator={isCreator}
               onContentSaved={(content, editedBy, editedAt) => {

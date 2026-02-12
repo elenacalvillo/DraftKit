@@ -1,9 +1,9 @@
-import { Crown, Sparkles, FileText, Users, Calendar, Palette, MessageSquare } from "lucide-react";
+import { Crown, Sparkles, FileText, Users, Calendar, Palette, MessageSquare, PenLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
-type FeatureType = 'export' | 'collabs' | 'mode' | 'matching' | 'style' | 'workspace';
+type FeatureType = 'export' | 'collabs' | 'mode' | 'matching' | 'style' | 'workspace' | 'editor';
 
 interface UpgradePromptProps {
   feature: FeatureType;
@@ -45,6 +45,11 @@ const FEATURE_COPY: Record<FeatureType, {
     title: "Workspace Conversation History",
     description: "Keep your collaboration context in one place",
     icon: MessageSquare,
+  },
+  editor: {
+    title: "Edit & Format Drafts",
+    description: "Take control of the workspace with full editing tools",
+    icon: PenLine,
   },
 };
 
