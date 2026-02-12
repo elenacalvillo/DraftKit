@@ -17,6 +17,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { usePro } from "@/hooks/usePro";
+import { ProBadge } from "@/components/subscription/ProBadge";
 
 const useIsDesktop = () => {
   const [isDesktop, setIsDesktop] = useState(
@@ -56,6 +58,7 @@ export function DashboardLayout({ children, zenMode, zenTitle, zenBackPath }: Da
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { creator, signOut } = useAuth();
+  const { isPro } = usePro();
   const isDesktop = useIsDesktop();
 
   useEffect(() => {
@@ -183,7 +186,10 @@ export function DashboardLayout({ children, zenMode, zenTitle, zenBackPath }: Da
                 {creator.name.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-medium truncate">{creator.name}</p>
+                <p className="font-medium truncate flex items-center gap-1.5">
+                  {creator.name}
+                  {isPro && <ProBadge size="sm" />}
+                </p>
                 <p className="text-sm text-muted-foreground truncate">@{creator.username}</p>
               </div>
             </div>
