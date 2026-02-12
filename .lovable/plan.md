@@ -1,53 +1,19 @@
 
+# Fix Subscription Page: Toggle Styling + Manage Button
 
-# Strategic Enhancements to Subscription Flow
+## Problem 1: Toggle looks wrong
+The active toggle uses `bg-primary` which is the coral/salmon brand color -- too bold for a small UI control. The toggle should use a subtle, neutral active state that feels clean.
 
-Three targeted improvements to make the subscription experience feel premium and conversion-optimized.
+**Fix:** Change the active toggle style to use `bg-background shadow-sm border` instead of `bg-primary text-primary-foreground`. This gives a clean "card popping out of the muted background" look, standard for billing toggles.
 
-## 1. Automatic Tax Calculation
+## Problem 2: Manage button hidden for early adopters
+The Manage button only shows when `tier === 'pro'` (Stripe subscription), but early adopters get Pro status via `user_roles`, where `tier` remains `'free'`. These users still need access to billing management if they later subscribe.
 
-Add `automatic_tax: { enabled: true }` to the Stripe Checkout session in the `create-checkout` edge function. This handles RFC/IVA and other regional tax requirements automatically -- no manual tax logic needed.
+**Fix:** Show the Manage button whenever `isPro && !isInTrial` -- regardless of how they got Pro status. The `handleManage` function already handles the "no Stripe customer" case gracefully with a toast, so there's no risk.
 
-**File:** `supabase/functions/create-checkout/index.ts`
-- Add `automatic_tax: { enabled: true }` to the `stripe.checkout.sessions.create()` call
+## File Changes
 
-## 2. Pro Badge in Sidebar
+**`src/pages/Subscription.tsx`**
 
-Show the existing `ProBadge` component next to the creator's name in the sidebar once they're on Pro. The `ProBadge` component already exists and is used in Settings -- we just need to wire it into the sidebar user info section.
-
-**File:** `src/components/layout/DashboardLayout.tsx`
-- Import `usePro` hook and `ProBadge` component
-- Add `ProBadge` next to the creator name in the sidebar footer (lines 181-189), only when `isPro` is true
-- Small, elegant placement right after the name
-
-## 3. Success State After Checkout
-
-When the user returns from Stripe with `?success=true`, show a celebratory toast and a visual success banner on the Subscription page.
-
-**File:** `src/pages/Subscription.tsx`
-- Read `?success=true` from URL params on mount via `useSearchParams`
-- Show a toast: "Welcome to the Engine. Your workspace is now unlocked."
-- Optionally pass a `returnTo` URL through the checkout flow so the success redirect can send them back to the workspace they came from
-
-### Redirect-back-to-workspace flow
-
-- Update `UpgradePrompt` and workspace view-only toasts to pass the current path as a query param when navigating to `/dashboard/subscription`
-- Pass that `returnTo` value through to the checkout edge function, which appends it to the Stripe `success_url`
-- On success return, redirect the user back to their workspace instead of staying on the subscription page
-
-## Technical Details
-
-| File | Change |
-|------|--------|
-| `supabase/functions/create-checkout/index.ts` | Add `automatic_tax` to session config |
-| `src/components/layout/DashboardLayout.tsx` | Import `usePro` + `ProBadge`, show badge next to name |
-| `src/pages/Subscription.tsx` | Handle `?success=true` with toast + optional redirect |
-| `src/components/subscription/UpgradePrompt.tsx` | Pass `returnTo` param when navigating |
-
-### Implementation order
-
-1. Update `create-checkout` edge function with `automatic_tax`
-2. Add Pro badge to sidebar
-3. Add success state handling to Subscription page
-4. Wire up returnTo redirect flow
-
+1. Toggle active state: change from `bg-primary text-primary-foreground shadow-md` to `bg-background text-foreground shadow-sm` for both Monthly and Yearly buttons
+2. Manage button condition: change `{!isInTrial && tier === 'pro' && (` to `{!isInTrial && isPro && (`
