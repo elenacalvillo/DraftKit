@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
-import { ArrowLeft, Calendar, ExternalLink, LinkIcon, Mail, Sparkles, FileText, MessageSquare, PenLine, Lock } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowLeft, Calendar, ExternalLink, LinkIcon, Mail, Sparkles, FileText, MessageSquare, PenLine, Lock, X, PartyPopper } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { SharedWorkspace } from "@/components/requests/SharedWorkspace";
 import { CollabDraftModal } from "@/components/requests/CollabDraftModal";
@@ -71,6 +71,10 @@ export default function Workspace() {
   const [localDraft, setLocalDraft] = useState<CollabDraft | null>(null);
   const [showMessageModal, setShowMessageModal] = useState(false);
   const [msgRefreshKey, setMsgRefreshKey] = useState(0);
+  const [retroDismissed, setRetroDismissed] = useState(() =>
+    localStorage.getItem(`retro-dismissed-${requestId}`) === "true"
+  );
+  const [publishAnswer, setPublishAnswer] = useState<string | null>(null);
 
   const handleMessageSent = useCallback(() => {
     setMsgRefreshKey((k) => k + 1);
@@ -260,9 +264,100 @@ export default function Workspace() {
     );
   }
 
+  // Retrospective banner logic
+  const isRetroEligible = (() => {
+    if (!request?.requested_date) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const reqDate = parseDateString(request.requested_date);
+    reqDate.setHours(0, 0, 0, 0);
+    return reqDate <= today;
+  })();
+
+  const retroDismissKey = `retro-dismissed-${requestId}`;
+  const handlePublishAnswer = async (answer: "yes" | "not_yet") => {
+    setPublishAnswer(answer);
+    try {
+      await supabase.from("user_feedback").insert({
+        user_id: user?.id || null,
+        email: user?.email || null,
+        feedback_type: "praise",
+        message: `Post-collab check-in: Published = ${answer}. Collab with ${partnerName}, request ${requestId}.`,
+        page_url: window.location.pathname,
+      });
+      toast.success(answer === "yes" ? "Congrats on publishing! 🎉" : "No rush — we'll be here when it's ready!");
+    } catch (e) {
+      console.error("Failed to save retro response:", e);
+    }
+  };
+
+  const dismissRetro = () => {
+    setRetroDismissed(true);
+    localStorage.setItem(retroDismissKey, "true");
+  };
+
   return (
     <DashboardLayout zenMode zenTitle={`Drafting with ${partnerName}`} zenBackPath={backPath}>
       <div className="max-w-6xl mx-auto min-w-0">
+        {/* Retrospective Banner */}
+        <AnimatePresence>
+          {isRetroEligible && !retroDismissed && (
+            <motion.div
+              initial={{ opacity: 0, y: -12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              className="glass-card p-5 mb-6 border-l-4 border-l-green-500 relative"
+            >
+              <button
+                onClick={dismissRetro}
+                className="absolute top-3 right-3 p-1 rounded-lg hover:bg-muted transition-colors"
+                aria-label="Dismiss"
+              >
+                <X className="w-4 h-4 text-muted-foreground" />
+              </button>
+
+              <div className="flex items-center gap-2 mb-2">
+                <PartyPopper className="w-5 h-5 text-primary" />
+                <h3 className="font-semibold text-lg">Milestone reached!</h3>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">
+                Your collab with <strong>{partnerName}</strong> was scheduled for{" "}
+                <strong>{formatDate(request.requested_date)}</strong>. How did it go?
+              </p>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-sm font-medium">Was this published?</span>
+                {publishAnswer ? (
+                  <Badge variant="secondary" className="capitalize">
+                    {publishAnswer === "yes" ? "✅ Yes" : "⏳ Not yet"}
+                  </Badge>
+                ) : (
+                  <>
+                    <Button size="sm" variant="outline" onClick={() => handlePublishAnswer("yes")}>
+                      Yes
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => handlePublishAnswer("not_yet")}>
+                      Not yet
+                    </Button>
+                  </>
+                )}
+
+                <div className="ml-auto">
+                  <Button
+                    size="sm"
+                    variant="gradient"
+                    onClick={() => {
+                      window.location.href = "/dashboard?feedback=true";
+                    }}
+                  >
+                    Share Your Experience
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
           {/* Left Panel — Context Sidebar */}
           <motion.div
