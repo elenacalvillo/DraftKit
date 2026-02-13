@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { FileText, Save, X, AlertCircle, PenLine, Lock } from "lucide-react";
+import { FileText, Save, X, AlertCircle, PenLine, Lock, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -11,6 +11,7 @@ import { formatDistanceToNow } from "date-fns";
 import DOMPurify from "dompurify";
 import { WorkspaceEditor } from "./WorkspaceEditor";
 import { cn } from "@/lib/utils";
+import { exportWorkspaceHtmlToDocx } from "@/lib/export-draft";
 
 const ALLOWED_TAGS = ["p", "h1", "h2", "h3", "strong", "em", "s", "code", "pre", "a", "ul", "ol", "li", "br"];
 const ALLOWED_ATTR = ["href", "target", "rel"];
@@ -137,12 +138,32 @@ export function SharedWorkspace({
           <FileText className="w-4 h-4 text-primary" />
           <span className="text-sm font-medium">Shared Workspace</span>
         </div>
-        {canEdit && !isEditing && (
-          <Button variant="ghost" size="sm" onClick={handleStartEditing} className="h-8">
-            <PenLine className="w-3.5 h-3.5 mr-1.5" />
-            {hasContent ? "Edit Draft" : "Start Writing"}
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {hasContent && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8"
+              onClick={async () => {
+                try {
+                  await exportWorkspaceHtmlToDocx(sharedContent!, partnerName ? `Drafting with ${partnerName}` : "Workspace Draft");
+                  toast.success("Draft downloaded");
+                } catch {
+                  toast.error("Failed to download draft");
+                }
+              }}
+            >
+              <Download className="w-3.5 h-3.5 mr-1.5" />
+              Download
+            </Button>
+          )}
+          {canEdit && !isEditing && (
+            <Button variant="ghost" size="sm" onClick={handleStartEditing} className="h-8">
+              <PenLine className="w-3.5 h-3.5 mr-1.5" />
+              {hasContent ? "Edit Draft" : "Start Writing"}
+            </Button>
+          )}
+        </div>
       </div>
 
       <AnimatePresence mode="wait">

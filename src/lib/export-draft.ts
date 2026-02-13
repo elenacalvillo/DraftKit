@@ -3,6 +3,75 @@ import { saveAs } from "file-saver";
 import { CollabDraft } from "./storage";
 
 /**
+ * Export workspace HTML content as a Word document (.docx)
+ */
+export async function exportWorkspaceHtmlToDocx(html: string, filename: string = "Workspace Draft"): Promise<void> {
+  try {
+    // Parse HTML and extract text content by paragraph
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, "text/html");
+    const elements = doc.body.children;
+
+    const paragraphs: Paragraph[] = [];
+
+    for (let i = 0; i < elements.length; i++) {
+      const el = elements[i];
+      const tag = el.tagName.toLowerCase();
+      const text = el.textContent?.trim() || "";
+      if (!text) continue;
+
+      if (tag === "h1") {
+        paragraphs.push(new Paragraph({
+          heading: HeadingLevel.HEADING_1,
+          children: [new TextRun({ text, bold: true })],
+          spacing: { after: 200 },
+        }));
+      } else if (tag === "h2") {
+        paragraphs.push(new Paragraph({
+          heading: HeadingLevel.HEADING_2,
+          children: [new TextRun({ text, bold: true })],
+          spacing: { after: 200 },
+        }));
+      } else if (tag === "h3") {
+        paragraphs.push(new Paragraph({
+          heading: HeadingLevel.HEADING_3,
+          children: [new TextRun({ text, bold: true })],
+          spacing: { after: 200 },
+        }));
+      } else if (tag === "ul" || tag === "ol") {
+        const items = el.querySelectorAll("li");
+        items.forEach((li) => {
+          paragraphs.push(new Paragraph({
+            children: [new TextRun({ text: `• ${li.textContent?.trim() || ""}` })],
+            indent: { left: 400 },
+            spacing: { after: 100 },
+          }));
+        });
+      } else {
+        paragraphs.push(new Paragraph({
+          children: [new TextRun({ text })],
+          spacing: { after: 200 },
+        }));
+      }
+    }
+
+    if (paragraphs.length === 0) {
+      // Fallback: treat the whole thing as one paragraph
+      const fallbackText = doc.body.textContent?.trim() || "";
+      paragraphs.push(new Paragraph({ children: [new TextRun({ text: fallbackText })] }));
+    }
+
+    const wordDoc = new Document({ sections: [{ children: paragraphs }] });
+    const blob = await Packer.toBlob(wordDoc);
+    const safeName = filename.replace(/[<>:"/\\|?*×]/g, "-").replace(/\s+/g, " ").trim();
+    saveAs(blob, `${safeName}.docx`);
+  } catch (error) {
+    console.error("Error generating Word document from workspace:", error);
+    throw error;
+  }
+}
+
+/**
  * Sanitize a filename by removing or replacing invalid characters
  */
 function sanitizeFilename(name: string): string {
