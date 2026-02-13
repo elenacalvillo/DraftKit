@@ -38,6 +38,19 @@ async function sendEmail(to: string[], subject: string, html: string) {
 }
 
 function buildRetrospectiveEmail(recipientName: string, partnerName: string, collabDate: string, feedbackUrl: string): string {
+  const surveyBaseUrl = feedbackUrl.replace("?feedback=true", "");
+  const q1Yes = `${surveyBaseUrl}?feedback=true&q=draft_time&a=yes`;
+  const q1No = `${surveyBaseUrl}?feedback=true&q=draft_time&a=no`;
+  const q2Yes = `${surveyBaseUrl}?feedback=true&q=workspace&a=yes`;
+  const q2No = `${surveyBaseUrl}?feedback=true&q=workspace&a=no`;
+  const q3Yes = `${surveyBaseUrl}?feedback=true&q=collab_again&a=yes`;
+  const q3Def = `${surveyBaseUrl}?feedback=true&q=collab_again&a=definitely`;
+
+  const pillStyle = `display:inline-block;padding:8px 18px;border-radius:20px;text-decoration:none;font-weight:600;font-size:14px;margin:0 4px;`;
+  const yesStyle = `${pillStyle}background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;`;
+  const noStyle = `${pillStyle}background:#fef2f2;color:#991b1b;border:1px solid #fecaca;`;
+  const defStyle = `${pillStyle}background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;`;
+
   return `
     <!DOCTYPE html>
     <html>
@@ -61,10 +74,25 @@ function buildRetrospectiveEmail(recipientName: string, partnerName: string, col
       </p>
 
       <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #d9826b;">
-        <h3 style="margin: 0 0 12px 0; color: #1e293b; font-size: 16px;">📝 Quick Feedback</h3>
-        <p style="margin: 0; color: #475569;">
-          We'd love to hear how DraftKit helped you collaborate. Your feedback shapes the future of the platform and helps us make the experience even better.
-        </p>
+        <h3 style="margin: 0 0 16px 0; color: #1e293b; font-size: 16px;">📊 Quick Survey (3 clicks!)</h3>
+
+        <p style="margin: 0 0 8px 0; color: #475569; font-size: 14px; font-weight: 600;">1. Did the SMART draft save you time?</p>
+        <div style="margin-bottom: 16px;">
+          <a href="${q1Yes}" style="${yesStyle}">👍 Yes</a>
+          <a href="${q1No}" style="${noStyle}">👎 No</a>
+        </div>
+
+        <p style="margin: 0 0 8px 0; color: #475569; font-size: 14px; font-weight: 600;">2. Was the workspace helpful?</p>
+        <div style="margin-bottom: 16px;">
+          <a href="${q2Yes}" style="${yesStyle}">👍 Yes</a>
+          <a href="${q2No}" style="${noStyle}">👎 No</a>
+        </div>
+
+        <p style="margin: 0 0 8px 0; color: #475569; font-size: 14px; font-weight: 600;">3. Would you collaborate here again?</p>
+        <div style="margin-bottom: 8px;">
+          <a href="${q3Yes}" style="${yesStyle}">Yes</a>
+          <a href="${q3Def}" style="${defStyle}">🔥 Definitely</a>
+        </div>
       </div>
 
       <div style="text-align: center; margin: 32px 0;">
