@@ -1,63 +1,54 @@
 
-# Launch-Ready: Serif Fix, Workspace Export, and Post-Collab Retrospective
 
-Five changes across frontend and backend to get DraftKit launch-ready.
+# Post-Collab Retrospective Banner + Survey Enhancement
 
----
-
-## 1. Remove Serif from Zen Header Title
-
-The "Drafting with Raghav Mehra" title in the workspace header still uses Georgia/serif (line 91 of `DashboardLayout.tsx`). Remove the inline `style` attribute so it inherits the app's Inter font.
-
-**File:** `src/components/layout/DashboardLayout.tsx` (line 91)
+Everything from the previous plan is already deployed. This adds two new pieces:
 
 ---
 
-## 2. Download Workspace Draft as .docx
+## 1. Retrospective Banner in the Workspace
 
-Add a "Download Draft" button to the SharedWorkspace header (next to "Edit Draft"). When clicked, it extracts the workspace HTML content, converts it to a Word document using the existing `docx` library, and triggers a download.
+When a collaboration's `requested_date` is today or in the past, show a celebratory banner at the top of the workspace (above the SharedWorkspace editor). This creates an in-app "closing the loop" moment.
 
-**File:** `src/components/requests/SharedWorkspace.tsx`
-- Add a Download button (with a `Download` icon) in the header bar, visible when there is content
-- Create a new function `exportWorkspaceToDocx(html, title)` in `src/lib/export-draft.ts` that:
-  - Strips HTML tags to extract plain text paragraphs
-  - Builds a `docx` Document with the content
-  - Downloads as `"Workspace Draft.docx"`
+**File:** `src/pages/Workspace.tsx`
 
-**File:** `src/lib/export-draft.ts`
-- Add a new `exportWorkspaceHtmlToDocx(html: string, filename: string)` function that converts HTML content to a Word document
+- Add date comparison logic: if `requested_date <= today`, show the banner
+- Banner content:
+  - Celebratory heading: "Milestone reached!" with a party emoji
+  - Two quick questions rendered as clickable pill buttons:
+    - "Was this post published?" (Yes / Not yet)
+    - "How did the collaboration feel?" (links to open the feedback widget with pre-filled context)
+  - Clicking "Yes" or "Not yet" saves the response to `user_feedback` table as type `"praise"` with contextual metadata
+  - The banner is dismissible and remembers dismissal via localStorage (`retro-dismissed-{requestId}`)
+- Uses existing glass-card styling with a coral/green left border accent
 
----
+### Layout
 
-## 3. Post-Collaboration Retrospective Email
-
-Create a new email type `collab_retrospective` in the `send-collab-email` edge function. A new edge function `send-collab-retrospective` will run daily (like the reminder function) and check for approved collabs where `requested_date = today`. It sends both the creator and the requester a branded email asking "How did it go?" with a link back to the app's feedback widget.
-
-**New file:** `supabase/functions/send-collab-retrospective/index.ts`
-- Queries `collab_requests` where `status = 'approved'`, `requested_date = today's date`
-- For each match, sends a retrospective email to both creator and requester
-- Tracks sent retrospectives to avoid duplicates (uses `email_events` table with type `collab_retrospective`)
-
-**Updated file:** `supabase/functions/send-collab-email/index.ts`
-- Add the `collab_retrospective` email type
-- Email content: congratulatory message, summary of the collaboration, and a CTA to rate the experience
-
-**Database migration:**
-- No new tables needed -- uses existing `email_events` table for deduplication with type `collab_retrospective`
+```text
++-----------------------------------------------+
+| Milestone reached!                         [X] |
+| Your collab with Raghav was scheduled for      |
+| today. How did it go?                          |
+|                                                |
+| Was this published?  [Yes]  [Not yet]          |
+| [Share Your Experience] (opens feedback widget)|
++-----------------------------------------------+
+```
 
 ---
 
-## 4. Add `collab_retrospective` to Analytics Events
+## 2. Enhance Retrospective Email with 3-Question Survey
 
-**File:** `src/hooks/useAnalytics.ts`
-- No changes needed server-side; the edge function handles tracking via `email_events`
+Update the retrospective email template to include three quick-response survey questions with clickable links.
 
----
+**File:** `supabase/functions/send-collab-retrospective/index.ts`
 
-## 5. Update Config for New Edge Function
-
-**File:** `supabase/config.toml`
-- Add `[functions.send-collab-retrospective]` with `verify_jwt = false` (it uses service role key internally)
+- Add three survey questions to `buildRetrospectiveEmail()`:
+  1. "Did the SMART draft save you time?" -- Yes / No (links to feedback URL with query params)
+  2. "Was the workspace helpful?" -- Yes / No
+  3. "Would you collaborate here again?" -- Yes / Definitely
+- Each answer links to `{baseUrl}/dashboard?feedback=true&q=draft_time&a=yes` (the feedback widget opens with pre-filled context)
+- Keep the existing "Share Your Experience" CTA button
 
 ---
 
@@ -65,10 +56,7 @@ Create a new email type `collab_retrospective` in the `send-collab-email` edge f
 
 | File | Change |
 |------|--------|
-| `src/components/layout/DashboardLayout.tsx` | Remove serif inline style from zen title |
-| `src/lib/export-draft.ts` | Add `exportWorkspaceHtmlToDocx()` function |
-| `src/components/requests/SharedWorkspace.tsx` | Add Download button in header |
-| `supabase/functions/send-collab-email/index.ts` | Add `collab_retrospective` email type |
-| `supabase/functions/send-collab-retrospective/index.ts` | New daily retrospective checker |
-| `supabase/config.toml` | Register new edge function |
+| `src/pages/Workspace.tsx` | Add retrospective banner when date is today or past |
+| `supabase/functions/send-collab-retrospective/index.ts` | Add 3-question survey to email template |
 
+No new tables or migrations needed -- responses flow through the existing feedback widget and `user_feedback` table.
