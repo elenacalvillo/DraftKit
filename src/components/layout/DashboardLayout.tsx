@@ -88,7 +88,6 @@ export function DashboardLayout({ children, zenMode, zenTitle, zenBackPath }: Da
           </button>
           <span
             className="flex-1 text-center text-sm font-medium truncate px-4"
-            style={{ fontFamily: "'Georgia', 'Times New Roman', serif" }}
           >
             {zenTitle || "Workspace"}
           </span>
