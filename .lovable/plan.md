@@ -1,65 +1,54 @@
 
-# Workspace Access Refactor: Host-Pays Model
+# Simplify `useCreatorPro`: Drop `has_role` RPC, Use `subscription_tier` Only
 
-The core insight from Dinah's feedback is correct: the workspace is a room the **host** (Pro creator) pays for. The **guest** (requester) should never hit a paywall just to collaborate inside it.
+## The Problem
 
-## What Is Broken Today
+The current `useCreatorPro` hook makes two sequential network calls:
+1. Fetch `subscription_tier`, `trial_ends_at`, and `user_id` from `creators`
+2. Call `has_role(_user_id, 'pro')` with the **host's** `user_id`
 
-In `src/pages/Workspace.tsx`:
+The second call is the issue. The `has_role` RPC is a `SECURITY DEFINER` function built to check whether the **currently authenticated user** has a role — it accepts any `_user_id` as a parameter, so it works today, but a guest client is handing it the host's `user_id`, which is semantically incorrect and a potential point of failure if permissions are ever tightened.
 
-- `const { isPro } = usePro()` checks the **current logged-in user's** Pro status
-- `canEdit={isPro}` — so if the guest (Raghav) is a free user, the editor is locked
-- `{isPro ? <WorkspaceConversation /> : <UpgradePrompt />}` — same broken gate hides the conversation from the guest
+More importantly: it's unnecessary. The `creators` table already has `subscription_tier` (values: `'free'` or `'pro'`) and `trial_ends_at`, which are publicly readable whenever `username IS NOT NULL`. Manual Pro grants (lifetime deals, early adopters) are administered by setting `subscription_tier = 'pro'` or inserting into `user_roles` — either way, the `subscription_tier` column is the source of truth for the UI.
 
-This means when Raghav opens the workspace, he sees a blurred "Upgrade to Pro" wall even though Dinah (the host) already paid for it.
+## The Fix
 
-## The Fix: Fetch the Host's Pro Status
+Remove the `has_role` RPC call entirely. The query becomes a single read against `creators` checking two columns. This is:
+- Faster (one round-trip instead of two)
+- Permission-safe (no cross-user RPC call)
+- Correct for all current Pro grant paths
 
-### New hook: `useCreatorPro(creatorUserId)`
+## Technical Details
 
-Create a small, focused query hook that checks whether a specific creator (identified by their `user_id`) has Pro access. This is used by the workspace to resolve the **host's** tier, not the current visitor's.
+**File:** `src/hooks/useCreatorPro.ts`
 
-It queries the `creators` table (readable by anyone when `username IS NOT NULL`) and the `has_role` RPC — but targeted at the host's `user_id`, which comes from the `creator_id` on the request combined with the creator's `user_id`.
+Remove the `user_id` from the SELECT (no longer needed), remove the `has_role` fallback, and simplify the return logic to just `subscription_tier` and `trial_ends_at`.
 
-Since `public_creator_profiles` doesn't expose `user_id` or `subscription_tier`, the host's Pro status will be determined by fetching from `creators` using the creator's `id` joined to `user_id`. The existing RLS on `creators` already allows: `SELECT` where `username IS NOT NULL` (the public policy). The `subscription_tier` and `trial_ends_at` columns are exposed under that public policy.
+Before:
+```
+.select("user_id, subscription_tier, trial_ends_at")
+→ check tier + trial
+→ if false, call has_role(host_user_id, 'pro')
+```
 
-### Logic Change in `Workspace.tsx`
+After:
+```
+.select("subscription_tier, trial_ends_at")
+→ check tier + trial only
+```
 
-| Before | After |
-|--------|-------|
-| `canEdit={isPro}` (current user's Pro) | `canEdit={isHostPro}` (host's Pro status) |
-| `{isPro ? <Conversation /> : <UpgradePrompt />}` | `{isHostPro ? <Conversation /> : <UpgradePrompt for creator only />}` |
-| UpgradePrompt shown to guests | UpgradePrompt shown **only** to the creator if host is free |
+No changes to `Workspace.tsx` or any other file — only `useCreatorPro.ts` is touched.
 
-### Guest Experience Changes
+## Note on Manual Pro Grants
 
-When `isGuest === true`:
-- Never show any `UpgradePrompt` — guests are there to collaborate, not subscribe
-- The conversation feed is visible if the **host** is Pro
-- The editor is unlocked if the **host** is Pro
-- No billing CTAs, no Crown icons, no "Upgrade to Pro" banners in the guest view
-
-### Creator Experience (Unchanged)
-
-If the host is **free tier** (not Pro), they still see the upgrade prompts encouraging them to unlock the workspace for their collaborator. This is actually a stronger conversion trigger: "Your collaborator is waiting — upgrade to open the workspace."
-
-## Files Changed
-
-### 1. New file: `src/hooks/useCreatorPro.ts`
-
-A targeted hook that accepts a `creatorId` (the UUID from `collab_requests.creator_id`) and resolves their Pro status by:
-1. Fetching their `user_id` from the `creators` table using `id`
-2. Checking `subscription_tier`, `trial_ends_at`, and calling `has_role` RPC with that `user_id`
-
-### 2. `src/pages/Workspace.tsx`
-
-- Import `useCreatorPro` and call it once `creatorInfo` is loaded: `const { isPro: isHostPro } = useCreatorPro(request?.creator_id)`
-- Replace every `isPro` gate that controls workspace features with `isHostPro`
-- Wrap all `UpgradePrompt` renders with `{!isGuest && ...}` so guests never see billing walls
-- Keep `isPro` (the current user's own Pro status) available for future creator-only features like "Generate AI Draft" (which already guards with `isCreator &&`)
+The `user_roles` table with role `'pro'` is reserved for role-based access that supplements the `subscription_tier` column (e.g. the `is_pro_user()` database function also checks it). For the **workspace UI gate specifically**, checking `subscription_tier` is the right and sufficient signal. If a manual grant ever needs to override the UI, the admin can also set `subscription_tier = 'pro'` on the `creators` row, which is already the correct pattern.
 
 ## Summary
 
-The workspace "unlocked" state is determined entirely by whether the **host creator** has a Pro subscription. Guests inherit the host's access level — they can read and write if the host is Pro, and they see a "workspace coming soon" message (not an upgrade button) if the host is free. The creator themselves still sees the upgrade prompt if they are free, giving a clear, motivating path to convert.
+| Before | After |
+|--------|-------|
+| 2 network calls (creators + has_role RPC) | 1 network call (creators only) |
+| Passes host's user_id to a self-checking RPC | No cross-user RPC call |
+| `select("user_id, subscription_tier, trial_ends_at")` | `select("subscription_tier, trial_ends_at")` |
 
-No database migrations needed. No new edge functions. The `creators` table is already readable publicly (where `username IS NOT NULL`), so the host's `subscription_tier` can be fetched from the client safely.
+One file changed, five lines removed.
