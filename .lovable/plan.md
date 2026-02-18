@@ -1,60 +1,75 @@
 
-# Add DraftKitLogo to HeroSection
+# Visual Authority: Five Targeted Refinements
 
-## What and Why
+## What's Being Fixed
 
-The HeroSection currently opens with a small badge chip (`Zap` icon + text) and then jumps straight to the headline. There is no visual brand anchor — nothing tells a first-time visitor "this is a product, not a blog post." Adding the Venn-ring mark above the headline gives the hero a center-of-gravity, ties the landing page visually to every other page where the logo already appears (Navbar, auth pages, sidebar), and reinforces the "two creators, one workspace" metaphor that the entire messaging is built around.
+The screenshot confirms five specific issues — all are low-risk, single-file edits with no new dependencies.
 
-## Exact Placement
+---
 
-The logo drops in between the animated badge and the `<h1>`, centered. The badge stays as the first element (it explains context), the logo comes second (visual identity), the headline third (the promise), and the CTA fourth — standard hero anatomy for a product page.
+## Change 1 — Brand Text Contrast (Navbar + Hero headline)
 
-```text
-[badge: "Built for creators who ship..."]
-[DraftKitLogo at 72px, centered]
-[h1: "Stop chasing drafts. / Start shipping together."]
-[subhead]
-[CTAs]
-[Product Loop]
-```
+**Problem:** "DraftKit" wordmark in the Navbar renders as a coral gradient. The hero second line "Start shipping together." also uses `gradient-text` (coral). Both fight for attention with the logo mark itself, which already carries the brand's coral.
 
-## Size Choice: 72px
+**Fix:** Replace `gradient-text` with a literal dark color class that maps to `#2a2318` — the exact dark stroke color of the left Venn circle. This anchors the wordmark to the logo visually.
 
-| Size | Context |
-|------|---------|
-| 32px | Navbar / Footer / mobile header |
-| 40px | Sidebar |
-| 56px | Auth page heroes |
-| **72px** | **Landing hero — largest treatment on the site** |
+- **Navbar (`Navbar.tsx` line 18):** `gradient-text` → `text-[#2a2318]`
+- **Hero headline (`HeroSection.tsx` line 97):** `gradient-text` on the `<span>` → `text-[#2a2318]`
 
-72px (`size={72}`) is the right step up from the auth-page 56px. It reads clearly on desktop and doesn't feel oversized on mobile since it's a compact square mark.
+---
 
-## Animation
+## Change 2 — Arrow Connector Stroke Weight (HeroSection)
 
-The logo gets the same Framer Motion `initial / animate` pattern the badge and headline already use — `opacity: 0 → 1, y: 20 → 0` — at delay `0.075` (after the badge at `0`, before the headline at `0.1`). This threads it cleanly into the existing staggered reveal without breaking the flow.
+**Problem:** The `ArrowRight` icons between the 4 step cards are `w-4 h-4 text-muted-foreground/40` — too small and washed out.
 
-## Technical Details
-
-**File changed:** `src/components/landing/HeroSection.tsx` only.
-
-**Two edits:**
-1. Add `import { DraftKitLogo } from "@/components/icons/DraftKitLogo";` at the top.
-2. Insert a `<motion.div>` wrapping `<DraftKitLogo size={72} />` between the badge block and the `<motion.h1>` block.
-
-No new files, no Tailwind changes, no dependency changes. The component is already in the codebase and works correctly at any size.
-
-## What the inserted block looks like
+**Fix:** Increase to `w-5 h-5`, full `text-foreground/50` opacity, and add `strokeWidth` override via a wrapper with `[&>*]:stroke-[3]` or use the `stroke-width` prop directly. Lucide icons accept `strokeWidth` as a prop.
 
 ```tsx
-{/* Logo mark */}
-<motion.div
-  initial={{ opacity: 0, y: 20 }}
-  animate={{ opacity: 1, y: 0 }}
-  transition={{ duration: 0.5, delay: 0.075 }}
-  className="flex justify-center mb-6"
->
-  <DraftKitLogo size={72} />
-</motion.div>
+<ArrowRight className="w-5 h-5 text-foreground/50" strokeWidth={3} />
 ```
 
-`mb-6` keeps tight spacing to the headline beneath. The existing `mb-8` on the badge above provides natural breathing room between the two.
+---
+
+## Change 3 — Number Badge Size (HeroSection)
+
+**Problem:** The coral number badges (`01`, `02`, etc.) use `w-6 h-6 text-xs font-bold` — small enough that the eye doesn't land on them as waypoints.
+
+**Fix:**
+- Container: `w-8 h-8` (from `w-6 h-6`)
+- Text: `text-sm font-bold` (from `text-xs font-bold`)
+
+This makes the number the dominant anchor in each card header, as intended.
+
+---
+
+## Change 4 — Icon Density in Cards (HeroSection)
+
+**Problem:** The Lucide icons (`Send`, `Sparkles`, `FileText`, `Trophy`) are `w-4 h-4` — they float lost next to the number badge.
+
+**Fix:** Scale up to `w-5 h-5` so they visually balance against the now-larger `w-8 h-8` badge. The icons live inside the `steps` array as JSX so they need to be updated at the array definition level.
+
+---
+
+## Change 5 — Vertical Rhythm (HeroSection)
+
+**Problem:** The CTA buttons and the 4-step preview are separated by `mb-20` on the CTA wrapper. The user wants more breathing room (`gap-y-16` between them).
+
+**Fix:** Change `mb-20` on the CTA `motion.div` to `mb-28`. This adds ~32px additional vertical space — equivalent to `gap-y-16` — without touching the grid itself.
+
+---
+
+## Files Changed
+
+| File | Changes |
+|------|---------|
+| `src/components/layout/Navbar.tsx` | Brand text: `gradient-text` → `text-[#2a2318]` |
+| `src/components/landing/HeroSection.tsx` | Headline span color, arrow weight/size, badge size, icon size, CTA bottom margin |
+
+---
+
+## Technical Notes
+
+- `text-[#2a2318]` is a Tailwind arbitrary value — no config change needed, it works out of the box with Tailwind v3+
+- `strokeWidth={3}` is a native prop on all Lucide React icons — no wrapper tricks needed
+- All icon changes are at the `steps` array definition (top of the file), so all 4 icons update together in one block
+- No layout regressions expected — changes are additive size increases within existing containers
