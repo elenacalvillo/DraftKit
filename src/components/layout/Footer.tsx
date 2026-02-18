@@ -11,12 +11,10 @@ export function Footer() {
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           {/* Logo & Tagline */}
           <div className="flex items-center gap-3">
-            <DraftKitLogo size={32} />
+            <DraftKitLogo size={50} />
             <div>
               <span className="font-semibold text-foreground">DraftKit</span>
-              <p className="text-xs text-muted-foreground">
-                The engine for creators who ship together
-              </p>
+              <p className="text-xs text-muted-foreground">The engine for creators who ship together</p>
             </div>
           </div>
 
