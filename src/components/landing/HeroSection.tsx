@@ -1,9 +1,34 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { ArrowRight, Heart } from "lucide-react";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { teamProfiles } from "@/data/team-profiles";
+import { ArrowRight, Zap, Send, Sparkles, FileText, Trophy } from "lucide-react";
+
+const steps = [
+  {
+    number: "01",
+    icon: <Send className="w-4 h-4" />,
+    title: "The Pitch",
+    description: "Structured requests, not cold DMs",
+  },
+  {
+    number: "02",
+    icon: <Sparkles className="w-4 h-4" />,
+    title: "The SMART Draft",
+    description: "Start at 80% done, not zero",
+  },
+  {
+    number: "03",
+    icon: <FileText className="w-4 h-4" />,
+    title: "The Workspace",
+    description: "A meeting room for two",
+  },
+  {
+    number: "04",
+    icon: <Trophy className="w-4 h-4" />,
+    title: "The Milestone",
+    description: "Export and celebrate the win",
+  },
+];
 
 export function HeroSection() {
   return (
@@ -45,8 +70,8 @@ export function HeroSection() {
             transition={{ duration: 0.5 }}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary mb-8"
           >
-            <Heart className="w-4 h-4" />
-            <span className="text-sm font-medium">Built for creators who care about connection</span>
+            <Zap className="w-4 h-4" />
+            <span className="text-sm font-medium">Built for creators who ship, not just schedule</span>
           </motion.div>
 
           {/* Headline */}
@@ -56,9 +81,9 @@ export function HeroSection() {
             transition={{ duration: 0.6, delay: 0.1 }}
             className="text-4xl md:text-6xl font-bold tracking-tight mb-6"
           >
-            The collaborative engine
+            Stop chasing drafts.
             <br />
-            <span className="gradient-text">for your next great post</span>
+            <span className="gradient-text">Start shipping together.</span>
           </motion.h1>
 
           {/* Subheadline */}
@@ -68,8 +93,8 @@ export function HeroSection() {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="text-xl text-muted-foreground max-w-2xl mx-auto mb-12"
           >
-            Sync schedules, find the right collaborator, and get a ready-to-publish 
-            plan in seconds. No more awkward DM chains.
+            One link to handle the pitch, the research, and the writing.
+            DraftKit is the shared workspace built for creators who value their time — and their collaborators.
           </motion.p>
 
           {/* CTA Buttons */}
@@ -81,82 +106,52 @@ export function HeroSection() {
           >
             <Link to="/signup">
               <Button variant="hero" size="xl">
-                Create Your Booking Page
+                Start Drafting — It's Free
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
             </Link>
             <Link to="/demo">
-              <Button variant="glass" size="lg">See How It Works</Button>
+              <Button variant="glass" size="lg">See a Demo Workspace</Button>
             </Link>
           </motion.div>
 
-          {/* Feature Cards */}
+          {/* Product Loop Preview */}
           <motion.div
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.4 }}
-            className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto"
+            className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-4xl mx-auto"
           >
-            <FeatureCard
-              image={teamProfiles[0].image}
-              name={teamProfiles[0].name}
-              initials={teamProfiles[0].initials}
-              title="Your Calendar, Your Rules"
-              description="Control when you're open to new connections with a simple, beautiful interface"
-              delay={0.5}
-            />
-            <FeatureCard
-              image={teamProfiles[1].image}
-              name={teamProfiles[1].name}
-              initials={teamProfiles[1].initials}
-              title="Personal Pitches Only"
-              description="Every request includes a space for collaborators to share their 'why'—no cold DMs"
-              delay={0.6}
-            />
-            <FeatureCard
-              image={teamProfiles[2].image}
-              name={teamProfiles[2].name}
-              initials={teamProfiles[2].initials}
-              title="Drafting Playbooks"
-              description="Share your interview formats or writing guidelines automatically when a request is approved"
-              delay={0.7}
-            />
+            {steps.map((step, index) => (
+              <div key={step.number} className="relative flex items-stretch">
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.5 + index * 0.1 }}
+                  className="glass-card p-4 text-left flex-1"
+                >
+                  {/* Number + Icon row */}
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full gradient-primary text-primary-foreground text-xs font-bold shrink-0">
+                      {step.number}
+                    </span>
+                    <span className="text-primary">{step.icon}</span>
+                  </div>
+                  <p className="font-semibold text-sm text-foreground leading-tight mb-1">{step.title}</p>
+                  <p className="text-xs text-muted-foreground leading-snug">{step.description}</p>
+                </motion.div>
+
+                {/* Arrow connector — desktop only, not after last item */}
+                {index < steps.length - 1 && (
+                  <div className="hidden md:flex items-center justify-center absolute -right-2 top-1/2 -translate-y-1/2 z-10">
+                    <ArrowRight className="w-4 h-4 text-muted-foreground/40" />
+                  </div>
+                )}
+              </div>
+            ))}
           </motion.div>
         </div>
       </div>
     </section>
-  );
-}
-
-function FeatureCard({
-  image,
-  name,
-  initials,
-  title,
-  description,
-  delay,
-}: {
-  image: string;
-  name: string;
-  initials: string;
-  title: string;
-  description: string;
-  delay: number;
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay }}
-      whileHover={{ y: -5 }}
-      className="glass-card p-6 hover-lift cursor-default"
-    >
-      <Avatar className="w-16 h-16 mx-auto mb-4 border-2 border-primary/20 shadow-lg">
-        <AvatarImage src={image} alt={name} className="object-cover" />
-        <AvatarFallback className="text-lg font-medium">{initials}</AvatarFallback>
-      </Avatar>
-      <h3 className="text-lg font-semibold mb-2">{title}</h3>
-      <p className="text-muted-foreground text-sm">{description}</p>
-    </motion.div>
   );
 }

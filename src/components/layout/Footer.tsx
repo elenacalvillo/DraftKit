@@ -16,7 +16,7 @@ export function Footer() {
             <div>
               <span className="font-semibold text-foreground">DraftKit</span>
               <p className="text-xs text-muted-foreground">
-                Simplifying creator collaborations
+                The engine for creators who ship together
               </p>
             </div>
           </div>

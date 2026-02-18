@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Quote } from "lucide-react";
+import { Quote, DoorOpen, ArrowRight } from "lucide-react";
+import { Link } from "react-router-dom";
 import stefImage from "@/assets/profiles/stef.jpg";
 import karoImage from "@/assets/profiles/karo.jpg";
 import dheerajImage from "@/assets/profiles/dheeraj.jpg";
@@ -53,14 +54,14 @@ export function TestimonialsSection() {
           className="text-center mb-16"
         >
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            What Creators Are Saying
+            Trusted by creators who ship
           </h2>
           <p className="text-muted-foreground text-lg max-w-xl mx-auto">
-            Hear from newsletter creators who are building meaningful connections
+            From newsletter writers to PMs — here's what they found when they stopped scheduling and started collaborating
           </p>
         </motion.div>
 
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-3 gap-6 mb-6">
           {testimonials.map((testimonial, index) => (
             <motion.div
               key={testimonial.name + index}
@@ -103,6 +104,31 @@ export function TestimonialsSection() {
             </motion.div>
           ))}
         </div>
+
+        {/* Guest Principle Banner */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+          className="glass-card p-6 md:p-8 border-l-4 border-primary flex flex-col md:flex-row items-start md:items-center gap-6"
+        >
+          <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center text-primary-foreground shrink-0">
+            <DoorOpen className="w-6 h-6" />
+          </div>
+          <div className="flex-1">
+            <p className="font-semibold text-foreground text-lg mb-1">"Your guest is never the subscriber."</p>
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              DraftKit runs on the Meeting Room model. You own the engine (Pro), so your collaborators join the ride — always free. No credit cards, no cover charges, no paywalls for the people who are there to help you write.
+            </p>
+          </div>
+          <Link
+            to="/demo"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline shrink-0"
+          >
+            Learn more <ArrowRight className="w-4 h-4" />
+          </Link>
+        </motion.div>
       </div>
     </section>
   );
