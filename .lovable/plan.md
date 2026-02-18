@@ -1,62 +1,65 @@
 
+# Workspace Access Refactor: Host-Pays Model
 
-# Post-Collab Retrospective Banner + Survey Enhancement
+The core insight from Dinah's feedback is correct: the workspace is a room the **host** (Pro creator) pays for. The **guest** (requester) should never hit a paywall just to collaborate inside it.
 
-Everything from the previous plan is already deployed. This adds two new pieces:
+## What Is Broken Today
 
----
+In `src/pages/Workspace.tsx`:
 
-## 1. Retrospective Banner in the Workspace
+- `const { isPro } = usePro()` checks the **current logged-in user's** Pro status
+- `canEdit={isPro}` — so if the guest (Raghav) is a free user, the editor is locked
+- `{isPro ? <WorkspaceConversation /> : <UpgradePrompt />}` — same broken gate hides the conversation from the guest
 
-When a collaboration's `requested_date` is today or in the past, show a celebratory banner at the top of the workspace (above the SharedWorkspace editor). This creates an in-app "closing the loop" moment.
+This means when Raghav opens the workspace, he sees a blurred "Upgrade to Pro" wall even though Dinah (the host) already paid for it.
 
-**File:** `src/pages/Workspace.tsx`
+## The Fix: Fetch the Host's Pro Status
 
-- Add date comparison logic: if `requested_date <= today`, show the banner
-- Banner content:
-  - Celebratory heading: "Milestone reached!" with a party emoji
-  - Two quick questions rendered as clickable pill buttons:
-    - "Was this post published?" (Yes / Not yet)
-    - "How did the collaboration feel?" (links to open the feedback widget with pre-filled context)
-  - Clicking "Yes" or "Not yet" saves the response to `user_feedback` table as type `"praise"` with contextual metadata
-  - The banner is dismissible and remembers dismissal via localStorage (`retro-dismissed-{requestId}`)
-- Uses existing glass-card styling with a coral/green left border accent
+### New hook: `useCreatorPro(creatorUserId)`
 
-### Layout
+Create a small, focused query hook that checks whether a specific creator (identified by their `user_id`) has Pro access. This is used by the workspace to resolve the **host's** tier, not the current visitor's.
 
-```text
-+-----------------------------------------------+
-| Milestone reached!                         [X] |
-| Your collab with Raghav was scheduled for      |
-| today. How did it go?                          |
-|                                                |
-| Was this published?  [Yes]  [Not yet]          |
-| [Share Your Experience] (opens feedback widget)|
-+-----------------------------------------------+
-```
+It queries the `creators` table (readable by anyone when `username IS NOT NULL`) and the `has_role` RPC — but targeted at the host's `user_id`, which comes from the `creator_id` on the request combined with the creator's `user_id`.
 
----
+Since `public_creator_profiles` doesn't expose `user_id` or `subscription_tier`, the host's Pro status will be determined by fetching from `creators` using the creator's `id` joined to `user_id`. The existing RLS on `creators` already allows: `SELECT` where `username IS NOT NULL` (the public policy). The `subscription_tier` and `trial_ends_at` columns are exposed under that public policy.
 
-## 2. Enhance Retrospective Email with 3-Question Survey
+### Logic Change in `Workspace.tsx`
 
-Update the retrospective email template to include three quick-response survey questions with clickable links.
+| Before | After |
+|--------|-------|
+| `canEdit={isPro}` (current user's Pro) | `canEdit={isHostPro}` (host's Pro status) |
+| `{isPro ? <Conversation /> : <UpgradePrompt />}` | `{isHostPro ? <Conversation /> : <UpgradePrompt for creator only />}` |
+| UpgradePrompt shown to guests | UpgradePrompt shown **only** to the creator if host is free |
 
-**File:** `supabase/functions/send-collab-retrospective/index.ts`
+### Guest Experience Changes
 
-- Add three survey questions to `buildRetrospectiveEmail()`:
-  1. "Did the SMART draft save you time?" -- Yes / No (links to feedback URL with query params)
-  2. "Was the workspace helpful?" -- Yes / No
-  3. "Would you collaborate here again?" -- Yes / Definitely
-- Each answer links to `{baseUrl}/dashboard?feedback=true&q=draft_time&a=yes` (the feedback widget opens with pre-filled context)
-- Keep the existing "Share Your Experience" CTA button
+When `isGuest === true`:
+- Never show any `UpgradePrompt` — guests are there to collaborate, not subscribe
+- The conversation feed is visible if the **host** is Pro
+- The editor is unlocked if the **host** is Pro
+- No billing CTAs, no Crown icons, no "Upgrade to Pro" banners in the guest view
 
----
+### Creator Experience (Unchanged)
 
-## Summary of Changes
+If the host is **free tier** (not Pro), they still see the upgrade prompts encouraging them to unlock the workspace for their collaborator. This is actually a stronger conversion trigger: "Your collaborator is waiting — upgrade to open the workspace."
 
-| File | Change |
-|------|--------|
-| `src/pages/Workspace.tsx` | Add retrospective banner when date is today or past |
-| `supabase/functions/send-collab-retrospective/index.ts` | Add 3-question survey to email template |
+## Files Changed
 
-No new tables or migrations needed -- responses flow through the existing feedback widget and `user_feedback` table.
+### 1. New file: `src/hooks/useCreatorPro.ts`
+
+A targeted hook that accepts a `creatorId` (the UUID from `collab_requests.creator_id`) and resolves their Pro status by:
+1. Fetching their `user_id` from the `creators` table using `id`
+2. Checking `subscription_tier`, `trial_ends_at`, and calling `has_role` RPC with that `user_id`
+
+### 2. `src/pages/Workspace.tsx`
+
+- Import `useCreatorPro` and call it once `creatorInfo` is loaded: `const { isPro: isHostPro } = useCreatorPro(request?.creator_id)`
+- Replace every `isPro` gate that controls workspace features with `isHostPro`
+- Wrap all `UpgradePrompt` renders with `{!isGuest && ...}` so guests never see billing walls
+- Keep `isPro` (the current user's own Pro status) available for future creator-only features like "Generate AI Draft" (which already guards with `isCreator &&`)
+
+## Summary
+
+The workspace "unlocked" state is determined entirely by whether the **host creator** has a Pro subscription. Guests inherit the host's access level — they can read and write if the host is Pro, and they see a "workspace coming soon" message (not an upgrade button) if the host is free. The creator themselves still sees the upgrade prompt if they are free, giving a clear, motivating path to convert.
+
+No database migrations needed. No new edge functions. The `creators` table is already readable publicly (where `username IS NOT NULL`), so the host's `subscription_tier` can be fetched from the client safely.
