@@ -14,7 +14,7 @@ export function Navbar() {
       <div className="max-w-7xl mx-auto">
         <div className="glass-card px-6 py-3 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 group">
-            <DraftKitLogo size={32} />
+            <DraftKitLogo size={50} />
             <span className="text-xl font-bold text-[#2a2318]">DraftKit</span>
           </Link>
 
