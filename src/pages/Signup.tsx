@@ -8,7 +8,7 @@ import {
   Lock,
   User,
   ExternalLink,
-  Sparkles,
+  
   Check,
   Calendar,
   MessageSquare,
@@ -20,6 +20,7 @@ import {
   EyeOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DraftKitLogo } from "@/components/icons/DraftKitLogo";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -469,8 +470,8 @@ export default function Signup() {
                 exit={{ opacity: 0, x: -20 }}
               >
                 <div className="text-center mb-8">
-                  <div className="w-14 h-14 rounded-xl gradient-primary mx-auto mb-4 flex items-center justify-center shadow-glow">
-                    <Sparkles className="w-7 h-7 text-primary-foreground" />
+                  <div className="mx-auto mb-4 flex items-center justify-center">
+                    <DraftKitLogo size={56} />
                   </div>
                   <h1 className="text-2xl font-bold">Create Account</h1>
                   <p className="text-muted-foreground mt-1">
