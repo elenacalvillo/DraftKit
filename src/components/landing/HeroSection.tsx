@@ -94,7 +94,7 @@ export function HeroSection() {
           >
             Stop chasing drafts.
             <br />
-            <span className="text-[#2a2318]">Start shipping together.</span>
+            Start <span className="gradient-text">shipping together.</span>
           </motion.h1>
 
           {/* Subheadline */}
