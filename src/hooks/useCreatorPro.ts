@@ -20,31 +20,20 @@ export function useCreatorPro(creatorId: string | undefined): CreatorProStatus {
       // RLS allows SELECT where username IS NOT NULL (public policy).
       const { data, error } = await supabase
         .from("creators")
-        .select("user_id, subscription_tier, trial_ends_at")
+        .select("subscription_tier, trial_ends_at")
         .eq("id", creatorId)
         .maybeSingle();
 
       if (error || !data) return false;
 
-      const { user_id, subscription_tier, trial_ends_at } = data as {
-        user_id: string;
+      const { subscription_tier, trial_ends_at } = data as {
         subscription_tier: string | null;
         trial_ends_at: string | null;
       };
 
-      // Check active trial
       const isInTrial = trial_ends_at ? new Date(trial_ends_at) > new Date() : false;
 
-      // Check subscription tier
-      if (subscription_tier === "pro" || isInTrial) return true;
-
-      // Check user_roles for manual pro (e.g. early adopters, lifetime deals)
-      const { data: hasRole } = await supabase.rpc("has_role", {
-        _user_id: user_id,
-        _role: "pro",
-      });
-
-      return Boolean(hasRole);
+      return subscription_tier === "pro" || isInTrial;
     },
     enabled: !!creatorId,
     staleTime: 5 * 60 * 1000, // 5 min cache — tier changes are infrequent
