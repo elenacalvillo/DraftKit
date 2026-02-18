@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Sparkles } from "lucide-react";
+import { DraftKitLogo } from "@/components/icons/DraftKitLogo";
 
 export function Navbar() {
   return (
@@ -14,9 +14,7 @@ export function Navbar() {
       <div className="max-w-7xl mx-auto">
         <div className="glass-card px-6 py-3 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 group">
-            <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center group-hover:shadow-glow transition-shadow duration-300">
-              <Sparkles className="w-4 h-4 text-primary-foreground" />
-            </div>
+            <DraftKitLogo size={32} />
             <span className="text-xl font-bold gradient-text">DraftKit</span>
           </Link>
 

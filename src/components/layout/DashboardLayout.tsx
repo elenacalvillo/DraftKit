@@ -7,7 +7,6 @@ import {
   LayoutDashboard,
   MessageSquare,
   Settings,
-  Sparkles,
   LogOut,
   Menu,
   X,
@@ -19,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { usePro } from "@/hooks/usePro";
 import { ProBadge } from "@/components/subscription/ProBadge";
+import { DraftKitLogo } from "@/components/icons/DraftKitLogo";
 
 const useIsDesktop = () => {
   const [isDesktop, setIsDesktop] = useState(
@@ -116,9 +116,7 @@ export function DashboardLayout({ children, zenMode, zenTitle, zenBackPath }: Da
       <div className="xl:hidden fixed top-0 left-0 right-0 z-50 px-4 py-3 glass-card rounded-none border-x-0 border-t-0">
         <div className="flex items-center justify-between">
           <Link to="/dashboard" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-primary-foreground" />
-            </div>
+            <DraftKitLogo size={32} />
             <span className="text-lg font-bold gradient-text">DraftKit</span>
           </Link>
           <Button
@@ -139,9 +137,7 @@ export function DashboardLayout({ children, zenMode, zenTitle, zenBackPath }: Da
         className="fixed top-0 left-0 bottom-0 w-64 z-40 glass-card rounded-none border-y-0 border-l-0 p-6 flex flex-col"
       >
         <Link to="/dashboard" className="flex items-center gap-2 mb-10">
-          <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-glow">
-            <Sparkles className="w-5 h-5 text-primary-foreground" />
-          </div>
+          <DraftKitLogo size={40} />
           <span className="text-xl font-bold gradient-text">DraftKit</span>
         </Link>
 

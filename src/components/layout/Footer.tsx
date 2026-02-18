@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
-import { Sparkles, Heart, Shield, BookOpen, FileText } from "lucide-react";
+import { Heart, Shield, BookOpen, FileText } from "lucide-react";
+import { DraftKitLogo } from "@/components/icons/DraftKitLogo";
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
@@ -10,9 +11,7 @@ export function Footer() {
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           {/* Logo & Tagline */}
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-primary-foreground" />
-            </div>
+            <DraftKitLogo size={32} />
             <div>
               <span className="font-semibold text-foreground">DraftKit</span>
               <p className="text-xs text-muted-foreground">
