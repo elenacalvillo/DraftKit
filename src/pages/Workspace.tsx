@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/useAuth";
 import { usePro } from "@/hooks/usePro";
+import { useCreatorPro } from "@/hooks/useCreatorPro";
 import { supabase } from "@/integrations/supabase/client";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { CollabDraft } from "@/lib/storage";
@@ -53,7 +54,7 @@ export default function Workspace() {
   const { requestId } = useParams<{ requestId: string }>();
   const navigate = useNavigate();
   const { user, creator, loading: authLoading } = useAuth();
-  const { isPro } = usePro();
+  const { isPro } = usePro(); // Current user's own Pro status (for creator-only features)
   const { trackEvent } = useAnalytics();
 
   const [request, setRequest] = useState<WorkspaceRequest | null>(null);
@@ -64,6 +65,10 @@ export default function Workspace() {
   // Role
   const isCreator = !!creator && creator.id === request?.creator_id;
   const isGuest = !!user && user.id === request?.requester_user_id;
+
+  // Host-pays model: workspace access is determined by the HOST creator's Pro status,
+  // not the current visitor's. Guests inherit the host's tier.
+  const { isPro: isHostPro } = useCreatorPro(request?.creator_id);
 
   // Modals
   const [showDraftModal, setShowDraftModal] = useState(false);
@@ -473,13 +478,19 @@ export default function Workspace() {
               <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
                 Conversation
               </h4>
-              {isPro ? (
+              {isHostPro ? (
                 <WorkspaceConversation
                   requestId={request.id}
                   currentUserIsCreator={isCreator}
                   refreshKey={msgRefreshKey}
                 />
+              ) : isGuest ? (
+                // Guests never see billing walls — the host needs to upgrade
+                <p className="text-xs text-muted-foreground text-center py-4">
+                  Conversation will be available once the workspace is unlocked.
+                </p>
               ) : (
+                // Creator (host) sees the upgrade prompt
                 <div className="relative">
                   <div className="opacity-20 pointer-events-none blur-[2px]">
                     <div className="space-y-3">
@@ -508,7 +519,7 @@ export default function Workspace() {
               lastEditedBy={request.content_last_edited_by}
               lastEditedAt={request.content_last_edited_at}
               currentUserName={currentUserName}
-              canEdit={isPro}
+              canEdit={isHostPro}
               partnerName={partnerName || undefined}
               isCreator={isCreator}
               onContentSaved={(content, editedBy, editedAt) => {
