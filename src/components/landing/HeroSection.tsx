@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { ArrowRight, Zap, Send, Sparkles, FileText, Trophy } from "lucide-react";
+import { DraftKitLogo } from "@/components/icons/DraftKitLogo";
 
 const steps = [
   {
@@ -72,6 +73,16 @@ export function HeroSection() {
           >
             <Zap className="w-4 h-4" />
             <span className="text-sm font-medium">Built for creators who ship, not just schedule</span>
+          </motion.div>
+
+          {/* Logo mark */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.075 }}
+            className="flex justify-center mb-6"
+          >
+            <DraftKitLogo size={72} />
           </motion.div>
 
           {/* Headline */}
