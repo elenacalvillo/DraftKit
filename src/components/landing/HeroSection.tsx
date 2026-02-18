@@ -7,25 +7,25 @@ import { DraftKitLogo } from "@/components/icons/DraftKitLogo";
 const steps = [
   {
     number: "01",
-    icon: <Send className="w-4 h-4" />,
+    icon: <Send className="w-5 h-5" />,
     title: "The Pitch",
     description: "Structured requests, not cold DMs",
   },
   {
     number: "02",
-    icon: <Sparkles className="w-4 h-4" />,
+    icon: <Sparkles className="w-5 h-5" />,
     title: "The SMART Draft",
     description: "Start at 80% done, not zero",
   },
   {
     number: "03",
-    icon: <FileText className="w-4 h-4" />,
+    icon: <FileText className="w-5 h-5" />,
     title: "The Workspace",
     description: "A meeting room for two",
   },
   {
     number: "04",
-    icon: <Trophy className="w-4 h-4" />,
+    icon: <Trophy className="w-5 h-5" />,
     title: "The Milestone",
     description: "Export and celebrate the win",
   },
@@ -94,7 +94,7 @@ export function HeroSection() {
           >
             Stop chasing drafts.
             <br />
-            <span className="gradient-text">Start shipping together.</span>
+            <span className="text-[#2a2318]">Start shipping together.</span>
           </motion.h1>
 
           {/* Subheadline */}
@@ -113,7 +113,7 @@ export function HeroSection() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.3 }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-20"
+            className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-28"
           >
             <Link to="/signup">
               <Button variant="hero" size="xl">
@@ -143,7 +143,7 @@ export function HeroSection() {
                 >
                   {/* Number + Icon row */}
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full gradient-primary text-primary-foreground text-xs font-bold shrink-0">
+                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-full gradient-primary text-primary-foreground text-sm font-bold shrink-0">
                       {step.number}
                     </span>
                     <span className="text-primary">{step.icon}</span>
@@ -155,7 +155,7 @@ export function HeroSection() {
                 {/* Arrow connector — desktop only, not after last item */}
                 {index < steps.length - 1 && (
                   <div className="hidden md:flex items-center justify-center absolute -right-2 top-1/2 -translate-y-1/2 z-10">
-                    <ArrowRight className="w-4 h-4 text-muted-foreground/40" />
+                    <ArrowRight className="w-5 h-5 text-foreground/50" strokeWidth={3} />
                   </div>
                 )}
               </div>
