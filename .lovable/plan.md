@@ -1,66 +1,134 @@
 
-# Logo Replacement: Venn-Ring SVG as the DraftKit Mark
+# Logo Implementation: DraftKitLogo SVG Component
 
-## What's Changing
+## Context
 
-The provisional logo — a Sparkles icon inside a coral gradient pill — appears in 7 locations across 6 files. Every instance will be replaced with an inline SVG rendering of the new two-circle Venn-ring mark.
+The `DraftKitLogo` component has never been created — the plan was proposed twice but never executed. This is a clean first implementation. The provisional Sparkles-in-gradient-pill logo needs to be replaced in 7 locations across 6 files.
 
-## The New Mark
+---
 
-The uploaded SVG is a Venn diagram composed of:
-- A left dark-outlined circle (`stroke: #2a2318`)
-- A right coral-outlined circle (`stroke: #e07b6c`)
-- A hatched fill (`stroke: #e29e8d` diagonal lines) in the overlap zone only
+## The `patternUnits` Detail (the core of this request)
 
-This is the "two creators, one workspace" metaphor in visual form — perfect for DraftKit.
+The SVG uses a `<pattern>` to render diagonal hatching in the Venn overlap zone. There are two values this attribute can take:
 
-## Implementation Strategy
+- `patternUnits="objectBoundingBox"` (browser default when omitted) — pattern tile dimensions are expressed as **fractions of the filled element's bounding box**. If the element changes size (e.g. the clip-path circle gets bigger), the tile scales too. This causes the hatch lines to visually "grow" or "shrink" when the `size` prop changes.
+- `patternUnits="userSpaceOnUse"` — pattern tile dimensions are expressed in the **SVG's own coordinate system** (the `viewBox="0 0 200 200"` space). The 8×8 tile stays 8 viewBox-units regardless of what element it fills. Since the `viewBox` is fixed and only `width`/`height` scale the whole SVG uniformly, the hatch density is always visually consistent.
 
-Rather than paste the full SVG into every file, a single **`DraftKitLogo` component** will be created at `src/components/icons/DraftKitLogo.tsx`. It accepts a `size` prop (defaults to `32`) and renders the SVG inline with unique pattern/clip IDs to avoid conflicts when multiple instances appear on the same page.
+The original uploaded SVG already has `patternUnits="userSpaceOnUse"` set. The implementation must preserve this exactly and must **not** accidentally omit it (JSX does not auto-fill SVG attribute defaults).
+
+---
+
+## Implementation
+
+### New file: `src/components/icons/DraftKitLogo.tsx`
 
 ```tsx
-// src/components/icons/DraftKitLogo.tsx
+import { useId } from "react";
+
 export function DraftKitLogo({ size = 32 }: { size?: number }) {
-  // Unique IDs prevent SVG defs collisions when rendered multiple times
-  const uid = useId(); // React 18 useId()
+  const uid = useId();
+  const patternId = `dk-lines-${uid}`;
+  const clipId   = `dk-clip-${uid}`;
+
   return (
-    <svg width={size} height={size} viewBox="0 0 200 200" ...>
-      ...
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 200 200"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <defs>
+        <pattern
+          id={patternId}
+          patternUnits="userSpaceOnUse"   {/* ← key: tied to viewBox coords, not element bbox */}
+          width="8"
+          height="8"
+          patternTransform="rotate(45)"
+        >
+          <line x1="0" y1="0" x2="0" y2="8" stroke="#e29e8d" strokeWidth="3" />
+        </pattern>
+        <clipPath id={clipId}>
+          <circle cx="85" cy="100" r="45" />
+        </clipPath>
+      </defs>
+
+      {/* Hatched overlap fill — right circle's area clipped to left circle shape */}
+      <circle
+        cx="115" cy="100" r="45"
+        fill={`url(#${patternId})`}
+        clipPath={`url(#${clipId})`}
+        opacity="1"
+      />
+      {/* Left circle outline — dark */}
+      <circle cx="85"  cy="100" r="45" stroke="#2a2318" strokeWidth="3" />
+      {/* Right circle outline — coral */}
+      <circle cx="115" cy="100" r="45" stroke="#e07b6c" strokeWidth="3" />
     </svg>
   );
 }
 ```
 
-## Files Changed
+**Why `useId()`:** When the logo renders simultaneously in the sidebar and the mobile header (both mounted at the same time in `DashboardLayout`), two SVG `<defs>` with the same `id` exist in the DOM. The browser uses the **first match**, so the second instance's pattern and clip-path silently reference the wrong element. `useId()` (React 18, already in the project) generates a stable, unique ID per component instance, preventing this collision entirely.
 
-| File | Change |
-|------|--------|
-| `src/components/icons/DraftKitLogo.tsx` | **New** — the reusable SVG logo component |
-| `src/components/layout/Navbar.tsx` | Replace `gradient-primary` div + `Sparkles` with `<DraftKitLogo size={32} />` |
-| `src/components/layout/Footer.tsx` | Replace `gradient-primary` div + `Sparkles` with `<DraftKitLogo size={32} />` |
-| `src/components/layout/DashboardLayout.tsx` | Replace both logo instances (sidebar 40px, mobile header 32px) |
-| `src/pages/Login.tsx` | Replace the `w-14 h-14` centered hero logo with `<DraftKitLogo size={56} />` |
-| `src/pages/Signup.tsx` | Same as Login — centered hero logo swap |
-| `src/pages/ForgotPassword.tsx` | Same — centered hero logo swap |
-| `src/pages/ResetPassword.tsx` | Same — centered hero logo swap |
+---
 
-## Size Mapping
+## Files to Update
 
-| Context | Current class | New size prop |
-|---------|--------------|---------------|
-| Navbar / Footer / Mobile header | `w-8 h-8` | `size={32}` |
-| Sidebar (DashboardLayout) | `w-10 h-10` | `size={40}` |
-| Auth page hero (Login, Signup, etc.) | `w-14 h-14` | `size={56}` |
+### 1. `src/components/icons/DraftKitLogo.tsx` — **Create**
+The component above.
 
-## What Gets Removed
+### 2. `src/components/layout/Navbar.tsx`
+- Remove `import { Sparkles } from "lucide-react"`
+- Replace the `<div className="w-8 h-8 rounded-lg gradient-primary ..."><Sparkles /></div>` wrapper with `<DraftKitLogo size={32} />`
 
-- The wrapping `<div className="... gradient-primary ...">` container is removed everywhere — the SVG is self-contained and carries its own colors
-- `import { Sparkles } from "lucide-react"` is removed from Navbar, Footer, and DashboardLayout (it may stay in other files where it serves non-logo purposes)
-- The `shadow-glow` and `group-hover:shadow-glow` effects on the logo container are dropped since the SVG has its own visual identity; `hover-lift` can still apply to the parent `<Link>` if desired
+### 3. `src/components/layout/Footer.tsx`
+- Remove `Sparkles` from lucide import
+- Same swap as Navbar — `size={32}`
 
-## Technical Notes
+### 4. `src/components/layout/DashboardLayout.tsx`
+- Remove `Sparkles` from the lucide import list
+- Mobile header logo: `size={32}`
+- Sidebar logo: `size={40}` (currently `w-10 h-10`, also remove `shadow-glow` on the wrapper div)
 
-- `useId()` from React 18 is already available (React `^18.3.1` in the project) — it generates stable unique IDs per component instance, preventing SVG `<defs>` ID collisions when the logo renders in both the sidebar and mobile header simultaneously
-- The SVG `viewBox="0 0 200 200"` is preserved; width/height are set via the `size` prop
-- No new dependencies, no Tailwind config changes
-- The favicon (`public/favicon.ico`) is left as-is — updating it is a separate step if desired
+### 5. `src/pages/Login.tsx`
+- Remove `Sparkles` from lucide import
+- Replace the `w-14 h-14 rounded-xl gradient-primary ... shadow-glow` div with `<DraftKitLogo size={56} />`
+
+### 6. `src/pages/Signup.tsx`
+- Remove `Sparkles` from lucide import (it appears in Step 1 header only)
+- Same swap as Login — `size={56}`
+
+### 7. `src/pages/ForgotPassword.tsx`
+- Remove `Sparkles` from lucide import
+- Same swap — `size={56}`
+
+### 8. `src/pages/ResetPassword.tsx`
+- Remove `Sparkles` from lucide import
+- Same swap — `size={56}`
+
+---
+
+## Size Reference
+
+| Location | Old class | New prop |
+|----------|-----------|----------|
+| Navbar, Footer, mobile header | `w-8 h-8` | `size={32}` |
+| Sidebar | `w-10 h-10` | `size={40}` |
+| Auth pages (Login, Signup, ForgotPassword, ResetPassword) | `w-14 h-14` | `size={56}` |
+
+---
+
+## What Is Removed
+
+- The `gradient-primary` wrapper `<div>` at every logo site — the SVG carries its own colors
+- `shadow-glow` on logo containers — the Venn mark has its own visual weight
+- `Sparkles` lucide import from all 6 files (it may remain in other files where it serves a non-logo purpose, e.g. `DashboardLayout`'s nav items do not use it, so it can be cleanly removed)
+
+---
+
+## What Is Not Changed
+
+- The favicon (`public/favicon.ico`) — a separate design step
+- Any non-logo usage of `Sparkles` elsewhere in the codebase
+- No Tailwind config changes, no new dependencies
