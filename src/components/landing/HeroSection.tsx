@@ -82,7 +82,7 @@ export function HeroSection() {
             transition={{ duration: 0.5, delay: 0.075 }}
             className="flex justify-center mb-6"
           >
-            <DraftKitLogo size={72} />
+            <DraftKitLogo size={100} />
           </motion.div>
 
           {/* Headline */}
@@ -104,8 +104,8 @@ export function HeroSection() {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="text-xl text-muted-foreground max-w-2xl mx-auto mb-12"
           >
-            One link to handle the pitch, the research, and the writing.
-            DraftKit is the shared workspace built for creators who value their time — and their collaborators.
+            One link to handle the pitch, the research, and the writing. DraftKit is the shared workspace built for
+            creators who value their time — and their collaborators.
           </motion.p>
 
           {/* CTA Buttons */}
@@ -122,7 +122,9 @@ export function HeroSection() {
               </Button>
             </Link>
             <Link to="/demo">
-              <Button variant="glass" size="lg">See a Demo Workspace</Button>
+              <Button variant="glass" size="lg">
+                See a Demo Workspace
+              </Button>
             </Link>
           </motion.div>
 
