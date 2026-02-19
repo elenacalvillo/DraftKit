@@ -52,6 +52,7 @@ const statusVariants: Record<string, { label: string; variant: 'default' | 'seco
   approved: { label: 'Approved', variant: 'default' },
   declined: { label: 'Declined', variant: 'destructive' },
   cancelled: { label: 'Cancelled', variant: 'outline' },
+  published: { label: '✨ Published', variant: 'default' },
 };
 
 export default function MyRequests() {
@@ -327,7 +328,7 @@ export default function MyRequests() {
                       </div>
                     )}
 
-                    {request.status === 'approved' && (
+                    {(request.status === 'approved' || request.status === 'published') && (
                       <div className="space-y-3 pt-3 border-t mt-3">
                         <Button
                           variant="default"
@@ -335,29 +336,31 @@ export default function MyRequests() {
                           onClick={() => navigate(`/dashboard/workspace/${request.id}`)}
                         >
                           <PenLine className="h-4 w-4 mr-2" />
-                          Enter Workspace
+                          {request.status === 'published' ? 'View Published Work' : 'Enter Workspace'}
                         </Button>
 
-                        <div className="flex gap-2">
-                          {request.collab_link && (
+                        {request.status === 'approved' && (
+                          <div className="flex gap-2">
+                            {request.collab_link && (
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => window.open(request.collab_link!, "_blank")}
+                              >
+                                <ExternalLink className="h-4 w-4 mr-1" />
+                                Open External Document
+                              </Button>
+                            )}
                             <Button 
                               variant="outline" 
                               size="sm"
-                              onClick={() => window.open(request.collab_link!, "_blank")}
+                              onClick={() => setMessageModalRequest(request)}
                             >
-                              <ExternalLink className="h-4 w-4 mr-1" />
-                              Open External Document
+                              <MessageSquare className="h-4 w-4 mr-1" />
+                              Message {request.creator?.name?.split(' ')[0] || 'Creator'}
                             </Button>
-                          )}
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => setMessageModalRequest(request)}
-                          >
-                            <MessageSquare className="h-4 w-4 mr-1" />
-                            Message {request.creator?.name?.split(' ')[0] || 'Creator'}
-                          </Button>
-                        </div>
+                          </div>
+                        )}
                       </div>
                     )}
 
