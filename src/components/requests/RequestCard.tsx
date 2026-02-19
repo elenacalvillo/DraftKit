@@ -349,10 +349,16 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
               }
             </span>
           </div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Mail className="w-4 h-4" />
-            <span>{request.requesterEmail}</span>
-          </div>
+          <a
+            href={`mailto:${request.requesterEmail}`}
+            aria-label="Send email to requester"
+            title="Send email"
+            onClick={e => e.stopPropagation()}
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
+          >
+            <Mail className="w-4 h-4 flex-shrink-0" />
+            <span>Email</span>
+          </a>
         </div>
 
         {/* Message */}
