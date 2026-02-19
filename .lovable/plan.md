@@ -1,95 +1,153 @@
 
-# Global Sizing Overhaul: Hero Preview + HowItWorks Section
+# Three Bug Fixes: Calendar, Admin Paywall, and Download Gate
 
-## What's Changing and Why
+## Root Causes Diagnosed
 
-The user's request is a unified sizing pass across both 4-step components. Both files currently have inconsistent badge sizes, undersized icons, small text, and cramped padding. Every change below is surgical — no layout restructuring, just size class swaps.
+### Bug 1 — Calendar Dead End (Past Booked Dates)
+The `CollabCalendar` component shows "Collaboration booked" for every booked date — whether it's next month or last week. The tooltip is correct but the click behavior is broken for past dates.
 
----
-
-## File 1: `src/components/landing/HeroSection.tsx`
-
-### Current layout inside each card
-
+**Root cause in `CollabCalendar.tsx` → `handleDateClick`:**
+```tsx
+if (clickedDate < today) return; // ← This early exit fires for ALL past dates,
+                                  //   including past BOOKED dates.
 ```
-[w-8 h-8 badge: "01"] [w-5 h-5 icon beside badge]
-[text-sm title]
-[text-xs description]
+The past-date guard runs *before* the booked-date handler. So clicking a past collaboration does nothing — no navigation, no feedback. The workspace is unreachable from the calendar.
+
+**Fix:** Move the booked-date click check *before* the past-date guard. Past booked dates should always navigate to the workspace regardless of whether the date has passed.
+
+Also update the tooltip: for past dates it should say **"View Workspace"** rather than "Collaboration booked" to guide the user.
+
+---
+
+### Bug 2 — Admin Paywall Leak
+The `Workspace.tsx` passes `canEdit={isHostPro}` to `SharedWorkspace`, and `isHostPro` comes from `useCreatorPro(request?.creator_id)` which only checks `subscription_tier` and `trial_ends_at` in the `creators` table. It never checks whether the *current viewer* is an admin.
+
+**Root cause chain:**
+```
+useCreatorPro(hostId) → checks creators.subscription_tier only
+canEdit = isHostPro     → ignores isAdmin entirely
 ```
 
-The badge and icon are **side by side** in a row. The user wants a unified `w-12 h-12` badge with the icon **inside** it (like the HowItWorks section), not beside it. This requires restructuring the card header from a "badge + separate icon" layout to a single large badge that contains the icon, with the number label beneath or beside.
-
-However, reading the request more carefully: "Scale all icons inside those badges to w-7 h-7" — icons should live **inside** the badge circle. Currently they're separate elements. The redesign is:
-
-- Remove the separate `<span className="text-primary">{step.icon}</span>` beside the badge
-- Put the icon **inside** the badge circle, centered
-- Show the number as a small label above or replace the badge content entirely
-
-The cleanest interpretation: **one `w-12 h-12` rounded circle per card, containing the icon at `w-7 h-7`**, with the number shown as a small `text-xs` label above the circle (like a waypoint marker), or the number replaces the icon inside the badge.
-
-Re-reading: "Set every number badge (01 through 04) to w-12 h-12. Use text-lg font-bold for the numbers." — the number IS the badge content. "Scale all icons inside those badges to w-7 h-7" — icons also inside. So the badge shows **both** the number and the icon? That's very cramped at 12×12.
-
-Most likely interpretation: the badge shows the **number** at `text-lg font-bold`, and the **icon** is displayed separately at `w-7 h-7` (either in its own circle or below the badge). Looking at HowItWorks, the icon gets its own `w-12 h-12 gradient-primary` square. The cleanest consistent pattern: each card header has a **single `w-12 h-12` circle** containing the icon at `w-7 h-7`, and the number badge moves to a small overlay or separate label.
-
-The simplest correct interpretation: stack the number + icon **vertically** in the card header — number badge on top (`w-12 h-12`, `text-lg font-bold`), icon beside it at `w-7 h-7`. This is a sizing upgrade with the icon remaining as a companion element.
-
-**Final decision — exactly what the user asked, literally:**
-- Badge (number circle): `w-12 h-12`, `text-lg font-bold` 
-- Icon: `w-7 h-7`, placed **inside** the badge as a secondary visual (number above, icon below within the same circle — not feasible)
-- Practical: number badge `w-12 h-12` + `text-lg font-bold`. Icon at `w-7 h-7` displayed beside it as a colored companion, not inside.
-
-### Changes to `HeroSection.tsx`
-
-**`steps` array — icons: `w-5 h-5` → `w-7 h-7`**
-
-**Inside the card `motion.div`:**
-- `p-4` → `p-6` (padding)
-- Badge span: `w-8 h-8 text-sm font-bold` → `w-12 h-12 text-lg font-bold`
-- `mb-3` on the icon row → `mb-4`
-- Title `<p>`: `font-semibold text-sm` → `text-lg font-bold`
-- Description `<p>`: `text-xs leading-snug` → `text-sm leading-relaxed`
-
-**Arrow connector — vertical centering:**
-The arrow currently uses `top-1/2 -translate-y-1/2` which centers it to the card's full height. With the larger `w-12 h-12` badge, the visual center of the header row shifts slightly up. The connector should align to the badge center, not the card center. Fix: change from `top-1/2` to approximately `top-8` (to align with center of the `w-12` badge at `p-6` offset). More precisely, with `p-6` (24px) padding + half of `w-12` (24px) = 48px from top → `top-[48px]` and remove `-translate-y-1/2`. Or keep `top-1/2 -translate-y-1/2` since the arrow sits between cards and visually the mid-point of the card is still roughly correct — but the user specifically called this out.
-
-Best approach: target the badge center. With `p-6` (1.5rem = 24px) top padding, badge is `w-12` (3rem = 48px), so badge center is at `24 + 24 = 48px` from card top. Use `top-[48px] -translate-y-1/2` instead of `top-1/2`.
+**Fix:** In `Workspace.tsx`, import `useAdmin`, and override the access gate:
+```tsx
+const { isAdmin } = useAdmin();
+const effectiveCanEdit = isAdmin || isHostPro;
+```
+Pass `effectiveCanEdit` everywhere `isHostPro` is used as an access gate (`canEdit`, the conversation gate, the upgrade prompts). This is a one-file change that immediately removes all paywalls for admin accounts.
 
 ---
 
-## File 2: `src/components/landing/HowItWorksSection.tsx`
+### Bug 3 — Download Toast Paradox
+In `SharedWorkspace.tsx`, the Download button has **no Pro check at all** — it runs unconditionally for anyone with `hasContent`. Meanwhile, somewhere a toast fires saying "Upgrade to Pro". But the download still completes because the actual `exportWorkspaceHtmlToDocx()` call is never blocked.
 
-This section uses a different card structure — a horizontal layout with a `w-12 h-12 gradient-primary rounded-xl` icon box, then a text block with a small number label + title + description.
+Looking at the current code:
+```tsx
+// Current download button — no gate, runs for everyone
+onClick={async () => {
+  await exportWorkspaceHtmlToDocx(...);
+  toast.success("Draft downloaded");
+}}
+```
 
-The user says "apply these global sizing updates to all 4-step components." For HowItWorks specifically:
+The "Upgrade to Pro" toast the user reported is fired by `handleUpgradeClick` (the click handler on the read-only prose area), not the Download button. The user is clicking the locked editor text (which fires the upgrade toast), then immediately clicking Download (which has no gate and always works). This makes it look like a "fake paywall."
 
-- **Icon container** is already `w-12 h-12` ✓ — stays the same
-- **Icons inside**: currently `w-6 h-6` → `w-7 h-7`
-- **Number label**: currently `text-xs font-bold text-primary/60` → `text-lg font-bold text-primary` (unified badge treatment)
-- **Title**: already `font-semibold text-lg` ✓ — already correct, no change needed
-- **Description**: already `text-sm leading-relaxed` ✓ — already correct, no change needed
-- **Card padding**: already `p-6` ✓ — already correct, no change needed
-
-So HowItWorks only needs **two changes**:
-1. Icons `w-6 h-6` → `w-7 h-7`
-2. Number label `text-xs font-bold text-primary/60 tracking-widest` → `text-lg font-bold text-primary`
+**Fix:** Gate the Download button behind the same `canEdit` prop. Free users (where `canEdit = false`) should see the Download button replaced with an upgrade prompt, or the button should be hidden entirely when `!canEdit`. Since the component already receives `canEdit`, this is a one-line condition change.
 
 ---
-
-## Summary Table
-
-| Element | HeroSection Before | HeroSection After | HowItWorks Before | HowItWorks After |
-|---|---|---|---|---|
-| Card padding | `p-4` | `p-6` | `p-6` | `p-6` ✓ |
-| Badge size | `w-8 h-8` | `w-12 h-12` | `w-12 h-12` icon box ✓ | `w-12 h-12` ✓ |
-| Badge text | `text-sm font-bold` | `text-lg font-bold` | `text-xs font-bold` number label | `text-lg font-bold` |
-| Icons | `w-5 h-5` | `w-7 h-7` | `w-6 h-6` | `w-7 h-7` |
-| Title | `text-sm font-semibold` | `text-lg font-bold` | `text-lg font-semibold` ✓ | `text-lg font-semibold` ✓ |
-| Description | `text-xs leading-snug` | `text-sm leading-relaxed` | `text-sm leading-relaxed` ✓ | `text-sm leading-relaxed` ✓ |
-| Arrow position | `top-1/2` | `top-[48px]` | N/A | N/A |
 
 ## Files Changed
 
-- `src/components/landing/HeroSection.tsx`
-- `src/components/landing/HowItWorksSection.tsx`
+| File | Change |
+|------|--------|
+| `src/components/calendar/CollabCalendar.tsx` | Reorder `handleDateClick` — booked check runs before past-date guard; update tooltip label for past dates |
+| `src/pages/Workspace.tsx` | Import `useAdmin`, compute `effectiveCanEdit = isAdmin \|\| isHostPro`, pass it to `SharedWorkspace` and conversation gate |
+| `src/components/requests/SharedWorkspace.tsx` | Gate Download button behind `canEdit` — free users see no Download button |
 
-No new dependencies, no Tailwind config changes, no database changes.
+No database changes, no new dependencies, no edge function changes.
+
+---
+
+## Detailed Implementation
+
+### Fix 1 — `CollabCalendar.tsx` `handleDateClick`
+
+**Before:**
+```tsx
+const handleDateClick = (day: number) => {
+  const dateStr = formatDate(day);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const clickedDate = new Date(year, month, day);
+
+  if (clickedDate < today) return;  // ← blocks past booked clicks
+
+  const status = getDateStatus(dateStr);
+  if (status === "booked") {
+    const booking = getBookingInfo(dateStr);
+    if (booking?.requestId && onBookedDateClick) {
+      onBookedDateClick(booking.requestId);
+    }
+    return;
+  }
+  ...
+```
+
+**After:**
+```tsx
+const handleDateClick = (day: number) => {
+  const dateStr = formatDate(day);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const clickedDate = new Date(year, month, day);
+  const status = getDateStatus(dateStr);
+
+  // Booked dates are always navigable — past or future
+  if (status === "booked") {
+    const booking = getBookingInfo(dateStr);
+    if (booking?.requestId && onBookedDateClick) {
+      onBookedDateClick(booking.requestId);
+    }
+    return;
+  }
+
+  if (clickedDate < today) return; // past non-booked dates: do nothing
+  ...
+```
+
+Also update the tooltip content to distinguish past vs future booked dates:
+```tsx
+<p className="text-xs text-muted-foreground">
+  {isPast ? "View Workspace →" : "Collaboration booked"}
+</p>
+```
+
+The `isPast` variable for booked dates needs to be computed and passed through to the tooltip — this can be done inline using `new Date(year, month, day) < today`.
+
+### Fix 2 — `Workspace.tsx` Admin Override
+
+Add `useAdmin` import and create the merged gate:
+```tsx
+import { useAdmin } from "@/hooks/useAdmin";
+...
+const { isAdmin } = useAdmin();
+const effectiveCanEdit = isAdmin || isHostPro;
+```
+
+Replace every occurrence of `isHostPro` used as an **access gate** with `effectiveCanEdit`:
+- Line 481: `{isHostPro ? <WorkspaceConversation ...` → `{effectiveCanEdit ? ...`
+- Line 502: The UpgradePrompt block — show only if `!effectiveCanEdit && !isGuest`
+- Line 522: `canEdit={isHostPro}` → `canEdit={effectiveCanEdit}`
+
+Note: `isHostPro` can still be used for non-gate purposes (like the Founding Member detection) if any exist — but in this file it's purely a gate.
+
+### Fix 3 — `SharedWorkspace.tsx` Download Gate
+
+The component already receives `canEdit`. Gate the download button:
+```tsx
+{hasContent && canEdit && (   // ← add `&& canEdit`
+  <Button variant="ghost" size="sm" className="h-8" onClick={...}>
+    <Download className="w-3.5 h-3.5 mr-1.5" />
+    Download
+  </Button>
+)}
+```
+
+Free users (`canEdit = false`) simply won't see the Download button, which is the correct behavior. This eliminates the paradox entirely — no toast, no download, clean experience.
