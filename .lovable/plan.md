@@ -1,57 +1,146 @@
 
-# Three Bug Fixes: Calendar, Admin Paywall, and Download Gate
+# Post-Collab Experience Loop Fix
 
-## Root Causes Diagnosed
+## What's Actually Broken
 
-### Bug 1 — Calendar Dead End (Past Booked Dates)
-The `CollabCalendar` component shows "Collaboration booked" for every booked date — whether it's next month or last week. The tooltip is correct but the click behavior is broken for past dates.
+There are three distinct problems across two views (Workspace + RequestCard):
 
-**Root cause in `CollabCalendar.tsx` → `handleDateClick`:**
+### Problem 1 — "Share Your Experience" navigates away and dies
+In `Workspace.tsx` line 358-363, the button does:
 ```tsx
-if (clickedDate < today) return; // ← This early exit fires for ALL past dates,
-                                  //   including past BOOKED dates.
+window.location.href = "/dashboard?feedback=true";
 ```
-The past-date guard runs *before* the booked-date handler. So clicking a past collaboration does nothing — no navigation, no feedback. The workspace is unreachable from the calendar.
+This is a full page redirect to the dashboard. The dashboard doesn't listen for `?feedback=true` to auto-open the feedback widget. So the user lands on a generic dashboard with no modal open and no feedback prompted — a "dead redirect."
 
-**Fix:** Move the booked-date click check *before* the past-date guard. Past booked dates should always navigate to the workspace regardless of whether the date has passed.
+### Problem 2 — The button has no memory
+The publish-answer (`handlePublishAnswer`) writes to `user_feedback` with `feedback_type: 'praise'` and `page_url` matching the workspace URL. But the "Share Your Experience" button is never checked against this existing record. Every time the user opens the workspace, they see the same banner — whether or not they've already answered.
 
-Also update the tooltip: for past dates it should say **"View Workspace"** rather than "Collaboration booked" to guide the user.
+### Problem 3 — RequestCard shows irrelevant actions for past approved collabs
+In `RequestCard.tsx` lines 395-489, for `status === "approved"` requests the card shows: Generate Draft, Message, Cancel, Start Drafting. For a collaboration whose `requested_date` is in the past, "Generate Draft" and "Cancel" are irrelevant. There's no way to tell at a glance that it's completed.
 
 ---
 
-### Bug 2 — Admin Paywall Leak
-The `Workspace.tsx` passes `canEdit={isHostPro}` to `SharedWorkspace`, and `isHostPro` comes from `useCreatorPro(request?.creator_id)` which only checks `subscription_tier` and `trial_ends_at` in the `creators` table. It never checks whether the *current viewer* is an admin.
+## The Fix Plan
 
-**Root cause chain:**
-```
-useCreatorPro(hostId) → checks creators.subscription_tier only
-canEdit = isHostPro     → ignores isAdmin entirely
-```
+### Fix 1 — Smart Retrospective Banner (Workspace.tsx)
 
-**Fix:** In `Workspace.tsx`, import `useAdmin`, and override the access gate:
+**Step A: Detect existing publish answer on mount**
+
+On load, query `user_feedback` for the matching `page_url` and `feedback_type = 'praise'` to see if the user has already answered the publish check-in:
+
 ```tsx
-const { isAdmin } = useAdmin();
-const effectiveCanEdit = isAdmin || isHostPro;
+const [existingRetroFeedback, setExistingRetroFeedback] = useState<{
+  message: string;
+} | null | undefined>(undefined); // undefined = loading
 ```
-Pass `effectiveCanEdit` everywhere `isHostPro` is used as an access gate (`canEdit`, the conversation gate, the upgrade prompts). This is a one-file change that immediately removes all paywalls for admin accounts.
+
+```tsx
+useEffect(() => {
+  if (!requestId || !user) return;
+  supabase
+    .from("user_feedback")
+    .select("message")
+    .eq("user_id", user.id)
+    .eq("page_url", `/dashboard/workspace/${requestId}`)
+    .eq("feedback_type", "praise")
+    .maybeSingle()
+    .then(({ data }) => setExistingRetroFeedback(data));
+}, [requestId, user]);
+```
+
+**Step B: Parse the stored answer from the message**
+
+The existing record's `message` contains `"Post-collab check-in: Published = yes"` or `"Published = not_yet"`. Parse this on load to restore the `publishAnswer` state:
+
+```tsx
+useEffect(() => {
+  if (!existingRetroFeedback) return;
+  if (existingRetroFeedback.message.includes('= yes')) setPublishAnswer('yes');
+  else if (existingRetroFeedback.message.includes('= not_yet')) setPublishAnswer('not_yet');
+}, [existingRetroFeedback]);
+```
+
+**Step C: Fix the "Share Your Experience" button**
+
+Replace the broken `window.location.href` redirect with the feedback widget opener. The feedback widget (`FeedbackWidget`) lives in `App.tsx` as a global component — but it has no external trigger. 
+
+The cleanest solution: open the global `FeedbackWidget` via a custom DOM event, OR simply add a **local inline feedback modal** to the workspace for this specific context.
+
+Given that the feedback widget uses its own state and there's no external trigger, the pragmatic fix is to dispatch a custom event that `FeedbackWidget` listens for:
+
+In `Workspace.tsx`:
+```tsx
+<Button
+  size="sm"
+  variant="gradient"
+  onClick={() => {
+    window.dispatchEvent(new CustomEvent("open-feedback-widget"));
+  }}
+>
+  Share Your Experience
+</Button>
+```
+
+In `FeedbackWidget.tsx`, add a listener:
+```tsx
+useEffect(() => {
+  const handler = () => setIsOpen(true);
+  window.addEventListener("open-feedback-widget", handler);
+  return () => window.removeEventListener("open-feedback-widget", handler);
+}, []);
+```
+
+**Step D: If already answered, show a "View Your Answer" state**
+
+When `publishAnswer` already exists (from the DB query), transform the banner from an action prompt to a completion summary:
+- Don't show the Yes/No buttons — instead show the badge of what was answered
+- Change "Share Your Experience" to "Add More Feedback" (secondary/ghost variant)
+- The banner can still be dismissed
 
 ---
 
-### Bug 3 — Download Toast Paradox
-In `SharedWorkspace.tsx`, the Download button has **no Pro check at all** — it runs unconditionally for anyone with `hasContent`. Meanwhile, somewhere a toast fires saying "Upgrade to Pro". But the download still completes because the actual `exportWorkspaceHtmlToDocx()` call is never blocked.
+### Fix 2 — RequestCard Past Collaboration Archive View
 
-Looking at the current code:
+In `RequestCard.tsx`, detect if the approved collaboration's date has passed:
+
 ```tsx
-// Current download button — no gate, runs for everyone
-onClick={async () => {
-  await exportWorkspaceHtmlToDocx(...);
-  toast.success("Draft downloaded");
-}}
+const isPastCollab = (() => {
+  const dateStr = (request as any).requested_date;
+  if (!dateStr) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const reqDate = parseDateString(dateStr);
+  reqDate.setHours(0, 0, 0, 0);
+  return reqDate < today;
+})();
 ```
 
-The "Upgrade to Pro" toast the user reported is fired by `handleUpgradeClick` (the click handler on the read-only prose area), not the Download button. The user is clicking the locked editor text (which fires the upgrade toast), then immediately clicking Download (which has no gate and always works). This makes it look like a "fake paywall."
+For `approved` requests where `isPastCollab === true`, replace the full action block with a clean "Milestone Summary" view:
 
-**Fix:** Gate the Download button behind the same `canEdit` prop. Free users (where `canEdit = false`) should see the Download button replaced with an upgrade prompt, or the button should be hidden entirely when `!canEdit`. Since the component already receives `canEdit`, this is a one-line condition change.
+```tsx
+{request.status === "approved" && isPastCollab && (
+  <div className="space-y-3 pt-3 border-t mt-3">
+    <div className="flex items-center gap-2 text-sm text-success font-medium">
+      <Check className="w-4 h-4" />
+      <span>Collaboration milestone reached</span>
+    </div>
+    <Button
+      variant="gradient"
+      className="w-full"
+      onClick={() => navigate(`/dashboard/workspace/${request.id}`)}
+    >
+      <PenLine className="w-4 h-4 mr-2" />
+      View Final Workspace
+    </Button>
+  </div>
+)}
+
+{request.status === "approved" && !isPastCollab && (
+  // ... existing action block unchanged
+)}
+```
+
+This eliminates the irrelevant "Generate Draft" and "Cancel" buttons for past collabs.
 
 ---
 
@@ -59,95 +148,17 @@ The "Upgrade to Pro" toast the user reported is fired by `handleUpgradeClick` (t
 
 | File | Change |
 |------|--------|
-| `src/components/calendar/CollabCalendar.tsx` | Reorder `handleDateClick` — booked check runs before past-date guard; update tooltip label for past dates |
-| `src/pages/Workspace.tsx` | Import `useAdmin`, compute `effectiveCanEdit = isAdmin \|\| isHostPro`, pass it to `SharedWorkspace` and conversation gate |
-| `src/components/requests/SharedWorkspace.tsx` | Gate Download button behind `canEdit` — free users see no Download button |
+| `src/pages/Workspace.tsx` | Query DB for existing retro feedback on mount; restore publish answer from existing record; fix "Share Your Experience" button to dispatch custom event instead of redirecting |
+| `src/components/feedback/FeedbackWidget.tsx` | Add `window.addEventListener("open-feedback-widget")` to open the widget programmatically |
+| `src/components/requests/RequestCard.tsx` | Add `isPastCollab` detection; show archive view for past approved collabs instead of irrelevant action buttons |
 
-No database changes, no new dependencies, no edge function changes.
+No database schema changes required — all data already exists in `user_feedback` with the correct shape.
 
 ---
 
-## Detailed Implementation
+## Edge Cases Handled
 
-### Fix 1 — `CollabCalendar.tsx` `handleDateClick`
-
-**Before:**
-```tsx
-const handleDateClick = (day: number) => {
-  const dateStr = formatDate(day);
-  const today = new Date(); today.setHours(0,0,0,0);
-  const clickedDate = new Date(year, month, day);
-
-  if (clickedDate < today) return;  // ← blocks past booked clicks
-
-  const status = getDateStatus(dateStr);
-  if (status === "booked") {
-    const booking = getBookingInfo(dateStr);
-    if (booking?.requestId && onBookedDateClick) {
-      onBookedDateClick(booking.requestId);
-    }
-    return;
-  }
-  ...
-```
-
-**After:**
-```tsx
-const handleDateClick = (day: number) => {
-  const dateStr = formatDate(day);
-  const today = new Date(); today.setHours(0,0,0,0);
-  const clickedDate = new Date(year, month, day);
-  const status = getDateStatus(dateStr);
-
-  // Booked dates are always navigable — past or future
-  if (status === "booked") {
-    const booking = getBookingInfo(dateStr);
-    if (booking?.requestId && onBookedDateClick) {
-      onBookedDateClick(booking.requestId);
-    }
-    return;
-  }
-
-  if (clickedDate < today) return; // past non-booked dates: do nothing
-  ...
-```
-
-Also update the tooltip content to distinguish past vs future booked dates:
-```tsx
-<p className="text-xs text-muted-foreground">
-  {isPast ? "View Workspace →" : "Collaboration booked"}
-</p>
-```
-
-The `isPast` variable for booked dates needs to be computed and passed through to the tooltip — this can be done inline using `new Date(year, month, day) < today`.
-
-### Fix 2 — `Workspace.tsx` Admin Override
-
-Add `useAdmin` import and create the merged gate:
-```tsx
-import { useAdmin } from "@/hooks/useAdmin";
-...
-const { isAdmin } = useAdmin();
-const effectiveCanEdit = isAdmin || isHostPro;
-```
-
-Replace every occurrence of `isHostPro` used as an **access gate** with `effectiveCanEdit`:
-- Line 481: `{isHostPro ? <WorkspaceConversation ...` → `{effectiveCanEdit ? ...`
-- Line 502: The UpgradePrompt block — show only if `!effectiveCanEdit && !isGuest`
-- Line 522: `canEdit={isHostPro}` → `canEdit={effectiveCanEdit}`
-
-Note: `isHostPro` can still be used for non-gate purposes (like the Founding Member detection) if any exist — but in this file it's purely a gate.
-
-### Fix 3 — `SharedWorkspace.tsx` Download Gate
-
-The component already receives `canEdit`. Gate the download button:
-```tsx
-{hasContent && canEdit && (   // ← add `&& canEdit`
-  <Button variant="ghost" size="sm" className="h-8" onClick={...}>
-    <Download className="w-3.5 h-3.5 mr-1.5" />
-    Download
-  </Button>
-)}
-```
-
-Free users (`canEdit = false`) simply won't see the Download button, which is the correct behavior. This eliminates the paradox entirely — no toast, no download, clean experience.
+- **Undefined state while loading**: `existingRetroFeedback` starts as `undefined` (loading) → the Yes/No buttons stay hidden until the check completes, preventing a flash of "unanswered" state
+- **User answers Yes/No, then re-opens workspace**: The DB query restores their answer immediately, so the banner shows "Already answered" state
+- **Request with no `requested_date`**: `isPastCollab` returns `false`, so the normal action block shows (correct behavior — no date = not past)
+- **Guest vs. Creator on RequestCard**: `isPastCollab` check applies equally regardless of role — both see the archive view
