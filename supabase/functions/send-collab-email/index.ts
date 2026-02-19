@@ -944,6 +944,60 @@ serve(async (req: Request): Promise<Response> => {
         </body>
         </html>
       `;
+    } else if (type === "collab_published") {
+      // Notify the partner (guest) that the collaboration is officially published
+      toEmail = requesterEmail;
+      emailSubject = `🎉 Your collaboration with ${creatorName} is live!`;
+
+      const workspaceUrl = `${baseUrl}/dashboard/workspace/${requestId}`;
+
+      emailHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid #f1f5f9;">
+            <span style="font-size: 22px; font-weight: 700; color: #2a2318; letter-spacing: -0.5px;">Draft</span><span style="font-size: 22px; font-weight: 700; color: #e07b6c; letter-spacing: -0.5px;">Kit</span>
+            <p style="margin: 4px 0 0; font-size: 12px; color: #94a3b8; letter-spacing: 0.5px;">The engine for creators who ship together</p>
+          </div>
+          <div style="text-align: center; margin-bottom: 32px;">
+            <h1 style="margin: 0; font-size: 24px; color: #1e293b;">🎉 Collaboration Published!</h1>
+          </div>
+
+          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterName},</p>
+
+          <p style="font-size: 16px; margin-bottom: 24px;">
+            Great news — <strong>${creatorName}</strong> has marked your collaboration as officially published! 🚀
+          </p>
+
+          <p style="font-size: 16px; margin-bottom: 24px; color: #475569;">
+            The work you shipped together is now out in the world. Give yourself a moment to celebrate — this is what creating together is all about.
+          </p>
+
+          <div style="background: #ecfdf5; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #10b981;">
+            <p style="margin: 0; color: #065f46; font-size: 14px;">
+              💡 <strong>Keep the momentum going:</strong> Share your published work and tag each other — it's the best way to grow together.
+            </p>
+          </div>
+
+          <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
+            <p style="margin: 0 0 16px 0; color: #475569;">View the final shared workspace:</p>
+            <a href="${workspaceUrl}"
+               style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+              View Published Work
+            </a>
+          </div>
+
+          <p style="font-size: 14px; color: #64748b; margin-top: 32px;">
+            Congratulations on shipping together!<br>
+            The DraftKit Team
+          </p>
+        </body>
+        </html>
+      `;
     }
 
     if (!toEmail) {
@@ -974,7 +1028,8 @@ serve(async (req: Request): Promise<Response> => {
       "new_message_from_guest",
       "collab_type_changed",
       "workspace_updated_by_creator",
-      "workspace_updated_by_guest"
+      "workspace_updated_by_guest",
+      "collab_published"
     ];
 
     if (DEDUP_TYPES.includes(type)) {
@@ -1014,6 +1069,7 @@ serve(async (req: Request): Promise<Response> => {
       workspace_updated_by_guest: requesterEmail,
       request_cancelled_by_guest: requesterEmail,
       collab_cancelled_by_host: creatorEmail || undefined,
+      collab_published: creatorEmail || undefined,
     };
     const replyTo = replyToMap[type];
 

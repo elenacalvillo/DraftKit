@@ -324,6 +324,20 @@ export default function Workspace() {
           .update({ status: "published" })
           .eq("id", requestId);
         setRequest(prev => prev ? { ...prev, status: "published" } : prev);
+
+        // Notify the guest partner that the collab is officially published
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            await supabase.functions.invoke("send-collab-email", {
+              body: { type: "collab_published", requestId },
+              headers: { Authorization: `Bearer ${session.access_token}` },
+            });
+          }
+        } catch (emailErr) {
+          // Non-fatal — don't surface this to the user
+          console.error("Failed to send collab_published email:", emailErr);
+        }
       }
 
       toast.success(answer === "yes" ? "Congrats on publishing! 🎉" : "No rush — we'll be here when it's ready!");
