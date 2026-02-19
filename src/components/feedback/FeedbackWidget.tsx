@@ -37,6 +37,13 @@ export function FeedbackWidget() {
   useEffect(() => {
     turnstileTokenRef.current = turnstileToken;
   }, [turnstileToken]);
+
+  // Listen for external trigger (e.g. from Workspace retrospective banner)
+  useEffect(() => {
+    const handler = () => setIsOpen(true);
+    window.addEventListener("open-feedback-widget", handler);
+    return () => window.removeEventListener("open-feedback-widget", handler);
+  }, []);
  
    // Handle token from Turnstile
    const handleTurnstileVerify = useCallback((token: string) => {
