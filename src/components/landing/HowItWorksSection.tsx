@@ -4,28 +4,28 @@ import { Send, Sparkles, FileText, Trophy } from "lucide-react";
 const steps = [
   {
     number: "01",
-    icon: <Send className="w-6 h-6" />,
+    icon: <Send className="w-7 h-7" />,
     title: "The Request",
     description:
       'Send one link. Your guest fills out a structured pitch with real research — not "let me know what you want to talk about."',
   },
   {
     number: "02",
-    icon: <Sparkles className="w-6 h-6" />,
+    icon: <Sparkles className="w-7 h-7" />,
     title: "The SMART Draft",
     description:
       "The AI takes their research and generates a 1,000-word starting point in your tone. You start at 80% done, not zero.",
   },
   {
     number: "03",
-    icon: <FileText className="w-6 h-6" />,
+    icon: <FileText className="w-7 h-7" />,
     title: "The Shared Workspace",
     description:
       'A distraction-free "meeting room" for two. No sidebars. No small talk. Just the text.',
   },
   {
     number: "04",
-    icon: <Trophy className="w-6 h-6" />,
+    icon: <Trophy className="w-7 h-7" />,
     title: "The Milestone",
     description:
       "Export to Substack or Word in one click. A retrospective banner closes the loop and celebrates the win.",
@@ -67,7 +67,7 @@ export function HowItWorksSection() {
               <div>
                 {/* Number + title */}
                 <div className="flex items-baseline gap-2 mb-2">
-                  <span className="text-xs font-bold text-primary/60 tracking-widest">{step.number}</span>
+                  <span className="text-lg font-bold text-primary">{step.number}</span>
                   <h3 className="font-semibold text-lg text-foreground">{step.title}</h3>
                 </div>
                 <p className="text-muted-foreground text-sm leading-relaxed">{step.description}</p>
