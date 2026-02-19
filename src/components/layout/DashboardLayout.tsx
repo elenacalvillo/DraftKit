@@ -117,7 +117,7 @@ export function DashboardLayout({ children, zenMode, zenTitle, zenBackPath }: Da
         <div className="flex items-center justify-between">
           <Link to="/dashboard" className="flex items-center gap-2">
             <DraftKitLogo size={32} />
-            <span className="text-lg font-bold gradient-text">DraftKit</span>
+            <span className="text-lg font-bold text-[#2a2318]">DraftKit</span>
           </Link>
           <Button
             variant="ghost"
@@ -138,7 +138,7 @@ export function DashboardLayout({ children, zenMode, zenTitle, zenBackPath }: Da
       >
         <Link to="/dashboard" className="flex items-center gap-2 mb-10">
           <DraftKitLogo size={40} />
-          <span className="text-xl font-bold gradient-text">DraftKit</span>
+          <span className="text-xl font-bold text-[#2a2318]">DraftKit</span>
         </Link>
 
         <nav className="flex-1 space-y-2">

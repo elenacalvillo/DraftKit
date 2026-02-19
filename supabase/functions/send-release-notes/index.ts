@@ -73,10 +73,11 @@ const generateEmailHtml = (
         <tr>
           <td align="center" style="padding: 40px 20px;">
             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);">
-              <!-- Header with gradient -->
+              <!-- Header with brand wordmark -->
               <tr>
-                <td style="background: linear-gradient(135deg, #d9826b 0%, #c9946d 100%); padding: 32px 40px; text-align: center;">
-                  <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;">DraftKit</h1>
+                <td style="background: #ffffff; padding: 32px 40px; text-align: center; border-bottom: 1px solid #f1f5f9;">
+                  <span style="font-size: 22px; font-weight: 700; color: #2a2318; letter-spacing: -0.5px;">Draft</span><span style="font-size: 22px; font-weight: 700; color: #e07b6c; letter-spacing: -0.5px;">Kit</span>
+                  <p style="margin: 4px 0 0; font-size: 12px; color: #94a3b8; letter-spacing: 0.5px;">The engine for creators who ship together</p>
                 </td>
               </tr>
               
