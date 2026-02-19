@@ -34,7 +34,7 @@ interface DbCollabRequest {
   content_last_edited_at: string | null;
 }
 
-type FilterTab = "all" | "pending" | "approved" | "declined" | "cancelled";
+type FilterTab = "all" | "pending" | "approved" | "declined" | "cancelled" | "published";
 
 export default function Requests() {
   const navigate = useNavigate();
@@ -301,6 +301,7 @@ export default function Requests() {
     { value: "all", label: "All", count: requests.length },
     { value: "pending", label: "Pending", count: requests.filter((r) => r.status === "pending").length },
     { value: "approved", label: "Approved", count: requests.filter((r) => r.status === "approved").length },
+    { value: "published", label: "✨ Published", count: requests.filter((r) => r.status === "published").length },
     { value: "declined", label: "Declined", count: requests.filter((r) => r.status === "declined").length },
     { value: "cancelled", label: "Cancelled", count: requests.filter((r) => r.status === "cancelled").length },
   ];
@@ -327,7 +328,7 @@ export default function Requests() {
     requesterProfileImageUrl: r.requester_profile_image_url,
     message: r.message || '',
     requestedDate: r.requested_date,
-    status: r.status as 'pending' | 'approved' | 'declined' | 'cancelled',
+    status: r.status as 'pending' | 'approved' | 'declined' | 'cancelled' | 'published',
     createdAt: r.created_at,
     aiDraft: r.ai_draft as CollabDraft | null,
     approvedAt: r.approved_at,

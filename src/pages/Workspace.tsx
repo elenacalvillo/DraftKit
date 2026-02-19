@@ -279,7 +279,7 @@ export default function Workspace() {
     );
   }
 
-  if (request.status !== "approved") {
+  if (request.status !== "approved" && request.status !== "published") {
     return (
       <DashboardLayout>
         <div className="max-w-6xl mx-auto text-center py-20">
@@ -316,6 +316,16 @@ export default function Workspace() {
         message: `Post-collab check-in: Published = ${answer}. Collab with ${partnerName}, request ${requestId}.`,
         page_url: window.location.pathname,
       });
+
+      // Only the host creator flips the canonical status to 'published'
+      if (answer === "yes" && isCreator && requestId) {
+        await supabase
+          .from("collab_requests")
+          .update({ status: "published" })
+          .eq("id", requestId);
+        setRequest(prev => prev ? { ...prev, status: "published" } : prev);
+      }
+
       toast.success(answer === "yes" ? "Congrats on publishing! 🎉" : "No rush — we'll be here when it's ready!");
     } catch (e) {
       console.error("Failed to save retro response:", e);

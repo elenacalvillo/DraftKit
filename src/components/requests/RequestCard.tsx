@@ -147,6 +147,15 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
     approved: "bg-success/10 text-success border-success/20",
     declined: "bg-destructive/10 text-destructive border-destructive/20",
     cancelled: "bg-muted text-muted-foreground border-muted-foreground/20",
+    published: "bg-success/15 text-success border-success/30",
+  };
+
+  const statusLabels: Record<string, string> = {
+    pending: "Pending",
+    approved: "Approved",
+    declined: "Declined",
+    cancelled: "Cancelled",
+    published: "✨ Published",
   };
 
   
@@ -260,11 +269,11 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
           </div>
           <span
             className={cn(
-              "px-3 py-1 rounded-full text-xs font-medium border capitalize",
-              statusColors[request.status]
+              "px-3 py-1 rounded-full text-xs font-medium border",
+              statusColors[request.status] || statusColors.pending
             )}
           >
-            {request.status}
+            {statusLabels[request.status] || request.status}
           </span>
         </div>
 
@@ -515,7 +524,26 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
           );
         })()}
 
+        {/* Published — celebratory archive view */}
+        {request.status === "published" && (
+          <div className="space-y-3 pt-3 border-t mt-3">
+            <div className="flex items-center gap-2 text-sm text-success font-medium">
+              <Sparkles className="w-4 h-4" />
+              <span>This collaboration is published!</span>
+            </div>
+            <Button
+              variant="outline"
+              className="w-full border-success/30 text-success hover:bg-success/10"
+              onClick={() => navigate(`/dashboard/workspace/${request.id}`)}
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              View Final Workspace
+            </Button>
+          </div>
+        )}
+
         {/* Cancelled status indicator with delete option */}
+
         {request.status === "cancelled" && (
           <div className="flex items-center justify-between bg-muted/50 rounded-lg p-3">
             <div className="flex items-center gap-2 text-muted-foreground">
