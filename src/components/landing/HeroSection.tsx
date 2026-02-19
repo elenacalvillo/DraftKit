@@ -133,7 +133,7 @@ export function HeroSection() {
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.4 }}
-            className="grid grid-cols-2 md:grid-cols-4 gap-10 max-w-5xl mx-auto"
+            className="grid grid-cols-2 md:grid-cols-4 gap-12 max-w-5xl mx-auto"
           >
             {steps.map((step, index) => (
               <div key={step.number} className="relative flex items-stretch">
