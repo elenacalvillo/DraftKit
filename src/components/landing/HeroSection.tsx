@@ -156,7 +156,7 @@ export function HeroSection() {
 
                 {/* Arrow connector — desktop only, not after last item */}
                 {index < steps.length - 1 && (
-                  <div className="hidden md:flex items-center justify-center absolute -right-[40px] top-[44px] translate-y-1/2 z-20">
+                  <div className="hidden md:flex items-center justify-center absolute -right-[43px] top-[44px] translate-y-1/2 z-20">
                     <ArrowRight className="w-10 h-10 text-[#e29e8d]" strokeWidth={3.5} />
                   </div>
                 )}
