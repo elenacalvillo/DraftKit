@@ -128,12 +128,9 @@ export function CollabCalendar({
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const clickedDate = new Date(year, month, day);
-
-    if (clickedDate < today) return;
-
     const status = getDateStatus(dateStr);
 
-    // Handle booked date clicks regardless of isEditable
+    // Booked dates are always navigable — past or future
     if (status === "booked") {
       const booking = getBookingInfo(dateStr);
       if (booking?.requestId && onBookedDateClick) {
@@ -141,6 +138,8 @@ export function CollabCalendar({
       }
       return;
     }
+
+    if (clickedDate < today) return; // past non-booked dates: do nothing
 
     if (isEditable) {
       if (status === "available") {
@@ -247,7 +246,9 @@ export function CollabCalendar({
                 </Avatar>
                 <div>
                   <p className="font-medium text-sm">{bookingInfo.requesterName}</p>
-                  <p className="text-xs text-muted-foreground">Collaboration booked</p>
+                  <p className="text-xs text-muted-foreground">
+                    {isPast ? "View Workspace →" : "Collaboration booked"}
+                  </p>
                 </div>
               </div>
             </TooltipContent>

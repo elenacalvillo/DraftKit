@@ -139,7 +139,7 @@ export function SharedWorkspace({
           <span className="text-sm font-medium">Shared Workspace</span>
         </div>
         <div className="flex items-center gap-2">
-          {hasContent && (
+          {hasContent && canEdit && (
             <Button
               variant="ghost"
               size="sm"

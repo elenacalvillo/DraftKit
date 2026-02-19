@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/useAuth";
 import { usePro } from "@/hooks/usePro";
 import { useCreatorPro } from "@/hooks/useCreatorPro";
+import { useAdmin } from "@/hooks/useAdmin";
 import { supabase } from "@/integrations/supabase/client";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { CollabDraft } from "@/lib/storage";
@@ -69,6 +70,9 @@ export default function Workspace() {
   // Host-pays model: workspace access is determined by the HOST creator's Pro status,
   // not the current visitor's. Guests inherit the host's tier.
   const { isPro: isHostPro } = useCreatorPro(request?.creator_id);
+  const { isAdmin } = useAdmin();
+  // Admins bypass all paywalls
+  const effectiveCanEdit = isAdmin || isHostPro;
 
   // Modals
   const [showDraftModal, setShowDraftModal] = useState(false);
@@ -478,7 +482,7 @@ export default function Workspace() {
               <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
                 Conversation
               </h4>
-              {isHostPro ? (
+              {effectiveCanEdit ? (
                 <WorkspaceConversation
                   requestId={request.id}
                   currentUserIsCreator={isCreator}
@@ -519,7 +523,7 @@ export default function Workspace() {
               lastEditedBy={request.content_last_edited_by}
               lastEditedAt={request.content_last_edited_at}
               currentUserName={currentUserName}
-              canEdit={isHostPro}
+              canEdit={effectiveCanEdit}
               partnerName={partnerName || undefined}
               isCreator={isCreator}
               onContentSaved={(content, editedBy, editedAt) => {
