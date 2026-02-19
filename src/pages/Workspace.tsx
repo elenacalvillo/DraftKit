@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Calendar, ExternalLink, LinkIcon, Mail, Sparkles, FileText, MessageSquare, PenLine, Lock, X, PartyPopper } from "lucide-react";
+import { ArrowLeft, Calendar, ExternalLink, LinkIcon, Mail, Sparkles, FileText, MessageSquare, PenLine, Lock, X, PartyPopper, CheckCircle2 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { SharedWorkspace } from "@/components/requests/SharedWorkspace";
 import { CollabDraftModal } from "@/components/requests/CollabDraftModal";
@@ -334,10 +334,14 @@ export default function Workspace() {
         <AnimatePresence>
           {isRetroEligible && !retroDismissed && (
             <motion.div
+              key={existingRetroFeedback !== undefined ? (existingRetroFeedback ? "saved" : "prompt") : "loading"}
               initial={{ opacity: 0, y: -12 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -12 }}
-              className="glass-card p-5 mb-6 border-l-4 border-l-green-500 relative"
+              className={cn(
+                "glass-card p-5 mb-6 border-l-4 relative",
+                existingRetroFeedback ? "border-l-success" : "border-l-primary"
+              )}
             >
               <button
                 onClick={dismissRetro}
@@ -347,49 +351,82 @@ export default function Workspace() {
                 <X className="w-4 h-4 text-muted-foreground" />
               </button>
 
-              <div className="flex items-center gap-2 mb-2">
-                <PartyPopper className="w-5 h-5 text-primary" />
-                <h3 className="font-semibold text-lg">Milestone reached!</h3>
-              </div>
-              <p className="text-sm text-muted-foreground mb-4">
-                Your collab with <strong>{partnerName}</strong> was scheduled for{" "}
-                <strong>{formatDate(request.requested_date)}</strong>. How did it go?
-              </p>
-
-              <div className="flex flex-wrap items-center gap-3">
-                {/* Only show publish prompt once DB check resolves (existingRetroFeedback !== undefined) */}
-                {existingRetroFeedback !== undefined && (
-                  <>
-                    <span className="text-sm font-medium">Was this published?</span>
-                    {publishAnswer ? (
-                      <Badge variant="secondary" className="capitalize">
-                        {publishAnswer === "yes" ? "✅ Yes" : "⏳ Not yet"}
-                      </Badge>
-                    ) : (
-                      <>
-                        <Button size="sm" variant="outline" onClick={() => handlePublishAnswer("yes")}>
-                          Yes
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => handlePublishAnswer("not_yet")}>
-                          Not yet
-                        </Button>
-                      </>
-                    )}
-                  </>
-                )}
-
-                <div className="ml-auto">
+              {/* Saved state — already answered */}
+              {existingRetroFeedback ? (
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="w-9 h-9 rounded-full bg-success/15 flex items-center justify-center flex-shrink-0">
+                      <CheckCircle2 className="w-5 h-5 text-success" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm leading-tight">Experience saved</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {publishAnswer === "yes"
+                          ? "You marked this collab as published 🎉"
+                          : publishAnswer === "not_yet"
+                          ? "You noted it's not published yet — no rush!"
+                          : `Collab with ${partnerName} — ${formatDate(request.requested_date)}`}
+                      </p>
+                    </div>
+                  </div>
                   <Button
                     size="sm"
-                    variant={existingRetroFeedback ? "outline" : "gradient"}
+                    variant="ghost"
+                    className="text-muted-foreground shrink-0"
                     onClick={() => {
                       window.dispatchEvent(new CustomEvent("open-feedback-widget"));
                     }}
                   >
-                    {existingRetroFeedback ? "Add More Feedback" : "Share Your Experience"}
+                    Add More Feedback
                   </Button>
                 </div>
-              </div>
+              ) : (
+                /* Prompt state — not yet answered */
+                <>
+                  <div className="flex items-center gap-2 mb-2">
+                    <PartyPopper className="w-5 h-5 text-primary" />
+                    <h3 className="font-semibold text-lg">Milestone reached!</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Your collab with <strong>{partnerName}</strong> was scheduled for{" "}
+                    <strong>{formatDate(request.requested_date)}</strong>. How did it go?
+                  </p>
+
+                  <div className="flex flex-wrap items-center gap-3">
+                    {existingRetroFeedback === null && (
+                      <>
+                        <span className="text-sm font-medium">Was this published?</span>
+                        {publishAnswer ? (
+                          <Badge variant="secondary">
+                            {publishAnswer === "yes" ? "✅ Yes" : "⏳ Not yet"}
+                          </Badge>
+                        ) : (
+                          <>
+                            <Button size="sm" variant="outline" onClick={() => handlePublishAnswer("yes")}>
+                              Yes
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => handlePublishAnswer("not_yet")}>
+                              Not yet
+                            </Button>
+                          </>
+                        )}
+                      </>
+                    )}
+
+                    <div className="ml-auto">
+                      <Button
+                        size="sm"
+                        variant="gradient"
+                        onClick={() => {
+                          window.dispatchEvent(new CustomEvent("open-feedback-widget"));
+                        }}
+                      >
+                        Share Your Experience
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
