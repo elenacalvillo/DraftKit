@@ -391,103 +391,129 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
           </div>
         )}
 
-        {/* Post-approval actions */}
-        {request.status === "approved" && (
-          <div className="space-y-4">
-            <div className="flex gap-2 flex-wrap">
-              <Button
-                variant={localDraft ? "outline" : "gradient"}
-                size="sm"
-                onClick={handleViewDraft}
-                className="flex-1"
-              >
-                <FileText className="w-4 h-4 mr-2" />
-                {localDraft ? "View Draft" : "Generate Draft"}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowMessageModal(true)}
-                className="flex-1"
-              >
-                <MessageSquare className="w-4 h-4 mr-2" />
-                Message
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onCancel?.(request.id)}
-                className="text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30"
-              >
-                <XCircle className="w-4 h-4 mr-1" />
-                Cancel
-              </Button>
-            </div>
-
-            {/* Collaboration Link Section */}
-            <div className="space-y-2">
-              {collabLink && !isEditingLink ? (
-                <div className="flex gap-2">
+        {/* Post-approval actions — past collabs show archive view */}
+        {request.status === "approved" && (() => {
+          const dateStr = (request as any).requested_date || (request as any).requestedDate;
+          if (dateStr) {
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            const reqDate = parseDateString(dateStr); reqDate.setHours(0, 0, 0, 0);
+            if (reqDate < today) {
+              return (
+                <div className="space-y-3 pt-3 border-t mt-3">
+                  <div className="flex items-center gap-2 text-sm text-success font-medium">
+                    <Check className="w-4 h-4" />
+                    <span>Collaboration milestone reached</span>
+                  </div>
                   <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => window.open(collabLink, "_blank")}
+                    variant="gradient"
+                    className="w-full"
+                    onClick={() => navigate(`/dashboard/workspace/${request.id}`)}
                   >
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    Open External Document
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9"
-                    onClick={() => setIsEditingLink(true)}
-                  >
-                    <Edit2 className="w-4 h-4" />
+                    <PenLine className="w-4 h-4 mr-2" />
+                    View Final Workspace
                   </Button>
                 </div>
-              ) : (
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Optional: link an external doc (Google Docs, Notion...)"
-                    value={collabLink}
-                    onChange={(e) => setCollabLink(e.target.value)}
-                    className="flex-1"
-                  />
-                  <Button 
-                    onClick={handleSaveCollabLink} 
-                    disabled={isSavingLink}
-                    size="sm"
-                  >
-                    Save
-                  </Button>
-                  {isEditingLink && (
-                    <Button 
-                      variant="ghost" 
+              );
+            }
+          }
+          // Upcoming approved collab — show full action block
+          return (
+            <div className="space-y-4">
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  variant={localDraft ? "outline" : "gradient"}
+                  size="sm"
+                  onClick={handleViewDraft}
+                  className="flex-1"
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  {localDraft ? "View Draft" : "Generate Draft"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowMessageModal(true)}
+                  className="flex-1"
+                >
+                  <MessageSquare className="w-4 h-4 mr-2" />
+                  Message
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onCancel?.(request.id)}
+                  className="text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30"
+                >
+                  <XCircle className="w-4 h-4 mr-1" />
+                  Cancel
+                </Button>
+              </div>
+
+              {/* Collaboration Link Section */}
+              <div className="space-y-2">
+                {collabLink && !isEditingLink ? (
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
                       size="sm"
-                      onClick={() => {
-                        setIsEditingLink(false);
-                        setCollabLink((request as any).collab_link || "");
-                      }}
+                      className="flex-1"
+                      onClick={() => window.open(collabLink, "_blank")}
                     >
-                      Cancel
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Open External Document
                     </Button>
-                  )}
-                </div>
-              )}
-            </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9"
+                      onClick={() => setIsEditingLink(true)}
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Optional: link an external doc (Google Docs, Notion...)"
+                      value={collabLink}
+                      onChange={(e) => setCollabLink(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button 
+                      onClick={handleSaveCollabLink} 
+                      disabled={isSavingLink}
+                      size="sm"
+                    >
+                      Save
+                    </Button>
+                    {isEditingLink && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => {
+                          setIsEditingLink(false);
+                          setCollabLink((request as any).collab_link || "");
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
 
-            {/* Start Drafting Button */}
-            <Button
-              variant="gradient"
-              className="w-full"
-              onClick={() => navigate(`/dashboard/workspace/${request.id}`)}
-            >
-              <PenLine className="w-4 h-4 mr-2" />
-              Start Drafting
-            </Button>
-          </div>
-        )}
+              {/* Start Drafting Button */}
+              <Button
+                variant="gradient"
+                className="w-full"
+                onClick={() => navigate(`/dashboard/workspace/${request.id}`)}
+              >
+                <PenLine className="w-4 h-4 mr-2" />
+                Start Drafting
+              </Button>
+            </div>
+          );
+        })()}
 
         {/* Cancelled status indicator with delete option */}
         {request.status === "cancelled" && (

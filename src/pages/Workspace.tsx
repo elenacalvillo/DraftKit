@@ -84,6 +84,28 @@ export default function Workspace() {
     localStorage.getItem(`retro-dismissed-${requestId}`) === "true"
   );
   const [publishAnswer, setPublishAnswer] = useState<string | null>(null);
+  // undefined = loading, null = not answered, {message} = already answered
+  const [existingRetroFeedback, setExistingRetroFeedback] = useState<{ message: string } | null | undefined>(undefined);
+
+  // On mount, check if the user has already answered the retrospective check-in
+  useEffect(() => {
+    if (!requestId || !user) return;
+    supabase
+      .from("user_feedback")
+      .select("message")
+      .eq("user_id", user.id)
+      .eq("page_url", `/dashboard/workspace/${requestId}`)
+      .eq("feedback_type", "praise")
+      .maybeSingle()
+      .then(({ data }) => setExistingRetroFeedback(data ?? null));
+  }, [requestId, user]);
+
+  // Restore publishAnswer from DB record
+  useEffect(() => {
+    if (!existingRetroFeedback) return;
+    if (existingRetroFeedback.message.includes("= yes")) setPublishAnswer("yes");
+    else if (existingRetroFeedback.message.includes("= not_yet")) setPublishAnswer("not_yet");
+  }, [existingRetroFeedback]);
 
   const handleMessageSent = useCallback(() => {
     setMsgRefreshKey((k) => k + 1);
@@ -335,31 +357,36 @@ export default function Workspace() {
               </p>
 
               <div className="flex flex-wrap items-center gap-3">
-                <span className="text-sm font-medium">Was this published?</span>
-                {publishAnswer ? (
-                  <Badge variant="secondary" className="capitalize">
-                    {publishAnswer === "yes" ? "✅ Yes" : "⏳ Not yet"}
-                  </Badge>
-                ) : (
+                {/* Only show publish prompt once DB check resolves (existingRetroFeedback !== undefined) */}
+                {existingRetroFeedback !== undefined && (
                   <>
-                    <Button size="sm" variant="outline" onClick={() => handlePublishAnswer("yes")}>
-                      Yes
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => handlePublishAnswer("not_yet")}>
-                      Not yet
-                    </Button>
+                    <span className="text-sm font-medium">Was this published?</span>
+                    {publishAnswer ? (
+                      <Badge variant="secondary" className="capitalize">
+                        {publishAnswer === "yes" ? "✅ Yes" : "⏳ Not yet"}
+                      </Badge>
+                    ) : (
+                      <>
+                        <Button size="sm" variant="outline" onClick={() => handlePublishAnswer("yes")}>
+                          Yes
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => handlePublishAnswer("not_yet")}>
+                          Not yet
+                        </Button>
+                      </>
+                    )}
                   </>
                 )}
 
                 <div className="ml-auto">
                   <Button
                     size="sm"
-                    variant="gradient"
+                    variant={existingRetroFeedback ? "outline" : "gradient"}
                     onClick={() => {
-                      window.location.href = "/dashboard?feedback=true";
+                      window.dispatchEvent(new CustomEvent("open-feedback-widget"));
                     }}
                   >
-                    Share Your Experience
+                    {existingRetroFeedback ? "Add More Feedback" : "Share Your Experience"}
                   </Button>
                 </div>
               </div>
