@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Calendar, ExternalLink, LinkIcon, Mail, Sparkles, FileText, MessageSquare, PenLine, Lock, X, PartyPopper, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Calendar, ExternalLink, LinkIcon, Mail, Sparkles, FileText, MessageSquare, PenLine, Lock, X, PartyPopper, CheckCircle2, Copy, Check } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { SharedWorkspace } from "@/components/requests/SharedWorkspace";
 import { CollabDraftModal } from "@/components/requests/CollabDraftModal";
@@ -498,13 +498,25 @@ export default function Workspace() {
               </div>
 
               {/* Email */}
-              <a
-                href={`mailto:${request.requester_email}`}
-                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
-              >
-                <Mail className="w-4 h-4 flex-shrink-0" />
-                <span>Send Email</span>
-              </a>
+              <div className="flex items-center gap-1">
+                <a
+                  href={`mailto:${request.requester_email}`}
+                  className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
+                >
+                  <Mail className="w-4 h-4 flex-shrink-0" />
+                  <span>Send Email</span>
+                </a>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(request.requester_email);
+                    toast.success("Email copied!");
+                  }}
+                  title="Copy email address"
+                  className="ml-1 p-1 rounded text-muted-foreground/50 hover:text-primary hover:bg-primary/10 transition-colors"
+                >
+                  <Copy className="w-3 h-3" />
+                </button>
+              </div>
             </div>
 
             {/* Message */}

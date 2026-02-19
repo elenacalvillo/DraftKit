@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Calendar, ExternalLink, Mail, Link as LinkIcon, Sparkles, MessageSquare, FileText, XCircle, Ban, Edit2, Check, X, Trash2, PenLine } from "lucide-react";
+import { Calendar, ExternalLink, Mail, Link as LinkIcon, Sparkles, MessageSquare, FileText, XCircle, Ban, Edit2, Check, X, Trash2, PenLine, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -349,16 +349,29 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
               }
             </span>
           </div>
-          <a
-            href={`mailto:${request.requesterEmail}`}
-            aria-label="Send email to requester"
-            title="Send email"
-            onClick={e => e.stopPropagation()}
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
-          >
-            <Mail className="w-4 h-4 flex-shrink-0" />
-            <span>Email</span>
-          </a>
+          <div className="flex items-center gap-1">
+            <a
+              href={`mailto:${request.requesterEmail}`}
+              aria-label="Send email to requester"
+              title="Send email"
+              onClick={e => e.stopPropagation()}
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
+            >
+              <Mail className="w-4 h-4 flex-shrink-0" />
+              <span>Email</span>
+            </a>
+            <button
+              onClick={e => {
+                e.stopPropagation();
+                navigator.clipboard.writeText(request.requesterEmail);
+                toast.success("Email copied!");
+              }}
+              title="Copy email address"
+              className="p-1 rounded text-muted-foreground/50 hover:text-primary hover:bg-primary/10 transition-colors"
+            >
+              <Copy className="w-3 h-3" />
+            </button>
+          </div>
         </div>
 
         {/* Message */}
