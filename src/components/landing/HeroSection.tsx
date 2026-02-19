@@ -133,7 +133,7 @@ export function HeroSection() {
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.4 }}
-            className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-4xl mx-auto"
+            className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-5xl mx-auto"
           >
             {steps.map((step, index) => (
               <div key={step.number} className="relative flex items-stretch">
@@ -156,8 +156,8 @@ export function HeroSection() {
 
                 {/* Arrow connector — desktop only, not after last item */}
                 {index < steps.length - 1 && (
-                  <div className="hidden md:flex items-center justify-center absolute -right-5 top-[48px] -translate-y-1/2 z-20">
-                    <ArrowRight className="w-8 h-8 text-[#e07b6c]" strokeWidth={3.5} />
+                  <div className="hidden md:flex items-center justify-center absolute -right-[32px] top-[44px] -translate-y-1/2 z-20">
+                    <ArrowRight className="w-6 h-6 text-[#2a2318]" strokeWidth={3.5} />
                   </div>
                 )}
               </div>
