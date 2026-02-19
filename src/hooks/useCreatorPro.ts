@@ -9,6 +9,10 @@ interface CreatorProStatus {
 /**
  * Checks whether the HOST creator (identified by their creators.id) has Pro access.
  * Used by the workspace so that the guest inherits the host's tier — never their own.
+ *
+ * Checks BOTH:
+ *  1. creators.subscription_tier / trial_ends_at (paying subscribers & trial users)
+ *  2. user_roles with role = 'pro' (early adopters / VIP grants)
  */
 export function useCreatorPro(creatorId: string | undefined): CreatorProStatus {
   const { data, isLoading } = useQuery({
@@ -16,27 +20,35 @@ export function useCreatorPro(creatorId: string | undefined): CreatorProStatus {
     queryFn: async (): Promise<boolean> => {
       if (!creatorId) return false;
 
-      // Fetch subscription_tier, trial_ends_at, and user_id from creators table.
-      // RLS allows SELECT where username IS NOT NULL (public policy).
       const { data, error } = await supabase
         .from("creators")
-        .select("subscription_tier, trial_ends_at")
+        .select("subscription_tier, trial_ends_at, user_id")
         .eq("id", creatorId)
         .maybeSingle();
 
       if (error || !data) return false;
 
-      const { subscription_tier, trial_ends_at } = data as {
+      const { subscription_tier, trial_ends_at, user_id } = data as {
         subscription_tier: string | null;
         trial_ends_at: string | null;
+        user_id: string;
       };
 
       const isInTrial = trial_ends_at ? new Date(trial_ends_at) > new Date() : false;
+      const isSubPro = subscription_tier === "pro";
 
-      return subscription_tier === "pro" || isInTrial;
+      if (isSubPro || isInTrial) return true;
+
+      // Also check user_roles table for 'pro' role (early adopters / VIP grants)
+      const { data: roleData } = await supabase.rpc("has_role", {
+        _user_id: user_id,
+        _role: "pro",
+      });
+
+      return roleData === true;
     },
     enabled: !!creatorId,
-    staleTime: 5 * 60 * 1000, // 5 min cache — tier changes are infrequent
+    staleTime: 5 * 60 * 1000,
   });
 
   return {
