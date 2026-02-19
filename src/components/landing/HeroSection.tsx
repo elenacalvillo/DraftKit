@@ -7,25 +7,25 @@ import { DraftKitLogo } from "@/components/icons/DraftKitLogo";
 const steps = [
   {
     number: "01",
-    icon: <Send className="w-5 h-5" />,
+    icon: <Send className="w-7 h-7" />,
     title: "The Pitch",
     description: "Structured requests, not cold DMs",
   },
   {
     number: "02",
-    icon: <Sparkles className="w-5 h-5" />,
+    icon: <Sparkles className="w-7 h-7" />,
     title: "The SMART Draft",
     description: "Start at 80% done, not zero",
   },
   {
     number: "03",
-    icon: <FileText className="w-5 h-5" />,
+    icon: <FileText className="w-7 h-7" />,
     title: "The Workspace",
     description: "A meeting room for two",
   },
   {
     number: "04",
-    icon: <Trophy className="w-5 h-5" />,
+    icon: <Trophy className="w-7 h-7" />,
     title: "The Milestone",
     description: "Export and celebrate the win",
   },
@@ -141,22 +141,22 @@ export function HeroSection() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: 0.5 + index * 0.1 }}
-                  className="glass-card p-4 text-left flex-1"
+                  className="glass-card p-6 text-left flex-1"
                 >
                   {/* Number + Icon row */}
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-full gradient-primary text-primary-foreground text-sm font-bold shrink-0">
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="inline-flex items-center justify-center w-12 h-12 rounded-full gradient-primary text-primary-foreground text-lg font-bold shrink-0">
                       {step.number}
                     </span>
                     <span className="text-primary">{step.icon}</span>
                   </div>
-                  <p className="font-semibold text-sm text-foreground leading-tight mb-1">{step.title}</p>
-                  <p className="text-xs text-muted-foreground leading-snug">{step.description}</p>
+                  <p className="text-lg font-bold text-foreground leading-tight mb-1">{step.title}</p>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{step.description}</p>
                 </motion.div>
 
                 {/* Arrow connector — desktop only, not after last item */}
                 {index < steps.length - 1 && (
-                  <div className="hidden md:flex items-center justify-center absolute -right-2 top-1/2 -translate-y-1/2 z-10">
+                  <div className="hidden md:flex items-center justify-center absolute -right-2 top-[48px] -translate-y-1/2 z-10">
                     <ArrowRight className="w-5 h-5 text-foreground/50" strokeWidth={3} />
                   </div>
                 )}
