@@ -498,10 +498,13 @@ export default function Workspace() {
               </div>
 
               {/* Email */}
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Mail className="w-4 h-4" />
-                <span className="truncate">{request.requester_email}</span>
-              </div>
+              <a
+                href={`mailto:${request.requester_email}`}
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
+              >
+                <Mail className="w-4 h-4 flex-shrink-0" />
+                <span>Send Email</span>
+              </a>
             </div>
 
             {/* Message */}
