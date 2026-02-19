@@ -308,11 +308,12 @@ serve(async (req: Request): Promise<Response> => {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
         </head>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid #f1f5f9;">
+            <span style="font-size: 22px; font-weight: 700; color: #2a2318; letter-spacing: -0.5px;">Draft</span><span style="font-size: 22px; font-weight: 700; color: #e07b6c; letter-spacing: -0.5px;">Kit</span>
+            <p style="margin: 4px 0 0; font-size: 12px; color: #94a3b8; letter-spacing: 0.5px;">The engine for creators who ship together</p>
+          </div>
           <div style="text-align: center; margin-bottom: 32px;">
-            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #d9826b, #c9946d); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
-              <span style="color: white; font-size: 24px;">✨</span>
-            </div>
-            <h1 style="margin: 0; font-size: 24px; color: #1e293b;">Collaboration Approved!</h1>
+            <h1 style="margin: 0; font-size: 24px; color: #1e293b;">✨ Collaboration Approved!</h1>
           </div>
 
           <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterName},</p>
@@ -352,11 +353,12 @@ serve(async (req: Request): Promise<Response> => {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
         </head>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid #f1f5f9;">
+            <span style="font-size: 22px; font-weight: 700; color: #2a2318; letter-spacing: -0.5px;">Draft</span><span style="font-size: 22px; font-weight: 700; color: #e07b6c; letter-spacing: -0.5px;">Kit</span>
+            <p style="margin: 4px 0 0; font-size: 12px; color: #94a3b8; letter-spacing: 0.5px;">The engine for creators who ship together</p>
+          </div>
           <div style="text-align: center; margin-bottom: 32px;">
-            <div style="width: 48px; height: 48px; background: #f1f5f9; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
-              <span style="font-size: 24px;">📬</span>
-            </div>
-            <h1 style="margin: 0; font-size: 24px; color: #1e293b;">Request Update</h1>
+            <h1 style="margin: 0; font-size: 24px; color: #1e293b;">📬 Request Update</h1>
           </div>
 
           <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterName},</p>
@@ -397,11 +399,12 @@ serve(async (req: Request): Promise<Response> => {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
         </head>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid #f1f5f9;">
+            <span style="font-size: 22px; font-weight: 700; color: #2a2318; letter-spacing: -0.5px;">Draft</span><span style="font-size: 22px; font-weight: 700; color: #e07b6c; letter-spacing: -0.5px;">Kit</span>
+            <p style="margin: 4px 0 0; font-size: 12px; color: #94a3b8; letter-spacing: 0.5px;">The engine for creators who ship together</p>
+          </div>
           <div style="text-align: center; margin-bottom: 32px;">
-            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #d9826b, #c9946d); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
-              <span style="color: white; font-size: 24px;">📨</span>
-            </div>
-            <h1 style="margin: 0; font-size: 24px; color: #1e293b;">New Collaboration Request</h1>
+            <h1 style="margin: 0; font-size: 24px; color: #1e293b;">📨 New Collaboration Request</h1>
           </div>
 
           <p style="font-size: 16px; margin-bottom: 24px;">Hi ${creatorName},</p>
@@ -444,11 +447,12 @@ serve(async (req: Request): Promise<Response> => {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
         </head>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid #f1f5f9;">
+            <span style="font-size: 22px; font-weight: 700; color: #2a2318; letter-spacing: -0.5px;">Draft</span><span style="font-size: 22px; font-weight: 700; color: #e07b6c; letter-spacing: -0.5px;">Kit</span>
+            <p style="margin: 4px 0 0; font-size: 12px; color: #94a3b8; letter-spacing: 0.5px;">The engine for creators who ship together</p>
+          </div>
           <div style="text-align: center; margin-bottom: 32px;">
-            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #d9826b, #c9946d); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
-              <span style="color: white; font-size: 24px;">✅</span>
-            </div>
-            <h1 style="margin: 0; font-size: 24px; color: #1e293b;">Request Submitted!</h1>
+            <h1 style="margin: 0; font-size: 24px; color: #1e293b;">✅ Request Submitted!</h1>
           </div>
 
           <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterName},</p>
@@ -506,11 +510,12 @@ serve(async (req: Request): Promise<Response> => {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
         </head>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid #f1f5f9;">
+            <span style="font-size: 22px; font-weight: 700; color: #2a2318; letter-spacing: -0.5px;">Draft</span><span style="font-size: 22px; font-weight: 700; color: #e07b6c; letter-spacing: -0.5px;">Kit</span>
+            <p style="margin: 4px 0 0; font-size: 12px; color: #94a3b8; letter-spacing: 0.5px;">The engine for creators who ship together</p>
+          </div>
           <div style="text-align: center; margin-bottom: 32px;">
-            <div style="width: 48px; height: 48px; background: #f1f5f9; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
-              <span style="font-size: 24px;">📋</span>
-            </div>
-            <h1 style="margin: 0; font-size: 24px; color: #1e293b;">Request Cancelled</h1>
+            <h1 style="margin: 0; font-size: 24px; color: #1e293b;">📋 Request Cancelled</h1>
           </div>
 
           <p style="font-size: 16px; margin-bottom: 24px;">Hi ${creatorName},</p>
@@ -553,11 +558,12 @@ serve(async (req: Request): Promise<Response> => {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
         </head>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid #f1f5f9;">
+            <span style="font-size: 22px; font-weight: 700; color: #2a2318; letter-spacing: -0.5px;">Draft</span><span style="font-size: 22px; font-weight: 700; color: #e07b6c; letter-spacing: -0.5px;">Kit</span>
+            <p style="margin: 4px 0 0; font-size: 12px; color: #94a3b8; letter-spacing: 0.5px;">The engine for creators who ship together</p>
+          </div>
           <div style="text-align: center; margin-bottom: 32px;">
-            <div style="width: 48px; height: 48px; background: #fef2f2; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
-              <span style="font-size: 24px;">📅</span>
-            </div>
-            <h1 style="margin: 0; font-size: 24px; color: #1e293b;">Collaboration Cancelled</h1>
+            <h1 style="margin: 0; font-size: 24px; color: #1e293b;">📅 Collaboration Cancelled</h1>
           </div>
 
           <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterName},</p>
@@ -598,11 +604,12 @@ serve(async (req: Request): Promise<Response> => {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
         </head>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid #f1f5f9;">
+            <span style="font-size: 22px; font-weight: 700; color: #2a2318; letter-spacing: -0.5px;">Draft</span><span style="font-size: 22px; font-weight: 700; color: #e07b6c; letter-spacing: -0.5px;">Kit</span>
+            <p style="margin: 4px 0 0; font-size: 12px; color: #94a3b8; letter-spacing: 0.5px;">The engine for creators who ship together</p>
+          </div>
           <div style="text-align: center; margin-bottom: 32px;">
-            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #d9826b, #c9946d); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
-              <span style="color: white; font-size: 24px;">💬</span>
-            </div>
-            <h1 style="margin: 0; font-size: 24px; color: #1e293b;">New Message</h1>
+            <h1 style="margin: 0; font-size: 24px; color: #1e293b;">💬 New Message</h1>
           </div>
 
           <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterName},</p>
@@ -642,11 +649,12 @@ serve(async (req: Request): Promise<Response> => {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
         </head>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid #f1f5f9;">
+            <span style="font-size: 22px; font-weight: 700; color: #2a2318; letter-spacing: -0.5px;">Draft</span><span style="font-size: 22px; font-weight: 700; color: #e07b6c; letter-spacing: -0.5px;">Kit</span>
+            <p style="margin: 4px 0 0; font-size: 12px; color: #94a3b8; letter-spacing: 0.5px;">The engine for creators who ship together</p>
+          </div>
           <div style="text-align: center; margin-bottom: 32px;">
-            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #d9826b, #c9946d); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
-              <span style="color: white; font-size: 24px;">💬</span>
-            </div>
-            <h1 style="margin: 0; font-size: 24px; color: #1e293b;">New Message</h1>
+            <h1 style="margin: 0; font-size: 24px; color: #1e293b;">💬 New Message</h1>
           </div>
 
           <p style="font-size: 16px; margin-bottom: 24px;">Hi ${creatorName},</p>
@@ -683,14 +691,13 @@ serve(async (req: Request): Promise<Response> => {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
         </head>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <div style="text-align: center; margin-bottom: 32px;">
-            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #d9826b, #c9946d); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
-              <span style="color: white; font-size: 24px;">⏰</span>
-            </div>
-            <h1 style="margin: 0; font-size: 24px; color: #1e293b;">Collaboration Reminder</h1>
+          <div style="text-align: center; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid #f1f5f9;">
+            <span style="font-size: 22px; font-weight: 700; color: #2a2318; letter-spacing: -0.5px;">Draft</span><span style="font-size: 22px; font-weight: 700; color: #e07b6c; letter-spacing: -0.5px;">Kit</span>
+            <p style="margin: 4px 0 0; font-size: 12px; color: #94a3b8; letter-spacing: 0.5px;">The engine for creators who ship together</p>
           </div>
-
-          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${creatorName},</p>
+          <div style="text-align: center; margin-bottom: 32px;">
+            <h1 style="margin: 0; font-size: 24px; color: #1e293b;">⏰ Collaboration Reminder</h1>
+          </div>
           
           <p style="font-size: 16px; margin-bottom: 24px;">
             Just a friendly reminder that you have a collaboration with <strong>${requesterName}</strong> coming up on <strong>${formattedDate}</strong>!
@@ -726,11 +733,12 @@ serve(async (req: Request): Promise<Response> => {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
         </head>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid #f1f5f9;">
+            <span style="font-size: 22px; font-weight: 700; color: #2a2318; letter-spacing: -0.5px;">Draft</span><span style="font-size: 22px; font-weight: 700; color: #e07b6c; letter-spacing: -0.5px;">Kit</span>
+            <p style="margin: 4px 0 0; font-size: 12px; color: #94a3b8; letter-spacing: 0.5px;">The engine for creators who ship together</p>
+          </div>
           <div style="text-align: center; margin-bottom: 32px;">
-            <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #d9826b, #c9946d); border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px;">
-              <span style="color: white; font-size: 24px;">⏰</span>
-            </div>
-            <h1 style="margin: 0; font-size: 24px; color: #1e293b;">Collaboration Reminder</h1>
+            <h1 style="margin: 0; font-size: 24px; color: #1e293b;">⏰ Collaboration Reminder</h1>
           </div>
 
           <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterName},</p>
