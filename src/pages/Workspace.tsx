@@ -308,6 +308,38 @@ export default function Workspace() {
   const retroDismissKey = `retro-dismissed-${requestId}`;
   const handlePublishAnswer = async (answer: "yes" | "not_yet") => {
     setPublishAnswer(answer);
+
+    // Step 1 (CRITICAL): Flip the status to 'published' FIRST, independently of feedback logging
+    if (answer === "yes" && isCreator && requestId) {
+      const { error: publishError } = await supabase
+        .from("collab_requests")
+        .update({ status: "published" })
+        .eq("id", requestId);
+
+      if (publishError) {
+        console.error("[Workspace] Failed to update status to published:", publishError);
+        toast.error("Couldn't mark as published — please try again.");
+        setPublishAnswer(null);
+        return;
+      }
+
+      setRequest(prev => prev ? { ...prev, status: "published" } : prev);
+
+      // Notify the guest partner — non-fatal
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          await supabase.functions.invoke("send-collab-email", {
+            body: { type: "collab_published", requestId },
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          });
+        }
+      } catch (emailErr) {
+        console.error("Failed to send collab_published email:", emailErr);
+      }
+    }
+
+    // Step 2: Log feedback separately — failure here must NOT block the status update above
     try {
       await supabase.from("user_feedback").insert({
         user_id: user?.id || null,
@@ -316,41 +348,11 @@ export default function Workspace() {
         message: `Post-collab check-in: Published = ${answer}. Collab with ${partnerName}, request ${requestId}.`,
         page_url: window.location.pathname,
       });
-
-      // Only the host creator flips the canonical status to 'published'
-      if (answer === "yes" && isCreator && requestId) {
-        console.log("[Workspace] Attempting to mark request as published:", requestId, "isCreator:", isCreator);
-        const { error: publishError } = await supabase
-          .from("collab_requests")
-          .update({ status: "published" })
-          .eq("id", requestId);
-        if (publishError) {
-          console.error("[Workspace] Failed to update status to published:", publishError);
-          toast.error("Couldn't mark as published — please try again.");
-          return;
-        }
-        console.log("[Workspace] Status updated to published successfully");
-        setRequest(prev => prev ? { ...prev, status: "published" } : prev);
-
-        // Notify the guest partner that the collab is officially published
-        try {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session) {
-            await supabase.functions.invoke("send-collab-email", {
-              body: { type: "collab_published", requestId },
-              headers: { Authorization: `Bearer ${session.access_token}` },
-            });
-          }
-        } catch (emailErr) {
-          // Non-fatal — don't surface this to the user
-          console.error("Failed to send collab_published email:", emailErr);
-        }
-      }
-
-      toast.success(answer === "yes" ? "Congrats on publishing! 🎉" : "No rush — we'll be here when it's ready!");
     } catch (e) {
-      console.error("Failed to save retro response:", e);
+      console.error("Feedback log failed (non-fatal):", e);
     }
+
+    toast.success(answer === "yes" ? "Congrats on publishing! 🎉" : "No rush — we'll be here when it's ready!");
   };
 
   const dismissRetro = () => {
