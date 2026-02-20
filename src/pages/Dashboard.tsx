@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { parseDateString } from "@/lib/utils";
-import { Calendar, Clock, Copy, ExternalLink, MessageSquare, Users } from "lucide-react";
+import { Copy, ExternalLink, Globe, MessageSquare, TrendingUp, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -16,6 +16,7 @@ interface CollabRequest {
   requester_name: string;
   requester_email: string;
   requester_profile_image_url: string | null;
+  requester_substack_url: string | null;
   requested_date: string;
   status: string;
   created_at: string;
@@ -97,7 +98,7 @@ export default function Dashboard() {
     // Fetch requests
     const { data: reqData } = await supabase
       .from('collab_requests')
-      .select('id, requester_name, requester_email, requester_profile_image_url, requested_date, status, created_at, ai_draft')
+      .select('id, requester_name, requester_email, requester_profile_image_url, requester_substack_url, requested_date, status, created_at, ai_draft')
       .eq('creator_id', creator.id)
       .eq('hidden_by_creator', false)
       .order('created_at', { ascending: false });
@@ -131,44 +132,65 @@ export default function Dashboard() {
   };
 
   const pendingCount = requests.filter((r) => r.status === "pending").length;
-  const draftsCreatedCount = requests.filter((r) => r.ai_draft !== null).length;
-  const thisMonthCollabs = requests.filter((r) => {
-    const date = parseDateString(r.requested_date);
-    const now = new Date();
-    return (
-      r.status === "approved" &&
-      date.getMonth() === now.getMonth() &&
-      date.getFullYear() === now.getFullYear()
-    );
-  }).length;
+
+  // Ship Rate: published / (non-pending, non-cancelled)
+  const eligibleRequests = requests.filter((r) => r.status !== "pending" && r.status !== "cancelled");
+  const publishedRequests = requests.filter((r) => r.status === "published");
+  const shipRate = eligibleRequests.length > 0
+    ? Math.round((publishedRequests.length / eligibleRequests.length) * 100)
+    : null;
+  const shipRateDisplay = shipRate === null ? "—" : `${shipRate}%`;
+
+  // Collaborator Reach: unique requester_substack_url values
+  const uniqueUrls = new Set(
+    requests
+      .filter((r) => r.requester_substack_url)
+      .map((r) => r.requester_substack_url!.trim().toLowerCase())
+  );
+  const reach = uniqueUrls.size;
+  const reachDisplay = `${reach} ${reach === 1 ? "Newsletter" : "Newsletters"}`;
+
+  // Time Saved: ai_draft count * 1.5 hrs
+  const draftsGenerated = requests.filter((r) => r.ai_draft !== null).length;
+  const hoursSaved = draftsGenerated * 1.5;
+  const timeSavedDisplay = hoursSaved % 1 === 0 ? `${hoursSaved} hrs` : `${hoursSaved.toFixed(1)} hrs`;
 
   const stats = [
     {
-      icon: Users,
-      label: "Outlines Created",
-      subLabel: "Ready to refine",
-      value: draftsCreatedCount,
-      emptyTip: "Review a request to generate your first collaboration outline",
-      color: "text-primary",
-      bg: "bg-primary/10",
+      icon: TrendingUp,
+      label: "Ship Rate",
+      subLabel: "Requests turned into published work",
+      value: shipRateDisplay,
+      isEmpty: shipRate === null || shipRate === 0,
+      emptyTip: "Approve and publish your first collab to track your closing rate",
+      iconClassName: "text-primary",
+      bgClassName: "bg-primary/10",
+      iconStyle: undefined as React.CSSProperties | undefined,
+      bgStyle: undefined as React.CSSProperties | undefined,
     },
     {
-      icon: Clock,
-      label: "Pending Requests",
-      subLabel: "Awaiting your review",
-      value: pendingCount,
-      emptyTip: "Share your link to start receiving collaboration requests",
-      color: "text-accent",
-      bg: "bg-accent/10",
+      icon: Globe,
+      label: "Collaborator Reach",
+      subLabel: "Unique audiences reached",
+      value: reachDisplay,
+      isEmpty: reach === 0,
+      emptyTip: "Each requester's newsletter counts — your first request is your first audience reached",
+      iconClassName: "",
+      bgClassName: "",
+      iconStyle: { color: "#c17f5c" } as React.CSSProperties,
+      bgStyle: { backgroundColor: "#c17f5c1a" } as React.CSSProperties,
     },
     {
-      icon: Calendar,
-      label: "Collaborations This Month",
-      subLabel: "Scheduled this month",
-      value: thisMonthCollabs,
-      emptyTip: "Approve requests to fill your calendar",
-      color: "text-success",
-      bg: "bg-success/10",
+      icon: Zap,
+      label: "Time Saved Drafting",
+      subLabel: "Estimated drafting time saved",
+      value: timeSavedDisplay,
+      isEmpty: draftsGenerated === 0,
+      emptyTip: "Generate a SMART draft to start tracking how much drafting time DraftKit saves you",
+      iconClassName: "",
+      bgClassName: "",
+      iconStyle: { color: "#2a2318" } as React.CSSProperties,
+      bgStyle: { backgroundColor: "#2a231810" } as React.CSSProperties,
     },
   ];
 
@@ -261,8 +283,14 @@ export default function Dashboard() {
               className="glass-card p-6 hover-lift"
             >
               <div className="flex items-center gap-4">
-                <div className={`w-12 h-12 rounded-xl ${stat.bg} flex items-center justify-center`}>
-                  <stat.icon className={`w-6 h-6 ${stat.color}`} />
+                <div
+                  className={`w-12 h-12 rounded-xl flex items-center justify-center ${stat.bgClassName}`}
+                  style={stat.bgStyle}
+                >
+                  <stat.icon
+                    className={`w-6 h-6 ${stat.iconClassName}`}
+                    style={stat.iconStyle}
+                  />
                 </div>
                 <div className="flex-1">
                   <p className="text-3xl font-bold">{stat.value}</p>
@@ -270,7 +298,7 @@ export default function Dashboard() {
                   <p className="text-xs text-muted-foreground">{stat.subLabel}</p>
                 </div>
               </div>
-              {stat.value === 0 && (
+              {stat.isEmpty && (
                 <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border/50">
                   {stat.emptyTip}
                 </p>
