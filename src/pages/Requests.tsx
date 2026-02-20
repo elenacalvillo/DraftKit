@@ -116,7 +116,6 @@ export default function Requests() {
       .select('*')
       .eq('creator_id', creator.id)
       .eq('hidden_by_creator', false)
-      .order('requested_date', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false });
 
     if (data) {
@@ -293,10 +292,29 @@ export default function Requests() {
     toast.success("Request deleted");
   };
 
-  const filteredRequests = requests.filter((r) => {
-    if (activeTab === "all") return true;
-    return r.status === activeTab;
-  });
+  const filteredRequests = requests
+    .filter((r) => {
+      if (activeTab === "all") return true;
+      return r.status === activeTab;
+    })
+    .sort((a, b) => {
+      if (activeTab === "approved") {
+        // Calendar: next upcoming collab first (ascending date)
+        if (!a.requested_date && !b.requested_date) return 0;
+        if (!a.requested_date) return 1;
+        if (!b.requested_date) return -1;
+        return a.requested_date.localeCompare(b.requested_date);
+      }
+      if (activeTab === "published") {
+        // Trophy case: most recent win first (descending date)
+        if (!a.requested_date && !b.requested_date) return 0;
+        if (!a.requested_date) return 1;
+        if (!b.requested_date) return -1;
+        return b.requested_date.localeCompare(a.requested_date);
+      }
+      // All other tabs (all, pending, declined, cancelled): newest submission first
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
 
   const tabs: { value: FilterTab; label: string; count: number }[] = [
     { value: "all", label: "All", count: requests.length },

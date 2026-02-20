@@ -319,10 +319,17 @@ export default function Workspace() {
 
       // Only the host creator flips the canonical status to 'published'
       if (answer === "yes" && isCreator && requestId) {
-        await supabase
+        console.log("[Workspace] Attempting to mark request as published:", requestId, "isCreator:", isCreator);
+        const { error: publishError } = await supabase
           .from("collab_requests")
           .update({ status: "published" })
           .eq("id", requestId);
+        if (publishError) {
+          console.error("[Workspace] Failed to update status to published:", publishError);
+          toast.error("Couldn't mark as published — please try again.");
+          return;
+        }
+        console.log("[Workspace] Status updated to published successfully");
         setRequest(prev => prev ? { ...prev, status: "published" } : prev);
 
         // Notify the guest partner that the collab is officially published
