@@ -27,6 +27,16 @@ serve(async (req) => {
     const { priceId, returnTo } = await req.json();
     if (!priceId) throw new Error("priceId is required");
 
+    // Validate returnTo is a safe relative path (no open redirect)
+    function isValidReturnPath(path: unknown): path is string {
+      if (typeof path !== "string" || !path) return false;
+      if (!path.startsWith("/")) return false;
+      if (path.includes("..")) return false;
+      if (path.includes(":") || path.includes("//")) return false;
+      if (path.length > 200) return false;
+      return true;
+    }
+
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
       apiVersion: "2025-08-27.basil",
     });
@@ -40,7 +50,7 @@ serve(async (req) => {
 
     const origin = req.headers.get("origin") || "https://collabstack.lovable.app";
 
-    const successUrl = returnTo
+    const successUrl = isValidReturnPath(returnTo)
       ? `${origin}${returnTo}?pro_activated=true`
       : `${origin}/dashboard/subscription?success=true`;
 
