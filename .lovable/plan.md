@@ -1,35 +1,103 @@
+## Protecting the Workspace: Hard Gate for Non-Pro Creators
 
-## The Actual Problem — Finally Confirmed
+### What is Actually Happening Now
 
-### What the database proves
+The workspace page currently uses a "soft lock" model:
 
-After querying directly:
+- Free-tier creators CAN navigate into `/dashboard/workspace/:id`
+- They see the full page layout — partner info, conversation panel, the shared doc
+- They just cannot edit (the pencil button is hidden, the doc shows a lock icon)
+- There is NO hard redirect or block screen for non-Pro creators
 
-1. `user_feedback` table HAS a record: `"Post-collab check-in: Published = yes. Collab with Raghav Mehra"` — the user DID click the button.
-2. `collab_requests` table still shows `status: approved` for both Raghav and James — the status update never persisted.
-3. Because `user_feedback` already has the answered record, when the user reopens Raghav's workspace, `existingRetroFeedback` is NOT null — so the banner shows the "Experience saved" read-only state. **The button to click "Yes" is gone.** The user is locked out of triggering the fix again.
+This means a new creator who signs up today, gets a collab request, accepts it, and clicks "Open Workspace" will land inside your Pro feature with full visibility — just unable to type. That is the leak you want closed.
 
-### Why the update never ran
+### What Needs to Change
 
-The old broken code ran FIRST (before the fix was deployed). The `user_feedback` insert succeeded, but the `collab_requests` update was blocked by the `isCreator` race condition. Now, even though the code is fixed, the user can't re-trigger it because the banner thinks it's already done.
+The fix is a **hard gate** added to `Workspace.tsx` that runs after the request is loaded and all Pro status hooks have resolved. The logic:
 
-### The Fix — Two Parts
+```
+Is the current user the CREATOR (host)?
+  → Yes: Are they Pro (or Admin)?
+      → No: Show hard upgrade wall. Block all workspace content.
+      → Yes: Proceed normally.
+  → No (they are the GUEST/requester):
+      → Is the HOST Pro?
+          → No: Show "workspace coming soon" neutral message (no billing CTA for guests).
+          → Yes: Proceed normally.
+```
 
-**Part 1: Fix the data right now (no user action needed)**
+This replaces the current soft-lock behavior with a real wall for free creators, while preserving the "Host-Pays" model for guests.
 
-Directly update the two rows in the database:
-- Raghav Mehra (`id: 4bed4866-...`) → `status = 'published'`
-- James Presbitero (`id: 25922d38-...`) → `status = 'published'`
+### The Upgrade Wall UI
 
-This is a data fix, not a schema change. It will immediately make both appear in the Published tab.
+For a free-tier creator (host) trying to access the workspace, instead of the full workspace layout, they will see a focused, high-quality upgrade screen:
 
-**Part 2: Make the "re-trigger" possible in the UI (belt and suspenders)**
+- Large lock icon or crown icon
+- "The Shared Workspace is a Pro Feature" headline  
+- A short value prop sentence (async drafting, conversation history, etc.)
+- A prominent "Upgrade to Pro" button → navigates to `/dashboard/subscription`
+- A softer "Back to Requests" link
 
-In `Workspace.tsx`, the banner shows a "saved" state when `existingRetroFeedback` exists. But even in that saved state, if the actual `request.status` is still `approved` (not `published`), we should show a "Mark as Published" recovery button so this mismatch can never strand a user again.
+This is rendered inside the existing `DashboardLayout` (no zen mode), so it feels intentional and polished, not like an error.
+
+### Existing "Guest Neutral" State
+
+For guests of free hosts, the current neutral message inside the conversation panel is already correct. We will expand this to the full page — if `isGuest` is true and `isHostPro` is false, the user sees a simple "Your collaboration partner hasn't unlocked the workspace yet" message with a "Message Partner" button as the only action.
+
+### Technical Details
+
+**File: `src/pages/Workspace.tsx**`
+
+After the loading/notFound/status guards (around line 296), add a new Pro gate block:
+
+```typescript
+// --- PRO GATE ---
+// Wait for both the request and the host Pro status to resolve before gating.
+// isHostPro comes from useCreatorPro(request?.creator_id) which is async.
+// Only gate once we know for sure (isLoading from useCreatorPro must be false).
+const { isPro: isHostPro, isLoading: isHostProLoading } = useCreatorPro(request?.creator_id);
+
+// Show loading skeleton while Pro status resolves (prevents flash of wrong content)
+if (isHostProLoading) return <LoadingState />;
+
+// Hard gate: creator (host) is free tier
+if (isCreator && !effectiveCanEdit) {
+  return (
+    <DashboardLayout>
+      <UpgradeWall /> // "Workspace is Pro" screen with Upgrade button
+    </DashboardLayout>
+  );
+}
+
+// Hard gate: guest, but host is free tier
+if (isGuest && !isHostPro && !isAdmin) {
+  return (
+    <DashboardLayout>
+      <GuestWaitingScreen /> // "Your partner hasn't unlocked the workspace yet"
+    </DashboardLayout>
+  );
+}
+```
+
+Note: `useCreatorPro` already returns `isLoading` — we just need to use it to prevent a flash before showing the gate.
+
+### What Does NOT Change
+
+- Founders and early adopters (Pro via `user_roles`) are not affected — `useCreatorPro` already checks `has_role` as a fallback
+- Admins bypass all gates via `effectiveCanEdit = isAdmin || isHostPro`
+- The database RLS policies do not change — the gate is purely at the UI routing level
+- Guests of Pro hosts continue to get full access with no billing CTAs
 
 ### Files Changed
 
-| What | How |
-|------|-----|
-| Database | Direct SQL update — set `status = 'published'` for Raghav and James rows |
-| `src/pages/Workspace.tsx` | In the "Experience saved" banner state, add a recovery check: if `existingRetroFeedback` exists but `request.status !== 'published'`, show a "Mark as Published" button that runs the update |
+
+| File                      | Change                                                                                                                                                                             |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/pages/Workspace.tsx` | Add hard Pro gate after status check — free creator sees upgrade wall, guest of free host sees neutral waiting screen. Also use `isLoading` from `useCreatorPro` to prevent flash. |
+
+
+No database changes. No new dependencies. No edge function changes.
+
+**One thing to watch for:**
+
+Make sure the **"Upgrade to Pro"** button on that wall is punchy. Don't just say "Upgrade." Use something aligned with your brand like: **"Unlock the Workspace & Start Shipping."**
