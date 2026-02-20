@@ -16,6 +16,8 @@ export default function Availability() {
   const [blockedDates, setBlockedDates] = useState<string[]>([]);
   const [bookedDates, setBookedDates] = useState<string[]>([]);
   const [bookingDetails, setBookingDetails] = useState<BookingInfo[]>([]);
+  const [publishedDates, setPublishedDates] = useState<string[]>([]);
+  const [publishedBookingDetails, setPublishedBookingDetails] = useState<BookingInfo[]>([]);
   const [availabilityId, setAvailabilityId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -80,23 +82,33 @@ export default function Availability() {
     
     const { data: reqData } = await supabase
       .from('collab_requests')
-      .select('id, requested_date, requester_name, requester_profile_image_url')
+      .select('id, requested_date, requester_name, requester_profile_image_url, status')
       .eq('creator_id', creator.id)
-      .eq('status', 'approved');
+      .in('status', ['approved', 'published']);
 
     if (reqData) {
-      setBookedDates(reqData.map((r) => r.requested_date).filter(Boolean) as string[]);
-      
-      // Transform to BookingInfo array
-      const details: BookingInfo[] = reqData
-        .filter(r => r.requested_date)
-        .map(r => ({
+      const approved = reqData.filter(r => r.status === 'approved' && r.requested_date);
+      const published = reqData.filter(r => r.status === 'published' && r.requested_date);
+
+      setBookedDates(approved.map((r) => r.requested_date as string));
+      setBookingDetails(
+        approved.map(r => ({
           date: r.requested_date as string,
           requesterName: r.requester_name,
           requesterProfileImageUrl: r.requester_profile_image_url,
           requestId: r.id,
-        }));
-      setBookingDetails(details);
+        }))
+      );
+
+      setPublishedDates(published.map((r) => r.requested_date as string));
+      setPublishedBookingDetails(
+        published.map(r => ({
+          date: r.requested_date as string,
+          requesterName: r.requester_name,
+          requesterProfileImageUrl: r.requester_profile_image_url,
+          requestId: r.id,
+        }))
+      );
     }
   };
 
@@ -268,6 +280,8 @@ export default function Availability() {
             blockedDates={blockedDates}
             bookedDates={bookedDates}
             bookingDetails={bookingDetails}
+            publishedDates={publishedDates}
+            publishedBookingDetails={publishedBookingDetails}
             isEditable={true}
             onToggleAvailable={handleToggleAvailable}
             onToggleBlocked={handleToggleBlocked}

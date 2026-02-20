@@ -36,6 +36,8 @@ export default function Dashboard() {
   const [requests, setRequests] = useState<CollabRequest[]>([]);
   const [bookedDates, setBookedDates] = useState<string[]>([]);
   const [bookingDetails, setBookingDetails] = useState<BookingInfo[]>([]);
+  const [publishedDates, setPublishedDates] = useState<string[]>([]);
+  const [publishedBookingDetails, setPublishedBookingDetails] = useState<BookingInfo[]>([]);
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
 
   const handleImageError = useCallback((requestId: string) => {
@@ -102,12 +104,23 @@ export default function Dashboard() {
 
     if (reqData) {
       setRequests(reqData);
-      const approvedRequests = reqData.filter((r) => r.status === "approved");
+
+      const approvedRequests = reqData.filter((r) => r.status === "approved" && r.requested_date);
+      const publishedRequests = reqData.filter((r) => r.status === "published" && r.requested_date);
+
       setBookedDates(approvedRequests.map((r) => r.requested_date));
-      
-      // Create booking details for calendar avatars
       setBookingDetails(
         approvedRequests.map((r) => ({
+          date: r.requested_date,
+          requesterName: r.requester_name,
+          requesterProfileImageUrl: r.requester_profile_image_url,
+          requestId: r.id,
+        }))
+      );
+
+      setPublishedDates(publishedRequests.map((r) => r.requested_date));
+      setPublishedBookingDetails(
+        publishedRequests.map((r) => ({
           date: r.requested_date,
           requesterName: r.requester_name,
           requesterProfileImageUrl: r.requester_profile_image_url,
@@ -289,6 +302,8 @@ export default function Dashboard() {
               availableDates={availability}
               bookedDates={bookedDates}
               bookingDetails={bookingDetails}
+              publishedDates={publishedDates}
+              publishedBookingDetails={publishedBookingDetails}
               collabMode={creator.collab_mode as 'async' | 'discovery' | null}
               onBookedDateClick={(requestId) => navigate(`/dashboard/workspace/${requestId}`)}
             />

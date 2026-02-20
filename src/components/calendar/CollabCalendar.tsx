@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarDays, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn, parseDateString } from "@/lib/utils";
 import { toast } from "sonner";
@@ -24,6 +24,8 @@ interface CollabCalendarProps {
   bookedDates?: string[];
   blockedDates?: string[];
   bookingDetails?: BookingInfo[];
+  publishedDates?: string[];
+  publishedBookingDetails?: BookingInfo[];
   onDateSelect?: (date: string) => void;
   isEditable?: boolean;
   onToggleAvailable?: (date: string) => void;
@@ -38,6 +40,8 @@ export function CollabCalendar({
   bookedDates = [],
   blockedDates = [],
   bookingDetails = [],
+  publishedDates = [],
+  publishedBookingDetails = [],
   onDateSelect,
   isEditable = false,
   onToggleAvailable,
@@ -50,6 +54,11 @@ export function CollabCalendar({
   const getBookingInfo = (dateStr: string): BookingInfo | undefined => {
     return bookingDetails.find(b => b.date === dateStr);
   };
+
+  const getPublishedBookingInfo = (dateStr: string): BookingInfo | undefined => {
+    return publishedBookingDetails.find(b => b.date === dateStr);
+  };
+
   // Calculate the first available month
   const firstAvailableDate = useMemo(() => {
     if (availableDates.length === 0) return null;
@@ -117,6 +126,8 @@ export function CollabCalendar({
   };
 
   const getDateStatus = (dateStr: string) => {
+    // Priority: published → booked → blocked → available → default
+    if (publishedDates.includes(dateStr)) return "published";
     if (bookedDates.includes(dateStr)) return "booked";
     if (blockedDates.includes(dateStr)) return "blocked";
     if (availableDates.includes(dateStr)) return "available";
@@ -129,6 +140,15 @@ export function CollabCalendar({
     today.setHours(0, 0, 0, 0);
     const clickedDate = new Date(year, month, day);
     const status = getDateStatus(dateStr);
+
+    // Published dates are navigable — go to workspace
+    if (status === "published") {
+      const booking = getPublishedBookingInfo(dateStr);
+      if (booking?.requestId && onBookedDateClick) {
+        onBookedDateClick(booking.requestId);
+      }
+      return;
+    }
 
     // Booked dates are always navigable — past or future
     if (status === "booked") {
@@ -184,21 +204,23 @@ export function CollabCalendar({
     today.setHours(0, 0, 0, 0);
     const isPast = new Date(year, month, day) < today;
     const bookingInfo = status === "booked" ? getBookingInfo(dateStr) : undefined;
+    const publishedInfo = status === "published" ? getPublishedBookingInfo(dateStr) : undefined;
 
     const dayButton = (
       <motion.button
         key={day}
-        whileHover={!isPast ? { scale: 1.1 } : {}}
-        whileTap={!isPast ? { scale: 0.95 } : {}}
+        whileHover={(!isPast || status === "published" || status === "booked") ? { scale: 1.1 } : {}}
+        whileTap={(!isPast || status === "published" || status === "booked") ? { scale: 0.95 } : {}}
         onClick={() => handleDateClick(day)}
-        disabled={isPast}
+        disabled={isPast && status !== "booked" && status !== "published"}
         className={cn(
           "h-12 w-12 rounded-xl font-medium transition-all duration-200 relative",
-          isPast && "opacity-30 cursor-not-allowed",
+          isPast && status !== "booked" && status !== "published" && "opacity-30 cursor-not-allowed",
           !isPast && status === "default" && "hover:bg-muted",
           status === "available" && !isPast && "bg-available/20 text-available hover:bg-available/30 hover:shadow-md",
           status === "booked" && cn("bg-booked/20 text-booked", onBookedDateClick ? "cursor-pointer" : "cursor-default"),
           status === "blocked" && "bg-blocked/20 text-blocked",
+          status === "published" && "bg-booked/10 text-booked opacity-60 cursor-pointer",
           isSelected && "ring-2 ring-primary ring-offset-2"
         )}
       >
@@ -210,7 +232,7 @@ export function CollabCalendar({
             className="absolute inset-0 rounded-xl bg-available/10 -z-10"
           />
         )}
-        {/* Show mini avatar for booked dates */}
+        {/* Avatar badge for booked dates */}
         {status === "booked" && bookingInfo && (
           <motion.div
             initial={{ scale: 0 }}
@@ -223,6 +245,16 @@ export function CollabCalendar({
                 {bookingInfo.requesterName.slice(0, 2).toUpperCase()}
               </AvatarFallback>
             </Avatar>
+          </motion.div>
+        )}
+        {/* Checkmark badge for published dates */}
+        {status === "published" && (
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            className="absolute -top-1 -right-1 z-10 w-5 h-5 rounded-full bg-foreground flex items-center justify-center border-2 border-background shadow-sm"
+          >
+            <Check className="w-2.5 h-2.5 text-background" strokeWidth={3} />
           </motion.div>
         )}
       </motion.button>
@@ -255,6 +287,31 @@ export function CollabCalendar({
           </Tooltip>
         </TooltipProvider>
       );
+    } else if (status === "published" && publishedInfo) {
+      // Tooltip for published dates
+      days.push(
+        <TooltipProvider key={day}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              {dayButton}
+            </TooltipTrigger>
+            <TooltipContent side="top" className="p-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-booked/20 flex items-center justify-center">
+                  <Check className="w-5 h-5 text-booked" />
+                </div>
+                <div>
+                  <p className="font-medium text-sm">{publishedInfo.requesterName}</p>
+                  <p className="text-xs text-muted-foreground">View published workspace →</p>
+                </div>
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    } else if (status === "published") {
+      // Published date with no booking info — still wrap with key
+      days.push(<div key={day}>{dayButton}</div>);
     } else {
       days.push(dayButton);
     }
@@ -338,7 +395,7 @@ export function CollabCalendar({
       </motion.div>
 
       {/* Legend */}
-      <div className="flex items-center justify-center gap-6 mt-6 pt-6 border-t border-border">
+      <div className="flex flex-wrap items-center justify-center gap-4 mt-6 pt-6 border-t border-border">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-available" />
           <span className="text-sm text-muted-foreground">{availableLegendText}</span>
@@ -346,6 +403,12 @@ export function CollabCalendar({
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-booked" />
           <span className="text-sm text-muted-foreground">Booked</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-booked/40 relative flex items-center justify-center">
+            <Check className="w-2 h-2 text-foreground absolute" strokeWidth={3} />
+          </div>
+          <span className="text-sm text-muted-foreground">Published</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-blocked" />
