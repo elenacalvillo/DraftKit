@@ -1,60 +1,35 @@
 
-## Root Cause Analysis
+## The Actual Problem — Finally Confirmed
 
-### What the database actually contains
+### What the database proves
 
-After querying the database directly:
+After querying directly:
 
-- Raghav (Feb 12) → `status: approved`
-- James (Feb 19) → `status: approved`
-- Declined/Cancelled rows → `hidden_by_creator: true` (soft-deleted by clicking "delete")
+1. `user_feedback` table HAS a record: `"Post-collab check-in: Published = yes. Collab with Raghav Mehra"` — the user DID click the button.
+2. `collab_requests` table still shows `status: approved` for both Raghav and James — the status update never persisted.
+3. Because `user_feedback` already has the answered record, when the user reopens Raghav's workspace, `existingRetroFeedback` is NOT null — so the banner shows the "Experience saved" read-only state. **The button to click "Yes" is gone.** The user is locked out of triggering the fix again.
 
-**Published tab is empty because no row has ever been saved with `status = 'published'` in the database.** The "Congrats 🎉" toast fires every time, masking the failure.
+### Why the update never ran
 
----
+The old broken code ran FIRST (before the fix was deployed). The `user_feedback` insert succeeded, but the `collab_requests` update was blocked by the `isCreator` race condition. Now, even though the code is fixed, the user can't re-trigger it because the banner thinks it's already done.
 
-### Root Cause: `isCreator` is false when `handlePublishAnswer` runs
+### The Fix — Two Parts
 
-In `Workspace.tsx` line 67:
+**Part 1: Fix the data right now (no user action needed)**
 
-```typescript
-const isCreator = !!creator && creator.id === request?.creator_id;
-```
+Directly update the two rows in the database:
+- Raghav Mehra (`id: 4bed4866-...`) → `status = 'published'`
+- James Presbitero (`id: 25922d38-...`) → `status = 'published'`
 
-`creator` comes from the `useAuth` hook, which fetches a row from the `creators` table. If that fetch is still in progress (or if there's a race condition between when the user clicks "Yes, published it" and when `creator` finishes loading), `isCreator` evaluates to `false` — and the entire `if (answer === "yes" && isCreator && requestId)` block is silently skipped.
+This is a data fix, not a schema change. It will immediately make both appear in the Published tab.
 
-No error is thrown. The feedback insert still works. The toast still shows. But `status` is never updated.
+**Part 2: Make the "re-trigger" possible in the UI (belt and suspenders)**
 
-### The Fix
-
-Replace the `isCreator` dependency inside `handlePublishAnswer` with a direct comparison using `user?.id` and `request?.creator_user_id` — or better, do a fallback: if `isCreator` is false but `user?.id` exists and the request is loaded, attempt the update anyway and let the RLS policy enforce access control server-side.
-
-The simplest and most robust fix: inside `handlePublishAnswer`, guard on `user?.id` being present AND the `requestId` being present, and let Supabase's RLS deny the update if the user isn't the creator. This removes the client-side race condition entirely.
-
-```typescript
-// Before (race condition — can be false during async load):
-if (answer === "yes" && isCreator && requestId) { ... }
-
-// After (let the server enforce authorization, no client-side race):
-if (answer === "yes" && requestId && user?.id) { ... }
-```
-
-If the user IS the creator, the RLS policy allows the update. If not, it returns an error which we already handle with `toast.error`. Zero behavioral difference for authorized users, eliminates the silent failure.
-
----
+In `Workspace.tsx`, the banner shows a "saved" state when `existingRetroFeedback` exists. But even in that saved state, if the actual `request.status` is still `approved` (not `published`), we should show a "Mark as Published" recovery button so this mismatch can never strand a user again.
 
 ### Files Changed
 
-| File | Change |
-|------|--------|
-| `src/pages/Workspace.tsx` | Change `isCreator` guard to `user?.id` guard inside `handlePublishAnswer` — eliminates the async race condition that silently skips the status update |
-
-No database changes. No new dependencies. No edge function changes.
-
-### What about Declined/Cancelled tabs being empty?
-
-Those are correctly empty — those rows have `hidden_by_creator: true` because the "delete" button was clicked on them at some point. The filter `.eq('hidden_by_creator', false)` correctly hides them. That behavior is working as designed.
-
-### After this fix
-
-To mark Raghav and James as published: open each workspace → the retrospective banner will appear (their dates are in the past) → click "Yes, we published it!" → status will now correctly save to `published` → they will appear in the Published tab.
+| What | How |
+|------|-----|
+| Database | Direct SQL update — set `status = 'published'` for Raghav and James rows |
+| `src/pages/Workspace.tsx` | In the "Experience saved" banner state, add a recovery check: if `existingRetroFeedback` exists but `request.status !== 'published'`, show a "Mark as Published" button that runs the update |
