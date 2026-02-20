@@ -1,59 +1,108 @@
-## Restoring Published Collaborations to the Calendar
 
-### What's Broken and Why
+## Redefining the Dashboard Metrics as "Value Signals"
 
-There are two data fetching queries that power the calendar's "booked" (coral) dots — one in `Dashboard.tsx` (the main dashboard calendar) and one in `Availability.tsx` (the edit calendar). Both filter requests with `.eq('status', 'approved')` only. When a collab transitions to `published`, it vanishes from the calendar entirely.
+### What's Currently Broken
 
-**The exact lines causing the disappearance:**
+**Three compounding issues** are making the stats block a "dead zone":
 
-- `Dashboard.tsx` line 105: `const approvedRequests = reqData.filter((r) => r.status === "approved");`
-- `Availability.tsx` line 85: `.eq('status', 'approved')`
+1. **"Collabs This Month" is blind to Published status** — line 139 filters `r.status === "approved"` only. A collab that moved to `published` (your actual win) does not count.
 
-### The Visual Distinction
+2. **The three metrics describe activity, not outcomes** — "Outlines Created," "Pending Requests," and "Collabs This Month" are backend counters with no business story.
 
-The `CollabCalendar` component currently has one "booked" state (coral background, full opacity). To distinguish **published** (done) from **approved** (upcoming), we'll add a `publishedDates` prop with its own visual treatment:
+3. **The icon colors use `text-success` (neon green) and `text-accent`** — against the brand dark (`#2a2318`) / coral palette, these read as off-brand.
 
-- **Approved (upcoming):** Existing coral background — full color, avatar badge, navigable
-- **Published (done):** Same coral color but at **50% opacity** + a small checkmark badge instead of the avatar, clearly reading as "completed"
+---
 
-This keeps the calendar as a true timeline — you see your full track record at a glance, with visual weight on what's still active.
+### The Three New Metrics
 
-### Files to Change
+| Card | New Label | Logic | Format |
+|---|---|---|---|
+| Card 1 | **Ship Rate** | `(published count / total non-pending, non-cancelled requests) * 100` | `"72%"` with subLabel "Requests turned into published work" |
+| Card 2 | **Collaborator Reach** | Count of unique `requester_substack_url` values across all requests (deduplicated by URL). Represents distinct newsletter audiences touched. | `"3 Newsletters"` with subLabel "Unique audiences reached" |
+| Card 3 | **Time Saved Drafting** | `(ai_draft !== null count) * 1.5 hours` — each AI draft generated saves ~90 min of research + drafting time, shown as `"4.5 hrs"` | `"4.5 hrs"` with subLabel "Estimated drafting time saved" |
 
+All three are calculated client-side from the already-fetched `requests` array — no new database queries needed.
 
-| File                                         | Change                                                                                                                                                                                                                                  |
-| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/components/calendar/CollabCalendar.tsx` | Add `publishedDates` prop + `publishedBookingDetails` prop. Add `"published"` status to `getDateStatus()`. Style published dates with 50% opacity + check badge. Make published dates clickable (navigate to workspace). Update legend. |
-| `src/pages/Dashboard.tsx`                    | Fetch both `approved` and `published` requests. Pass approved ones as `bookedDates` and published ones as `publishedDates` (with their own `BookingInfo` arrays).                                                                       |
-| `src/pages/Availability.tsx`                 | Change the query from `.eq('status', 'approved')` to `.in('status', ['approved', 'published'])`. Show both on calendar — published with the completed visual.                                                                           |
+---
 
+### The Ship Rate Formula
 
-### Precise Changes
+```
+eligible = requests where status is NOT 'pending' and NOT 'cancelled'
+published = requests where status === 'published'
+shipRate = eligible.length > 0 ? Math.round((published.length / eligible.length) * 100) : 0
+display = shipRate + "%"
+```
 
-`**CollabCalendar.tsx**`
+If `eligible.length === 0`, display `"—"` (em dash) instead of "0%" to avoid a discouraging zero on a fresh account.
 
-- Add `publishedDates?: string[]` and `publishedBookingDetails?: BookingInfo[]` to props interface
-- In `getDateStatus()`: check `publishedDates` before `bookedDates` (priority order: published → booked → blocked → available → default)
-- In the day button render: for `status === "published"`, apply `bg-booked/10 text-booked opacity-60 cursor-pointer` + a tiny `✓` checkmark badge (replacing the avatar badge)
-- In the tooltip for published dates: show "View published workspace →" text
-- In the legend: add a "Published" entry with a faded coral dot + checkmark
+---
 
-`**Dashboard.tsx**`
+### Collaborator Reach Formula
 
-- Change the filter on line 105 from `status === "approved"` to include both
-- Create two separate arrays: `approvedRequests` (status approved) and `publishedRequests` (status published)
-- Pass `publishedDates` and `publishedBookingDetails` to `CollabCalendar`
+```
+uniqueUrls = new Set(
+  requests
+    .filter(r => r.requester_substack_url)
+    .map(r => r.requester_substack_url.trim().toLowerCase())
+)
+reach = uniqueUrls.size
+display = reach + (reach === 1 ? " Newsletter" : " Newsletters")
+```
 
-`**Availability.tsx**`
+Note: `requester_substack_url` is already in the select query on line 100 — we need to add it. Currently the query only selects specific columns. We'll add `requester_substack_url` to the select.
 
-- Change `.eq('status', 'approved')` to `.in('status', ['approved', 'published'])`
-- Separate the results into approved vs published arrays
-- Pass both to `CollabCalendar`
+---
+
+### Time Saved Formula
+
+```
+draftsGenerated = requests.filter(r => r.ai_draft !== null).length
+hoursSaved = draftsGenerated * 1.5
+display = hoursSaved % 1 === 0 ? hoursSaved + " hrs" : hoursSaved.toFixed(1) + " hrs"
+```
+
+Empty state: `"0 hrs"` → show tip "Generate your first SMART draft to start tracking time saved"
+
+---
+
+### Icon & Color Changes
+
+The current colors use Tailwind utility classes that map to CSS variables:
+- `text-primary` → coral (correct, keep for Card 1)  
+- `text-accent` → this is the neon yellow/green that feels off-brand → change to use a custom inline style `color: '#2a2318'` (brand dark) with `bg: 'bg-[#2a2318]/10'`
+- `text-success` → neon green → same treatment, swap to coral-adjacent
+
+New color scheme (all on-brand):
+- **Ship Rate** (Card 1): Icon `TrendingUp` — `text-primary` / `bg-primary/10` (coral — represents growth)
+- **Collaborator Reach** (Card 2): Icon `Globe` — `color: #c17f5c` / background `#c17f5c1a` (terracotta, second coral shade)
+- **Time Saved** (Card 3): Icon `Zap` — `color: #2a2318` / background `#2a231810` (brand dark — premium, grounded)
+
+Icons imported from `lucide-react`: swap `Users` for `TrendingUp`, `Clock` for `Globe`, `Calendar` for `Zap`.
+
+---
+
+### What Stays the Same
+
+- The "Recent Requests" list on the right — no change
+- The calendar section — no change
+- The "Share Your Link" card — no change
+- Database queries — **one small addition**: add `requester_substack_url` to the `select()` on line 100
+
+---
+
+### Files Changed
+
+| File | Change |
+|---|---|
+| `src/pages/Dashboard.tsx` | (1) Add `requester_substack_url` to the select query. (2) Replace three metric calculations with Ship Rate, Collaborator Reach, and Time Saved. (3) Update `stats` array with new labels, icons, colors, display values, and empty state tips. (4) Update icon imports. |
 
 No database changes. No new dependencies. No edge function changes.
 
-### A Small Color Tweak for the "Brand"
+---
 
-We discussed moving away from "ugly bright colors" for the badges. Let's make sure that the **Checkmark Badge** on the calendar isn't a neon green.
+### Empty State Tips (New Copy)
 
-- **Suggestion:** Keep the checkmark white or a very dark grey (`#2a2318`) inside a small circle. It keeps the aesthetic grounded and editorial.
+- **Ship Rate (0):** "Approve and publish your first collab to track your closing rate"
+- **Collaborator Reach (0):** "Each requester's newsletter counts — your first request is your first audience reached"
+- **Time Saved (0 hrs):** "Generate a SMART draft to start tracking how much drafting time DraftKit saves you"
