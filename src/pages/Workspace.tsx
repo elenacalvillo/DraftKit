@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Calendar, ExternalLink, LinkIcon, Mail, Sparkles, FileText, MessageSquare, PenLine, Lock, X, PartyPopper, CheckCircle2, Copy, Check } from "lucide-react";
+import { ArrowLeft, Calendar, ExternalLink, LinkIcon, Mail, Sparkles, FileText, MessageSquare, PenLine, Lock, X, PartyPopper, CheckCircle2, Copy, Check, Crown, Clock } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { SharedWorkspace } from "@/components/requests/SharedWorkspace";
 import { CollabDraftModal } from "@/components/requests/CollabDraftModal";
@@ -69,7 +69,7 @@ export default function Workspace() {
 
   // Host-pays model: workspace access is determined by the HOST creator's Pro status,
   // not the current visitor's. Guests inherit the host's tier.
-  const { isPro: isHostPro } = useCreatorPro(request?.creator_id);
+  const { isPro: isHostPro, isLoading: isHostProLoading } = useCreatorPro(request?.creator_id);
   const { isAdmin } = useAdmin();
   // Admins bypass all paywalls
   const effectiveCanEdit = isAdmin || isHostPro;
@@ -291,6 +291,124 @@ export default function Workspace() {
             Back to Requests
           </Button>
         </div>
+      </DashboardLayout>
+    );
+  }
+
+  // --- PRO GATE ---
+  // Wait for host Pro status to resolve before gating (prevents flash of wrong content).
+  if (!loading && !authLoading && isHostProLoading) {
+    return (
+      <DashboardLayout>
+        <div className="max-w-6xl mx-auto space-y-6">
+          <Skeleton className="h-6 w-40" />
+          <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6">
+            <Skeleton className="h-96" />
+            <Skeleton className="h-96" />
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // Hard gate: creator (host) is free tier — show upgrade wall
+  if (isCreator && !effectiveCanEdit) {
+    return (
+      <DashboardLayout>
+        <div className="max-w-2xl mx-auto py-20 px-4 text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="glass-card p-10 flex flex-col items-center gap-6"
+          >
+            <div className="w-20 h-20 rounded-2xl gradient-primary flex items-center justify-center shadow-glow">
+              <Crown className="w-10 h-10 text-primary-foreground" />
+            </div>
+
+            <div className="space-y-3 max-w-md">
+              <h2 className="text-2xl font-bold">The Shared Workspace is a Pro Feature</h2>
+              <p className="text-muted-foreground leading-relaxed">
+                Unlock async drafting, real-time conversation history, and a beautiful co-writing
+                environment — built to turn collab ideas into published posts, fast.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full max-w-sm">
+              <Button
+                variant="hero"
+                size="lg"
+                className="w-full"
+                onClick={() => navigate("/dashboard/subscription")}
+              >
+                <Crown className="w-5 h-5" />
+                Unlock the Workspace &amp; Start Shipping
+              </Button>
+            </div>
+
+            <button
+              onClick={() => navigate(backPath)}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              ← Back to Requests
+            </button>
+          </motion.div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // Hard gate: guest of a free-tier host — neutral waiting screen (no billing CTA)
+  if (isGuest && !isHostPro && !isAdmin) {
+    return (
+      <DashboardLayout>
+        <div className="max-w-2xl mx-auto py-20 px-4 text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="glass-card p-10 flex flex-col items-center gap-6"
+          >
+            <div className="w-20 h-20 rounded-2xl bg-muted flex items-center justify-center">
+              <Clock className="w-10 h-10 text-muted-foreground" />
+            </div>
+
+            <div className="space-y-3 max-w-md">
+              <h2 className="text-2xl font-bold">Workspace Coming Soon</h2>
+              <p className="text-muted-foreground leading-relaxed">
+                Your collaboration partner hasn't unlocked the workspace yet. Once they do,
+                you'll both have access to the shared drafting space and conversation history.
+              </p>
+            </div>
+
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => setShowMessageModal(true)}
+            >
+              <MessageSquare className="w-5 h-5" />
+              Message {partnerName?.split(" ")[0] || "Partner"}
+            </Button>
+
+            <button
+              onClick={() => navigate(backPath)}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              ← Back to My Requests
+            </button>
+          </motion.div>
+        </div>
+
+        {isGuest && (
+          <GuestMessageModal
+            open={showMessageModal}
+            onOpenChange={setShowMessageModal}
+            requestId={request.id}
+            creatorName={creatorInfo?.name || "Creator"}
+            requesterEmail={request.requester_email}
+            onMessageSent={handleMessageSent}
+          />
+        )}
       </DashboardLayout>
     );
   }
