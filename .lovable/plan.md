@@ -1,78 +1,45 @@
 
-## Fix: Sorting for "All" Tab + Published Status Actually Saving
+## Root Cause Analysis
 
-### Two Confirmed Root Causes
+### What the database actually contains
 
----
+After querying the database directly:
 
-### Root Cause 1 — "All" Tab Sort Order
+- Raghav (Feb 12) → `status: approved`
+- James (Feb 19) → `status: approved`
+- Declined/Cancelled rows → `hidden_by_creator: true` (soft-deleted by clicking "delete")
 
-The per-tab sort logic is correctly in the code for `approved` and `published` tabs. But the **"All" tab** falls into the `created_at` DESC fallback — which puts old submissions (Raghav Jan 13, James Jan 14) below recently submitted ones.
-
-The user wants all tabs to prioritize by collaboration date. The fix: for the "All" tab, sort by `requested_date` ascending (closest date first, matching the calendar mental model), with `created_at` as a tiebreaker for requests without a date.
-
-```typescript
-// Updated fallback for "All", "Pending", "Declined", "Cancelled"
-// Sort by requested_date ascending, then created_at descending for undated ones
-const aDate = a.requested_date;
-const bDate = b.requested_date;
-if (aDate && bDate) return aDate.localeCompare(bDate); // both have dates → ascending
-if (aDate) return -1; // a has date, b doesn't → a first
-if (bDate) return 1;  // b has date, a doesn't → b first
-return new Date(b.created_at).getTime() - new Date(a.created_at).getTime(); // neither has date
-```
-
-This means Raghav (Feb 12) and James (Feb 19) float to the top in "All", "Pending", and every other tab too — exactly as expected.
+**Published tab is empty because no row has ever been saved with `status = 'published'` in the database.** The "Congrats 🎉" toast fires every time, masking the failure.
 
 ---
 
-### Root Cause 2 — Published Status Never Saves
+### Root Cause: `isCreator` is false when `handlePublishAnswer` runs
 
-Looking at `Workspace.tsx` lines 309–353, the flow is:
-
-```
-handlePublishAnswer("yes")
-  └─ try {
-       1. insert into user_feedback (page_url: window.location.pathname)
-       2. if (answer === "yes" && isCreator) → update status to "published"   ← ONLY RUNS IF #1 SUCCEEDS
-       toast.success("Congrats!")   ← shows regardless, masking any failure
-     } catch (e) { console.error only }
-```
-
-**The problem:** Step 1 (`user_feedback` insert) is inside the same `try` block. If it fails for any reason (RLS, validation), it throws and Step 2 never runs — but the `toast.success` still fires because it's **outside** the conditional. The user sees "Congrats 🎉" but the database was never updated.
-
-Confirmed by the database query: zero rows with `status = 'published'`.
-
-**The fix:** Split the publish logic into two independent operations so a feedback insert failure can't block the status update. Wrap each in its own try/catch:
+In `Workspace.tsx` line 67:
 
 ```typescript
-const handlePublishAnswer = async (answer: "yes" | "not_yet") => {
-  setPublishAnswer(answer);
-
-  // Step 1: Flip the canonical status (CRITICAL — must happen first)
-  if (answer === "yes" && isCreator && requestId) {
-    const { error: publishError } = await supabase
-      .from("collab_requests")
-      .update({ status: "published" })
-      .eq("id", requestId);
-    if (publishError) {
-      toast.error("Couldn't mark as published — please try again.");
-      return;
-    }
-    setRequest(prev => prev ? { ...prev, status: "published" } : prev);
-    // send email...
-  }
-
-  // Step 2: Log feedback separately (non-blocking)
-  try {
-    await supabase.from("user_feedback").insert({ ... });
-  } catch (e) {
-    console.error("Feedback log failed (non-fatal):", e);
-  }
-
-  toast.success(answer === "yes" ? "Congrats on publishing! 🎉" : "No rush — we'll be here when it's ready!");
-};
+const isCreator = !!creator && creator.id === request?.creator_id;
 ```
+
+`creator` comes from the `useAuth` hook, which fetches a row from the `creators` table. If that fetch is still in progress (or if there's a race condition between when the user clicks "Yes, published it" and when `creator` finishes loading), `isCreator` evaluates to `false` — and the entire `if (answer === "yes" && isCreator && requestId)` block is silently skipped.
+
+No error is thrown. The feedback insert still works. The toast still shows. But `status` is never updated.
+
+### The Fix
+
+Replace the `isCreator` dependency inside `handlePublishAnswer` with a direct comparison using `user?.id` and `request?.creator_user_id` — or better, do a fallback: if `isCreator` is false but `user?.id` exists and the request is loaded, attempt the update anyway and let the RLS policy enforce access control server-side.
+
+The simplest and most robust fix: inside `handlePublishAnswer`, guard on `user?.id` being present AND the `requestId` being present, and let Supabase's RLS deny the update if the user isn't the creator. This removes the client-side race condition entirely.
+
+```typescript
+// Before (race condition — can be false during async load):
+if (answer === "yes" && isCreator && requestId) { ... }
+
+// After (let the server enforce authorization, no client-side race):
+if (answer === "yes" && requestId && user?.id) { ... }
+```
+
+If the user IS the creator, the RLS policy allows the update. If not, it returns an error which we already handle with `toast.error`. Zero behavioral difference for authorized users, eliminates the silent failure.
 
 ---
 
@@ -80,7 +47,14 @@ const handlePublishAnswer = async (answer: "yes" | "not_yet") => {
 
 | File | Change |
 |------|--------|
-| `src/pages/Requests.tsx` | Update the "All" tab fallback sort to prioritize `requested_date` ascending |
-| `src/pages/Workspace.tsx` | Reorder `handlePublishAnswer` so the DB status update runs **before** (and independently from) the `user_feedback` insert |
+| `src/pages/Workspace.tsx` | Change `isCreator` guard to `user?.id` guard inside `handlePublishAnswer` — eliminates the async race condition that silently skips the status update |
 
 No database changes. No new dependencies. No edge function changes.
+
+### What about Declined/Cancelled tabs being empty?
+
+Those are correctly empty — those rows have `hidden_by_creator: true` because the "delete" button was clicked on them at some point. The filter `.eq('hidden_by_creator', false)` correctly hides them. That behavior is working as designed.
+
+### After this fix
+
+To mark Raghav and James as published: open each workspace → the retrospective banner will appear (their dates are in the past) → click "Yes, we published it!" → status will now correctly save to `published` → they will appear in the Published tab.
