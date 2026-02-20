@@ -310,7 +310,9 @@ export default function Workspace() {
     setPublishAnswer(answer);
 
     // Step 1 (CRITICAL): Flip the status to 'published' FIRST, independently of feedback logging
-    if (answer === "yes" && isCreator && requestId) {
+    // Use user?.id instead of isCreator to avoid the async race condition where creator
+    // hasn't loaded yet — RLS on the server enforces that only the actual creator can update.
+    if (answer === "yes" && requestId && user?.id) {
       const { error: publishError } = await supabase
         .from("collab_requests")
         .update({ status: "published" })
