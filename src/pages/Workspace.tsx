@@ -404,16 +404,40 @@ export default function Workspace() {
                       </p>
                     </div>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-muted-foreground shrink-0"
-                    onClick={() => {
-                      window.dispatchEvent(new CustomEvent("open-feedback-widget"));
-                    }}
-                  >
-                    Add More Feedback
-                  </Button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {/* Recovery button: feedback says "yes" but status never updated */}
+                    {publishAnswer === "yes" && request.status !== "published" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-success border-success/40 hover:bg-success/10"
+                        onClick={async () => {
+                          const { error } = await supabase
+                            .from("collab_requests")
+                            .update({ status: "published" })
+                            .eq("id", requestId);
+                          if (error) {
+                            toast.error("Couldn't mark as published — please try again.");
+                          } else {
+                            setRequest(prev => prev ? { ...prev, status: "published" } : prev);
+                            toast.success("Marked as published! 🎉");
+                          }
+                        }}
+                      >
+                        Mark as Published
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-muted-foreground"
+                      onClick={() => {
+                        window.dispatchEvent(new CustomEvent("open-feedback-widget"));
+                      }}
+                    >
+                      Add More Feedback
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 /* Prompt state — not yet answered */
