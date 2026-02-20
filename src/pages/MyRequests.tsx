@@ -95,6 +95,7 @@ export default function MyRequests() {
         `)
         .eq('requester_user_id', user?.id)
         .eq('hidden_by_requester', false)
+        .order('requested_date', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false });
 
       if (error) throw error;
