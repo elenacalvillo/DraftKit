@@ -312,7 +312,14 @@ export default function Requests() {
         if (!b.requested_date) return -1;
         return b.requested_date.localeCompare(a.requested_date);
       }
-      // All other tabs (all, pending, declined, cancelled): newest submission first
+      // All other tabs (all, pending, declined, cancelled):
+      // prioritize by requested_date ascending (closest date first),
+      // fall back to newest submission for undated requests
+      const aDate = a.requested_date;
+      const bDate = b.requested_date;
+      if (aDate && bDate) return aDate.localeCompare(bDate);
+      if (aDate) return -1;
+      if (bDate) return 1;
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
 
