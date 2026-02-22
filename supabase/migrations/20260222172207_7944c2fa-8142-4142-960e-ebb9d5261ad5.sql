@@ -1,0 +1,1 @@
+CREATE POLICY "Public can view creators with username" ON public.creators FOR SELECT USING (username IS NOT NULL);
