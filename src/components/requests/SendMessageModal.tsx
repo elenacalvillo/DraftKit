@@ -63,9 +63,7 @@ export function SendMessageModal({
         }
       }).catch(err => console.error('Failed to send message email:', err));
 
-      toast.success(`Message sent to ${requesterName}!`, {
-        description: "They'll receive it at " + requesterEmail,
-      });
+      toast.success(`Message sent to ${requesterName}!`);
       setMessage("");
       onOpenChange(false);
       onMessageSent?.();
@@ -86,7 +84,7 @@ export function SendMessageModal({
             Message {requesterName}
           </DialogTitle>
           <DialogDescription>
-            Send a quick message to your collaborator at {requesterEmail}
+            Send a quick message to your collaboration partner
           </DialogDescription>
         </DialogHeader>
 
