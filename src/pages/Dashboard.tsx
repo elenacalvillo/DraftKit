@@ -66,20 +66,10 @@ export default function Dashboard() {
   }, [loading, searchParams, navigate]);
 
   useEffect(() => {
-    if (!loading && !user) {
-      navigate("/login");
-      return;
-    }
-
-    if (!loading && user && !creator) {
-      navigate("/signup");
-      return;
-    }
-
     if (creator) {
       fetchData();
     }
-  }, [user, creator, loading, navigate]);
+  }, [creator]);
 
   const fetchData = async () => {
     if (!creator) return;
@@ -194,17 +184,7 @@ export default function Dashboard() {
     },
   ];
 
-  if (loading || !creator) {
-    return (
-      <div className="min-h-screen gradient-bg flex items-center justify-center">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-          className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full"
-        />
-      </div>
-    );
-  }
+  if (!creator) return null;
 
   // Mode-aware calendar section (must be after creator null-check)
   const calendarHeader = creator.collab_mode === 'discovery' 

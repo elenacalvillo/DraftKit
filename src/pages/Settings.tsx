@@ -120,39 +120,28 @@ export default function Settings() {
   };
 
   useEffect(() => {
-    if (!loading && !user) {
-      navigate("/login");
-      return;
-    }
+    if (!creator) return;
 
-    if (!loading && user && !creator) {
-      navigate("/signup");
-      return;
+    setFormData({
+      name: creator.name,
+      bio: creator.bio || "",
+      substackUrl: creator.substack_url || "",
+      newsletterUrl: (creator as any).newsletter_url || "",
+      welcomeMessage: creator.welcome_message || "",
+      collabStyles: parseCollabStyles((creator as any).collab_style),
+      collabGuidelines: (creator as any).collab_guidelines || "",
+      reminderDaysBefore: (creator as any).reminder_days_before ?? 3,
+      dateMeaning: ((creator as any).date_meaning || "flexible") as DateMeaning,
+      collabMode: ((creator as any).collab_mode || "async") as CollabMode,
+    });
+    setPreviewImageUrl((creator as any).profile_image_url || null);
+    
+    // Auto-fetch profile image if missing but substack URL exists
+    if (!(creator as any).profile_image_url && creator.substack_url) {
+      autoFetchProfileImage(creator.substack_url);
     }
-
-    if (creator) {
-      setFormData({
-        name: creator.name,
-        bio: creator.bio || "",
-        substackUrl: creator.substack_url || "",
-        newsletterUrl: (creator as any).newsletter_url || "",
-        welcomeMessage: creator.welcome_message || "",
-        collabStyles: parseCollabStyles((creator as any).collab_style),
-        collabGuidelines: (creator as any).collab_guidelines || "",
-        reminderDaysBefore: (creator as any).reminder_days_before ?? 3,
-        dateMeaning: ((creator as any).date_meaning || "flexible") as DateMeaning,
-        collabMode: ((creator as any).collab_mode || "async") as CollabMode,
-      });
-      setPreviewImageUrl((creator as any).profile_image_url || null);
-      
-      // Auto-fetch profile image if missing but substack URL exists
-      if (!(creator as any).profile_image_url && creator.substack_url) {
-        autoFetchProfileImage(creator.substack_url);
-      }
-    }
-    // Only re-initialize when creator ID changes (not on every re-fetch)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [creator?.id, loading, navigate]);
+  }, [creator?.id]);
 
   const handleSave = async () => {
     if (!creator) return;
@@ -254,17 +243,7 @@ export default function Settings() {
     navigate("/");
   };
 
-  if (loading || !creator) {
-    return (
-      <div className="min-h-screen gradient-bg flex items-center justify-center">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-          className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full"
-        />
-      </div>
-    );
-  }
+  if (!creator) return null;
 
   const publicUrl = `${window.location.origin}/${creator.username}`;
 

@@ -93,20 +93,10 @@ export default function Requests() {
   }, [highlightParam, requests, setSearchParams, activeTab]);
 
   useEffect(() => {
-    if (!loading && !user) {
-      navigate("/login");
-      return;
-    }
-
-    if (!loading && user && !creator) {
-      navigate("/signup");
-      return;
-    }
-
     if (creator) {
       fetchRequests();
     }
-  }, [user, creator, loading, navigate]);
+  }, [creator]);
 
   const fetchRequests = async () => {
     if (!creator) return;
@@ -332,17 +322,7 @@ export default function Requests() {
     { value: "cancelled", label: "Cancelled", count: requests.filter((r) => r.status === "cancelled").length },
   ];
 
-  if (loading || !creator) {
-    return (
-      <div className="min-h-screen gradient-bg flex items-center justify-center">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-          className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full"
-        />
-      </div>
-    );
-  }
+  if (!creator) return null;
 
   // Map requests to the format expected by RequestCard
   const mappedRequests = filteredRequests.map((r) => ({

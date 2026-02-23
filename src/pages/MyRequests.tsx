@@ -64,15 +64,10 @@ export default function MyRequests() {
   const [messageModalRequest, setMessageModalRequest] = useState<SentRequest | null>(null);
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/login');
-      return;
-    }
-
     if (user) {
       fetchSentRequests();
     }
-  }, [user, authLoading, navigate]);
+  }, [user]);
 
   const fetchSentRequests = async () => {
     try {
