@@ -1,55 +1,60 @@
+## Fix: Unify All Email Headers to DraftKit Branded Wordmark
+
+### The Problem
+
+Some email templates use a random emoji inside a gradient square as their "header icon" instead of the consistent DraftKit two-tone wordmark + tagline. This creates a fragmented, unpolished brand experience.
+
+### Emails That Need Fixing (brand header only -- no content changes)
+
+**In `send-collab-email/index.ts`:**
 
 
-## Fix: Prevent AI Draft from Overwriting Manual Content + Dynamic Button Labels
+| Email Type                                     | Current Header                   | Fix                                      |
+| ---------------------------------------------- | -------------------------------- | ---------------------------------------- |
+| `collab_type_changed` (lines 817-822)          | Gradient box with "pencil" emoji | Replace with DraftKit wordmark + tagline |
+| `workspace_updated_by_creator` (lines 876-881) | Gradient box with "pencil" emoji | Replace with DraftKit wordmark + tagline |
+| `workspace_updated_by_guest` (lines 920-924)   | Gradient box with "pencil" emoji | Replace with DraftKit wordmark + tagline |
 
-### The Problem (from Dinah's feedback)
 
-1. **AI draft overwrites manual work**: When "Generate AI Draft" is clicked, the edge function unconditionally overwrites `shared_content` -- even if a human already wrote there
-2. **"Start Drafting" is misleading**: The button always says "Start Drafting" even when manual content already exists -- should say "Continue Drafting"
-3. **"View Draft" shows AI modal, not the workspace**: Clicking "View Draft" opens the read-only AI draft modal instead of navigating to the editable workspace
+**In `send-feedback-notification/index.ts`:**
 
-### Good News: No Data Loss
 
-Dinah's content is safe in the database -- `content_last_edited_by` shows "Dinah Davis - Code Like A Girl". The issue is purely UX: the AI generation overwrites existing manual content, and buttons route to the wrong place.
+| Email Type            | Current Header                 | Fix                                      |
+| --------------------- | ------------------------------ | ---------------------------------------- |
+| Feedback notification | Colored banner with emoji icon | Replace with DraftKit wordmark + tagline |
 
-### Changes
 
-**1. Edge Function: `supabase/functions/generate-collab-draft/index.ts`**
+### The Standard Header (already used by 10+ other email types)
 
-Add a safety check before overwriting `shared_content`:
-- Fetch the current `shared_content` value first
-- If `shared_content` already has human-written content (i.e., `content_last_edited_by` is NOT "AI Draft" and NOT null), do NOT update `shared_content` -- only save `ai_draft`
-- If `shared_content` is empty or was last edited by "AI Draft", auto-populate as before
+All headers will be replaced with this exact block:
 
-**2. RequestCard: Dynamic button label (`src/components/requests/RequestCard.tsx`)**
+```html
+<div style="text-align: center; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid #f1f5f9;">
+  <span style="font-size: 22px; font-weight: 700; color: #2a2318; letter-spacing: -0.5px;">DraftKit</span>
+  <p style="margin: 4px 0 0; font-size: 12px; color: #94a3b8; letter-spacing: 0.5px;">
+    The engine for creators who ship together
+  </p>
+</div>
+```
 
-Line 534-541 -- the "Start Drafting" button:
-- Check if the request has `shared_content` (non-empty)
-- If yes: label becomes **"Continue Drafting"** with a `PenLine` icon
-- If no: keep "Start Drafting"
+### Emails Already Correct (no changes needed)
 
-Lines 451-458 -- the "View Draft" / "Generate Draft" button:
-- Rename "View Draft" to **"View AI Draft"** to make it clear this opens the AI reference modal, not the workspace
-
-**3. Workspace sidebar: Already correct**
-
-The sidebar in `Workspace.tsx` (line 699-706) already says "View AI Draft" -- no change needed there.
-
-**4. Workspace.tsx: Protect against AI overwrite on frontend**
-
-Lines 169-183 -- after `generateDraft()` returns:
-- Only update `request.shared_content` in local state if `request.shared_content` was previously empty
-- This prevents the frontend from displaying the AI-generated content over existing manual work
-
-### Data Recovery
-
-No recovery needed -- Dinah's manual content is intact in the database. The `shared_content` field currently contains her manual edits (last edited by "Dinah Davis - Code Like A Girl" at 2026-02-23 22:11).
+- request_approved, request_declined, request_received, request_submitted
+- request_cancelled_by_guest, collab_cancelled_by_host
+- new_message, new_message_from_guest
+- collab_reminder (host + guest)
+- collab_published
+- send-collab-retrospective
+- send-release-notes
 
 ### Technical Details
 
-| File | Change |
-|------|--------|
-| `supabase/functions/generate-collab-draft/index.ts` | Check existing `shared_content` before overwriting; skip if human-edited |
-| `src/components/requests/RequestCard.tsx` | "Start Drafting" becomes "Continue Drafting" when content exists; "View Draft" becomes "View AI Draft" |
-| `src/pages/Workspace.tsx` | Only apply AI-generated `shared_content` to state if workspace was empty |
+**File: `supabase/functions/send-collab-email/index.ts**`
 
+For three email types (`collab_type_changed`, `workspace_updated_by_creator`, `workspace_updated_by_guest`), replace the gradient-box emoji header block with the standard DraftKit wordmark header. The heading text (e.g. "Collaboration Type Updated") stays -- only the icon block above it changes.
+
+**File: `supabase/functions/send-feedback-notification/index.ts**`
+
+Replace the colored `<td>` banner header (which has a large emoji + white text label) with the standard DraftKit wordmark header. The email subject line badge (emoji + label) stays in the body content -- only the top-level header block changes to match the brand.
+
+Both edge functions will be redeployed after changes.
