@@ -660,16 +660,27 @@ Generate a collaboration draft that:
     // Convert draft to HTML for the shared workspace
     const sharedContentHtml = draftToHtml(draft, creatorName, requesterName);
 
-    // Save the draft and auto-populate workspace
+    // Safety lock: check if a human has already edited shared_content
+    const hasHumanContent = request.shared_content &&
+      request.shared_content.trim().length > 0 &&
+      request.content_last_edited_by &&
+      request.content_last_edited_by !== "AI Draft";
+
+    // Build the update payload — only overwrite shared_content if no human edits exist
+    const updatePayload: Record<string, unknown> = {
+      ai_draft: draft,
+      approved_at: new Date().toISOString(),
+    };
+
+    if (!hasHumanContent) {
+      updatePayload.shared_content = sharedContentHtml;
+      updatePayload.content_last_edited_by = "AI Draft";
+      updatePayload.content_last_edited_at = new Date().toISOString();
+    }
+
     const { error: updateError } = await supabase
       .from("collab_requests")
-      .update({
-        ai_draft: draft,
-        approved_at: new Date().toISOString(),
-        shared_content: sharedContentHtml,
-        content_last_edited_by: "AI Draft",
-        content_last_edited_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq("id", requestId);
 
     if (updateError) {
@@ -677,7 +688,12 @@ Generate a collaboration draft that:
     }
 
     return new Response(
-      JSON.stringify({ draft, shared_content: sharedContentHtml, success: true }),
+      JSON.stringify({
+        draft,
+        shared_content: hasHumanContent ? null : sharedContentHtml,
+        human_content_preserved: !!hasHumanContent,
+        success: true,
+      }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {

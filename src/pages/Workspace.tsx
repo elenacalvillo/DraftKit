@@ -168,8 +168,8 @@ export default function Workspace() {
       if (error) throw error;
       if (data?.draft) {
         setLocalDraft(data.draft);
-        // Update shared_content from the auto-populated workspace
-        if (data.shared_content) {
+        // Only update shared_content if no human content was preserved
+        if (data.shared_content && !data.human_content_preserved) {
           setRequest((prev) =>
             prev
               ? {
@@ -181,7 +181,10 @@ export default function Workspace() {
               : prev
           );
         }
-        toast.success("Collaboration draft generated!");
+        const msg = data.human_content_preserved
+          ? "AI draft saved! Your manual work is untouched — view it in the AI Draft panel."
+          : "Collaboration draft generated!";
+        toast.success(msg);
         trackEvent("draft_generated", { request_id: request!.id });
       }
     } catch (error) {

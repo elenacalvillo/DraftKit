@@ -455,7 +455,7 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
                   className="flex-1"
                 >
                   <FileText className="w-4 h-4 mr-2" />
-                  {localDraft ? "View Draft" : "Generate Draft"}
+                  {localDraft ? "View AI Draft" : "Generate Draft"}
                 </Button>
                 <Button
                   variant="outline"
@@ -530,14 +530,14 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
                 )}
               </div>
 
-              {/* Start Drafting Button */}
+              {/* Start/Continue Drafting Button */}
               <Button
                 variant="gradient"
                 className="w-full"
                 onClick={() => navigate(`/dashboard/workspace/${request.id}`)}
               >
                 <PenLine className="w-4 h-4 mr-2" />
-                Start Drafting
+                {(request as any).shared_content ? "Continue Drafting" : "Start Drafting"}
               </Button>
             </div>
           );
