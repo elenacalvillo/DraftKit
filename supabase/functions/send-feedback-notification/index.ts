@@ -68,9 +68,14 @@ const generateEmailHtml = (feedback: FeedbackNotificationRequest): string => {
             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);">
               <!-- Header -->
               <tr>
-                <td style="background-color: ${config.color}; padding: 24px 40px; text-align: center;">
-                  <div style="font-size: 32px; margin-bottom: 8px;">${config.emoji}</div>
-                  <h1 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 600;">${config.label}</h1>
+                <td style="padding: 32px 40px 0; text-align: center;">
+                  <div style="text-align: center; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid #f1f5f9;">
+                    <span style="font-size: 22px; font-weight: 700; color: #2a2318; letter-spacing: -0.5px;">DraftKit</span>
+                    <p style="margin: 4px 0 0; font-size: 12px; color: #94a3b8; letter-spacing: 0.5px;">The engine for creators who ship together</p>
+                  </div>
+                  <div style="display: inline-block; padding: 6px 14px; border-radius: 20px; background-color: ${config.color}; color: #ffffff; font-size: 14px; font-weight: 600;">
+                    ${config.emoji} ${config.label}
+                  </div>
                 </td>
               </tr>
               
