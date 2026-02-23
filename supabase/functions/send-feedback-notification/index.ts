@@ -70,6 +70,7 @@ const generateEmailHtml = (feedback: FeedbackNotificationRequest): string => {
               <tr>
                 <td style="padding: 32px 40px 0; text-align: center;">
                   <div style="text-align: center; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid #f1f5f9;">
+                    <img src="https://cbgchxesngdsvkevbqwh.supabase.co/storage/v1/object/public/email-assets/draftkit-logo.png?v=1" alt="DraftKit" width="48" height="48" style="display: block; margin: 0 auto 12px;" />
                     <span style="font-size: 22px; font-weight: 700; color: #2a2318; letter-spacing: -0.5px;">DraftKit</span>
                     <p style="margin: 4px 0 0; font-size: 12px; color: #94a3b8; letter-spacing: 0.5px;">The engine for creators who ship together</p>
                   </div>
