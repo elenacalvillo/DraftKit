@@ -21,42 +21,32 @@ export default function Availability() {
   const [availabilityId, setAvailabilityId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!loading && !user) {
-      navigate("/login");
-      return;
-    }
+    if (!creator) return;
 
-    if (!loading && user && !creator) {
-      navigate("/signup");
-      return;
-    }
+    fetchData();
 
-    if (creator) {
-      fetchData();
+    // Subscribe to real-time updates for collab_requests
+    const channel = supabase
+      .channel('availability-booked-dates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'collab_requests',
+          filter: `creator_id=eq.${creator.id}`,
+        },
+        () => {
+          // Refetch booked dates when requests change
+          fetchBookedDates();
+        }
+      )
+      .subscribe();
 
-      // Subscribe to real-time updates for collab_requests
-      const channel = supabase
-        .channel('availability-booked-dates')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'collab_requests',
-            filter: `creator_id=eq.${creator.id}`,
-          },
-          () => {
-            // Refetch booked dates when requests change
-            fetchBookedDates();
-          }
-        )
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
-    }
-  }, [user, creator, loading, navigate]);
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [creator]);
 
   const fetchData = async () => {
     if (!creator) return;
@@ -185,17 +175,7 @@ export default function Availability() {
     saveAvailability(newAvailable, newBlocked);
   };
 
-  if (loading || !creator) {
-    return (
-      <div className="min-h-screen gradient-bg flex items-center justify-center">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-          className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full"
-        />
-      </div>
-    );
-  }
+  if (!creator) return null;
 
   return (
     <DashboardLayout>

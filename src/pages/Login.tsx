@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft, Mail, Lock, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { DraftKitLogo } from "@/components/icons/DraftKitLogo";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { verifyTurnstileToken } from "@/lib/turnstile";
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { signIn, signInWithGoogle, user, creator, loading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
@@ -60,9 +61,10 @@ export default function Login() {
 
   useEffect(() => {
     if (!loading && user && creator) {
-      navigate("/dashboard");
+      const from = (location.state as any)?.from?.pathname || "/dashboard";
+      navigate(from, { replace: true });
     }
-  }, [user, creator, loading, navigate]);
+  }, [user, creator, loading, navigate, location.state]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -140,7 +142,8 @@ export default function Login() {
     }
 
     toast.success("Welcome back!");
-    navigate("/dashboard");
+    const from = (location.state as any)?.from?.pathname || "/dashboard";
+    navigate(from, { replace: true });
     setIsLoading(false);
   };
 

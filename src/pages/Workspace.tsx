@@ -112,14 +112,10 @@ export default function Workspace() {
   }, []);
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      navigate("/login");
-      return;
-    }
     if (user && requestId) {
       fetchRequest();
     }
-  }, [user, authLoading, requestId]);
+  }, [user, requestId]);
 
   const fetchRequest = async () => {
     try {

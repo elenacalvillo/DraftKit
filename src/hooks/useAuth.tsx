@@ -28,6 +28,7 @@ interface AuthContextType {
   session: Session | null;
   creator: Creator | null;
   loading: boolean;
+  creatorLoading: boolean;
   signUp: (email: string, password: string) => Promise<{ error: Error | null; data: { user: User | null } | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signInWithGoogle: () => Promise<{ error: Error | null }>;
@@ -42,15 +43,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [creator, setCreator] = useState<Creator | null>(null);
   const [loading, setLoading] = useState(true);
+  const [creatorLoading, setCreatorLoading] = useState(false);
 
   const fetchCreator = async (userId: string) => {
-    const { data } = await supabase
-      .from('creators')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
-    
-    setCreator((data as Creator) ?? null);
+    setCreatorLoading(true);
+    try {
+      const { data } = await supabase
+        .from('creators')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+      
+      setCreator((data as Creator) ?? null);
+    } finally {
+      setCreatorLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -143,6 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       session, 
       creator, 
       loading, 
+      creatorLoading,
       signUp, 
       signIn, 
       signInWithGoogle,

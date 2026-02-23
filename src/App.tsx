@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { FeedbackWidget } from "@/components/feedback/FeedbackWidget";
 import { TrackingNotice } from "@/components/privacy/TrackingNotice";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -45,14 +46,14 @@ const App = () => (
             <Route path="/transparency" element={<Transparency />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/demo" element={<Demo />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/dashboard/availability" element={<Availability />} />
-            <Route path="/dashboard/requests" element={<Requests />} />
-            <Route path="/dashboard/my-requests" element={<MyRequests />} />
-            <Route path="/dashboard/settings" element={<Settings />} />
-            <Route path="/dashboard/subscription" element={<Subscription />} />
-            <Route path="/dashboard/workspace/:requestId" element={<Workspace />} />
-            <Route path="/admin/analytics" element={<AdminAnalytics />} />
+            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/dashboard/availability" element={<ProtectedRoute><Availability /></ProtectedRoute>} />
+            <Route path="/dashboard/requests" element={<ProtectedRoute><Requests /></ProtectedRoute>} />
+            <Route path="/dashboard/my-requests" element={<ProtectedRoute requireCreator={false}><MyRequests /></ProtectedRoute>} />
+            <Route path="/dashboard/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            <Route path="/dashboard/subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
+            <Route path="/dashboard/workspace/:requestId" element={<ProtectedRoute requireCreator={false}><Workspace /></ProtectedRoute>} />
+            <Route path="/admin/analytics" element={<ProtectedRoute requireCreator={false}><AdminAnalytics /></ProtectedRoute>} />
             <Route path="/:username" element={<PublicBooking />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
