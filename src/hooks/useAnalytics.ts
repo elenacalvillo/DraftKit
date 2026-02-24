@@ -17,6 +17,7 @@ export type AnalyticsEventType =
   | "draft_exported_google_docs_oauth"
   | "draft_exported_google_docs_fallback"
   | "draft_export_new_tab_opened"
+  | "draft_applied_to_workspace"
   | "user_signup"
   | "collab_approved"
   | "collab_declined"

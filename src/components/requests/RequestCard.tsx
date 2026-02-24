@@ -616,6 +616,7 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
         onOpenChange={setShowDraftModal}
         draft={localDraft}
         requesterName={request.requesterName}
+        requestId={request.id}
         isLoading={isGeneratingDraft}
         onRegenerate={generateDraft}
         onDelete={handleDeleteDraft}
