@@ -175,14 +175,14 @@ export default function Workspace() {
               ? {
                   ...prev,
                   shared_content: data.shared_content,
-                  content_last_edited_by: "AI Draft",
+                  content_last_edited_by: "SMART Draft",
                   content_last_edited_at: new Date().toISOString(),
                 }
               : prev
           );
         }
         const msg = data.human_content_preserved
-          ? "AI draft saved! Your manual work is untouched — view it in the AI Draft panel."
+          ? "SMART draft saved! Your manual work is untouched — view it in the SMART Draft panel."
           : "Collaboration draft generated!";
         toast.success(msg);
         trackEvent("draft_generated", { request_id: request!.id });
@@ -705,7 +705,7 @@ export default function Workspace() {
                   className="w-full"
                 >
                   <FileText className="w-4 h-4 mr-2" />
-                  {localDraft ? "View AI Draft" : "Generate AI Draft"}
+                  {localDraft ? "View SMART Draft" : "Generate SMART Draft"}
                 </Button>
               )}
 
@@ -801,11 +801,12 @@ export default function Workspace() {
       {/* Modals */}
       {isCreator && (
         <>
-          <CollabDraftModal
+        <CollabDraftModal
             open={showDraftModal}
             onOpenChange={setShowDraftModal}
             draft={localDraft}
             requesterName={request.requester_name}
+            requestId={request.id}
             isLoading={isGeneratingDraft}
             onRegenerate={generateDraft}
             onDelete={handleDeleteDraft}

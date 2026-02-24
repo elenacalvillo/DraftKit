@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Copy, RefreshCw, Sparkles, User, Users, Clock, CheckCircle, ChevronDown, FileText, FileIcon, Loader2, ExternalLink, Crown, Trash2 } from "lucide-react";
+import { Copy, RefreshCw, Sparkles, User, Users, Clock, CheckCircle, ChevronDown, FileText, Crown, Trash2, PenLine } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -19,16 +19,17 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { CollabDraft } from "@/lib/storage";
 import { useAnalytics } from "@/hooks/useAnalytics";
-import { useGoogleDocs } from "@/hooks/useGoogleDocs";
 import { usePro } from "@/hooks/usePro";
-import { exportToDocx, exportToGoogleDocs } from "@/lib/export-draft";
+import { exportToDocx } from "@/lib/export-draft";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 
 interface CollabDraftModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   draft: CollabDraft | null;
   requesterName: string;
+  requestId?: string;
   isLoading?: boolean;
   onRegenerate?: () => void;
   onDelete?: () => void;
@@ -39,23 +40,16 @@ export function CollabDraftModal({
   onOpenChange,
   draft,
   requesterName,
+  requestId,
   isLoading,
   onRegenerate,
   onDelete,
 }: CollabDraftModalProps) {
   const [copied, setCopied] = useState(false);
-  const [isExportingToGoogleDocs, setIsExportingToGoogleDocs] = useState(false);
+  const [isApplying, setIsApplying] = useState(false);
   const { trackEvent } = useAnalytics();
   const { isPro } = usePro();
   const navigate = useNavigate();
-  const { 
-    createGoogleDoc, 
-    isLoading: isGoogleDocsLoading, 
-    error: googleDocsError, 
-    isGisLoaded,
-    isIframeBlocked,
-    openInNewTab 
-  } = useGoogleDocs();
 
   const copyToClipboard = () => {
     if (!draft) return;
@@ -81,11 +75,54 @@ Estimated Read Time: ${draft.estimatedReadTime}`;
     navigator.clipboard.writeText(text);
     setCopied(true);
     toast.success("Draft copied to clipboard!");
-    
-    // Track draft copy event
     trackEvent("draft_copied", { draft_title: draft.title });
-    
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleApplyToWorkspace = async () => {
+    if (!requestId || !draft) return;
+    setIsApplying(true);
+
+    try {
+      // Format the draft as HTML for the workspace editor
+      const draftHtml = `<h1>${draft.title}</h1>
+<p><em>${draft.hook}</em></p>
+<h2>Outline</h2>
+<ul>${draft.outline.map((s) => `<li><strong>${s.section}</strong> (${s.contributor}): ${s.description}</li>`).join("")}</ul>
+<h2>Talking Points</h2>
+<ul>${draft.talkingPoints.map((p) => `<li>${p}</li>`).join("")}</ul>
+<h2>Format</h2>
+<p>${draft.suggestedFormat}</p>
+<h2>Tone Notes</h2>
+<p>${draft.toneNotes}</p>`;
+
+      // Only write to shared_content if it's currently empty
+      const { data: current } = await supabase
+        .from("collab_requests")
+        .select("shared_content")
+        .eq("id", requestId)
+        .maybeSingle();
+
+      if (!current?.shared_content) {
+        await supabase
+          .from("collab_requests")
+          .update({
+            shared_content: draftHtml,
+            content_last_edited_by: "SMART Draft",
+            content_last_edited_at: new Date().toISOString(),
+          })
+          .eq("id", requestId);
+      }
+
+      trackEvent("draft_applied_to_workspace", { draft_title: draft.title, request_id: requestId });
+      onOpenChange(false);
+      navigate(`/dashboard/workspace/${requestId}`);
+    } catch (error) {
+      console.error("Failed to apply draft to workspace:", error);
+      toast.error("Failed to apply draft. Please try again.");
+    } finally {
+      setIsApplying(false);
+    }
   };
 
   const contributorIcon = (contributor: "creator" | "requester" | "both") => {
@@ -226,92 +263,62 @@ Estimated Read Time: ${draft.estimatedReadTime}`;
             </div>
 
             {/* Actions */}
-            <div className="flex gap-3 pt-2">
-              <div className="flex-1 flex">
-                <Button onClick={copyToClipboard} className="flex-1 rounded-r-none">
-                  {copied ? (
-                    <>
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      Copied!
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-4 h-4 mr-2" />
-                      Copy Draft
-                    </>
-                  )}
+            <div className="space-y-3 pt-2">
+              {/* Primary: Apply to Workspace */}
+              {requestId && (
+                <Button
+                  variant="gradient"
+                  className="w-full"
+                  onClick={handleApplyToWorkspace}
+                  disabled={isApplying}
+                >
+                  <PenLine className="w-4 h-4 mr-2" />
+                  {isApplying ? "Applying…" : "Apply to Workspace"}
                 </Button>
+              )}
+
+              {/* Secondary row */}
+              <div className="flex gap-3">
+                {onDelete && (
+                  <Button 
+                    variant="outline" 
+                    onClick={onDelete}
+                    className="text-destructive hover:bg-destructive/10"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete Draft
+                  </Button>
+                )}
+
+                {/* Copy/Export dropdown */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button className="rounded-l-none border-l border-primary-foreground/20 px-2">
-                      <ChevronDown className="w-4 h-4" />
+                    <Button variant="outline">
+                      <Copy className="w-4 h-4 mr-2" />
+                      Copy / Export
+                      <ChevronDown className="w-4 h-4 ml-1" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="bg-popover border shadow-md z-50">
+                    <DropdownMenuItem
+                      onClick={copyToClipboard}
+                      className="cursor-pointer"
+                    >
+                      <Copy className="w-4 h-4 mr-2" />
+                      {copied ? "Copied!" : "Copy Raw Text"}
+                    </DropdownMenuItem>
                     {isPro ? (
-                      <>
-                        <DropdownMenuItem 
-                          onClick={async () => {
-                            await exportToDocx(draft, requesterName);
-                            toast.success("Word document downloaded!");
-                            trackEvent("draft_exported_docx", { draft_title: draft.title });
-                          }}
-                          className="cursor-pointer"
-                        >
-                          <FileText className="w-4 h-4 mr-2" />
-                          Download as Word (.docx)
-                        </DropdownMenuItem>
-                        {isIframeBlocked ? (
-                          <DropdownMenuItem 
-                            onClick={() => {
-                              toast.info(
-                                "Opening in new tab to enable Google Docs export...",
-                                { duration: 3000 }
-                              );
-                              openInNewTab();
-                              trackEvent("draft_export_new_tab_opened", { draft_title: draft?.title });
-                            }}
-                            className="cursor-pointer"
-                          >
-                            <ExternalLink className="w-4 h-4 mr-2" />
-                            Open in New Tab for Google Docs
-                          </DropdownMenuItem>
-                        ) : (
-                          <DropdownMenuItem 
-                            onClick={async () => {
-                              if (!draft) return;
-                              setIsExportingToGoogleDocs(true);
-                              
-                              // Try OAuth flow first if GIS is loaded
-                              if (isGisLoaded) {
-                                const docUrl = await createGoogleDoc(draft, requesterName);
-                                if (docUrl) {
-                                  window.open(docUrl, "_blank");
-                                  toast.success("Google Doc created with your draft!");
-                                  trackEvent("draft_exported_google_docs_oauth", { draft_title: draft.title });
-                                  setIsExportingToGoogleDocs(false);
-                                  return;
-                                }
-                              }
-                              
-                              // Fallback to copy-paste method
-                              await exportToGoogleDocs(draft, requesterName);
-                              toast.success("Content copied! Paste into Google Docs with Cmd/Ctrl+V");
-                              trackEvent("draft_exported_google_docs_fallback", { draft_title: draft.title });
-                              setIsExportingToGoogleDocs(false);
-                            }}
-                            className="cursor-pointer"
-                            disabled={isExportingToGoogleDocs || isGoogleDocsLoading}
-                          >
-                            {(isExportingToGoogleDocs || isGoogleDocsLoading) ? (
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            ) : (
-                              <FileIcon className="w-4 h-4 mr-2" />
-                            )}
-                            Open in Google Docs
-                          </DropdownMenuItem>
-                        )}
-                      </>
+                      <DropdownMenuItem 
+                        onClick={async () => {
+                          await exportToDocx(draft, requesterName);
+                          toast.success("Word document downloaded!");
+                          trackEvent("draft_exported_docx", { draft_title: draft.title });
+                        }}
+                        className="cursor-pointer"
+                      >
+                        <FileText className="w-4 h-4 mr-2" />
+                        Download as Word (.docx)
+                      </DropdownMenuItem>
                     ) : (
                       <DropdownMenuItem 
                         onClick={() => navigate("/dashboard/settings?upgrade=true")}
@@ -323,29 +330,19 @@ Estimated Read Time: ${draft.estimatedReadTime}`;
                     )}
                   </DropdownMenuContent>
                 </DropdownMenu>
+
+                {onRegenerate && (
+                  <Button variant="outline" onClick={() => {
+                    trackEvent("draft_regeneration_requested", { 
+                      draft_title: draft?.title 
+                    });
+                    onRegenerate();
+                  }}>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Regenerate
+                  </Button>
+                )}
               </div>
-              {onDelete && (
-                <Button 
-                  variant="outline" 
-                  onClick={onDelete}
-                  className="text-destructive hover:bg-destructive/10"
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Delete Draft
-                </Button>
-              )}
-              {onRegenerate && (
-                <Button variant="outline" onClick={() => {
-                  // Track regeneration request
-                  trackEvent("draft_regeneration_requested", { 
-                    draft_title: draft?.title 
-                  });
-                  onRegenerate();
-                }}>
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Regenerate
-                </Button>
-              )}
             </div>
           </motion.div>
         ) : (
