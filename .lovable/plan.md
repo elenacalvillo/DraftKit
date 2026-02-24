@@ -1,60 +1,116 @@
-## Fix: Unify All Email Headers to DraftKit Branded Wordmark
+## Contextual Card Redesign for RequestCard
 
-### The Problem
+### Goal
 
-Some email templates use a random emoji inside a gradient square as their "header icon" instead of the consistent DraftKit two-tone wordmark + tagline. This creates a fragmented, unpolished brand experience.
+Transform the approved-state card from a "cockpit of buttons" into a clean, single-action workspace card using progressive disclosure.
 
-### Emails That Need Fixing (brand header only -- no content changes)
+### Changes (all in `src/components/requests/RequestCard.tsx`)
 
-**In `send-collab-email/index.ts`:**
+#### 1. Add a three-dot overflow menu (using DropdownMenu)
 
+Move low-frequency actions into a `...` menu in the card header (top-right, next to the status badge):
 
-| Email Type                                     | Current Header                   | Fix                                      |
-| ---------------------------------------------- | -------------------------------- | ---------------------------------------- |
-| `collab_type_changed` (lines 817-822)          | Gradient box with "pencil" emoji | Replace with DraftKit wordmark + tagline |
-| `workspace_updated_by_creator` (lines 876-881) | Gradient box with "pencil" emoji | Replace with DraftKit wordmark + tagline |
-| `workspace_updated_by_guest` (lines 920-924)   | Gradient box with "pencil" emoji | Replace with DraftKit wordmark + tagline |
+- "Message" (opens SendMessageModal)
+- "Link External Doc" (toggles the link input inline)
+- "View SMART Draft" / "Generate SMART Draft" (conditionally labeled)
+- Separator
+- "Change Collab Type" (if approved)
+- "Cancel Collaboration" (destructive, if approved)
 
+#### 2. Rename all "AI" references to "SMART"
 
-**In `send-feedback-notification/index.ts`:**
+- "View AI Draft" becomes "View SMART Draft"
+- "Generate Draft" becomes "Generate SMART Draft"
+- "Draft Ready" label becomes "SMART Draft Ready"
 
+#### 3. Collapse the External Doc Link input
 
-| Email Type            | Current Header                 | Fix                                      |
-| --------------------- | ------------------------------ | ---------------------------------------- |
-| Feedback notification | Colored banner with emoji icon | Replace with DraftKit wordmark + tagline |
+Remove the always-visible input box (lines 480-531). Instead:
 
+- If a link exists, show a small inline text link "External Doc" with an external-link icon (not a full button row).
+- The input only appears when triggered from the overflow menu's "Link External Doc" action.
 
-### The Standard Header (already used by 10+ other email types)
+#### 4. Simplify the approved-state footer
 
-All headers will be replaced with this exact block:
+Replace the current 4-button row + input + primary button with:
 
-```html
-<div style="text-align: center; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid #f1f5f9;">
-  <span style="font-size: 22px; font-weight: 700; color: #2a2318; letter-spacing: -0.5px;">DraftKit</span>
-  <p style="margin: 4px 0 0; font-size: 12px; color: #94a3b8; letter-spacing: 0.5px;">
-    The engine for creators who ship together
-  </p>
-</div>
+- One primary gradient button: "Start Drafting" or "Continue Drafting" (already exists, just remove clutter above it).
+- A small secondary row: if a SMART draft exists, show a subtle "SMART Draft ready" text indicator (clickable to view). No standalone buttons.
+
+#### 5. Header cleanup
+
+- Move the status badge into a small dot/icon next to the name instead of the large pill (keep pill for pending/declined/cancelled, use subtle indicator for approved).
+- Keep the collab type as a small tag, remove the inline edit button (moved to overflow menu).
+
+#### 6. Email row cleanup
+
+- Keep the email link but remove the copy button from always-visible; move copy to the overflow menu or keep as a tiny icon.
+
+### Visual Result (Approved Card)
+
+```text
++------------------------------------------+
+| [Avatar] Name              [...] [badge] |
+|          substack.com/name               |
+|                                          |
+| Calendar icon  Requested: Mon, Mar 3     |
+| Sparkles icon  Virtual Coffee            |
+|                                          |
+| "Their message here..."                  |
+|                                          |
+| SMART Draft ready (clickable)            |
+| External Doc (small link, if set)        |
+|                                          |
+| [====== Continue Drafting ======]  (orange)|
++------------------------------------------+
 ```
-
-### Emails Already Correct (no changes needed)
-
-- request_approved, request_declined, request_received, request_submitted
-- request_cancelled_by_guest, collab_cancelled_by_host
-- new_message, new_message_from_guest
-- collab_reminder (host + guest)
-- collab_published
-- send-collab-retrospective
-- send-release-notes
 
 ### Technical Details
 
-**File: `supabase/functions/send-collab-email/index.ts**`
+**New import**: `DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger` from `@/components/ui/dropdown-menu`, plus `MoreHorizontal` from `lucide-react`.
 
-For three email types (`collab_type_changed`, `workspace_updated_by_creator`, `workspace_updated_by_guest`), replace the gradient-box emoji header block with the standard DraftKit wordmark header. The heading text (e.g. "Collaboration Type Updated") stays -- only the icon block above it changes.
+**State changes**:
 
-**File: `supabase/functions/send-feedback-notification/index.ts**`
+- `isEditingLink` now toggled from overflow menu instead of inline edit button.
+- `isEditingCollabType` toggled from overflow menu.
 
-Replace the colored `<td>` banner header (which has a large emoji + white text label) with the standard DraftKit wordmark header. The email subject line badge (emoji + label) stays in the body content -- only the top-level header block changes to match the brand.
+**Lines affected** (approximate):
 
-Both edge functions will be redeployed after changes.
+- Lines 230-278 (header): add overflow menu trigger, simplify status badge for approved state
+- Lines 280-375 (details): remove standalone email copy button row, keep calendar + collab type compact
+- Lines 384-398 (draft preview): make clickable, rename to "SMART Draft Ready"
+- Lines 448-543 (approved actions): remove the 3-button row and external doc input; keep only the primary CTA button; add subtle draft/link indicators
+- Import line (line 4): add `MoreHorizontal`, add dropdown imports
+
+**No backend changes needed.** This is purely a frontend UI refactor.
+
+&nbsp;
+
+### 1. The "Mental Wireframe"
+
+Here is how the card will be structured to avoid the "cockpit" look:
+
+- **Top Right:** The only thing next to the name is the `...` (More) menu and a tiny **Status Dot** (Green for Approved).
+- **The "Contextual" Row:** Right above the orange button, there will be a single line of text.
+  - *If no draft:* (Empty space or "Ready to start?")
+  - *If draft exists:* "✨ **SMART Draft ready**" (Clickable text).
+- **The Action:** A single, full-width **Orange Button**.
+
+---
+
+### 2. How to "Safety Check" before clicking Accept
+
+When Lovable generates the code, **DO NOT click "Accept" immediately.** Instead, use the **Preview Window** and perform these three "Stress Tests":
+
+1. **The "Shrink" Test:** Resize the preview to a narrow mobile view. If the `...` menu overlaps the name or the "SMART Draft" text wraps weirdly, tell Lovable: *"The header is overlapping on mobile, please fix the flex-wrap."*
+2. **The Dropdown Test:** Click the `...` menu. Does "Generate SMART Draft" actually work from inside a menu? If not, the logic might be disconnected.
+3. **The "Empty State" Test:** If you have a request with NO manual content and NO draft, make sure the card doesn't look "broken" or "too empty." It should still feel like a clean invitation to work.
+
+---
+
+### 3. Add this "Confidence Clause" to the instructions:
+
+Paste this at the very bottom of your plan to ensure the CSS is tight:
+
+> **"Styling Requirement:** The `RequestCard` must use a strict Flexbox layout. Ensure the 'Continue Drafting' button is always anchored at the bottom. The overflow menu (`...`) must be aligned to the top-right with enough padding to be a clear touch target on mobile (min 44x44px). If `shared_content` exists, ensure the 'SMART Draft' text is rendered in a muted brand color so it doesn't compete with the primary orange button."
+
