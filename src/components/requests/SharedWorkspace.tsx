@@ -13,7 +13,7 @@ import { WorkspaceEditor } from "./WorkspaceEditor";
 import { cn } from "@/lib/utils";
 import { exportWorkspaceHtmlToDocx } from "@/lib/export-draft";
 
-const ALLOWED_TAGS = ["p", "h1", "h2", "h3", "strong", "em", "s", "code", "pre", "a", "ul", "ol", "li", "br"];
+const ALLOWED_TAGS = ["p", "h1", "h2", "h3", "strong", "em", "s", "code", "pre", "a", "ul", "ol", "li", "br", "hr"];
 const ALLOWED_ATTR = ["href", "target", "rel"];
 
 function sanitize(html: string): string {
