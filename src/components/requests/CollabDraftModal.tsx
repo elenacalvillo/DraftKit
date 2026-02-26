@@ -104,13 +104,23 @@ Estimated Read Time: ${draft.estimatedReadTime}`;
         .maybeSingle();
 
       if (!current?.shared_content) {
+        const updatePayload: any = {
+          shared_content: draftHtml,
+          content_last_edited_by: "SMART Draft",
+          content_last_edited_at: new Date().toISOString(),
+        };
+        // Set first_draft_generated_at if not already set
+        const { data: currentFull } = await supabase
+          .from("collab_requests")
+          .select("first_draft_generated_at")
+          .eq("id", requestId)
+          .maybeSingle();
+        if (!(currentFull as any)?.first_draft_generated_at) {
+          updatePayload.first_draft_generated_at = new Date().toISOString();
+        }
         await supabase
           .from("collab_requests")
-          .update({
-            shared_content: draftHtml,
-            content_last_edited_by: "SMART Draft",
-            content_last_edited_at: new Date().toISOString(),
-          })
+          .update(updatePayload)
           .eq("id", requestId);
       }
 

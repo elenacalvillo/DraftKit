@@ -20,6 +20,12 @@ function sanitize(html: string): string {
   return DOMPurify.sanitize(html, { ALLOWED_TAGS, ALLOWED_ATTR });
 }
 
+interface EditingSession {
+  edited_by: string;
+  saved_at: string;
+  duration_seconds: number;
+}
+
 interface SharedWorkspaceProps {
   requestId: string;
   sharedContent: string | null;
@@ -30,6 +36,7 @@ interface SharedWorkspaceProps {
   onContentSaved: (content: string, editedBy: string, editedAt: string) => void;
   partnerName?: string;
   isCreator?: boolean;
+  editingSessions?: EditingSession[];
 }
 
 export function SharedWorkspace({
@@ -42,12 +49,14 @@ export function SharedWorkspace({
   onContentSaved,
   partnerName,
   isCreator,
+  editingSessions = [],
 }: SharedWorkspaceProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(sharedContent || "");
   const [isSaving, setIsSaving] = useState(false);
   const [notifyPartner, setNotifyPartner] = useState(false);
   const [headerPortal, setHeaderPortal] = useState<HTMLElement | null>(null);
+  const [editStartTime, setEditStartTime] = useState<number | null>(null);
 
   // Find the zen header portal target
   useEffect(() => {
@@ -58,6 +67,7 @@ export function SharedWorkspace({
   const handleStartEditing = () => {
     setEditContent(sharedContent || "");
     setIsEditing(true);
+    setEditStartTime(Date.now());
   };
 
   const handleCancel = () => {
@@ -70,6 +80,13 @@ export function SharedWorkspace({
     setIsSaving(true);
     const now = new Date().toISOString();
     const cleanHtml = sanitize(editContent);
+    const durationSeconds = editStartTime ? Math.round((Date.now() - editStartTime) / 1000) : 0;
+    const newSession: EditingSession = {
+      edited_by: currentUserName,
+      saved_at: now,
+      duration_seconds: durationSeconds,
+    };
+    const updatedSessions = [...editingSessions, newSession];
     try {
       const { error } = await supabase
         .from("collab_requests")
@@ -77,7 +94,8 @@ export function SharedWorkspace({
           shared_content: cleanHtml || null,
           content_last_edited_by: currentUserName,
           content_last_edited_at: now,
-        })
+          editing_sessions: updatedSessions,
+        } as any)
         .eq("id", requestId);
 
       if (error) throw error;

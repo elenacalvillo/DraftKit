@@ -181,6 +181,14 @@ export default function Workspace() {
               : prev
           );
         }
+        // Set first_draft_generated_at if not already set
+        if (!(request as any).first_draft_generated_at) {
+          await supabase
+            .from("collab_requests")
+            .update({ first_draft_generated_at: new Date().toISOString() } as any)
+            .eq("id", request!.id);
+          setRequest((prev) => prev ? { ...prev, first_draft_generated_at: new Date().toISOString() } as any : prev);
+        }
         const msg = data.human_content_preserved
           ? "SMART draft saved! Your manual work is untouched — view it in the SMART Draft panel."
           : "Collaboration draft generated!";
@@ -781,6 +789,7 @@ export default function Workspace() {
               canEdit={effectiveCanEdit}
               partnerName={partnerName || undefined}
               isCreator={isCreator}
+              editingSessions={(request as any).editing_sessions || []}
               onContentSaved={(content, editedBy, editedAt) => {
                 setRequest((prev) =>
                   prev
