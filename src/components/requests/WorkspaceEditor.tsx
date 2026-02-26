@@ -10,6 +10,7 @@ import {
   Link as LinkIcon,
   List,
   ListOrdered,
+  Minus,
   ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -33,7 +34,6 @@ const extensions = [
   StarterKit.configure({
     heading: { levels: [1, 2, 3] },
     blockquote: false,
-    horizontalRule: false,
   }),
   Link.configure({
     openOnClick: false,
@@ -201,6 +201,13 @@ export function WorkspaceEditor({ content, onChange, editable }: WorkspaceEditor
           </ToolbarButton>
           <ToolbarButton active={editor.isActive("orderedList")} onClick={() => editor.chain().focus().toggleOrderedList().run()} title="Numbered list">
             <ListOrdered className="w-4 h-4" />
+          </ToolbarButton>
+
+          <div className="w-px h-5 bg-border/40 mx-1" />
+
+          {/* Divider */}
+          <ToolbarButton active={false} onClick={() => editor.chain().focus().setHorizontalRule().run()} title="Divider (---)">
+            <Minus className="w-4 h-4" />
           </ToolbarButton>
         </div>,
         document.body
