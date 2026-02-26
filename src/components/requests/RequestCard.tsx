@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Calendar, ExternalLink, Mail, Link as LinkIcon, Sparkles, MessageSquare, FileText, XCircle, Ban, Check, X, Trash2, PenLine, Copy, MoreHorizontal } from "lucide-react";
+import { Calendar, ExternalLink, Mail, Link as LinkIcon, Sparkles, MessageSquare, FileText, XCircle, Ban, Check, X, Trash2, PenLine, Copy, MoreHorizontal, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -30,6 +30,45 @@ interface RequestCardProps {
 }
 
 const COLLAB_STYLE_OPTIONS = ["Virtual Coffee", "Async Drafting", "Interview Style", "Custom"];
+
+interface EditingSession {
+  edited_by: string;
+  saved_at: string;
+  duration_seconds: number;
+}
+
+function TimeSavedBadge({ request }: { request: CollabRequest }) {
+  const firstDraft = (request as any).first_draft_generated_at;
+  const sessions: EditingSession[] = (request as any).editing_sessions || [];
+  
+  if (!firstDraft) return null;
+  if (request.status !== "approved" && request.status !== "published") return null;
+
+  // SMART draft = 60 min saved
+  let totalMinutes = 60;
+
+  // Count async handoffs (different edited_by with >4h gap)
+  let handoffs = 0;
+  for (let i = 1; i < sessions.length; i++) {
+    if (sessions[i].edited_by !== sessions[i - 1].edited_by) {
+      const gap = new Date(sessions[i].saved_at).getTime() - new Date(sessions[i - 1].saved_at).getTime();
+      if (gap > 4 * 60 * 60 * 1000) handoffs++;
+    }
+  }
+  totalMinutes += handoffs * 45;
+
+  const hours = totalMinutes / 60;
+  const display = hours >= 1
+    ? `~${hours % 1 === 0 ? hours : hours.toFixed(1)} hrs saved`
+    : `~${totalMinutes} min saved`;
+
+  return (
+    <div className="flex items-center gap-1.5 mb-3 text-sm text-muted-foreground">
+      <Zap className="w-3.5 h-3.5 text-primary/70" />
+      <span>{display}</span>
+    </div>
+  );
+}
 
 export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApprove = true, isPro = false, onApprove, onDecline, onCancel, onDraftGenerated, onCollabTypeChanged, onDelete }: RequestCardProps) {
   const navigate = useNavigate();
@@ -184,6 +223,13 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
       if (data?.draft) {
         setLocalDraft(data.draft);
         onDraftGenerated?.(request.id, data.draft);
+        // Set first_draft_generated_at if not already set
+        if (!(request as any).first_draft_generated_at) {
+          await supabase
+            .from("collab_requests")
+            .update({ first_draft_generated_at: new Date().toISOString() } as any)
+            .eq("id", request.id);
+        }
         toast.success("SMART Draft generated!");
         trackEvent("draft_generated", { request_id: request.id });
       }
@@ -495,6 +541,9 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
             )}
           </div>
         )}
+
+        {/* Time Saved Badge */}
+        <TimeSavedBadge request={request} />
 
         {/* ===== ACTIONS ===== */}
 

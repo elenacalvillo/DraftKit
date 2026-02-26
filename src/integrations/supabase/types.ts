@@ -97,6 +97,8 @@ export type Database = {
           created_at: string
           creator_id: string
           creator_notes: string | null
+          editing_sessions: Json | null
+          first_draft_generated_at: string | null
           hidden_by_creator: boolean
           hidden_by_requester: boolean
           id: string
@@ -122,6 +124,8 @@ export type Database = {
           created_at?: string
           creator_id: string
           creator_notes?: string | null
+          editing_sessions?: Json | null
+          first_draft_generated_at?: string | null
           hidden_by_creator?: boolean
           hidden_by_requester?: boolean
           id?: string
@@ -147,6 +151,8 @@ export type Database = {
           created_at?: string
           creator_id?: string
           creator_notes?: string | null
+          editing_sessions?: Json | null
+          first_draft_generated_at?: string | null
           hidden_by_creator?: boolean
           hidden_by_requester?: boolean
           id?: string
