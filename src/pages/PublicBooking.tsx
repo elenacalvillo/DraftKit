@@ -508,7 +508,19 @@ export default function PublicBooking() {
       .single();
 
     if (error) {
-      console.error("Collab request insert error:", JSON.stringify(error));
+      console.error("Collab request insert error:", JSON.stringify({
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        payload: {
+          creator_id: creator.id,
+          requester_email: formData.email.trim(),
+          requester_user_id: null,
+          selected_collab_type: selectedCollabType,
+          requested_date: isFlexibleDate ? null : selectedDate,
+        },
+      }));
       // Handle unique constraint violation (race condition - date was just booked)
       if (error.code === '23505') {
         toast.error("This date has just been booked. Please select another date.");
