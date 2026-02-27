@@ -1,18 +1,15 @@
 
 
-## Fix: "Protocol Wall" on Substack Profile Input
+## Fix: Substack URL input squished on mobile
 
-Karen's bug is straightforward. The Signup form uses `type="url"` on the Substack Profile input, which triggers native browser validation requiring `https://`. Users naturally type `substack.com/@name` as the placeholder suggests, and the browser blocks them before your code even runs.
-
-Your existing `normalizeSubstackUrl()` utility already handles all formats (bare usernames, profile URLs, mobile share links) perfectly. The browser is just blocking users from reaching it.
+**Problem**: On mobile, the `flex gap-2` row at line 1098 in `src/pages/PublicBooking.tsx` forces the input and "Check Match" button onto one line. The `shrink-0` button wins the space battle, leaving the input unusable.
 
 ### Changes
 
-**1. `src/pages/Signup.tsx`** — Change `type="url"` to `type="text"` on the Substack Profile input (line 724). The Zod schema + `normalizeSubstackUrl` already validate properly.
+**`src/pages/PublicBooking.tsx` (line 1098)**:
+- Change `flex gap-2` to `flex flex-wrap gap-2`
+- Change the input's `flex-1` to `flex-1 min-w-0 w-full` so it claims full width when wrapping occurs
+- The button already has `shrink-0`, so it will naturally wrap to the next line on narrow screens
 
-**2. `src/pages/Settings.tsx`** — Confirm input is already `type="text"` (it is). No change needed.
-
-**3. Both files** — Update placeholder from `substack.com/@yourname` to `yourname.substack.com or substack.com/@yourname` so users see both accepted formats clearly.
-
-One line change + two placeholder updates. No architectural changes needed.
+Single-line CSS fix, no logic changes.
 
