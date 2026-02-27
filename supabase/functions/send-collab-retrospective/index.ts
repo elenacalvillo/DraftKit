@@ -113,18 +113,14 @@ serve(async (req: Request): Promise<Response> => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const baseUrl = Deno.env.get("SITE_URL") || "https://draftkit.app";
 
-    // Get today's date in YYYY-MM-DD
-    const today = new Date();
-    const todayStr = today.toISOString().split("T")[0];
+    // Check for manual override via request body
+    let manualRequestId: string | null = null;
+    try {
+      const body = await req.json();
+      manualRequestId = body?.request_id || null;
+    } catch { /* no body */ }
 
-    // Also check yesterday to handle UTC timezone offset
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split("T")[0];
-    console.log(`Checking dates: ${yesterdayStr} and ${todayStr}`);
-
-    // Fetch approved requests where requested_date = today or yesterday
-    const { data: requests, error: fetchError } = await supabase
+    let query = supabase
       .from("collab_requests")
       .select(`
         id,
@@ -135,9 +131,23 @@ serve(async (req: Request): Promise<Response> => {
           name,
           creator_contacts ( email )
         )
-      `)
-      .eq("status", "approved")
-      .in("requested_date", [todayStr, yesterdayStr]);
+      `);
+
+    if (manualRequestId) {
+      console.log(`Manual trigger for request: ${manualRequestId}`);
+      query = query.eq("id", manualRequestId);
+    } else {
+      // Get today's date in YYYY-MM-DD
+      const today = new Date();
+      const todayStr = today.toISOString().split("T")[0];
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = yesterday.toISOString().split("T")[0];
+      console.log(`Checking dates: ${yesterdayStr} and ${todayStr}`);
+      query = query.eq("status", "approved").in("requested_date", [todayStr, yesterdayStr]);
+    }
+
+    const { data: requests, error: fetchError } = await query;
 
     if (fetchError) {
       console.error("Error fetching requests:", fetchError);
@@ -156,7 +166,7 @@ serve(async (req: Request): Promise<Response> => {
     let sentCount = 0;
     // Each collab gets its own retro URL now
 
-    const formattedDate = today.toLocaleDateString("en-US", {
+    const formattedDate = new Date().toLocaleDateString("en-US", {
       weekday: "long",
       month: "long",
       day: "numeric",
