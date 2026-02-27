@@ -110,6 +110,9 @@ export type Database = {
           requester_profile_image_url: string | null
           requester_substack_url: string | null
           requester_user_id: string | null
+          retro_completed_at: string | null
+          retro_notes: string | null
+          retro_rating: number | null
           selected_collab_type: string | null
           shared_content: string | null
           status: string
@@ -137,6 +140,9 @@ export type Database = {
           requester_profile_image_url?: string | null
           requester_substack_url?: string | null
           requester_user_id?: string | null
+          retro_completed_at?: string | null
+          retro_notes?: string | null
+          retro_rating?: number | null
           selected_collab_type?: string | null
           shared_content?: string | null
           status?: string
@@ -164,6 +170,9 @@ export type Database = {
           requester_profile_image_url?: string | null
           requester_substack_url?: string | null
           requester_user_id?: string | null
+          retro_completed_at?: string | null
+          retro_notes?: string | null
+          retro_rating?: number | null
           selected_collab_type?: string | null
           shared_content?: string | null
           status?: string

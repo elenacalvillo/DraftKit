@@ -25,6 +25,7 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import NotFound from "./pages/NotFound";
 import Workspace from "./pages/Workspace";
 import Subscription from "./pages/Subscription";
+import Retrospective from "./pages/Retrospective";
 
 const queryClient = new QueryClient();
 
@@ -54,6 +55,7 @@ const App = () => (
             <Route path="/dashboard/subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
             <Route path="/dashboard/workspace/:requestId" element={<ProtectedRoute requireCreator={false}><Workspace /></ProtectedRoute>} />
             <Route path="/admin/analytics" element={<ProtectedRoute requireCreator={false}><AdminAnalytics /></ProtectedRoute>} />
+            <Route path="/retro/:collabId" element={<ProtectedRoute requireCreator={false}><Retrospective /></ProtectedRoute>} />
             <Route path="/:username" element={<PublicBooking />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
