@@ -1,32 +1,23 @@
 
+Goal: stop booking failures immediately for registered emails while keeping Account Blindness.
 
-## Investigation Results
+Implementation steps:
+1) Update backend trigger function `public.link_request_to_existing_user` to a no-op for booking inserts (always `RETURN NEW` without assigning `requester_user_id`).
+2) Keep trigger `trg_link_request_to_existing_user` attached (safe), but with no-op behavior to avoid future migration dependencies.
+3) Add a migration that:
+   - `CREATE OR REPLACE FUNCTION public.link_request_to_existing_user()` with no linking logic.
+   - Adds a comment documenting that reconciliation is handled by `link_requests_to_new_user` only.
+4) Keep frontend insert as-is (`requester_user_id: null`) in `src/pages/PublicBooking.tsx`.
+5) Improve observability in `src/pages/PublicBooking.tsx` error block:
+   - Log `error.code`, `error.message`, `error.details`, `error.hint`, and payload summary (excluding sensitive message body).
+6) Validate in test environment:
+   - Case A: logged-in user submits with `elenacalvilloalcalde@gmail.com` (registered, different account) → must insert successfully.
+   - Case B: anonymous user submits same email → must insert successfully.
+   - Case C: invalid profile URL (`substack.com/@...`) still fails with URL validation trigger.
+7) Confirm rows inserted by querying latest `collab_requests` for that email and checking `requester_user_id IS NULL`.
+8) Publish once test passes so live matches preview behavior.
 
-**Triggers ARE active** on `collab_requests` (contrary to what the schema info showed). Two triggers fire on every insert:
-1. `trg_link_request_to_existing_user` — the one we fixed
-2. `trg_validate_requester_url` — validates Substack URL format
-
-**The trigger function IS updated** — confirmed via direct database query. The fix is live server-side.
-
-**No recent test row exists** — querying for `elenacalvilloalcalde@gmail.com` shows only one request from January 16. Your test today did not insert.
-
-### Most likely cause
-
-You tested on the **published site** (`collabstack.lovable.app`), which still has the **old frontend code** (before our fix). The published site needs a new deployment to pick up the code changes. The database trigger fix IS live, but the frontend retry logic is only in the preview.
-
-### The real fix: True Account Blindness
-
-The current code is too clever — it validates the session, sets `requester_user_id` if valid, and retries if it fails. This creates unnecessary complexity. The simpler approach:
-
-**Always send `requester_user_id: null` from the public booking page.** Period. No session checking. No retry. The booking form should never care who you are.
-
-### Changes
-
-**`src/pages/PublicBooking.tsx`**:
-- Remove the `supabase.auth.getSession()` call before insert
-- Remove the retry-as-anonymous fallback block
-- Hardcode `requester_user_id: null` in the insert payload
-- Keep the error logging
-
-This is 3 lines of code instead of 15. The `link_requests_to_new_user` trigger (which fires when a user signs up) already handles reconciliation by matching email — so no data is lost.
-
+Technical details:
+- Root cause confirmed: trigger-level identity matching still runs for authenticated sessions and sets `NEW.requester_user_id` to the matched account (`ce0504e4-...`) while caller auth user is different (`e12cb16e-...`), violating `collab_requests` INSERT RLS check.
+- This is why failures happen specifically with already-registered emails, even after frontend Account Blindness changes.
+- RLS policy itself is structurally correct for Account Blindness; trigger mutation is the conflicting layer.
