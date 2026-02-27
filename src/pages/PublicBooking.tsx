@@ -483,45 +483,29 @@ export default function PublicBooking() {
       console.log("Could not fetch requester profile image:", e);
     }
 
-    // Re-validate session before insert to prevent stale auth (Bug fix: mobile tab suspension)
-    const { data: { session: currentSession } } = await supabase.auth.getSession();
-    const verifiedUserId = currentSession?.user?.id || null;
-
-    const insertPayload = {
-      creator_id: creator.id,
-      requester_name: formData.name.trim(),
-      requester_email: formData.email.trim(),
-      requester_substack_url: normalizedSubstackUrl,
-      requester_profile_image_url: requesterProfileImageUrl,
-      message: formData.message.trim() || null,
-      requested_date: isFlexibleDate ? null : selectedDate,
-      status: 'pending' as const,
-      requester_user_id: verifiedUserId,
-      selected_collab_type: selectedCollabType,
-      ai_suggestion_used: selectedAiSuggestion ? {
-        topic: selectedAiSuggestion.topic,
-        format: selectedAiSuggestion.format,
-        description: selectedAiSuggestion.description,
-      } : null,
-    };
-
-    let { data: insertedRequest, error } = await supabase
+    // Account Blind: always submit as guest. Reconciliation happens via email matching
+    // when the user eventually signs up (link_requests_to_new_user trigger).
+    const { data: insertedRequest, error } = await supabase
       .from('collab_requests')
-      .insert(insertPayload)
+      .insert({
+        creator_id: creator.id,
+        requester_name: formData.name.trim(),
+        requester_email: formData.email.trim(),
+        requester_substack_url: normalizedSubstackUrl,
+        requester_profile_image_url: requesterProfileImageUrl,
+        message: formData.message.trim() || null,
+        requested_date: isFlexibleDate ? null : selectedDate,
+        status: 'pending' as const,
+        requester_user_id: null,
+        selected_collab_type: selectedCollabType,
+        ai_suggestion_used: selectedAiSuggestion ? {
+          topic: selectedAiSuggestion.topic,
+          format: selectedAiSuggestion.format,
+          description: selectedAiSuggestion.description,
+        } : null,
+      })
       .select('id')
       .single();
-
-    // If insert failed and we had a user ID, retry as anonymous (session may have expired)
-    if (error && error.code !== '23505' && verifiedUserId) {
-      console.error("Insert failed with user ID, retrying as anonymous:", JSON.stringify(error));
-      const retryResult = await supabase
-        .from('collab_requests')
-        .insert({ ...insertPayload, requester_user_id: null })
-        .select('id')
-        .single();
-      insertedRequest = retryResult.data;
-      error = retryResult.error;
-    }
 
     if (error) {
       console.error("Collab request insert error:", JSON.stringify(error));
