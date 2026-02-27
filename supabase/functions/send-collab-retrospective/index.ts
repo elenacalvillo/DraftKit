@@ -37,19 +37,10 @@ async function sendEmail(to: string[], subject: string, html: string) {
   return await response.json();
 }
 
-function buildRetrospectiveEmail(recipientName: string, partnerName: string, collabDate: string, feedbackUrl: string): string {
-  const surveyBaseUrl = feedbackUrl.replace("?feedback=true", "");
-  const q1Yes = `${surveyBaseUrl}?feedback=true&q=draft_time&a=yes`;
-  const q1No = `${surveyBaseUrl}?feedback=true&q=draft_time&a=no`;
-  const q2Yes = `${surveyBaseUrl}?feedback=true&q=workspace&a=yes`;
-  const q2No = `${surveyBaseUrl}?feedback=true&q=workspace&a=no`;
-  const q3Yes = `${surveyBaseUrl}?feedback=true&q=collab_again&a=yes`;
-  const q3Def = `${surveyBaseUrl}?feedback=true&q=collab_again&a=definitely`;
-
-  const pillStyle = `display:inline-block;padding:8px 18px;border-radius:20px;text-decoration:none;font-weight:600;font-size:14px;margin:0 4px;`;
-  const yesStyle = `${pillStyle}background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;`;
-  const noStyle = `${pillStyle}background:#fef2f2;color:#991b1b;border:1px solid #fecaca;`;
-  const defStyle = `${pillStyle}background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;`;
+function buildRetrospectiveEmail(recipientName: string, partnerName: string, collabDate: string, retroUrl: string): string {
+  const starStyle = `display:inline-block;width:40px;height:40px;line-height:40px;text-align:center;font-size:24px;text-decoration:none;margin:0 2px;border-radius:8px;`;
+  const activeStarStyle = `${starStyle}background:#fffbeb;border:1px solid #fbbf24;`;
+  const defaultStarStyle = `${starStyle}background:#f8fafc;border:1px solid #e2e8f0;`;
 
   return `
     <!DOCTYPE html>
@@ -75,30 +66,20 @@ function buildRetrospectiveEmail(recipientName: string, partnerName: string, col
         We hope it went great! 🙌
       </p>
 
-      <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #d9826b;">
-        <h3 style="margin: 0 0 16px 0; color: #1e293b; font-size: 16px;">📊 Quick Survey (3 clicks!)</h3>
-
-        <p style="margin: 0 0 8px 0; color: #475569; font-size: 14px; font-weight: 600;">1. Did the SMART draft save you time?</p>
-        <div style="margin-bottom: 16px;">
-          <a href="${q1Yes}" style="${yesStyle}">👍 Yes</a>
-          <a href="${q1No}" style="${noStyle}">👎 No</a>
-        </div>
-
-        <p style="margin: 0 0 8px 0; color: #475569; font-size: 14px; font-weight: 600;">2. Was the workspace helpful?</p>
-        <div style="margin-bottom: 16px;">
-          <a href="${q2Yes}" style="${yesStyle}">👍 Yes</a>
-          <a href="${q2No}" style="${noStyle}">👎 No</a>
-        </div>
-
-        <p style="margin: 0 0 8px 0; color: #475569; font-size: 14px; font-weight: 600;">3. Would you collaborate here again?</p>
-        <div style="margin-bottom: 8px;">
-          <a href="${q3Yes}" style="${yesStyle}">Yes</a>
-          <a href="${q3Def}" style="${defStyle}">🔥 Definitely</a>
+      <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center; border-left: 4px solid #d9826b;">
+        <h3 style="margin: 0 0 8px 0; color: #1e293b; font-size: 16px;">Rate this collaboration</h3>
+        <p style="margin: 0 0 16px 0; color: #64748b; font-size: 14px;">Click a star to start your 1-minute retrospective</p>
+        <div>
+          <a href="${retroUrl}?rating=1" style="${defaultStarStyle}">⭐</a>
+          <a href="${retroUrl}?rating=2" style="${defaultStarStyle}">⭐</a>
+          <a href="${retroUrl}?rating=3" style="${defaultStarStyle}">⭐</a>
+          <a href="${retroUrl}?rating=4" style="${activeStarStyle}">⭐</a>
+          <a href="${retroUrl}?rating=5" style="${activeStarStyle}">⭐</a>
         </div>
       </div>
 
       <div style="text-align: center; margin: 32px 0;">
-        <a href="${feedbackUrl}" 
+        <a href="${retroUrl}" 
            style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
           Share Your Experience
         </a>
@@ -173,7 +154,7 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     let sentCount = 0;
-    const feedbackUrl = `${baseUrl}/dashboard?feedback=true`;
+    // Each collab gets its own retro URL now
 
     const formattedDate = today.toLocaleDateString("en-US", {
       weekday: "long",
@@ -205,10 +186,12 @@ serve(async (req: Request): Promise<Response> => {
         continue;
       }
 
+      const retroUrl = `${baseUrl}/retro/${request.id}`;
+
       // Send to requester
       if (requesterEmail) {
         try {
-          const html = buildRetrospectiveEmail(requesterName, creatorName, formattedDate, feedbackUrl);
+          const html = buildRetrospectiveEmail(requesterName, creatorName, formattedDate, retroUrl);
           const result = await sendEmail([requesterEmail], `🎉 How did your collaboration with ${creatorName} go?`, html);
 
           await supabase.from("email_events").insert({
@@ -227,7 +210,7 @@ serve(async (req: Request): Promise<Response> => {
       // Send to creator
       if (creatorEmail) {
         try {
-          const html = buildRetrospectiveEmail(creatorName, requesterName, formattedDate, feedbackUrl);
+          const html = buildRetrospectiveEmail(creatorName, requesterName, formattedDate, retroUrl);
           const result = await sendEmail([creatorEmail], `🎉 How did your collaboration with ${requesterName} go?`, html);
 
           await supabase.from("email_events").insert({
