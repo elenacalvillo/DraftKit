@@ -485,7 +485,8 @@ export default function PublicBooking() {
 
     // Account Blind: always submit as guest. Reconciliation happens via email matching
     // when the user eventually signs up (link_requests_to_new_user trigger).
-    const { data: insertedRequest, error } = await supabase
+    // Insert without returning row data to avoid SELECT RLS conflicts (Account Blindness hotfix)
+    const { error } = await supabase
       .from('collab_requests')
       .insert({
         creator_id: creator.id,
@@ -503,16 +504,20 @@ export default function PublicBooking() {
           format: selectedAiSuggestion.format,
           description: selectedAiSuggestion.description,
         } : null,
-      })
-      .select('id')
-      .single();
+      });
 
     if (error) {
+      const { data: sessionData } = await supabase.auth.getSession();
       console.error("Collab request insert error:", JSON.stringify({
+        step: 'insert_without_returning',
         code: error.code,
         message: error.message,
         details: error.details,
         hint: error.hint,
+        auth_state_summary: {
+          hasSession: !!sessionData?.session,
+          authUserId: sessionData?.session?.user?.id ?? null,
+        },
         payload: {
           creator_id: creator.id,
           requester_email: formData.email.trim(),
@@ -532,28 +537,9 @@ export default function PublicBooking() {
       return;
     }
 
-    // Send email notifications (fire-and-forget)
-    if (insertedRequest?.id) {
-      // Send notification to the host (creator)
-      supabase.functions.invoke('send-collab-email', {
-        body: { 
-          type: 'request_received', 
-          requestId: insertedRequest.id 
-        }
-      }).catch(err => {
-        console.error('Failed to send host notification email:', err);
-      });
-      
-      // Send confirmation to the guest (requester)
-      supabase.functions.invoke('send-collab-email', {
-        body: { 
-          type: 'request_submitted', 
-          requestId: insertedRequest.id 
-        }
-      }).catch(err => {
-        console.error('Failed to send guest confirmation email:', err);
-      });
-    }
+    // Email notifications temporarily disabled in this hotfix.
+    // Post-insert emails require the row ID, which we no longer retrieve
+    // to avoid SELECT RLS conflicts. Will be restored via a backend trigger.
 
     setIsSubmitting(false);
     setIsSuccess(true);
