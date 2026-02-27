@@ -389,7 +389,7 @@ export default function Settings() {
                 onChange={(e) =>
                   setFormData({ ...formData, substackUrl: e.target.value })
                 }
-                placeholder="substack.com/@yourname"
+                placeholder="yourname.substack.com or substack.com/@yourname"
               />
               {errors.substackUrl && (
                 <p className="text-sm text-destructive">{errors.substackUrl}</p>
