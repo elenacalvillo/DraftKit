@@ -1095,7 +1095,7 @@ export default function PublicBooking() {
                       <ExternalLink className="w-4 h-4" />
                       Your Newsletter URL <span className="text-destructive">*</span>
                     </Label>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <Input
                         id="substackUrl"
                         type="text"
@@ -1111,7 +1111,7 @@ export default function PublicBooking() {
                           }
                         }}
                         placeholder="yourname.substack.com"
-                        className="h-12 flex-1"
+                        className="h-12 flex-1 min-w-0 w-full"
                       />
                       {(creator.newsletter_url || creator.substack_url) && (
                         <div className="relative group">
