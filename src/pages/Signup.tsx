@@ -721,12 +721,12 @@ export default function Signup() {
                     </Label>
                     <Input
                       id="substackUrl"
-                      type="url"
+                      type="text"
                       value={formData.substackUrl}
                       onChange={(e) =>
                         setFormData({ ...formData, substackUrl: e.target.value })
                       }
-                      placeholder="substack.com/@yourname"
+                      placeholder="yourname.substack.com or substack.com/@yourname"
                       className="h-12"
                     />
                     {errors.substackUrl && (
