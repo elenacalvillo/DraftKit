@@ -1,23 +1,26 @@
 
-Goal: stop booking failures immediately for registered emails while keeping Account Blindness.
+Root cause to fix now:
+- The insert call still uses `.select('id').single()` on `collab_requests`.
+- That forces a read (`RETURNING`) of the new row, and your current `SELECT` RLS blocks reading guest rows (`requester_user_id = null`), so the request fails with 401/42501 even when write payload is valid.
 
-Implementation steps:
-1) Update backend trigger function `public.link_request_to_existing_user` to a no-op for booking inserts (always `RETURN NEW` without assigning `requester_user_id`).
-2) Keep trigger `trg_link_request_to_existing_user` attached (safe), but with no-op behavior to avoid future migration dependencies.
-3) Add a migration that:
-   - `CREATE OR REPLACE FUNCTION public.link_request_to_existing_user()` with no linking logic.
-   - Adds a comment documenting that reconciliation is handled by `link_requests_to_new_user` only.
-4) Keep frontend insert as-is (`requester_user_id: null`) in `src/pages/PublicBooking.tsx`.
-5) Improve observability in `src/pages/PublicBooking.tsx` error block:
-   - Log `error.code`, `error.message`, `error.details`, `error.hint`, and payload summary (excluding sensitive message body).
-6) Validate in test environment:
-   - Case A: logged-in user submits with `elenacalvilloalcalde@gmail.com` (registered, different account) → must insert successfully.
-   - Case B: anonymous user submits same email → must insert successfully.
-   - Case C: invalid profile URL (`substack.com/@...`) still fails with URL validation trigger.
-7) Confirm rows inserted by querying latest `collab_requests` for that email and checking `requester_user_id IS NULL`.
-8) Publish once test passes so live matches preview behavior.
-
-Technical details:
-- Root cause confirmed: trigger-level identity matching still runs for authenticated sessions and sets `NEW.requester_user_id` to the matched account (`ce0504e4-...`) while caller auth user is different (`e12cb16e-...`), violating `collab_requests` INSERT RLS check.
-- This is why failures happen specifically with already-registered emails, even after frontend Account Blindness changes.
-- RLS policy itself is structurally correct for Account Blindness; trigger mutation is the conflicting layer.
+Implementation steps (hotfix-first):
+1) Update `src/pages/PublicBooking.tsx` submit path to stop requesting row data:
+   - Replace `insert(...).select('id').single()` with plain `insert(...)` (no `select`, no `single`).
+   - Keep `requester_user_id: null` exactly as-is.
+2) Temporarily disable post-insert email sends in that flow (or guard them behind a request id check that is no longer expected), so booking success is never coupled to row returning.
+3) Keep current trigger/RLS architecture unchanged for this hotfix:
+   - `link_request_to_existing_user` stays no-op.
+   - `INSERT` policy stays account-blind.
+   - No broadening of `SELECT` policy.
+4) Strengthen observability in the same error block:
+   - Keep logging `code/message/details/hint`.
+   - Add `auth_state_summary` (`hasSession`, `authUserId`) and a `step` label (`insert_without_returning`) to confirm the new path is running.
+5) Validate in test environment:
+   - A) logged-in user submits with `elenacalvilloalcalde@gmail.com` → success toast.
+   - B) anonymous user submits same email → success toast.
+   - C) invalid Substack profile URL still fails with validation message.
+6) Confirm persistence with backend query:
+   - Verify newest rows for that email exist and `requester_user_id IS NULL`.
+7) Publish to live after test passes (test/live are separate environments).
+8) Follow-up (non-blocking next patch):
+   - Add backend-driven email notification trigger/function so confirmation emails work without relying on frontend row-returning access.
