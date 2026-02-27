@@ -1,51 +1,32 @@
-## Fix: "Failed to submit request" on Public Booking
 
-### Root Cause Analysis
 
-There are two interacting bugs that cause the insert into `collab_requests` to fail silently:
+## Investigation Results
 
-**Bug 1: Stale Auth Session**
-When a user is logged into DraftKit and visits a booking page, the React state has `user.id` set. The code passes `requester_user_id: user.id` in the insert. But if their auth token expires while filling out the form (common on mobile where browsers aggressively suspend tabs), the Supabase request goes out as `anon`. The RLS policy then sees `auth.uid() IS NULL` but `requester_user_id IS NOT NULL` -- both policy branches fail, and the insert is denied.
+**Triggers ARE active** on `collab_requests` (contrary to what the schema info showed). Two triggers fire on every insert:
+1. `trg_link_request_to_existing_user` — the one we fixed
+2. `trg_validate_requester_url` — validates Substack URL format
 
-This matches Dinah's scenario: she's likely logged in (she has a codelikeagirl account), on mobile, filling out a form on her own booking page. Her session expired mid-form, the code still thinks she's logged in, and the insert fails.
+**The trigger function IS updated** — confirmed via direct database query. The fix is live server-side.
 
-**Bug 2: Trigger + RLS Conflict (ticking time bomb)**
-The `link_request_to_existing_user` trigger fires BEFORE INSERT and sets `requester_user_id` if the requester's email matches a `creator_contacts` entry. But if the requester is anonymous, this breaks the same RLS condition. Any anonymous visitor who uses an email that belongs to an existing creator will get "Failed to submit."
+**No recent test row exists** — querying for `elenacalvilloalcalde@gmail.com` shows only one request from January 16. Your test today did not insert.
 
-**Bug 3: No error logging**
-The error object from the failed insert is never logged, making debugging impossible.
+### Most likely cause
 
-### Implementation Plan
+You tested on the **published site** (`collabstack.lovable.app`), which still has the **old frontend code** (before our fix). The published site needs a new deployment to pick up the code changes. The database trigger fix IS live, but the frontend retry logic is only in the preview.
 
-**1. Fix the frontend code** (`src/pages/PublicBooking.tsx`)
+### The real fix: True Account Blindness
 
-- Before the insert, re-check if the user session is still valid by calling `supabase.auth.getSession()`
-- Only set `requester_user_id` if the session is confirmed valid
-- Add `console.error("Insert error:", JSON.stringify(error))` when the insert fails
-- If the insert fails with a non-23505 error, retry once with `requester_user_id: null` as a fallback
+The current code is too clever — it validates the session, sets `requester_user_id` if valid, and retries if it fails. This creates unnecessary complexity. The simpler approach:
 
-**2. Fix the database trigger** (migration)
+**Always send `requester_user_id: null` from the public booking page.** Period. No session checking. No retry. The booking form should never care who you are.
 
-- Modify `link_request_to_existing_user` to only set `requester_user_id` when `auth.uid() IS NOT NULL`
-- This prevents the trigger from violating RLS for anonymous users
+### Changes
 
-### The Fix: "Account Neutrality"
+**`src/pages/PublicBooking.tsx`**:
+- Remove the `supabase.auth.getSession()` call before insert
+- Remove the retry-as-anonymous fallback block
+- Hardcode `requester_user_id: null` in the insert payload
+- Keep the error logging
 
-We need to strip the "identity guessing" out of the booking flow. Whether Karen has an account or not should be **irrelevant** to the success of the form submission.
+This is 3 lines of code instead of 15. The `link_requests_to_new_user` trigger (which fires when a user signs up) already handles reconciliation by matching email — so no data is lost.
 
-**The plan for Lovable is now crystal clear:**
-
-1. **Kill the Auto-Link:** Modify the `link_request_to_existing_user` trigger. It should **NEVER** try to guess a `user_id` for a guest. Guests should always be saved as guests (`requester_user_id = NULL`).
-2. **Frontend Silence:** In `PublicBooking.tsx`, we explicitly pass `requester_user_id: null` unless the user is actively logged in with a verified session.
-3. **The "Reconciliation" (Later):** When Karen eventually logs in or creates her account, she will see her "Guest" requests because we will match them by her **email**, not by a hidden ID that broke the form.
-
----
-
-### Why this is a "Product-Led" Win
-
-By making the booking form **"Account Blind,"** you ensure that zero friction exists for the person trying to book. You want the "Yes" to happen as fast as possible. You can deal with the "User Account" logic after the collaboration is already agreed upon.
-
-### Files Modified
-
-- `src/pages/PublicBooking.tsx` -- session validation + error logging + retry logic
-- Database migration -- update `link_request_to_existing_user` trigger function
