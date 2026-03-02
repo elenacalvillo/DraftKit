@@ -43,7 +43,7 @@ const navItems = [
   { icon: MessageSquare, label: "Requests", path: "/dashboard/requests" },
   { icon: Send, label: "Sent Requests", path: "/dashboard/my-requests" },
   { icon: Settings, label: "Settings", path: "/dashboard/settings" },
-  { icon: Crown, label: "Subscription", path: "/dashboard/subscription" },
+  { icon: Crown, label: "Membership", path: "/dashboard/subscription" },
 ];
 
 interface DashboardLayoutProps {

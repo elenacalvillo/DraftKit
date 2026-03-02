@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
-import { Crown, Sparkles, Users, MessageSquare, PenLine, Palette, Rocket } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { Crown, Sparkles, Users, MessageSquare, PenLine, Palette, Rocket, Check, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import { usePro } from "@/hooks/usePro";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
 
 const MONTHLY_PRICE_ID = "price_1Szs8CAgAh00fVW11BjTnSrF";
 const YEARLY_PRICE_ID = "price_1Szs8KAgAh00fVW1sKwidi8l";
@@ -28,7 +29,23 @@ export default function Subscription() {
   const { isPro, isInTrial, trialEndsAt, tier } = usePro();
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
+
+  // Detect founding member status
+  const { data: creatorBilling } = useQuery({
+    queryKey: ["creator-billing", user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("creators")
+        .select("stripe_customer_id")
+        .eq("user_id", user!.id)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!user?.id,
+  });
+
+  const isFounder = isPro && !isInTrial && !creatorBilling?.stripe_customer_id;
+  const isPaidPro = isPro && !isInTrial && !!creatorBilling?.stripe_customer_id;
 
   useEffect(() => {
     if (searchParams.get("success") === "true") {
@@ -46,7 +63,6 @@ export default function Subscription() {
       toast({ title: "Please sign in first", variant: "destructive" });
       return;
     }
-
     setLoading(true);
     try {
       const priceId = billing === "monthly" ? MONTHLY_PRICE_ID : YEARLY_PRICE_ID;
@@ -55,9 +71,7 @@ export default function Subscription() {
         body: { priceId, returnTo },
       });
       if (error) throw error;
-      if (data?.url) {
-        window.open(data.url, "_blank");
-      }
+      if (data?.url) window.open(data.url, "_blank");
     } catch (err: any) {
       toast({ title: "Checkout failed", description: err.message, variant: "destructive" });
     } finally {
@@ -65,30 +79,12 @@ export default function Subscription() {
     }
   };
 
-  const handleManage = async () => {
-    if (!isPro) {
-      document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" });
-      return;
-    }
-
+  const handleManageBilling = async () => {
     setLoading(true);
     try {
-      const { data: creator } = await supabase
-        .from("creators")
-        .select("stripe_customer_id")
-        .eq("user_id", user!.id)
-        .maybeSingle();
-
-      if (!creator?.stripe_customer_id) {
-        toast({ title: "You're a founding member! 🎉", description: "Full access, no billing to manage yet." });
-        return;
-      }
-
       const { data, error } = await supabase.functions.invoke("customer-portal");
       if (error) throw error;
-      if (data?.url) {
-        window.open(data.url, "_blank");
-      }
+      if (data?.url) window.open(data.url, "_blank");
     } catch (err: any) {
       toast({ title: "Could not open portal", description: err.message, variant: "destructive" });
     } finally {
@@ -100,46 +96,113 @@ export default function Subscription() {
     ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : 0;
 
+  // View A: Founding Members & Active Pro
+  if (isPro && !isInTrial) {
+    return (
+      <DashboardLayout>
+        <div className="max-w-xl mx-auto">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2 mb-3">
+              <Crown className="w-6 h-6 text-primary" />
+              <h1 className="text-2xl font-bold">Membership</h1>
+            </div>
+          </div>
+
+          {/* Status card */}
+          <Card className="mb-6 border-primary/30 bg-primary/5">
+            <CardContent className="p-6 text-center">
+              <div className="inline-flex items-center gap-2 mb-3">
+                {isFounder ? (
+                  <Heart className="w-5 h-5 text-primary fill-primary/20" />
+                ) : (
+                  <Crown className="w-5 h-5 text-primary" />
+                )}
+                <Badge variant="outline" className="border-primary/50 text-primary bg-primary/10 text-sm px-3 py-1">
+                  {isFounder ? "Founding Member" : "Pro Member"}
+                </Badge>
+              </div>
+              <p className="text-muted-foreground text-sm mt-2 max-w-sm mx-auto">
+                {isFounder
+                  ? "You helped build DraftKit from day one. All Pro features are yours, forever."
+                  : "All features unlocked. Thank you for being part of the engine."}
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Features Unlocked */}
+          <Card className="mb-6">
+            <CardContent className="p-6">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">
+                Features Unlocked
+              </h3>
+              <ul className="space-y-3">
+                {features.map(({ label }) => (
+                  <li key={label} className="flex items-center gap-3 text-sm">
+                    <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <Check className="w-3 h-3 text-primary" />
+                    </div>
+                    {label}
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+
+          {/* Creator Discovery teaser */}
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 mb-6">
+            <Rocket className="w-4 h-4 text-accent-foreground" />
+            <span className="text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">Creator Discovery</span> tools are coming soon — you'll get them automatically.
+            </span>
+          </div>
+
+          {/* Manage Billing — only for paying subscribers */}
+          {isPaidPro && (
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={handleManageBilling}
+              disabled={loading}
+            >
+              Manage Billing
+            </Button>
+          )}
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // View B: Free / Trial users
   return (
     <DashboardLayout>
       <div className="max-w-xl mx-auto">
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-3">
             <Crown className="w-6 h-6 text-primary" />
-            <h1 className="text-2xl font-bold">DraftKit Pro</h1>
+            <h1 className="text-2xl font-bold">Membership</h1>
           </div>
           <p className="text-muted-foreground">
             Professional tools for serious newsletter collaborators.
           </p>
         </div>
 
-        {/* Trial / Active Pro banner */}
-        {isPro && (
+        {/* Trial banner */}
+        {isInTrial && (
           <Card className="mb-6 border-primary/30 bg-primary/5">
-            <CardContent className="p-4 flex items-center justify-between">
-              <div>
-                <p className="font-medium text-sm">
-                  {isInTrial
-                    ? `Founding Member Trial — ${trialDaysLeft} day${trialDaysLeft !== 1 ? "s" : ""} left`
-                    : "You're on Pro"}
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {isInTrial
-                    ? "Subscribe now to keep your Pro features."
-                    : "All features unlocked."}
-                </p>
-              </div>
-              <Button variant="outline" size="sm" onClick={handleManage} disabled={loading}>
-                Manage
-              </Button>
+            <CardContent className="p-4">
+              <p className="font-medium text-sm">
+                You're exploring Pro — {trialDaysLeft} day{trialDaysLeft !== 1 ? "s" : ""} left
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Subscribe to keep all your Pro features.
+              </p>
             </CardContent>
           </Card>
         )}
 
         {/* Pricing card */}
-        <Card id="pricing" className="overflow-hidden">
-          {/* Billing toggle */}
-          <div className="flex justify-center gap-1 p-1.5 bg-muted rounded-xl mx-auto w-fit">
+        <Card className="overflow-hidden">
+          <div className="flex justify-center gap-1 p-1.5 bg-muted rounded-xl mx-auto w-fit mt-4">
             <button
               onClick={() => setBilling("monthly")}
               className={cn(
@@ -168,7 +231,6 @@ export default function Subscription() {
           </div>
 
           <CardContent className="p-6">
-            {/* Price display */}
             <div className="text-center mb-6">
               <div className="flex items-baseline justify-center gap-1">
                 <span className="text-4xl font-bold">
@@ -183,7 +245,6 @@ export default function Subscription() {
               )}
             </div>
 
-            {/* Features */}
             <ul className="space-y-3 mb-6">
               {features.map(({ icon: Icon, label }) => (
                 <li key={label} className="flex items-center gap-3 text-sm">
@@ -195,7 +256,6 @@ export default function Subscription() {
               ))}
             </ul>
 
-            {/* Early access badge */}
             <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 mb-6">
               <Rocket className="w-4 h-4 text-accent-foreground" />
               <span className="text-xs text-muted-foreground">
@@ -203,27 +263,17 @@ export default function Subscription() {
               </span>
             </div>
 
-            {/* CTA */}
             <Button
               className="w-full gradient-primary text-primary-foreground"
               size="lg"
               onClick={handleCheckout}
-              disabled={loading || (isPro && !isInTrial)}
+              disabled={loading}
             >
               <Crown className="w-4 h-4 mr-2" />
-              {isPro && !isInTrial ? "You're on Pro" : "Start Pro"}
+              {isInTrial ? "Subscribe to Pro" : "Upgrade to Pro"}
             </Button>
           </CardContent>
         </Card>
-        {!isPro && (
-          <Button
-            variant="outline"
-            className="w-full mt-4"
-            onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })}
-          >
-            View Plans
-          </Button>
-        )}
       </div>
     </DashboardLayout>
   );
