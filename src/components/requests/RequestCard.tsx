@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Calendar as CalendarIcon, CalendarDays, ExternalLink, Mail, Link as LinkIcon, Sparkles, MessageSquare, FileText, XCircle, Ban, Check, X, Trash2, PenLine, Copy, MoreHorizontal, Zap } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
