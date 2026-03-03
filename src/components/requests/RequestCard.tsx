@@ -351,6 +351,10 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
                     <LinkIcon className="w-4 h-4 mr-2" />
                     Link External Doc
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShowReschedulePicker(true)}>
+                    <CalendarDays className="w-4 h-4 mr-2" />
+                    Reschedule
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleViewDraft}>
                     <FileText className="w-4 h-4 mr-2" />
                     {localDraft ? "View SMART Draft" : "Generate SMART Draft"}
