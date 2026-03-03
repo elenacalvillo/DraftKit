@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Calendar, ExternalLink, Mail, Link as LinkIcon, Sparkles, MessageSquare, FileText, XCircle, Ban, Check, X, Trash2, PenLine, Copy, MoreHorizontal, Zap } from "lucide-react";
+import { Calendar as CalendarIcon, CalendarDays, ExternalLink, Mail, Link as LinkIcon, Sparkles, MessageSquare, FileText, XCircle, Ban, Check, X, Trash2, PenLine, Copy, MoreHorizontal, Zap } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -27,6 +30,7 @@ interface RequestCardProps {
   onDraftGenerated?: (id: string, draft: CollabDraft) => void;
   onCollabTypeChanged?: (id: string, newType: string) => void;
   onDelete?: (id: string) => void;
+  onReschedule?: (id: string, newDate: string) => void;
 }
 
 const COLLAB_STYLE_OPTIONS = ["Virtual Coffee", "Async Drafting", "Interview Style", "Custom"];
@@ -70,7 +74,7 @@ function TimeSavedBadge({ request }: { request: CollabRequest }) {
   );
 }
 
-export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApprove = true, isPro = false, onApprove, onDecline, onCancel, onDraftGenerated, onCollabTypeChanged, onDelete }: RequestCardProps) {
+export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApprove = true, isPro = false, onApprove, onDecline, onCancel, onDraftGenerated, onCollabTypeChanged, onDelete, onReschedule }: RequestCardProps) {
   const navigate = useNavigate();
   const { trackEvent } = useAnalytics();
   const [imageError, setImageError] = useState(false);
@@ -94,6 +98,9 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
     (request as any).selected_collab_type || (request as any).selectedCollabType || ""
   );
   const [isSavingCollabType, setIsSavingCollabType] = useState(false);
+
+  // Reschedule state
+  const [showReschedulePicker, setShowReschedulePicker] = useState(false);
   
   const currentCollabType = (request as any).selected_collab_type || (request as any).selectedCollabType;
   
@@ -344,6 +351,10 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
                     <LinkIcon className="w-4 h-4 mr-2" />
                     Link External Doc
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShowReschedulePicker(true)}>
+                    <CalendarDays className="w-4 h-4 mr-2" />
+                    Reschedule
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleViewDraft}>
                     <FileText className="w-4 h-4 mr-2" />
                     {localDraft ? "View SMART Draft" : "Generate SMART Draft"}
@@ -441,7 +452,7 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
           )}
 
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Calendar className="w-4 h-4" />
+            <CalendarIcon className="w-4 h-4" />
             <span>
               {request.requestedDate 
                 ? `Requested: ${formatDate(request.requestedDate)}`
@@ -449,6 +460,40 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
               }
             </span>
           </div>
+
+          {/* Inline reschedule date picker */}
+          {showReschedulePicker && isApproved && !isPastCollab && (
+            <Popover open={showReschedulePicker} onOpenChange={setShowReschedulePicker}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="w-fit">
+                  <CalendarDays className="w-4 h-4 mr-2" />
+                  Pick a new date
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={undefined}
+                  onSelect={(date) => {
+                    if (date) {
+                      const yyyy = date.getFullYear();
+                      const mm = String(date.getMonth() + 1).padStart(2, '0');
+                      const dd = String(date.getDate()).padStart(2, '0');
+                      onReschedule?.(request.id, `${yyyy}-${mm}-${dd}`);
+                      setShowReschedulePicker(false);
+                    }
+                  }}
+                  disabled={(date) => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    return date < today;
+                  }}
+                  initialFocus
+                  className="p-3 pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+          )}
 
           {/* Email — compact, with tiny copy icon only for non-approved or keep minimal */}
           <div className="flex items-center gap-1">

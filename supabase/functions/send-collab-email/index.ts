@@ -66,10 +66,11 @@ const corsHeaders = {
 };
 
 interface EmailRequest {
-  type: "request_approved" | "request_declined" | "request_received" | "request_submitted" | "request_cancelled_by_guest" | "collab_cancelled_by_host" | "new_message" | "new_message_from_guest" | "collab_reminder" | "collab_type_changed" | "workspace_updated_by_creator" | "workspace_updated_by_guest";
+  type: "request_approved" | "request_declined" | "request_received" | "request_submitted" | "request_cancelled_by_guest" | "collab_cancelled_by_host" | "new_message" | "new_message_from_guest" | "collab_reminder" | "collab_type_changed" | "workspace_updated_by_creator" | "workspace_updated_by_guest" | "collab_rescheduled";
   requestId: string;
   messageContent?: string;
   newCollabType?: string;
+  newDate?: string;
 }
 
 interface CollabDraft {
@@ -103,6 +104,7 @@ const EMAIL_TYPE_ROLES: Record<EmailRequest["type"], "creator" | "requester" | "
   new_message_from_guest: "requester",
   collab_reminder: "service",
   collab_type_changed: "creator",
+  collab_rescheduled: "creator",
   workspace_updated_by_creator: "creator",
   workspace_updated_by_guest: "requester",
 };
@@ -118,7 +120,7 @@ serve(async (req: Request): Promise<Response> => {
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    const { type, requestId, messageContent, newCollabType }: EmailRequest = await req.json();
+    const { type, requestId, messageContent, newCollabType, newDate }: EmailRequest = await req.json();
 
     if (!type || !requestId) {
       return new Response(
@@ -833,6 +835,50 @@ serve(async (req: Request): Promise<Response> => {
         </body>
         </html>
       `;
+    } else if (type === "collab_rescheduled") {
+      toEmail = requesterEmail;
+      const newFormattedDate = newDate
+        ? parseDateString(newDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
+        : "a new date";
+      emailSubject = `📅 Collaboration with ${creatorName} rescheduled`;
+
+      emailHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
+          ${brandHeader}
+          <h1 style="margin: 0 0 24px; font-size: 24px; color: #1e293b; text-align: center;">Collaboration Rescheduled</h1>
+
+          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterName},</p>
+
+          <p style="font-size: 16px; margin-bottom: 24px;">
+            <strong>${creatorName}</strong> has rescheduled your collaboration to a new date.
+          </p>
+
+          <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #d9826b; text-align: center;">
+            <p style="margin: 0 0 8px 0; color: #64748b; font-size: 14px;">New Date</p>
+            <p style="margin: 0; font-size: 24px; font-weight: 600; color: #d9826b;">${newFormattedDate}</p>
+          </div>
+
+          <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
+            <p style="margin: 0 0 16px 0; color: #475569;">Questions about the new date?</p>
+            <a href="mailto:${creatorEmail}?subject=Re: Rescheduled collaboration"
+               style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+              Contact ${creatorName}
+            </a>
+          </div>
+
+          <p style="font-size: 14px; color: #64748b; margin-top: 32px;">
+            Happy collaborating!<br>
+            The DraftKit Team
+          </p>
+        </body>
+        </html>
+      `;
     } else if (type === "workspace_updated_by_creator") {
       // Creator updated workspace → email goes to guest
       toEmail = requesterEmail;
@@ -993,7 +1039,8 @@ serve(async (req: Request): Promise<Response> => {
       "collab_type_changed",
       "workspace_updated_by_creator",
       "workspace_updated_by_guest",
-      "collab_published"
+      "collab_published",
+      "collab_rescheduled"
     ];
 
     if (DEDUP_TYPES.includes(type)) {
@@ -1034,6 +1081,7 @@ serve(async (req: Request): Promise<Response> => {
       request_cancelled_by_guest: requesterEmail,
       collab_cancelled_by_host: creatorEmail || undefined,
       collab_published: creatorEmail || undefined,
+      collab_rescheduled: creatorEmail || undefined,
     };
     const replyTo = replyToMap[type];
 

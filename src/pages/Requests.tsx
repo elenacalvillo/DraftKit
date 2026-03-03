@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { parseDateString } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { Inbox, ArrowLeft } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -267,6 +268,64 @@ export default function Requests() {
     );
   };
 
+  const handleReschedule = async (id: string, newDate: string) => {
+    if (!creator) return;
+
+    const request = requests.find((r) => r.id === id);
+    if (!request) return;
+
+    const oldDate = request.requested_date;
+
+    // 1. Update the request's date
+    const { error } = await supabase
+      .from('collab_requests')
+      .update({ requested_date: newDate })
+      .eq('id', id);
+
+    if (error) {
+      toast.error("Failed to reschedule");
+      return;
+    }
+
+    // 2. Swap availability: restore old date, remove new date
+    const { data: availData } = await supabase
+      .from('availability')
+      .select('*')
+      .eq('creator_id', creator.id)
+      .maybeSingle();
+
+    if (availData) {
+      let dates: string[] = availData.available_dates || [];
+      // Restore old date
+      if (oldDate && !dates.includes(oldDate)) {
+        dates = [...dates, oldDate];
+      }
+      // Remove new date
+      dates = dates.filter((d: string) => d !== newDate);
+
+      await supabase
+        .from('availability')
+        .update({ available_dates: dates })
+        .eq('id', availData.id);
+    }
+
+    // 3. Update local state
+    setRequests(
+      requests.map((r) => (r.id === id ? { ...r, requested_date: newDate } : r))
+    );
+
+    const formattedNew = parseDateString(newDate).toLocaleDateString("en-US", {
+      month: "short", day: "numeric", year: "numeric",
+    });
+    toast.success(`Rescheduled to ${formattedNew}. Old slot restored.`);
+    trackEvent("collab_rescheduled", { request_id: id, new_date: newDate });
+
+    // 4. Notify guest (fire and forget)
+    supabase.functions.invoke('send-collab-email', {
+      body: { type: 'collab_rescheduled', requestId: id, newDate }
+    }).catch(err => console.error('Failed to send reschedule email:', err));
+  };
+
   const handleDelete = async (id: string) => {
     const { error } = await supabase
       .from('collab_requests')
@@ -450,6 +509,7 @@ export default function Requests() {
                     onCancel={handleCancel}
                     onDraftGenerated={handleDraftGenerated}
                     onDelete={handleDelete}
+                    onReschedule={handleReschedule}
                   />
                 </motion.div>
               ))}
