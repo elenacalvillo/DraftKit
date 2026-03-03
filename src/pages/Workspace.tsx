@@ -230,6 +230,41 @@ export default function Workspace() {
     }
   };
 
+  const handleReschedule = async (newDate: string) => {
+    if (!creator || !request) return;
+    const oldDate = request.requested_date;
+    const { error } = await supabase
+      .from('collab_requests')
+      .update({ requested_date: newDate })
+      .eq('id', request.id);
+    if (error) {
+      toast.error("Failed to reschedule");
+      return;
+    }
+    const { data: availData } = await supabase
+      .from('availability')
+      .select('*')
+      .eq('creator_id', creator.id)
+      .maybeSingle();
+    if (availData) {
+      let dates: string[] = availData.available_dates || [];
+      if (oldDate && !dates.includes(oldDate)) dates = [...dates, oldDate];
+      dates = dates.filter((d: string) => d !== newDate);
+      await supabase
+        .from('availability')
+        .update({ available_dates: dates })
+        .eq('id', availData.id);
+    }
+    setRequest(prev => prev ? { ...prev, requested_date: newDate } : prev);
+    setShowReschedulePicker(false);
+    const formattedNew = parseDateString(newDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    toast.success(`Rescheduled to ${formattedNew}. Old slot restored.`);
+    trackEvent("collab_rescheduled", { request_id: request.id, new_date: newDate });
+    supabase.functions.invoke('send-collab-email', {
+      body: { type: 'collab_rescheduled', requestId: request.id, newDate }
+    }).catch(err => console.error('Failed to send reschedule email:', err));
+  };
+
   const currentUserName = isCreator
     ? creator!.name
     : request?.requester_name || "Guest";
