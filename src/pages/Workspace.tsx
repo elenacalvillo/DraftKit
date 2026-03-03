@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Calendar, ExternalLink, LinkIcon, Mail, Sparkles, FileText, MessageSquare, PenLine, Lock, X, PartyPopper, CheckCircle2, Copy, Check, Crown, Clock } from "lucide-react";
+import { ArrowLeft, Calendar as CalendarIcon, CalendarDays, ExternalLink, LinkIcon, Mail, Sparkles, FileText, MessageSquare, PenLine, Lock, X, PartyPopper, CheckCircle2, Copy, Check, Crown, Clock } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { SharedWorkspace } from "@/components/requests/SharedWorkspace";
 import { CollabDraftModal } from "@/components/requests/CollabDraftModal";

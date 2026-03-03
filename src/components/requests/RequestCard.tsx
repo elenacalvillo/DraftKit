@@ -463,36 +463,31 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
 
           {/* Inline reschedule date picker */}
           {showReschedulePicker && isApproved && !isPastCollab && (
-            <Popover open={showReschedulePicker} onOpenChange={setShowReschedulePicker}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="w-fit">
-                  <CalendarDays className="w-4 h-4 mr-2" />
-                  Pick a new date
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={undefined}
-                  onSelect={(date) => {
-                    if (date) {
-                      const yyyy = date.getFullYear();
-                      const mm = String(date.getMonth() + 1).padStart(2, '0');
-                      const dd = String(date.getDate()).padStart(2, '0');
-                      onReschedule?.(request.id, `${yyyy}-${mm}-${dd}`);
-                      setShowReschedulePicker(false);
-                    }
-                  }}
-                  disabled={(date) => {
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
-                    return date < today;
-                  }}
-                  initialFocus
-                  className="p-3 pointer-events-auto"
-                />
-              </PopoverContent>
-            </Popover>
+            <div className="p-4 border rounded-lg bg-muted/50">
+              <p className="text-sm font-medium mb-2">Pick a new date</p>
+              <Calendar
+                mode="single"
+                selected={undefined}
+                onSelect={(date) => {
+                  if (date) {
+                    const yyyy = date.getFullYear();
+                    const mm = String(date.getMonth() + 1).padStart(2, '0');
+                    const dd = String(date.getDate()).padStart(2, '0');
+                    onReschedule?.(request.id, `${yyyy}-${mm}-${dd}`);
+                    setShowReschedulePicker(false);
+                  }
+                }}
+                disabled={(date) => {
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  return date < today;
+                }}
+                className="p-3 pointer-events-auto"
+              />
+              <Button variant="ghost" size="sm" onClick={() => setShowReschedulePicker(false)}>
+                Cancel
+              </Button>
+            </div>
           )}
 
           {/* Email — compact, with tiny copy icon only for non-approved or keep minimal */}
