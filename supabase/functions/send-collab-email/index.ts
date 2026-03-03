@@ -1081,6 +1081,7 @@ serve(async (req: Request): Promise<Response> => {
       request_cancelled_by_guest: requesterEmail,
       collab_cancelled_by_host: creatorEmail || undefined,
       collab_published: creatorEmail || undefined,
+      collab_rescheduled: creatorEmail || undefined,
     };
     const replyTo = replyToMap[type];
 
