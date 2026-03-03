@@ -722,10 +722,12 @@ export default function Workspace() {
                 )}
               </div>
 
-              {/* Inline reschedule picker */}
-              {showReschedulePicker && isCreator && (
-                <div className="p-4 border rounded-lg bg-muted/50">
-                  <p className="text-sm font-medium mb-2">Pick a new date</p>
+              {/* Reschedule date picker dialog */}
+              <Dialog open={showReschedulePicker && isCreator} onOpenChange={setShowReschedulePicker}>
+                <DialogContent className="sm:max-w-[350px] p-0">
+                  <DialogHeader className="px-4 pt-4 pb-2">
+                    <DialogTitle className="text-base">Reschedule</DialogTitle>
+                  </DialogHeader>
                   <Calendar
                     mode="single"
                     selected={undefined}
@@ -742,13 +744,10 @@ export default function Workspace() {
                       today.setHours(0, 0, 0, 0);
                       return date < today;
                     }}
-                    className="p-3 pointer-events-auto"
+                    className="p-3 pointer-events-auto mx-auto"
                   />
-                  <Button variant="ghost" size="sm" onClick={() => setShowReschedulePicker(false)}>
-                    Cancel
-                  </Button>
-                </div>
-              )}
+                </DialogContent>
+              </Dialog>
 
               {/* Email */}
               <div className="flex items-center gap-1">
