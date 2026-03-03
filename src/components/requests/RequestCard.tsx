@@ -76,7 +76,7 @@ function TimeSavedBadge({ request }: { request: CollabRequest }) {
   );
 }
 
-export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApprove = true, isPro = false, onApprove, onDecline, onCancel, onDraftGenerated, onCollabTypeChanged, onDelete, onReschedule }: RequestCardProps) {
+export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApprove = true, isPro = false, bookedDates, onApprove, onDecline, onCancel, onDraftGenerated, onCollabTypeChanged, onDelete, onReschedule }: RequestCardProps) {
   const navigate = useNavigate();
   const { trackEvent } = useAnalytics();
   const [imageError, setImageError] = useState(false);
