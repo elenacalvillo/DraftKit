@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Calendar, ExternalLink, Mail, Link as LinkIcon, Sparkles, MessageSquare, FileText, XCircle, Ban, Check, X, Trash2, PenLine, Copy, MoreHorizontal, Zap } from "lucide-react";
+import { Calendar as CalendarIcon, CalendarDays, ExternalLink, Mail, Link as LinkIcon, Sparkles, MessageSquare, FileText, XCircle, Ban, Check, X, Trash2, PenLine, Copy, MoreHorizontal, Zap } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -27,6 +30,7 @@ interface RequestCardProps {
   onDraftGenerated?: (id: string, draft: CollabDraft) => void;
   onCollabTypeChanged?: (id: string, newType: string) => void;
   onDelete?: (id: string) => void;
+  onReschedule?: (id: string, newDate: string) => void;
 }
 
 const COLLAB_STYLE_OPTIONS = ["Virtual Coffee", "Async Drafting", "Interview Style", "Custom"];
@@ -70,7 +74,7 @@ function TimeSavedBadge({ request }: { request: CollabRequest }) {
   );
 }
 
-export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApprove = true, isPro = false, onApprove, onDecline, onCancel, onDraftGenerated, onCollabTypeChanged, onDelete }: RequestCardProps) {
+export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApprove = true, isPro = false, onApprove, onDecline, onCancel, onDraftGenerated, onCollabTypeChanged, onDelete, onReschedule }: RequestCardProps) {
   const navigate = useNavigate();
   const { trackEvent } = useAnalytics();
   const [imageError, setImageError] = useState(false);
