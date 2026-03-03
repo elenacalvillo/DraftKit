@@ -700,13 +700,55 @@ export default function Workspace() {
 
               {/* Date */}
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Calendar className="w-4 h-4" />
+                <CalendarIcon className="w-4 h-4" />
                 <span>
                   {request.requested_date
                     ? formatDate(request.requested_date)
                     : "Flexible — To be scheduled"}
                 </span>
+                {isCreator && request.status === "approved" && (() => {
+                  if (!request.requested_date) return true;
+                  const today = new Date(); today.setHours(0, 0, 0, 0);
+                  const rd = parseDateString(request.requested_date); rd.setHours(0, 0, 0, 0);
+                  return rd >= today;
+                })() && (
+                  <button
+                    onClick={() => setShowReschedulePicker(!showReschedulePicker)}
+                    className="ml-1 p-1 rounded text-muted-foreground/50 hover:text-primary hover:bg-primary/10 transition-colors"
+                    title="Reschedule"
+                  >
+                    <CalendarDays className="w-4 h-4" />
+                  </button>
+                )}
               </div>
+
+              {/* Inline reschedule picker */}
+              {showReschedulePicker && isCreator && (
+                <div className="p-4 border rounded-lg bg-muted/50">
+                  <p className="text-sm font-medium mb-2">Pick a new date</p>
+                  <Calendar
+                    mode="single"
+                    selected={undefined}
+                    onSelect={(date) => {
+                      if (date) {
+                        const yyyy = date.getFullYear();
+                        const mm = String(date.getMonth() + 1).padStart(2, '0');
+                        const dd = String(date.getDate()).padStart(2, '0');
+                        handleReschedule(`${yyyy}-${mm}-${dd}`);
+                      }
+                    }}
+                    disabled={(date) => {
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      return date < today;
+                    }}
+                    className="p-3 pointer-events-auto"
+                  />
+                  <Button variant="ghost" size="sm" onClick={() => setShowReschedulePicker(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              )
 
               {/* Email */}
               <div className="flex items-center gap-1">
