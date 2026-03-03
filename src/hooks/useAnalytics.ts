@@ -26,7 +26,8 @@ export type AnalyticsEventType =
   // New events for funnel analytics
   | "analyze_collab_match_invoked"
   | "ai_match_suggestion_selected"
-  | "draft_regeneration_requested";
+  | "draft_regeneration_requested"
+  | "collab_rescheduled";
 
 function getOrCreateSessionId(): string {
   let sessionId = sessionStorage.getItem("draftkit_session_id");
