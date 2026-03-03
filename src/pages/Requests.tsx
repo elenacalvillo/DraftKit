@@ -504,6 +504,9 @@ export default function Requests() {
                     creatorEmail={user?.email || ""}
                     canApprove={canApprove}
                     isPro={isPro}
+                    bookedDates={requests
+                      .filter(r => (r.status === 'approved' || r.status === 'published') && r.requested_date && r.id !== request.id)
+                      .map(r => r.requested_date)}
                     onApprove={handleApprove}
                     onDecline={handleDecline}
                     onCancel={handleCancel}
