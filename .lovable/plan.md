@@ -1,52 +1,41 @@
 
 
-## Fix: Reschedule date picker not working + Add reschedule to Workspace
+## Redesign: "Membership" page replacing corporate "Subscription" page
 
-Two issues to fix:
+Inspired by CarouselBot's "Forever Free" approach, this transforms the transactional subscription page into a warm membership recognition page.
 
-### 1. RequestCard reschedule picker is broken
+### Changes
 
-The Popover at line 466 only renders when `showReschedulePicker` is true, but then requires a *second* click on the PopoverTrigger button to open. The user clicks "Reschedule" in the menu, sees a button appear, but nothing else happens automatically.
+**1. Sidebar nav (`src/components/layout/DashboardLayout.tsx`)**
+- Rename "Subscription" to "Membership" in the nav items array
+- Keep the Crown icon and `/dashboard/subscription` path (no route change needed)
 
-**Fix**: Remove the Popover wrapper entirely. Render the Calendar inline when `showReschedulePicker` is true, with a Cancel button. This is simpler and guaranteed to work:
+**2. Rewrite `src/pages/Subscription.tsx` with two distinct views:**
 
-```tsx
-{showReschedulePicker && isApproved && !isPastCollab && (
-  <div className="p-4 border rounded-lg bg-muted/50">
-    <p className="text-sm font-medium mb-2">Pick a new date</p>
-    <Calendar
-      mode="single"
-      selected={undefined}
-      onSelect={(date) => {
-        if (date) {
-          onReschedule?.(request.id, formatDateString(date));
-          setShowReschedulePicker(false);
-        }
-      }}
-      disabled={(date) => date < today}
-      className="p-3 pointer-events-auto"
-    />
-    <Button variant="ghost" size="sm" onClick={() => setShowReschedulePicker(false)}>
-      Cancel
-    </Button>
-  </div>
-)}
-```
+**View A: Founding Members / Active Pro users (`isPro && !isInTrial`)**
+- Page title: "Membership" with Crown icon
+- Large status card: "Founding Member" badge (for users without `stripe_customer_id`) or "Pro Member" badge (for paying subscribers)
+- Warm copy: "You helped build DraftKit from day one. All Pro features are yours, forever." (founders) or "All features unlocked." (paid)
+- Feature checklist styled as "Features Unlocked" (not a sales pitch) with check marks instead of feature icons
+- "Manage Billing" button only shown if user has a `stripe_customer_id` (opens Stripe portal)
+- Creator Discovery teaser kept as a subtle note
 
-**File**: `src/components/requests/RequestCard.tsx` — replace lines 464-496
+**View B: Free / Trial users**
+- Page title: "Membership" 
+- If in trial: warm banner showing days left
+- Single clean upgrade card with billing toggle, price, features list, and "Upgrade to Pro" CTA
+- Keep existing checkout logic intact
 
-### 2. Add reschedule button to Workspace page
+**3. `src/components/subscription/UpgradePrompt.tsx`**
+- Update navigation text from "Upgrade to Pro" link text; no structural change needed since the route stays the same
 
-On the Workspace page (`src/pages/Workspace.tsx`), next to the date display (line 664-672), add a small calendar icon button that opens the same inline date picker — but only for the **creator** viewing an approved, upcoming collab.
+**4. `src/components/subscription/ProBadge.tsx`**
+- Add a "Founding Member" variant: when user is Pro without a Stripe customer ID, show "Founder" instead of "Pro" with a star/heart icon
 
-**Changes to `src/pages/Workspace.tsx`**:
-- Import `CalendarDays` icon, `Calendar` component (rename existing Calendar icon import to avoid conflict)
-- Add `showReschedulePicker` state
-- Add `handleReschedule` function (same availability-swap logic as in Requests.tsx — update request date, restore old slot, claim new slot, send email)
-- Next to the date `<span>`, render a small `CalendarDays` icon button for creator + approved + upcoming collabs
-- Below the date row, conditionally render the inline Calendar picker
+### No database or backend changes required
+All logic uses existing `usePro()` hook + `stripe_customer_id` check already in the Subscription page's `handleManage` function.
 
-### Technical notes
-- The `handleReschedule` in Workspace.tsx will duplicate the availability-swap logic from Requests.tsx (update `collab_requests.requested_date`, swap `availability.available_dates`, fire `send-collab-email`). This is acceptable since both pages operate independently.
-- Only the **creator** (not guest) sees the reschedule button in the Workspace.
+### Technical detail
+- The founding member detection reuses the existing pattern: query `creators.stripe_customer_id` for the current user. If `isPro` is true but `stripe_customer_id` is null, they're a founder.
+- This check will be lifted into a `useQuery` at the top of the component so both the status card and manage button can reference it.
 

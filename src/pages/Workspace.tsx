@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Calendar, ExternalLink, LinkIcon, Mail, Sparkles, FileText, MessageSquare, PenLine, Lock, X, PartyPopper, CheckCircle2, Copy, Check, Crown, Clock } from "lucide-react";
+import { ArrowLeft, Calendar as CalendarIcon, CalendarDays, ExternalLink, LinkIcon, Mail, Sparkles, FileText, MessageSquare, PenLine, Lock, X, PartyPopper, CheckCircle2, Copy, Check, Crown, Clock } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { SharedWorkspace } from "@/components/requests/SharedWorkspace";
 import { CollabDraftModal } from "@/components/requests/CollabDraftModal";
@@ -79,6 +80,7 @@ export default function Workspace() {
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
   const [localDraft, setLocalDraft] = useState<CollabDraft | null>(null);
   const [showMessageModal, setShowMessageModal] = useState(false);
+  const [showReschedulePicker, setShowReschedulePicker] = useState(false);
   const [msgRefreshKey, setMsgRefreshKey] = useState(0);
   const [retroDismissed, setRetroDismissed] = useState(() =>
     localStorage.getItem(`retro-dismissed-${requestId}`) === "true"
@@ -226,6 +228,41 @@ export default function Workspace() {
     } else {
       generateDraft();
     }
+  };
+
+  const handleReschedule = async (newDate: string) => {
+    if (!creator || !request) return;
+    const oldDate = request.requested_date;
+    const { error } = await supabase
+      .from('collab_requests')
+      .update({ requested_date: newDate })
+      .eq('id', request.id);
+    if (error) {
+      toast.error("Failed to reschedule");
+      return;
+    }
+    const { data: availData } = await supabase
+      .from('availability')
+      .select('*')
+      .eq('creator_id', creator.id)
+      .maybeSingle();
+    if (availData) {
+      let dates: string[] = availData.available_dates || [];
+      if (oldDate && !dates.includes(oldDate)) dates = [...dates, oldDate];
+      dates = dates.filter((d: string) => d !== newDate);
+      await supabase
+        .from('availability')
+        .update({ available_dates: dates })
+        .eq('id', availData.id);
+    }
+    setRequest(prev => prev ? { ...prev, requested_date: newDate } : prev);
+    setShowReschedulePicker(false);
+    const formattedNew = parseDateString(newDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    toast.success(`Rescheduled to ${formattedNew}. Old slot restored.`);
+    trackEvent("collab_rescheduled", { request_id: request.id, new_date: newDate });
+    supabase.functions.invoke('send-collab-email', {
+      body: { type: 'collab_rescheduled', requestId: request.id, newDate }
+    }).catch(err => console.error('Failed to send reschedule email:', err));
   };
 
   const currentUserName = isCreator
@@ -663,13 +700,55 @@ export default function Workspace() {
 
               {/* Date */}
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Calendar className="w-4 h-4" />
+                <CalendarIcon className="w-4 h-4" />
                 <span>
                   {request.requested_date
                     ? formatDate(request.requested_date)
                     : "Flexible — To be scheduled"}
                 </span>
+                {isCreator && request.status === "approved" && (() => {
+                  if (!request.requested_date) return true;
+                  const today = new Date(); today.setHours(0, 0, 0, 0);
+                  const rd = parseDateString(request.requested_date); rd.setHours(0, 0, 0, 0);
+                  return rd >= today;
+                })() && (
+                  <button
+                    onClick={() => setShowReschedulePicker(!showReschedulePicker)}
+                    className="ml-1 p-1 rounded text-muted-foreground/50 hover:text-primary hover:bg-primary/10 transition-colors"
+                    title="Reschedule"
+                  >
+                    <CalendarDays className="w-4 h-4" />
+                  </button>
+                )}
               </div>
+
+              {/* Inline reschedule picker */}
+              {showReschedulePicker && isCreator && (
+                <div className="p-4 border rounded-lg bg-muted/50">
+                  <p className="text-sm font-medium mb-2">Pick a new date</p>
+                  <Calendar
+                    mode="single"
+                    selected={undefined}
+                    onSelect={(date) => {
+                      if (date) {
+                        const yyyy = date.getFullYear();
+                        const mm = String(date.getMonth() + 1).padStart(2, '0');
+                        const dd = String(date.getDate()).padStart(2, '0');
+                        handleReschedule(`${yyyy}-${mm}-${dd}`);
+                      }
+                    }}
+                    disabled={(date) => {
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      return date < today;
+                    }}
+                    className="p-3 pointer-events-auto"
+                  />
+                  <Button variant="ghost" size="sm" onClick={() => setShowReschedulePicker(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              )}
 
               {/* Email */}
               <div className="flex items-center gap-1">
