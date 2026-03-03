@@ -66,10 +66,11 @@ const corsHeaders = {
 };
 
 interface EmailRequest {
-  type: "request_approved" | "request_declined" | "request_received" | "request_submitted" | "request_cancelled_by_guest" | "collab_cancelled_by_host" | "new_message" | "new_message_from_guest" | "collab_reminder" | "collab_type_changed" | "workspace_updated_by_creator" | "workspace_updated_by_guest";
+  type: "request_approved" | "request_declined" | "request_received" | "request_submitted" | "request_cancelled_by_guest" | "collab_cancelled_by_host" | "new_message" | "new_message_from_guest" | "collab_reminder" | "collab_type_changed" | "workspace_updated_by_creator" | "workspace_updated_by_guest" | "collab_rescheduled";
   requestId: string;
   messageContent?: string;
   newCollabType?: string;
+  newDate?: string;
 }
 
 interface CollabDraft {
@@ -103,6 +104,7 @@ const EMAIL_TYPE_ROLES: Record<EmailRequest["type"], "creator" | "requester" | "
   new_message_from_guest: "requester",
   collab_reminder: "service",
   collab_type_changed: "creator",
+  collab_rescheduled: "creator",
   workspace_updated_by_creator: "creator",
   workspace_updated_by_guest: "requester",
 };

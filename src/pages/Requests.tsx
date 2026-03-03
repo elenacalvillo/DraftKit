@@ -509,6 +509,7 @@ export default function Requests() {
                     onCancel={handleCancel}
                     onDraftGenerated={handleDraftGenerated}
                     onDelete={handleDelete}
+                    onReschedule={handleReschedule}
                   />
                 </motion.div>
               ))}
