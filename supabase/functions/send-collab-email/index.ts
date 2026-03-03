@@ -1039,7 +1039,8 @@ serve(async (req: Request): Promise<Response> => {
       "collab_type_changed",
       "workspace_updated_by_creator",
       "workspace_updated_by_guest",
-      "collab_published"
+      "collab_published",
+      "collab_rescheduled"
     ];
 
     if (DEDUP_TYPES.includes(type)) {
