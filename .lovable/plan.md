@@ -1,41 +1,43 @@
 
 
-## Redesign: "Membership" page replacing corporate "Subscription" page
+## Add "Reschedule" to approved collaboration requests
 
-Inspired by CarouselBot's "Forever Free" approach, this transforms the transactional subscription page into a warm membership recognition page.
+### What this does
+Adds a "Reschedule" option to approved collab request cards. When clicked, a date picker appears inline. Picking a new date:
+1. Updates the `requested_date` on the collab request
+2. Restores the old date to available slots (so another collaborator can book it)
+3. Sends an email notification to the guest about the date change
+
+No new database columns or tables needed — this only updates existing `requested_date` and `available_dates` fields.
 
 ### Changes
 
-**1. Sidebar nav (`src/components/layout/DashboardLayout.tsx`)**
-- Rename "Subscription" to "Membership" in the nav items array
-- Keep the Crown icon and `/dashboard/subscription` path (no route change needed)
+**1. `src/components/requests/RequestCard.tsx`**
+- Add `CalendarDays` icon import and date-picker imports (Popover, Calendar from shadcn)
+- Add `onReschedule` callback prop: `(id: string, newDate: string) => void`
+- Add state for showing the reschedule date picker
+- Add "Reschedule" item to the approved card's overflow dropdown menu (the `MoreHorizontal` menu, around line 338), between "Link External Doc" and "Generate SMART Draft"
+- When clicked, show an inline date picker (Popover with Calendar) below the card header
+- On date selection, call `onReschedule(request.id, newDateString)` and close the picker
 
-**2. Rewrite `src/pages/Subscription.tsx` with two distinct views:**
+**2. `src/pages/Requests.tsx`**
+- Add `handleReschedule` function that:
+  - Updates `collab_requests.requested_date` to the new date
+  - Restores the old date to `availability.available_dates` (if it existed)
+  - Removes the new date from `availability.available_dates` (if present)
+  - Updates local state
+  - Shows toast: "Rescheduled to [new date]. Old slot restored."
+  - Fires `send-collab-email` with type `collab_rescheduled`
+- Pass `onReschedule={handleReschedule}` to each `RequestCard`
 
-**View A: Founding Members / Active Pro users (`isPro && !isInTrial`)**
-- Page title: "Membership" with Crown icon
-- Large status card: "Founding Member" badge (for users without `stripe_customer_id`) or "Pro Member" badge (for paying subscribers)
-- Warm copy: "You helped build DraftKit from day one. All Pro features are yours, forever." (founders) or "All features unlocked." (paid)
-- Feature checklist styled as "Features Unlocked" (not a sales pitch) with check marks instead of feature icons
-- "Manage Billing" button only shown if user has a `stripe_customer_id` (opens Stripe portal)
-- Creator Discovery teaser kept as a subtle note
+**3. `src/lib/storage.ts`** — No changes needed (types already support `requestedDate` as nullable string)
 
-**View B: Free / Trial users**
-- Page title: "Membership" 
-- If in trial: warm banner showing days left
-- Single clean upgrade card with billing toggle, price, features list, and "Upgrade to Pro" CTA
-- Keep existing checkout logic intact
+### UI behavior
+- Reschedule picker only appears on **approved, upcoming** cards (same condition as the overflow menu: `isApproved && !isPastCollab`)
+- The Calendar component disables past dates
+- After rescheduling, the card immediately reflects the new date
+- The old calendar slot becomes available for new bookings
 
-**3. `src/components/subscription/UpgradePrompt.tsx`**
-- Update navigation text from "Upgrade to Pro" link text; no structural change needed since the route stays the same
-
-**4. `src/components/subscription/ProBadge.tsx`**
-- Add a "Founding Member" variant: when user is Pro without a Stripe customer ID, show "Founder" instead of "Pro" with a star/heart icon
-
-### No database or backend changes required
-All logic uses existing `usePro()` hook + `stripe_customer_id` check already in the Subscription page's `handleManage` function.
-
-### Technical detail
-- The founding member detection reuses the existing pattern: query `creators.stripe_customer_id` for the current user. If `isPro` is true but `stripe_customer_id` is null, they're a founder.
-- This check will be lifted into a `useQuery` at the top of the component so both the status card and manage button can reference it.
+### Email notification
+The existing `send-collab-email` edge function will need a new `collab_rescheduled` type handler — a simple addition to notify the guest that "Your collaboration has been rescheduled to [new date]."
 
