@@ -98,6 +98,9 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
     (request as any).selected_collab_type || (request as any).selectedCollabType || ""
   );
   const [isSavingCollabType, setIsSavingCollabType] = useState(false);
+
+  // Reschedule state
+  const [showReschedulePicker, setShowReschedulePicker] = useState(false);
   
   const currentCollabType = (request as any).selected_collab_type || (request as any).selectedCollabType;
   
