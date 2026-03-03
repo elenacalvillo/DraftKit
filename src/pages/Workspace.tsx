@@ -756,10 +756,20 @@ export default function Workspace() {
                         handleReschedule(`${yyyy}-${mm}-${dd}`);
                       }
                     }}
+                    modifiers={{
+                      booked: bookedDates.map(d => parseDateString(d)),
+                    }}
+                    modifiersClassNames={{
+                      booked: "bg-destructive/20 text-destructive line-through",
+                    }}
                     disabled={(date) => {
                       const today = new Date();
                       today.setHours(0, 0, 0, 0);
-                      return date < today;
+                      if (date < today) return true;
+                      const yyyy = date.getFullYear();
+                      const mm = String(date.getMonth() + 1).padStart(2, '0');
+                      const dd = String(date.getDate()).padStart(2, '0');
+                      return bookedDates.includes(`${yyyy}-${mm}-${dd}`);
                     }}
                     className="p-3 pointer-events-auto mx-auto"
                   />
