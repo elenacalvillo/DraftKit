@@ -82,6 +82,7 @@ export default function Workspace() {
   const [localDraft, setLocalDraft] = useState<CollabDraft | null>(null);
   const [showMessageModal, setShowMessageModal] = useState(false);
   const [showReschedulePicker, setShowReschedulePicker] = useState(false);
+  const [bookedDates, setBookedDates] = useState<string[]>([]);
   const [msgRefreshKey, setMsgRefreshKey] = useState(0);
   const [retroDismissed, setRetroDismissed] = useState(() =>
     localStorage.getItem(`retro-dismissed-${requestId}`) === "true"
@@ -119,6 +120,21 @@ export default function Workspace() {
       fetchRequest();
     }
   }, [user, requestId]);
+
+  // Fetch sibling booked dates for reschedule conflict prevention
+  useEffect(() => {
+    if (!request?.creator_id || !requestId) return;
+    supabase
+      .from("collab_requests")
+      .select("requested_date")
+      .eq("creator_id", request.creator_id)
+      .in("status", ["approved", "published"])
+      .neq("id", requestId)
+      .not("requested_date", "is", null)
+      .then(({ data }) => {
+        if (data) setBookedDates(data.map(r => r.requested_date!));
+      });
+  }, [request?.creator_id, requestId]);
 
   const fetchRequest = async () => {
     try {
