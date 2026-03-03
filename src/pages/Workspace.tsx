@@ -80,6 +80,7 @@ export default function Workspace() {
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false);
   const [localDraft, setLocalDraft] = useState<CollabDraft | null>(null);
   const [showMessageModal, setShowMessageModal] = useState(false);
+  const [showReschedulePicker, setShowReschedulePicker] = useState(false);
   const [msgRefreshKey, setMsgRefreshKey] = useState(0);
   const [retroDismissed, setRetroDismissed] = useState(() =>
     localStorage.getItem(`retro-dismissed-${requestId}`) === "true"
