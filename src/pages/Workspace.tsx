@@ -748,7 +748,7 @@ export default function Workspace() {
                     Cancel
                   </Button>
                 </div>
-              )
+              )}
 
               {/* Email */}
               <div className="flex items-center gap-1">
