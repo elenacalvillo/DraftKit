@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Calendar as CalendarIcon, CalendarDays, ExternalLink, Mail, Link as LinkIcon, Sparkles, MessageSquare, FileText, XCircle, Ban, Check, X, Trash2, PenLine, Copy, MoreHorizontal, Zap } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
