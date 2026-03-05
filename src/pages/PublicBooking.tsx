@@ -537,9 +537,8 @@ export default function PublicBooking() {
       return;
     }
 
-    // Email notifications temporarily disabled in this hotfix.
-    // Post-insert emails require the row ID, which we no longer retrieve
-    // to avoid SELECT RLS conflicts. Will be restored via a backend trigger.
+    // Email notifications are handled by the on_new_collab_request database trigger,
+    // which calls send-collab-email via pg_net after insert.
 
     setIsSubmitting(false);
     setIsSuccess(true);
