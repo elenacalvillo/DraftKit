@@ -1,41 +1,133 @@
+## Problem: No email sent when a guest books a collaboration
 
+The `PublicBooking.tsx` page has email notifications **explicitly disabled** (lines 540-542):
 
-## Redesign: "Membership" page replacing corporate "Subscription" page
+```
+// Email notifications temporarily disabled in this hotfix.
+// Post-insert emails require the row ID, which we no longer retrieve
+// to avoid SELECT RLS conflicts. Will be restored via a backend trigger.
+```
 
-Inspired by CarouselBot's "Forever Free" approach, this transforms the transactional subscription page into a warm membership recognition page.
+The insert uses `.insert({...})` without `.select()` to avoid RLS conflicts (the "Account Blindness" pattern). This means the frontend never gets the new row's `id`, so it can't call `send-collab-email` with a `requestId`.
+
+### Solution: Use a database trigger to send the email
+
+Instead of trying to retrieve the row ID on the client, create a **Postgres trigger + edge function call** pattern:
+
+1. **Create a database trigger** on `collab_requests` that fires `AFTER INSERT` when `status = 'pending'`
+2. The trigger calls a `**pg_net` HTTP request** to the `send-collab-email` edge function with `type: 'request_received'` and the new row's `id`
+3. This completely bypasses the client-side RLS issue since the trigger runs with table-owner privileges
 
 ### Changes
 
-**1. Sidebar nav (`src/components/layout/DashboardLayout.tsx`)**
-- Rename "Subscription" to "Membership" in the nav items array
-- Keep the Crown icon and `/dashboard/subscription` path (no route change needed)
+**1. Database migration** — Create a trigger function that uses `pg_net` to call the edge function:
 
-**2. Rewrite `src/pages/Subscription.tsx` with two distinct views:**
+```sql
+-- Enable pg_net extension (already available in Supabase)
+CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
 
-**View A: Founding Members / Active Pro users (`isPro && !isInTrial`)**
-- Page title: "Membership" with Crown icon
-- Large status card: "Founding Member" badge (for users without `stripe_customer_id`) or "Pro Member" badge (for paying subscribers)
-- Warm copy: "You helped build DraftKit from day one. All Pro features are yours, forever." (founders) or "All features unlocked." (paid)
-- Feature checklist styled as "Features Unlocked" (not a sales pitch) with check marks instead of feature icons
-- "Manage Billing" button only shown if user has a `stripe_customer_id` (opens Stripe portal)
-- Creator Discovery teaser kept as a subtle note
+CREATE OR REPLACE FUNCTION public.notify_new_collab_request()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+BEGIN
+  -- Only fire for new pending requests
+  IF NEW.status = 'pending' THEN
+    PERFORM extensions.http_post(
+      url := current_setting('app.settings.supabase_url') || '/functions/v1/send-collab-email',
+      body := jsonb_build_object(
+        'type', 'request_received',
+        'requestId', NEW.id::text
+      ),
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json',
+        'Authorization', 'Bearer ' || current_setting('app.settings.service_role_key')
+      )
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$;
 
-**View B: Free / Trial users**
-- Page title: "Membership" 
-- If in trial: warm banner showing days left
-- Single clean upgrade card with billing toggle, price, features list, and "Upgrade to Pro" CTA
-- Keep existing checkout logic intact
+CREATE TRIGGER on_new_collab_request
+  AFTER INSERT ON public.collab_requests
+  FOR EACH ROW
+  EXECUTE FUNCTION public.notify_new_collab_request();
+```
 
-**3. `src/components/subscription/UpgradePrompt.tsx`**
-- Update navigation text from "Upgrade to Pro" link text; no structural change needed since the route stays the same
+**However**, `pg_net` / `http_post` availability varies. A simpler and more reliable alternative:
 
-**4. `src/components/subscription/ProBadge.tsx`**
-- Add a "Founding Member" variant: when user is Pro without a Stripe customer ID, show "Founder" instead of "Pro" with a star/heart icon
+### Alternative (recommended): Use Supabase Database Webhooks
 
-### No database or backend changes required
-All logic uses existing `usePro()` hook + `stripe_customer_id` check already in the Subscription page's `handleManage` function.
+Actually, the simplest reliable approach is to use `pg_net.http_post` which is available in Supabase:
 
-### Technical detail
-- The founding member detection reuses the existing pattern: query `creators.stripe_customer_id` for the current user. If `isPro` is true but `stripe_customer_id` is null, they're a founder.
-- This check will be lifted into a `useQuery` at the top of the component so both the status card and manage button can reference it.
+```sql
+CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
 
+CREATE OR REPLACE FUNCTION public.notify_new_collab_request()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+DECLARE
+  supabase_url text := 'https://cbgchxesngdsvkevbqwh.supabase.co';
+  service_key text;
+BEGIN
+  IF NEW.status = 'pending' THEN
+    SELECT decrypted_secret INTO service_key
+    FROM vault.decrypted_secrets
+    WHERE name = 'SUPABASE_SERVICE_ROLE_KEY'
+    LIMIT 1;
+
+    PERFORM net.http_post(
+      url := supabase_url || '/functions/v1/send-collab-email',
+      body := jsonb_build_object(
+        'type', 'request_received',
+        'requestId', NEW.id::text
+      ),
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json',
+        'Authorization', 'Bearer ' || service_key
+      )::jsonb
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER on_new_collab_request
+  AFTER INSERT ON public.collab_requests
+  FOR EACH ROW
+  EXECUTE FUNCTION public.notify_new_collab_request();
+```
+
+**2. Update `send-collab-email/index.ts**` — The `request_received` type already exists and has a full email template (line 394+). The role is `"service"` which matches the service-role auth the trigger will use. No changes needed to the edge function.
+
+**3. Remove the disabled comment** in `PublicBooking.tsx` (lines 540-542) — replace with a comment noting emails are handled by the database trigger.
+
+### Files changed
+
+- **Database migration**: New trigger `on_new_collab_request` + function `notify_new_collab_request()`
+- `**src/pages/PublicBooking.tsx**`: Update comment (lines 540-542) — cosmetic only
+
+### Why this is safe
+
+- The trigger uses `SECURITY DEFINER` + service role key from vault, so it authenticates properly with the edge function
+- The edge function already validates `request_received` as a `"service"` role type
+- No RLS conflicts since the trigger runs server-side after the insert succeeds
+- The `request_received` email template already exists and sends to the creator's contact email
+
+&nbsp;
+
+### A Small "Builder" Warning
+
+When you set up the `pg_net` trigger, make sure your Supabase Project has the **Vault** enabled if you are pulling the `service_role_key` from it. Most modern Supabase projects have this by default, but it's worth a quick check in your dashboard.
+
+Also, since you're using `pg_net`, the request is **asynchronous**. This is good because it won't slow down the user's booking experience, but it means if the Edge Function fails, the database won't "roll back" the insert. This is exactly what you want for a notification.
+
+### The Impact
+
+Now, when someone like Cristina or a new collaborator fills out your form, you'll get that "New Request" email instantly. No more manual checking of the dashboard to see if someone new signed up.
