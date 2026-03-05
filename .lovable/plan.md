@@ -1,41 +1,36 @@
 
 
-## Redesign: "Membership" page replacing corporate "Subscription" page
+## Problem
 
-Inspired by CarouselBot's "Forever Free" approach, this transforms the transactional subscription page into a warm membership recognition page.
+1. **Timo IS receiving the approval email** — the `request_approved` flow in `Requests.tsx` (line 181) fires correctly and the edge function handles it.
+2. **But the CTA is wrong** — the approval email's call-to-action is a `mailto:` link ("Reply to [creator]"), which sends Timo to his email client instead of into the DraftKit workspace where drafting actually happens.
+3. This directly undermines the platform retention strategy: the workspace is where value is captured, not email threads.
 
-### Changes
+## Solution: Replace the mailto CTA with a "Open Workspace" link
 
-**1. Sidebar nav (`src/components/layout/DashboardLayout.tsx`)**
-- Rename "Subscription" to "Membership" in the nav items array
-- Keep the Crown icon and `/dashboard/subscription` path (no route change needed)
+In `supabase/functions/send-collab-email/index.ts`, update the `request_approved` email template (lines 337-343):
 
-**2. Rewrite `src/pages/Subscription.tsx` with two distinct views:**
+**Before:**
+```html
+<a href="mailto:${creatorEmail}?subject=Re: Collaboration on ${formattedDate}" ...>
+  Reply to ${creatorName}
+</a>
+```
 
-**View A: Founding Members / Active Pro users (`isPro && !isInTrial`)**
-- Page title: "Membership" with Crown icon
-- Large status card: "Founding Member" badge (for users without `stripe_customer_id`) or "Pro Member" badge (for paying subscribers)
-- Warm copy: "You helped build DraftKit from day one. All Pro features are yours, forever." (founders) or "All features unlocked." (paid)
-- Feature checklist styled as "Features Unlocked" (not a sales pitch) with check marks instead of feature icons
-- "Manage Billing" button only shown if user has a `stripe_customer_id` (opens Stripe portal)
-- Creator Discovery teaser kept as a subtle note
+**After:**
+```html
+<a href="https://collabstack.lovable.app/dashboard/my-requests" ...>
+  Open Your Workspace →
+</a>
+```
 
-**View B: Free / Trial users**
-- Page title: "Membership" 
-- If in trial: warm banner showing days left
-- Single clean upgrade card with billing toggle, price, features list, and "Upgrade to Pro" CTA
-- Keep existing checkout logic intact
+The link points to `/dashboard/my-requests` — the requester's view where they can see approved requests and click "Start Drafting" to enter the workspace. We use this route instead of a direct `/dashboard/workspace/${requestId}` because the requester may not be signed up yet (Account Blindness pattern), and `/my-requests` handles that gracefully after login.
 
-**3. `src/components/subscription/UpgradePrompt.tsx`**
-- Update navigation text from "Upgrade to Pro" link text; no structural change needed since the route stays the same
+Additionally, add a secondary line below the button: a subtle text note like "Sign up or log in to start drafting with [creator]" to guide new users.
 
-**4. `src/components/subscription/ProBadge.tsx`**
-- Add a "Founding Member" variant: when user is Pro without a Stripe customer ID, show "Founder" instead of "Pro" with a star/heart icon
+### Files changed
+- `supabase/functions/send-collab-email/index.ts` — update the CTA block in the `request_approved` template (lines 337-343)
 
-### No database or backend changes required
-All logic uses existing `usePro()` hook + `stripe_customer_id` check already in the Subscription page's `handleManage` function.
-
-### Technical detail
-- The founding member detection reuses the existing pattern: query `creators.stripe_customer_id` for the current user. If `isPro` is true but `stripe_customer_id` is null, they're a founder.
-- This check will be lifted into a `useQuery` at the top of the component so both the status card and manage button can reference it.
+### Verification
+After deploying, ask Timo to check if the existing email arrived (it should have). The next approval will include the new workspace CTA.
 
