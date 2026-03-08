@@ -235,7 +235,7 @@ serve(async (req) => {
       // Get ALL published requests (removed retro_completed_at filter)
       const { data: published, error } = await supabase
         .from("collab_requests")
-        .select("id, creator_id, collab_link, requested_date, requester_substack_url, approved_at, retro_completed_at, created_at")
+        .select("id, creator_id, collab_link, requester_collab_link, requested_date, requester_substack_url, approved_at, retro_completed_at, created_at")
         .eq("status", "published");
 
       if (error || !published?.length) {
