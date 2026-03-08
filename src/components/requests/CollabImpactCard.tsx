@@ -1,7 +1,10 @@
-import { TrendingUp, Heart, MessageSquare, ExternalLink, BarChart3, RefreshCw } from "lucide-react";
-import { useCollabMetrics, useTriggerMetricsSnapshot, CollabMetric } from "@/hooks/useCollabMetrics";
+import { TrendingUp, Heart, MessageSquare, ExternalLink, BarChart3, RefreshCw, Edit2 } from "lucide-react";
+import { useCollabMetrics, useTriggerMetricsSnapshot, useCollabUrls, useUpdateCollabUrls } from "@/hooks/useCollabMetrics";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useState, useEffect } from "react";
 
 interface CollabImpactCardProps {
   requestId: string;
@@ -34,8 +37,39 @@ function GrowthIndicator({ current, previous, label }: { current: number | null;
 }
 
 export function CollabImpactCard({ requestId, creatorName, requesterName }: CollabImpactCardProps) {
-  const { data: metrics, isLoading } = useCollabMetrics(requestId);
+  const { data: metrics, isLoading: isMetricsLoading } = useCollabMetrics(requestId);
+  const { data: urls, isLoading: isUrlsLoading } = useCollabUrls(requestId);
+  const { mutateAsync: updateUrls } = useUpdateCollabUrls();
   const { trigger, isCollecting, error: collectError } = useTriggerMetricsSnapshot(requestId);
+
+  const [isEditingUrls, setIsEditingUrls] = useState(false);
+  const [hostUrl, setHostUrl] = useState("");
+  const [guestUrl, setGuestUrl] = useState("");
+  const [isSavingUrls, setIsSavingUrls] = useState(false);
+
+  useEffect(() => {
+    if (urls && !isEditingUrls) {
+      setHostUrl(urls.collab_link || "");
+      setGuestUrl(urls.requester_collab_link || "");
+    }
+  }, [urls, isEditingUrls]);
+
+  const handleCollect = async () => {
+    if (isEditingUrls || !metrics?.length) {
+      setIsSavingUrls(true);
+      try {
+        await updateUrls({ requestId, hostUrl, guestUrl });
+      } catch (e) {
+        console.error("Failed to update URLs", e);
+      } finally {
+        setIsSavingUrls(false);
+        setIsEditingUrls(false);
+      }
+    }
+    trigger();
+  };
+
+  const isLoading = isMetricsLoading || isUrlsLoading;
 
   if (isLoading) {
     return (
@@ -55,17 +89,39 @@ export function CollabImpactCard({ requestId, creatorName, requesterName }: Coll
           <span>Collab Impact</span>
         </div>
         <p className="text-sm text-muted-foreground">
-          No engagement data collected yet for this collaboration.
+          No engagement data collected yet. Provide the published post URLs below so we can track them.
         </p>
+        
+        <div className="space-y-3 py-1">
+          <div className="space-y-1.5">
+            <Label className="text-xs">{creatorName || "Host"}'s Post URL</Label>
+            <Input 
+              placeholder="https://..." 
+              value={hostUrl} 
+              onChange={(e) => setHostUrl(e.target.value)} 
+              className="h-8 text-xs"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">{requesterName || "Guest"}'s Post URL</Label>
+            <Input 
+              placeholder="https://..." 
+              value={guestUrl} 
+              onChange={(e) => setGuestUrl(e.target.value)} 
+              className="h-8 text-xs"
+            />
+          </div>
+        </div>
+
         <Button
           variant="outline"
           size="sm"
-          onClick={() => trigger()}
-          disabled={isCollecting}
-          className="gap-2"
+          onClick={handleCollect}
+          disabled={isCollecting || isSavingUrls || (!hostUrl && !guestUrl)}
+          className="gap-2 w-full"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${isCollecting ? "animate-spin" : ""}`} />
-          {isCollecting ? "Collecting…" : "Collect engagement data"}
+          {isCollecting || isSavingUrls ? "Collecting…" : "Save URLs & Collect Data"}
         </Button>
         {collectError && (
           <p className="text-xs text-destructive">{collectError}</p>
@@ -83,12 +139,56 @@ export function CollabImpactCard({ requestId, creatorName, requesterName }: Coll
       <div className="flex items-center gap-2 text-sm font-medium">
         <BarChart3 className="w-4 h-4 text-primary" />
         <span>Collab Impact</span>
-        {hasGrowth && latest.snapshot_day > 0 && (
-          <span className="text-xs text-muted-foreground ml-auto">
-            Day {latest.snapshot_day} snapshot
-          </span>
-        )}
+        <div className="ml-auto flex items-center gap-2">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="w-6 h-6" 
+            onClick={() => setIsEditingUrls(!isEditingUrls)}
+            title="Edit post URLs"
+          >
+            <Edit2 className="w-3 h-3 text-muted-foreground" />
+          </Button>
+          {hasGrowth && latest.snapshot_day > 0 && (
+            <span className="text-xs text-muted-foreground">
+              Day {latest.snapshot_day}
+            </span>
+          )}
+        </div>
       </div>
+
+      {isEditingUrls && (
+        <div className="space-y-3 py-2 border-y border-border/50 my-2">
+          <div className="space-y-1.5">
+            <Label className="text-xs">{creatorName || "Host"}'s Post URL</Label>
+            <Input 
+              placeholder="https://..." 
+              value={hostUrl} 
+              onChange={(e) => setHostUrl(e.target.value)} 
+              className="h-8 text-xs"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">{requesterName || "Guest"}'s Post URL</Label>
+            <Input 
+              placeholder="https://..." 
+              value={guestUrl} 
+              onChange={(e) => setGuestUrl(e.target.value)} 
+              className="h-8 text-xs"
+            />
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCollect}
+            disabled={isCollecting || isSavingUrls || (!hostUrl && !guestUrl)}
+            className="gap-2 w-full"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isCollecting ? "animate-spin" : ""}`} />
+            {isCollecting || isSavingUrls ? "Updating…" : "Update URLs & Re-collect"}
+          </Button>
+        </div>
+      )}
 
       <div className="grid gap-3">
         {/* Creator's post metrics */}
