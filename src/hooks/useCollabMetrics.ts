@@ -33,6 +33,45 @@ export function useCollabMetrics(requestId: string | undefined) {
   });
 }
 
+export function useCollabUrls(requestId: string | undefined) {
+  return useQuery({
+    queryKey: ["collab-urls", requestId],
+    queryFn: async () => {
+      if (!requestId) return null;
+      const { data, error } = await supabase
+        .from("collab_requests")
+        .select("collab_link, requester_collab_link")
+        .eq("id", requestId)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!requestId,
+  });
+}
+
+export function useUpdateCollabUrls() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ requestId, hostUrl, guestUrl }: { requestId: string, hostUrl?: string, guestUrl?: string }) => {
+      const updates: any = {};
+      if (hostUrl !== undefined) updates.collab_link = hostUrl;
+      if (guestUrl !== undefined) updates.requester_collab_link = guestUrl;
+      
+      const { error } = await supabase
+        .from("collab_requests")
+        .update(updates)
+        .eq("id", requestId);
+        
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["collab-urls", variables.requestId] });
+    }
+  });
+}
+
 export function useTriggerMetricsSnapshot(requestId: string) {
   const queryClient = useQueryClient();
   const [isCollecting, setIsCollecting] = useState(false);
