@@ -32,6 +32,7 @@ export function FeedbackWidget() {
   const [email, setEmail] = useState("");
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstileTokenRef = useRef<string | null>(null);
+  const turnstileBypassed = useRef(false);
 
   // Keep ref in sync with state
   useEffect(() => {
