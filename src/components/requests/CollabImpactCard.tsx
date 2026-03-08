@@ -1,6 +1,7 @@
-import { TrendingUp, Heart, MessageSquare, ExternalLink, BarChart3 } from "lucide-react";
-import { useCollabMetrics, CollabMetric } from "@/hooks/useCollabMetrics";
+import { TrendingUp, Heart, MessageSquare, ExternalLink, BarChart3, RefreshCw } from "lucide-react";
+import { useCollabMetrics, useTriggerMetricsSnapshot, CollabMetric } from "@/hooks/useCollabMetrics";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 
 interface CollabImpactCardProps {
   requestId: string;
@@ -34,6 +35,7 @@ function GrowthIndicator({ current, previous, label }: { current: number | null;
 
 export function CollabImpactCard({ requestId, creatorName, requesterName }: CollabImpactCardProps) {
   const { data: metrics, isLoading } = useCollabMetrics(requestId);
+  const { trigger, isCollecting, error: collectError } = useTriggerMetricsSnapshot(requestId);
 
   if (isLoading) {
     return (
@@ -44,7 +46,33 @@ export function CollabImpactCard({ requestId, creatorName, requesterName }: Coll
     );
   }
 
-  if (!metrics?.length) return null;
+  // Empty state: no metrics yet, show collect button
+  if (!metrics?.length) {
+    return (
+      <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <BarChart3 className="w-4 h-4 text-primary" />
+          <span>Collab Impact</span>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          No engagement data collected yet for this collaboration.
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => trigger()}
+          disabled={isCollecting}
+          className="gap-2"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${isCollecting ? "animate-spin" : ""}`} />
+          {isCollecting ? "Collecting…" : "Collect engagement data"}
+        </Button>
+        {collectError && (
+          <p className="text-xs text-destructive">{collectError}</p>
+        )}
+      </div>
+    );
+  }
 
   const latest = metrics[metrics.length - 1];
   const initial = metrics[0];
