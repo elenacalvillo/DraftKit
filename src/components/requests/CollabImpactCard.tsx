@@ -1,7 +1,10 @@
-import { TrendingUp, Heart, MessageSquare, ExternalLink, BarChart3, RefreshCw } from "lucide-react";
-import { useCollabMetrics, useTriggerMetricsSnapshot, CollabMetric } from "@/hooks/useCollabMetrics";
+import { TrendingUp, Heart, MessageSquare, ExternalLink, BarChart3, RefreshCw, Edit2 } from "lucide-react";
+import { useCollabMetrics, useTriggerMetricsSnapshot, useCollabUrls, useUpdateCollabUrls } from "@/hooks/useCollabMetrics";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useState, useEffect } from "react";
 
 interface CollabImpactCardProps {
   requestId: string;
