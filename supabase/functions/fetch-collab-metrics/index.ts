@@ -31,8 +31,89 @@ interface ArchivePost {
   comment_count: number;
 }
 
+function extractUsername(url: string): string | null {
+  if (!url) return null;
+  const cleaned = url.trim().replace(/[?#].*$/, "").replace(/\/+$/, "");
+  const withoutProtocol = cleaned.replace(/^https?:\/\//, "");
+
+  // username.substack.com
+  const subdomainMatch = withoutProtocol.match(/^([a-zA-Z0-9][a-zA-Z0-9_-]*)\.substack\.com/i);
+  if (subdomainMatch) return subdomainMatch[1].toLowerCase();
+
+  // substack.com/@username
+  const profileMatch = withoutProtocol.match(/substack\.com\/@([a-zA-Z0-9_-]+)/i);
+  if (profileMatch) return profileMatch[1].toLowerCase();
+
+  // open.substack.com/pub/username
+  const mobileMatch = withoutProtocol.match(/open\.substack\.com\/pub\/([a-zA-Z0-9_-]+)/i);
+  if (mobileMatch) return mobileMatch[1].toLowerCase();
+
+  // Bare username
+  if (/^[a-zA-Z0-9][a-zA-Z0-9_-]{1,49}$/.test(withoutProtocol)) {
+    return withoutProtocol.toLowerCase();
+  }
+
+  return null;
+}
+
+/**
+ * Try to resolve a username to a working publication subdomain.
+ * Profile URLs (substack.com/@user) may differ from publication subdomains.
+ * Strategy: try archive API directly, if 404 try fetching profile page for redirect.
+ */
+async function resolvePublicationUsername(username: string): Promise<string | null> {
+  // First, try the username directly
+  const directUrl = `https://${username}.substack.com/api/v1/archive?sort=new&limit=1`;
+  if (!isAllowedDomain(directUrl)) return null;
+
+  try {
+    const resp = await fetch(directUrl, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; DraftKit/1.0)", "Accept": "application/json" },
+      redirect: "follow",
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      if (Array.isArray(data) && data.length > 0) return username;
+    }
+  } catch { /* continue */ }
+
+  // If direct failed, try fetching the profile page to find the publication
+  const profileUrl = `https://substack.com/@${username}`;
+  if (!isAllowedDomain(profileUrl)) return null;
+
+  try {
+    const resp = await fetch(profileUrl, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; DraftKit/1.0)" },
+      redirect: "follow",
+    });
+    if (!resp.ok) return null;
+
+    const html = await resp.text();
+    // Look for publication subdomain in the HTML (e.g., href="https://realusername.substack.com")
+    const pubMatch = html.match(/href="https:\/\/([a-zA-Z0-9_-]+)\.substack\.com\/?"/i);
+    if (pubMatch) {
+      const resolved = pubMatch[1].toLowerCase();
+      if (resolved !== "substack" && resolved !== "open" && resolved !== "www") {
+        console.log(`Resolved @${username} → ${resolved}.substack.com`);
+        return resolved;
+      }
+    }
+  } catch (err) {
+    console.error(`Profile resolution failed for @${username}:`, err instanceof Error ? err.message : err);
+  }
+
+  return null;
+}
+
 async function fetchArchivePosts(username: string): Promise<ArchivePost[]> {
-  const url = `https://${username}.substack.com/api/v1/archive?sort=new&limit=12`;
+  // Try direct first, then resolve if needed
+  const resolvedUsername = await resolvePublicationUsername(username);
+  if (!resolvedUsername) {
+    console.warn(`Could not resolve publication for username: ${username}`);
+    return [];
+  }
+
+  const url = `https://${resolvedUsername}.substack.com/api/v1/archive?sort=new&limit=12`;
   if (!isAllowedDomain(url)) {
     console.warn(`SSRF blocked: ${url}`);
     return [];
@@ -52,7 +133,7 @@ async function fetchArchivePosts(username: string): Promise<ArchivePost[]> {
     clearTimeout(timeout);
 
     if (!resp.ok) {
-      console.error(`Archive fetch failed for ${username}: ${resp.status}`);
+      console.error(`Archive fetch failed for ${resolvedUsername}: ${resp.status}`);
       return [];
     }
 
@@ -60,7 +141,7 @@ async function fetchArchivePosts(username: string): Promise<ArchivePost[]> {
     return Array.isArray(data) ? data : [];
   } catch (err) {
     clearTimeout(timeout);
-    console.error(`Archive fetch error for ${username}:`, err instanceof Error ? err.message : err);
+    console.error(`Archive fetch error for ${resolvedUsername}:`, err instanceof Error ? err.message : err);
     return [];
   }
 }
@@ -68,7 +149,6 @@ async function fetchArchivePosts(username: string): Promise<ArchivePost[]> {
 function findCollabPost(posts: ArchivePost[], publishDate: string | null, collabLink: string | null): ArchivePost | null {
   if (!posts.length) return null;
 
-  // Try matching by collab_link URL
   if (collabLink) {
     const match = posts.find(p => 
       collabLink.includes(p.slug) || p.canonical_url === collabLink
@@ -76,7 +156,6 @@ function findCollabPost(posts: ArchivePost[], publishDate: string | null, collab
     if (match) return match;
   }
 
-  // Try matching by date (within 3 days of the requested_date or approved_at)
   if (publishDate) {
     const target = new Date(publishDate).getTime();
     const THREE_DAYS = 3 * 24 * 60 * 60 * 1000;
@@ -87,7 +166,6 @@ function findCollabPost(posts: ArchivePost[], publishDate: string | null, collab
     if (match) return match;
   }
 
-  // Fallback: most recent post
   return posts[0];
 }
 
@@ -113,14 +191,12 @@ serve(async (req) => {
     const body = await req.json();
     const { requestId, snapshotDay } = body;
 
-    // If called with specific requestId, process just that one
-    // If called without, process all published requests needing snapshots
-    let requestsToProcess: { id: string; creator_id: string; collab_link: string | null; requested_date: string | null; requester_substack_url: string | null; approved_at: string | null; retro_completed_at: string | null }[] = [];
+    let requestsToProcess: { id: string; creator_id: string; collab_link: string | null; requested_date: string | null; requester_substack_url: string | null; approved_at: string | null; retro_completed_at: string | null; created_at: string }[] = [];
 
     if (requestId) {
       const { data, error } = await supabase
         .from("collab_requests")
-        .select("id, creator_id, collab_link, requested_date, requester_substack_url, approved_at, retro_completed_at")
+        .select("id, creator_id, collab_link, requested_date, requester_substack_url, approved_at, retro_completed_at, created_at")
         .eq("id", requestId)
         .eq("status", "published")
         .single();
@@ -133,15 +209,13 @@ serve(async (req) => {
       }
       requestsToProcess = [data];
     } else {
-      // Cron mode: find all published requests that need a snapshot for the given day
       const day = snapshotDay ?? 0;
       
-      // Get published requests that don't have this day's snapshot yet
+      // Get ALL published requests (removed retro_completed_at filter)
       const { data: published, error } = await supabase
         .from("collab_requests")
-        .select("id, creator_id, collab_link, requested_date, requester_substack_url, approved_at, retro_completed_at")
-        .eq("status", "published")
-        .not("retro_completed_at", "is", null);
+        .select("id, creator_id, collab_link, requested_date, requester_substack_url, approved_at, retro_completed_at, created_at")
+        .eq("status", "published");
 
       if (error || !published?.length) {
         return new Response(
@@ -150,7 +224,6 @@ serve(async (req) => {
         );
       }
 
-      // Filter out ones that already have this snapshot
       const { data: existing } = await supabase
         .from("collab_metrics")
         .select("request_id")
@@ -159,13 +232,14 @@ serve(async (req) => {
 
       const existingIds = new Set((existing || []).map(e => e.request_id));
       
-      // For day > 0, check if enough time has passed since publish
       const now = Date.now();
       requestsToProcess = published.filter(r => {
         if (existingIds.has(r.id)) return false;
         if (day === 0) return true;
         
-        const publishedAt = new Date(r.retro_completed_at!).getTime();
+        // Use retro_completed_at, approved_at, or created_at as publish reference
+        const publishRef = r.retro_completed_at || r.approved_at || r.created_at;
+        const publishedAt = new Date(publishRef).getTime();
         const daysSincePublish = (now - publishedAt) / (24 * 60 * 60 * 1000);
         return daysSincePublish >= day;
       });
@@ -182,7 +256,6 @@ serve(async (req) => {
 
     for (const request of requestsToProcess) {
       try {
-        // Get creator's substack username
         const { data: creator } = await supabase
           .from("creators")
           .select("substack_url, username")
@@ -204,13 +277,13 @@ serve(async (req) => {
           continue;
         }
 
-        // Fetch archive for both publications
         const [creatorPosts, requesterPosts] = await Promise.all([
           fetchArchivePosts(creatorUsername),
           requesterUsername ? fetchArchivePosts(requesterUsername) : Promise.resolve([]),
         ]);
 
-        const publishDate = request.retro_completed_at || request.approved_at || request.requested_date;
+        // Use best available date reference
+        const publishDate = request.retro_completed_at || request.approved_at || request.requested_date || request.created_at;
         
         const creatorPost = findCollabPost(creatorPosts, publishDate, request.collab_link);
         const requesterPost = requesterPosts.length > 0 
@@ -256,28 +329,3 @@ serve(async (req) => {
     );
   }
 });
-
-function extractUsername(url: string): string | null {
-  if (!url) return null;
-  const cleaned = url.trim().replace(/[?#].*$/, "").replace(/\/+$/, "");
-  const withoutProtocol = cleaned.replace(/^https?:\/\//, "");
-
-  // username.substack.com
-  const subdomainMatch = withoutProtocol.match(/^([a-zA-Z0-9][a-zA-Z0-9_-]*)\.substack\.com/i);
-  if (subdomainMatch) return subdomainMatch[1].toLowerCase();
-
-  // substack.com/@username
-  const profileMatch = withoutProtocol.match(/substack\.com\/@([a-zA-Z0-9_-]+)/i);
-  if (profileMatch) return profileMatch[1].toLowerCase();
-
-  // open.substack.com/pub/username
-  const mobileMatch = withoutProtocol.match(/open\.substack\.com\/pub\/([a-zA-Z0-9_-]+)/i);
-  if (mobileMatch) return mobileMatch[1].toLowerCase();
-
-  // Bare username
-  if (/^[a-zA-Z0-9][a-zA-Z0-9_-]{1,49}$/.test(withoutProtocol)) {
-    return withoutProtocol.toLowerCase();
-  }
-
-  return null;
-}

@@ -1,5 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useState, useCallback } from "react";
 
 export interface CollabMetric {
   id: string;
@@ -33,11 +34,28 @@ export function useCollabMetrics(requestId: string | undefined) {
 }
 
 export function useTriggerMetricsSnapshot(requestId: string) {
-  return async () => {
-    const { data, error } = await supabase.functions.invoke("fetch-collab-metrics", {
-      body: { requestId, snapshotDay: 0 },
-    });
-    if (error) throw error;
-    return data;
-  };
+  const queryClient = useQueryClient();
+  const [isCollecting, setIsCollecting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const trigger = useCallback(async () => {
+    setIsCollecting(true);
+    setError(null);
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke("fetch-collab-metrics", {
+        body: { requestId, snapshotDay: 0 },
+      });
+      if (fnError) throw fnError;
+      // Invalidate the metrics query so UI refreshes
+      await queryClient.invalidateQueries({ queryKey: ["collab-metrics", requestId] });
+      return data;
+    } catch (err: any) {
+      setError(err?.message || "Failed to collect metrics");
+      throw err;
+    } finally {
+      setIsCollecting(false);
+    }
+  }, [requestId, queryClient]);
+
+  return { trigger, isCollecting, error };
 }
