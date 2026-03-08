@@ -66,7 +66,7 @@ const corsHeaders = {
 };
 
 interface EmailRequest {
-  type: "request_approved" | "request_declined" | "request_received" | "request_submitted" | "request_cancelled_by_guest" | "collab_cancelled_by_host" | "new_message" | "new_message_from_guest" | "collab_reminder" | "collab_type_changed" | "workspace_updated_by_creator" | "workspace_updated_by_guest" | "collab_rescheduled";
+  type: "request_approved" | "request_declined" | "request_received" | "request_submitted" | "request_cancelled_by_guest" | "collab_cancelled_by_host" | "new_message" | "new_message_from_guest" | "collab_reminder" | "collab_type_changed" | "workspace_updated_by_creator" | "workspace_updated_by_guest" | "collab_rescheduled" | "collab_published";
   requestId: string;
   messageContent?: string;
   newCollabType?: string;
