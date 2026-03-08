@@ -37,8 +37,39 @@ function GrowthIndicator({ current, previous, label }: { current: number | null;
 }
 
 export function CollabImpactCard({ requestId, creatorName, requesterName }: CollabImpactCardProps) {
-  const { data: metrics, isLoading } = useCollabMetrics(requestId);
+  const { data: metrics, isLoading: isMetricsLoading } = useCollabMetrics(requestId);
+  const { data: urls, isLoading: isUrlsLoading } = useCollabUrls(requestId);
+  const { mutateAsync: updateUrls } = useUpdateCollabUrls();
   const { trigger, isCollecting, error: collectError } = useTriggerMetricsSnapshot(requestId);
+
+  const [isEditingUrls, setIsEditingUrls] = useState(false);
+  const [hostUrl, setHostUrl] = useState("");
+  const [guestUrl, setGuestUrl] = useState("");
+  const [isSavingUrls, setIsSavingUrls] = useState(false);
+
+  useEffect(() => {
+    if (urls && !isEditingUrls) {
+      setHostUrl(urls.collab_link || "");
+      setGuestUrl(urls.requester_collab_link || "");
+    }
+  }, [urls, isEditingUrls]);
+
+  const handleCollect = async () => {
+    if (isEditingUrls || !metrics?.length) {
+      setIsSavingUrls(true);
+      try {
+        await updateUrls({ requestId, hostUrl, guestUrl });
+      } catch (e) {
+        console.error("Failed to update URLs", e);
+      } finally {
+        setIsSavingUrls(false);
+        setIsEditingUrls(false);
+      }
+    }
+    trigger();
+  };
+
+  const isLoading = isMetricsLoading || isUrlsLoading;
 
   if (isLoading) {
     return (
