@@ -664,38 +664,93 @@ export default function Workspace() {
                     <strong>{formatDate(request.requested_date)}</strong>. How did it go?
                   </p>
 
-                  <div className="flex flex-wrap items-center gap-3">
+                  <div className="space-y-3">
                     {existingRetroFeedback === null && (
                       <>
-                        <span className="text-sm font-medium">Was this published?</span>
-                        {publishAnswer ? (
-                          <Badge variant="secondary">
-                            {publishAnswer === "yes" ? "✅ Yes" : "⏳ Not yet"}
-                          </Badge>
-                        ) : (
-                          <>
-                            <Button size="sm" variant="outline" onClick={() => handlePublishAnswer("yes")}>
-                              Yes
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className="text-sm font-medium">Was this published?</span>
+                          {publishAnswer ? (
+                            <Badge variant="secondary">
+                              {publishAnswer === "yes" ? "✅ Yes" : "⏳ Not yet"}
+                            </Badge>
+                          ) : (
+                            <>
+                              <Button size="sm" variant="outline" onClick={() => handlePublishAnswer("yes")}>
+                                Yes
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => handlePublishAnswer("not_yet")}>
+                                Not yet
+                              </Button>
+                            </>
+                          )}
+                          <div className="ml-auto">
+                            <Button
+                              size="sm"
+                              variant="gradient"
+                              onClick={() => {
+                                window.dispatchEvent(new CustomEvent("open-feedback-widget"));
+                              }}
+                            >
+                              Share Your Experience
                             </Button>
-                            <Button size="sm" variant="outline" onClick={() => handlePublishAnswer("not_yet")}>
-                              Not yet
-                            </Button>
-                          </>
+                          </div>
+                        </div>
+
+                        {/* URL input form after clicking "Yes" */}
+                        {publishAnswer === "yes" && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            className="space-y-3 pt-2 border-t border-border/50"
+                          >
+                            <p className="text-sm text-muted-foreground">
+                              Paste the published post URLs so we can track engagement:
+                            </p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div>
+                                <label className="text-xs font-medium text-muted-foreground mb-1 block">Your post URL</label>
+                                <input
+                                  type="text"
+                                  placeholder="https://you.substack.com/p/..."
+                                  value={publishUrls.creatorUrl}
+                                  onChange={(e) => setPublishUrls(prev => ({ ...prev, creatorUrl: e.target.value }))}
+                                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-xs font-medium text-muted-foreground mb-1 block">Guest's post URL (optional)</label>
+                                <input
+                                  type="text"
+                                  placeholder="https://guest.substack.com/p/..."
+                                  value={publishUrls.requesterUrl}
+                                  onChange={(e) => setPublishUrls(prev => ({ ...prev, requesterUrl: e.target.value }))}
+                                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                variant="hero"
+                                onClick={handlePublishWithUrls}
+                                disabled={isSavingPublish}
+                              >
+                                {isSavingPublish ? "Saving…" : "Confirm & Track Engagement"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-muted-foreground"
+                                onClick={handlePublishWithUrls}
+                                disabled={isSavingPublish}
+                              >
+                                Skip — publish without URLs
+                              </Button>
+                            </div>
+                          </motion.div>
                         )}
                       </>
                     )}
-
-                    <div className="ml-auto">
-                      <Button
-                        size="sm"
-                        variant="gradient"
-                        onClick={() => {
-                          window.dispatchEvent(new CustomEvent("open-feedback-widget"));
-                        }}
-                      >
-                        Share Your Experience
-                      </Button>
-                    </div>
                   </div>
                 </>
               )}
