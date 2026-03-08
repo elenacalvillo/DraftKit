@@ -58,13 +58,18 @@ export function FeedbackWidget() {
      setTurnstileToken(null);
    }, []);
  
-   // Immediate error when widget fails to load
-   const handleTurnstileError = useCallback(() => {
-     turnstileTokenRef.current = null;
-     setTurnstileToken(null);
-     const errorMsg = "Security check couldn't load. If you use an ad blocker or strict privacy mode, try disabling it or use another browser.";
-     setSecurityError(errorMsg);
-   }, []);
+  // Silent bypass when widget fails to load
+  const handleTurnstileBypass = useCallback((reason: string) => {
+    console.log('[Feedback] Bypassing Turnstile verification:', reason);
+    turnstileBypassed.current = true;
+    setSecurityError(null);
+  }, []);
+
+  const handleTurnstileError = useCallback(() => {
+    // Don't show error - bypass is handled via onBypass callback
+    turnstileTokenRef.current = null;
+    setTurnstileToken(null);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
