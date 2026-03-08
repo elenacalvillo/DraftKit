@@ -217,7 +217,7 @@ serve(async (req) => {
     if (requestId) {
       const { data, error } = await supabase
         .from("collab_requests")
-        .select("id, creator_id, collab_link, requested_date, requester_substack_url, approved_at, retro_completed_at, created_at")
+        .select("id, creator_id, collab_link, requester_collab_link, requested_date, requester_substack_url, approved_at, retro_completed_at, created_at")
         .eq("id", requestId)
         .eq("status", "published")
         .single();
