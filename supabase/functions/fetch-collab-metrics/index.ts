@@ -146,16 +146,35 @@ async function fetchArchivePosts(username: string): Promise<ArchivePost[]> {
   }
 }
 
+function extractSlugFromUrl(url: string): string | null {
+  try {
+    const urlObj = new URL(url);
+    // e.g. /p/my-post-slug or /p/my-post-slug/comments
+    const match = urlObj.pathname.match(/\/p\/([a-zA-Z0-9_-]+)/);
+    return match ? match[1].toLowerCase() : null;
+  } catch {
+    return null;
+  }
+}
+
 function findCollabPost(posts: ArchivePost[], publishDate: string | null, collabLink: string | null): ArchivePost | null {
   if (!posts.length) return null;
 
+  // Priority 1: Match by exact slug from the provided URL
   if (collabLink) {
+    const slug = extractSlugFromUrl(collabLink);
+    if (slug) {
+      const match = posts.find(p => p.slug?.toLowerCase() === slug);
+      if (match) return match;
+    }
+    // Fallback: partial match
     const match = posts.find(p => 
       collabLink.includes(p.slug) || p.canonical_url === collabLink
     );
     if (match) return match;
   }
 
+  // Priority 2: Match by date proximity
   if (publishDate) {
     const target = new Date(publishDate).getTime();
     const THREE_DAYS = 3 * 24 * 60 * 60 * 1000;
@@ -166,7 +185,9 @@ function findCollabPost(posts: ArchivePost[], publishDate: string | null, collab
     if (match) return match;
   }
 
-  return posts[0];
+  // Fallback: most recent post (but only if no URL was provided — prevents wrong match)
+  if (!collabLink) return posts[0];
+  return null;
 }
 
 function getReactionCount(post: ArchivePost): number {
