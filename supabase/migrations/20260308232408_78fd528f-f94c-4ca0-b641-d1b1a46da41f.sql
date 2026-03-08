@@ -1,0 +1,1 @@
+ALTER TABLE public.collab_requests ADD COLUMN requester_collab_link text;

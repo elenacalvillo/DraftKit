@@ -89,6 +89,8 @@ export default function Workspace() {
     localStorage.getItem(`retro-dismissed-${requestId}`) === "true"
   );
   const [publishAnswer, setPublishAnswer] = useState<string | null>(null);
+  const [publishUrls, setPublishUrls] = useState<{ creatorUrl: string; requesterUrl: string }>({ creatorUrl: "", requesterUrl: "" });
+  const [isSavingPublish, setIsSavingPublish] = useState(false);
   // undefined = loading, null = not answered, {message} = already answered
   const [existingRetroFeedback, setExistingRetroFeedback] = useState<{ message: string } | null | undefined>(undefined);
 
@@ -486,26 +488,43 @@ export default function Workspace() {
   })();
 
   const retroDismissKey = `retro-dismissed-${requestId}`;
-  const handlePublishAnswer = async (answer: "yes" | "not_yet") => {
-    setPublishAnswer(answer);
 
-    // Step 1 (CRITICAL): Flip the status to 'published' FIRST, independently of feedback logging
-    // Use user?.id instead of isCreator to avoid the async race condition where creator
-    // hasn't loaded yet — RLS on the server enforces that only the actual creator can update.
-    if (answer === "yes" && requestId && user?.id) {
+  // Step 1: User clicks Yes/Not yet — for "yes", show URL form instead of immediately publishing
+  const handlePublishAnswer = (answer: "yes" | "not_yet") => {
+    setPublishAnswer(answer);
+    if (answer === "yes") {
+      // Pre-fill creator URL if collab_link exists
+      setPublishUrls({ creatorUrl: request?.collab_link || "", requesterUrl: "" });
+    } else {
+      // "Not yet" — just log feedback
+      logPublishFeedback("not_yet");
+      toast.success("No rush — we'll be here when it's ready!");
+    }
+  };
+
+  // Step 2: Submit post URLs, update status, trigger metrics
+  const handlePublishWithUrls = async () => {
+    if (!requestId || !user?.id) return;
+    setIsSavingPublish(true);
+    try {
+      // Save URLs + flip status to published
+      const updatePayload: Record<string, unknown> = { status: "published" };
+      if (publishUrls.creatorUrl.trim()) updatePayload.collab_link = publishUrls.creatorUrl.trim();
+      if (publishUrls.requesterUrl.trim()) updatePayload.requester_collab_link = publishUrls.requesterUrl.trim();
+
       const { error: publishError } = await supabase
         .from("collab_requests")
-        .update({ status: "published" })
+        .update(updatePayload)
         .eq("id", requestId);
 
       if (publishError) {
         console.error("[Workspace] Failed to update status to published:", publishError);
         toast.error("Couldn't mark as published — please try again.");
-        setPublishAnswer(null);
+        setIsSavingPublish(false);
         return;
       }
 
-      setRequest(prev => prev ? { ...prev, status: "published" } : prev);
+      setRequest(prev => prev ? { ...prev, ...updatePayload, status: "published" } as any : prev);
 
       // Notify the guest partner — non-fatal
       try {
@@ -519,9 +538,25 @@ export default function Workspace() {
       } catch (emailErr) {
         console.error("Failed to send collab_published email:", emailErr);
       }
-    }
 
-    // Step 2: Log feedback separately — failure here must NOT block the status update above
+      // Auto-trigger metrics snapshot
+      try {
+        await supabase.functions.invoke("fetch-collab-metrics", {
+          body: { requestId, snapshotDay: 0 },
+        });
+      } catch (metricsErr) {
+        console.error("Failed to trigger metrics snapshot:", metricsErr);
+      }
+
+      // Log feedback
+      await logPublishFeedback("yes");
+      toast.success("Congrats on publishing! 🎉 Engagement data is being collected.");
+    } finally {
+      setIsSavingPublish(false);
+    }
+  };
+
+  const logPublishFeedback = async (answer: string) => {
     try {
       await supabase.from("user_feedback").insert({
         user_id: user?.id || null,
@@ -533,8 +568,6 @@ export default function Workspace() {
     } catch (e) {
       console.error("Feedback log failed (non-fatal):", e);
     }
-
-    toast.success(answer === "yes" ? "Congrats on publishing! 🎉" : "No rush — we'll be here when it's ready!");
   };
 
   const dismissRetro = () => {
@@ -631,38 +664,93 @@ export default function Workspace() {
                     <strong>{formatDate(request.requested_date)}</strong>. How did it go?
                   </p>
 
-                  <div className="flex flex-wrap items-center gap-3">
+                  <div className="space-y-3">
                     {existingRetroFeedback === null && (
                       <>
-                        <span className="text-sm font-medium">Was this published?</span>
-                        {publishAnswer ? (
-                          <Badge variant="secondary">
-                            {publishAnswer === "yes" ? "✅ Yes" : "⏳ Not yet"}
-                          </Badge>
-                        ) : (
-                          <>
-                            <Button size="sm" variant="outline" onClick={() => handlePublishAnswer("yes")}>
-                              Yes
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className="text-sm font-medium">Was this published?</span>
+                          {publishAnswer ? (
+                            <Badge variant="secondary">
+                              {publishAnswer === "yes" ? "✅ Yes" : "⏳ Not yet"}
+                            </Badge>
+                          ) : (
+                            <>
+                              <Button size="sm" variant="outline" onClick={() => handlePublishAnswer("yes")}>
+                                Yes
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => handlePublishAnswer("not_yet")}>
+                                Not yet
+                              </Button>
+                            </>
+                          )}
+                          <div className="ml-auto">
+                            <Button
+                              size="sm"
+                              variant="gradient"
+                              onClick={() => {
+                                window.dispatchEvent(new CustomEvent("open-feedback-widget"));
+                              }}
+                            >
+                              Share Your Experience
                             </Button>
-                            <Button size="sm" variant="outline" onClick={() => handlePublishAnswer("not_yet")}>
-                              Not yet
-                            </Button>
-                          </>
+                          </div>
+                        </div>
+
+                        {/* URL input form after clicking "Yes" */}
+                        {publishAnswer === "yes" && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            className="space-y-3 pt-2 border-t border-border/50"
+                          >
+                            <p className="text-sm text-muted-foreground">
+                              Paste the published post URLs so we can track engagement:
+                            </p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div>
+                                <label className="text-xs font-medium text-muted-foreground mb-1 block">Your post URL</label>
+                                <input
+                                  type="text"
+                                  placeholder="https://you.substack.com/p/..."
+                                  value={publishUrls.creatorUrl}
+                                  onChange={(e) => setPublishUrls(prev => ({ ...prev, creatorUrl: e.target.value }))}
+                                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-xs font-medium text-muted-foreground mb-1 block">Guest's post URL (optional)</label>
+                                <input
+                                  type="text"
+                                  placeholder="https://guest.substack.com/p/..."
+                                  value={publishUrls.requesterUrl}
+                                  onChange={(e) => setPublishUrls(prev => ({ ...prev, requesterUrl: e.target.value }))}
+                                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                variant="hero"
+                                onClick={handlePublishWithUrls}
+                                disabled={isSavingPublish}
+                              >
+                                {isSavingPublish ? "Saving…" : "Confirm & Track Engagement"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-muted-foreground"
+                                onClick={handlePublishWithUrls}
+                                disabled={isSavingPublish}
+                              >
+                                Skip — publish without URLs
+                              </Button>
+                            </div>
+                          </motion.div>
                         )}
                       </>
                     )}
-
-                    <div className="ml-auto">
-                      <Button
-                        size="sm"
-                        variant="gradient"
-                        onClick={() => {
-                          window.dispatchEvent(new CustomEvent("open-feedback-widget"));
-                        }}
-                      >
-                        Share Your Experience
-                      </Button>
-                    </div>
                   </div>
                 </>
               )}

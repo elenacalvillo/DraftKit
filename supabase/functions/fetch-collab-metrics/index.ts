@@ -146,16 +146,35 @@ async function fetchArchivePosts(username: string): Promise<ArchivePost[]> {
   }
 }
 
+function extractSlugFromUrl(url: string): string | null {
+  try {
+    const urlObj = new URL(url);
+    // e.g. /p/my-post-slug or /p/my-post-slug/comments
+    const match = urlObj.pathname.match(/\/p\/([a-zA-Z0-9_-]+)/);
+    return match ? match[1].toLowerCase() : null;
+  } catch {
+    return null;
+  }
+}
+
 function findCollabPost(posts: ArchivePost[], publishDate: string | null, collabLink: string | null): ArchivePost | null {
   if (!posts.length) return null;
 
+  // Priority 1: Match by exact slug from the provided URL
   if (collabLink) {
+    const slug = extractSlugFromUrl(collabLink);
+    if (slug) {
+      const match = posts.find(p => p.slug?.toLowerCase() === slug);
+      if (match) return match;
+    }
+    // Fallback: partial match
     const match = posts.find(p => 
       collabLink.includes(p.slug) || p.canonical_url === collabLink
     );
     if (match) return match;
   }
 
+  // Priority 2: Match by date proximity
   if (publishDate) {
     const target = new Date(publishDate).getTime();
     const THREE_DAYS = 3 * 24 * 60 * 60 * 1000;
@@ -166,7 +185,9 @@ function findCollabPost(posts: ArchivePost[], publishDate: string | null, collab
     if (match) return match;
   }
 
-  return posts[0];
+  // Fallback: most recent post (but only if no URL was provided — prevents wrong match)
+  if (!collabLink) return posts[0];
+  return null;
 }
 
 function getReactionCount(post: ArchivePost): number {
@@ -191,12 +212,12 @@ serve(async (req) => {
     const body = await req.json();
     const { requestId, snapshotDay } = body;
 
-    let requestsToProcess: { id: string; creator_id: string; collab_link: string | null; requested_date: string | null; requester_substack_url: string | null; approved_at: string | null; retro_completed_at: string | null; created_at: string }[] = [];
+    let requestsToProcess: { id: string; creator_id: string; collab_link: string | null; requester_collab_link: string | null; requested_date: string | null; requester_substack_url: string | null; approved_at: string | null; retro_completed_at: string | null; created_at: string }[] = [];
 
     if (requestId) {
       const { data, error } = await supabase
         .from("collab_requests")
-        .select("id, creator_id, collab_link, requested_date, requester_substack_url, approved_at, retro_completed_at, created_at")
+        .select("id, creator_id, collab_link, requester_collab_link, requested_date, requester_substack_url, approved_at, retro_completed_at, created_at")
         .eq("id", requestId)
         .eq("status", "published")
         .single();
@@ -214,7 +235,7 @@ serve(async (req) => {
       // Get ALL published requests (removed retro_completed_at filter)
       const { data: published, error } = await supabase
         .from("collab_requests")
-        .select("id, creator_id, collab_link, requested_date, requester_substack_url, approved_at, retro_completed_at, created_at")
+        .select("id, creator_id, collab_link, requester_collab_link, requested_date, requester_substack_url, approved_at, retro_completed_at, created_at")
         .eq("status", "published");
 
       if (error || !published?.length) {
@@ -287,7 +308,7 @@ serve(async (req) => {
         
         const creatorPost = findCollabPost(creatorPosts, publishDate, request.collab_link);
         const requesterPost = requesterPosts.length > 0 
-          ? findCollabPost(requesterPosts, publishDate, null) 
+          ? findCollabPost(requesterPosts, publishDate, request.requester_collab_link) 
           : null;
 
         const day = snapshotDay ?? 0;
