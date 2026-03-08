@@ -89,17 +89,39 @@ export function CollabImpactCard({ requestId, creatorName, requesterName }: Coll
           <span>Collab Impact</span>
         </div>
         <p className="text-sm text-muted-foreground">
-          No engagement data collected yet for this collaboration.
+          No engagement data collected yet. Provide the published post URLs below so we can track them.
         </p>
+        
+        <div className="space-y-3 py-1">
+          <div className="space-y-1.5">
+            <Label className="text-xs">{creatorName || "Host"}'s Post URL</Label>
+            <Input 
+              placeholder="https://..." 
+              value={hostUrl} 
+              onChange={(e) => setHostUrl(e.target.value)} 
+              className="h-8 text-xs"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">{requesterName || "Guest"}'s Post URL</Label>
+            <Input 
+              placeholder="https://..." 
+              value={guestUrl} 
+              onChange={(e) => setGuestUrl(e.target.value)} 
+              className="h-8 text-xs"
+            />
+          </div>
+        </div>
+
         <Button
           variant="outline"
           size="sm"
-          onClick={() => trigger()}
-          disabled={isCollecting}
-          className="gap-2"
+          onClick={handleCollect}
+          disabled={isCollecting || isSavingUrls || (!hostUrl && !guestUrl)}
+          className="gap-2 w-full"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${isCollecting ? "animate-spin" : ""}`} />
-          {isCollecting ? "Collecting…" : "Collect engagement data"}
+          {isCollecting || isSavingUrls ? "Collecting…" : "Save URLs & Collect Data"}
         </Button>
         {collectError && (
           <p className="text-xs text-destructive">{collectError}</p>
