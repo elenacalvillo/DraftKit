@@ -1,18 +1,41 @@
 
 
-## Tone down green in published collaboration cards
+## Redesign: "Membership" page replacing corporate "Subscription" page
 
-### Problem
-The "This collaboration is published!" text and "View Final Workspace" button use `text-success` which resolves to a bright emerald green (`hsl(152, 69%, 45%)`) — too saturated and hard to read on light backgrounds.
+Inspired by CarouselBot's "Forever Free" approach, this transforms the transactional subscription page into a warm membership recognition page.
 
-### Solution
-Change these two elements in `src/components/requests/RequestCard.tsx` (lines 655-669) to use the warm brand palette instead of the raw success green:
+### Changes
 
-1. **"This collaboration is published!" text** (line 657): Replace `text-success` with `text-primary` (coral) — matches the brand and the sparkle emoji already suggests celebration
-2. **"View Final Workspace" button** (line 663): Replace `border-success/30 text-success hover:bg-success/10` with `border-primary/30 text-primary hover:bg-primary/10` — coral outline button, consistent with the rest of the UI
+**1. Sidebar nav (`src/components/layout/DashboardLayout.tsx`)**
+- Rename "Subscription" to "Membership" in the nav items array
+- Keep the Crown icon and `/dashboard/subscription` path (no route change needed)
 
-This is a 2-line change scoped only to the published section. No global color changes needed.
+**2. Rewrite `src/pages/Subscription.tsx` with two distinct views:**
 
-### File changed
-- `src/components/requests/RequestCard.tsx` — lines 657 and 663
+**View A: Founding Members / Active Pro users (`isPro && !isInTrial`)**
+- Page title: "Membership" with Crown icon
+- Large status card: "Founding Member" badge (for users without `stripe_customer_id`) or "Pro Member" badge (for paying subscribers)
+- Warm copy: "You helped build DraftKit from day one. All Pro features are yours, forever." (founders) or "All features unlocked." (paid)
+- Feature checklist styled as "Features Unlocked" (not a sales pitch) with check marks instead of feature icons
+- "Manage Billing" button only shown if user has a `stripe_customer_id` (opens Stripe portal)
+- Creator Discovery teaser kept as a subtle note
+
+**View B: Free / Trial users**
+- Page title: "Membership" 
+- If in trial: warm banner showing days left
+- Single clean upgrade card with billing toggle, price, features list, and "Upgrade to Pro" CTA
+- Keep existing checkout logic intact
+
+**3. `src/components/subscription/UpgradePrompt.tsx`**
+- Update navigation text from "Upgrade to Pro" link text; no structural change needed since the route stays the same
+
+**4. `src/components/subscription/ProBadge.tsx`**
+- Add a "Founding Member" variant: when user is Pro without a Stripe customer ID, show "Founder" instead of "Pro" with a star/heart icon
+
+### No database or backend changes required
+All logic uses existing `usePro()` hook + `stripe_customer_id` check already in the Subscription page's `handleManage` function.
+
+### Technical detail
+- The founding member detection reuses the existing pattern: query `creators.stripe_customer_id` for the current user. If `isPro` is true but `stripe_customer_id` is null, they're a founder.
+- This check will be lifted into a `useQuery` at the top of the component so both the status card and manage button can reference it.
 

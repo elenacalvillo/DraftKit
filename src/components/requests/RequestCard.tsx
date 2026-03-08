@@ -654,13 +654,13 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
         {/* Published */}
         {request.status === "published" && (
           <div className="space-y-3 pt-3 border-t mt-auto">
-            <div className="flex items-center gap-2 text-sm text-success font-medium">
+            <div className="flex items-center gap-2 text-sm text-primary font-medium">
               <Sparkles className="w-4 h-4" />
               <span>This collaboration is published!</span>
             </div>
             <Button
               variant="outline"
-              className="w-full border-success/30 text-success hover:bg-success/10"
+              className="w-full border-primary/30 text-primary hover:bg-primary/10"
               onClick={() => navigate(`/dashboard/workspace/${request.id}`)}
             >
               <ExternalLink className="w-4 h-4 mr-2" />
