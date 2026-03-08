@@ -80,52 +80,57 @@ export function FeedbackWidget() {
       return;
     }
 
-    // If token not ready yet, show verifying state and wait
-    if (!turnstileTokenRef.current) {
-      setIsVerifying(true);
-      // Wait up to 10 seconds for the token
-      const token = await new Promise<string | null>((resolve) => {
-        let attempts = 0;
-        const checkToken = setInterval(() => {
-          attempts++;
-          if (turnstileTokenRef.current) {
-            clearInterval(checkToken);
-            resolve(turnstileTokenRef.current);
-          } else if (attempts >= 100) { // 10 seconds
-            clearInterval(checkToken);
-            resolve(null);
-          }
-        }, 100);
-      });
-      
-      setIsVerifying(false);
-      
-      if (!token) {
-        const errorMsg = "Security check took too long. If you're using a VPN or ad blocker, try disabling it temporarily.";
+    // If bypassed, skip token verification entirely
+    if (turnstileBypassed.current) {
+      console.log('[Feedback] Bypassing Turnstile verification');
+    } else {
+      // If token not ready yet, show verifying state and wait
+      if (!turnstileTokenRef.current) {
+        setIsVerifying(true);
+        // Wait up to 10 seconds for the token
+        const token = await new Promise<string | null>((resolve) => {
+          let attempts = 0;
+          const checkToken = setInterval(() => {
+            attempts++;
+            if (turnstileTokenRef.current) {
+              clearInterval(checkToken);
+              resolve(turnstileTokenRef.current);
+            } else if (attempts >= 100) { // 10 seconds
+              clearInterval(checkToken);
+              resolve(null);
+            }
+          }, 100);
+        });
+        
+        setIsVerifying(false);
+        
+        if (!token) {
+          const errorMsg = "Security check took too long. If you're using a VPN or ad blocker, try disabling it temporarily.";
+          setSecurityError(errorMsg);
+          toast.error(errorMsg);
+          return;
+        }
+      }
+
+      // Verify token with backend
+      const verifyResult = await verifyTurnstileToken(turnstileTokenRef.current!);
+      if (!verifyResult.success) {
+         // Check for configuration issues vs user issues
+         const isConfigError = verifyResult.codes?.some(c => 
+           ['invalid-input-secret', 'invalid-input-response', 'bad-request'].includes(c)
+         );
+         const errorMsg = isConfigError
+           ? "Security verification error. Please try again in a moment."
+           : "Security check failed. Please refresh the page and try again.";
         setSecurityError(errorMsg);
         toast.error(errorMsg);
+        setTurnstileToken(null);
+        setIsSubmitting(false);
         return;
       }
     }
 
     setIsSubmitting(true);
-
-    // Verify token with backend
-    const verifyResult = await verifyTurnstileToken(turnstileTokenRef.current!);
-    if (!verifyResult.success) {
-       // Check for configuration issues vs user issues
-       const isConfigError = verifyResult.codes?.some(c => 
-         ['invalid-input-secret', 'invalid-input-response', 'bad-request'].includes(c)
-       );
-       const errorMsg = isConfigError
-         ? "Security verification error. Please try again in a moment."
-         : "Security check failed. Please refresh the page and try again.";
-      setSecurityError(errorMsg);
-      toast.error(errorMsg);
-      setTurnstileToken(null);
-      setIsSubmitting(false);
-      return;
-    }
 
     try {
       const feedbackEmail = email.trim() || user?.email || null;
