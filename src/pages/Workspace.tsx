@@ -845,6 +845,15 @@ export default function Workspace() {
               )}
             </div>
 
+            {/* Collab Impact Metrics (published collabs) */}
+            {request.status === "published" && (
+              <CollabImpactCard
+                requestId={request.id}
+                creatorName={creatorInfo?.name}
+                requesterName={request.requester_name}
+              />
+            )}
+
             {/* Conversation Feed */}
             <div className="glass-card p-4">
               <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
