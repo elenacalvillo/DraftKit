@@ -24,6 +24,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { GuestMessageModal } from '@/components/requests/GuestMessageModal';
+import { CollabImpactCard } from '@/components/requests/CollabImpactCard';
 
 interface SentRequest {
   id: string;
