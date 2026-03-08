@@ -1,26 +1,41 @@
 
 
-## Where metrics are visible today — and where they should be
+## Redesign: "Membership" page replacing corporate "Subscription" page
 
-### Current state
-The `CollabImpactCard` is rendered only inside `RequestCard.tsx`, which lives on the host's **Requests page** (`/dashboard/requests`) for published collaborations. The guest's view (`MyRequests.tsx` / Sent Requests) does not show it.
+Inspired by CarouselBot's "Forever Free" approach, this transforms the transactional subscription page into a warm membership recognition page.
 
-### Recommended additions
+### Changes
 
-**1. Guest's Sent Requests page (`MyRequests.tsx`)**
-Add `CollabImpactCard` to the published state in the guest's request view so both parties can see engagement data.
+**1. Sidebar nav (`src/components/layout/DashboardLayout.tsx`)**
+- Rename "Subscription" to "Membership" in the nav items array
+- Keep the Crown icon and `/dashboard/subscription` path (no route change needed)
 
-**2. Workspace page (`Workspace.tsx`)**
-When viewing a published workspace, show the impact card at the top or bottom of the shared content area — this is the most natural place to review collab outcomes.
+**2. Rewrite `src/pages/Subscription.tsx` with two distinct views:**
 
-**3. Dashboard summary (optional, lightweight)**
-On the main Dashboard, surface a small "Recent Collab Impact" widget or badge showing aggregate engagement for the latest published collab.
+**View A: Founding Members / Active Pro users (`isPro && !isInTrial`)**
+- Page title: "Membership" with Crown icon
+- Large status card: "Founding Member" badge (for users without `stripe_customer_id`) or "Pro Member" badge (for paying subscribers)
+- Warm copy: "You helped build DraftKit from day one. All Pro features are yours, forever." (founders) or "All features unlocked." (paid)
+- Feature checklist styled as "Features Unlocked" (not a sales pitch) with check marks instead of feature icons
+- "Manage Billing" button only shown if user has a `stripe_customer_id` (opens Stripe portal)
+- Creator Discovery teaser kept as a subtle note
 
-### Implementation scope
-- **MyRequests.tsx**: Import `CollabImpactCard`, render it for requests with `status === 'published'` (same pattern as RequestCard)
-- **Workspace.tsx**: Import and render `CollabImpactCard` when the workspace's request status is `published`
-- **RLS**: The existing policy already allows requesters to read their own metrics (`requester_id` match), so no DB changes needed
-- Minor: pass correct `creatorName` / `requesterName` props from each context
+**View B: Free / Trial users**
+- Page title: "Membership" 
+- If in trial: warm banner showing days left
+- Single clean upgrade card with billing toggle, price, features list, and "Upgrade to Pro" CTA
+- Keep existing checkout logic intact
 
-This is a small UI wiring task — no new tables, edge functions, or migrations required.
+**3. `src/components/subscription/UpgradePrompt.tsx`**
+- Update navigation text from "Upgrade to Pro" link text; no structural change needed since the route stays the same
+
+**4. `src/components/subscription/ProBadge.tsx`**
+- Add a "Founding Member" variant: when user is Pro without a Stripe customer ID, show "Founder" instead of "Pro" with a star/heart icon
+
+### No database or backend changes required
+All logic uses existing `usePro()` hook + `stripe_customer_id` check already in the Subscription page's `handleManage` function.
+
+### Technical detail
+- The founding member detection reuses the existing pattern: query `creators.stripe_customer_id` for the current user. If `isPro` is true but `stripe_customer_id` is null, they're a founder.
+- This check will be lifted into a `useQuery` at the top of the component so both the status card and manage button can reference it.
 
