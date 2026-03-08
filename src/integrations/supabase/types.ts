@@ -86,6 +86,56 @@ export type Database = {
           },
         ]
       }
+      collab_metrics: {
+        Row: {
+          created_at: string
+          creator_comments: number | null
+          creator_likes: number | null
+          creator_post_url: string | null
+          id: string
+          request_id: string
+          requester_comments: number | null
+          requester_likes: number | null
+          requester_post_url: string | null
+          snapshot_at: string
+          snapshot_day: number
+        }
+        Insert: {
+          created_at?: string
+          creator_comments?: number | null
+          creator_likes?: number | null
+          creator_post_url?: string | null
+          id?: string
+          request_id: string
+          requester_comments?: number | null
+          requester_likes?: number | null
+          requester_post_url?: string | null
+          snapshot_at?: string
+          snapshot_day?: number
+        }
+        Update: {
+          created_at?: string
+          creator_comments?: number | null
+          creator_likes?: number | null
+          creator_post_url?: string | null
+          id?: string
+          request_id?: string
+          requester_comments?: number | null
+          requester_likes?: number | null
+          requester_post_url?: string | null
+          snapshot_at?: string
+          snapshot_day?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collab_metrics_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "collab_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       collab_requests: {
         Row: {
           ai_draft: Json | null

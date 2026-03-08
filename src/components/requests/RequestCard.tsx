@@ -13,6 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { CollabRequest, CollabDraft } from "@/lib/storage";
 import { cn, parseDateString } from "@/lib/utils";
 import { CollabDraftModal } from "./CollabDraftModal";
+import { CollabImpactCard } from "./CollabImpactCard";
 import { SendMessageModal } from "./SendMessageModal";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -658,6 +659,10 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
               <Sparkles className="w-4 h-4" />
               <span>This collaboration is published!</span>
             </div>
+            <CollabImpactCard
+              requestId={request.id}
+              requesterName={request.requesterName}
+            />
             <Button
               variant="outline"
               className="w-full border-primary/30 text-primary hover:bg-primary/10"
