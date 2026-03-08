@@ -304,6 +304,7 @@ export function FeedbackWidget() {
                  onVerify={handleTurnstileVerify}
                  onExpire={handleTurnstileExpire}
                  onError={handleTurnstileError}
+                 onBypass={handleTurnstileBypass}
                 />
 
                 {/* Inline Security Error */}
