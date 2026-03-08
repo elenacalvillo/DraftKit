@@ -212,7 +212,7 @@ serve(async (req) => {
     const body = await req.json();
     const { requestId, snapshotDay } = body;
 
-    let requestsToProcess: { id: string; creator_id: string; collab_link: string | null; requested_date: string | null; requester_substack_url: string | null; approved_at: string | null; retro_completed_at: string | null; created_at: string }[] = [];
+    let requestsToProcess: { id: string; creator_id: string; collab_link: string | null; requester_collab_link: string | null; requested_date: string | null; requester_substack_url: string | null; approved_at: string | null; retro_completed_at: string | null; created_at: string }[] = [];
 
     if (requestId) {
       const { data, error } = await supabase
