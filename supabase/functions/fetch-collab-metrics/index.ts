@@ -308,7 +308,7 @@ serve(async (req) => {
         
         const creatorPost = findCollabPost(creatorPosts, publishDate, request.collab_link);
         const requesterPost = requesterPosts.length > 0 
-          ? findCollabPost(requesterPosts, publishDate, null) 
+          ? findCollabPost(requesterPosts, publishDate, request.requester_collab_link) 
           : null;
 
         const day = snapshotDay ?? 0;
