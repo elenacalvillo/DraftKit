@@ -488,26 +488,43 @@ export default function Workspace() {
   })();
 
   const retroDismissKey = `retro-dismissed-${requestId}`;
-  const handlePublishAnswer = async (answer: "yes" | "not_yet") => {
-    setPublishAnswer(answer);
 
-    // Step 1 (CRITICAL): Flip the status to 'published' FIRST, independently of feedback logging
-    // Use user?.id instead of isCreator to avoid the async race condition where creator
-    // hasn't loaded yet — RLS on the server enforces that only the actual creator can update.
-    if (answer === "yes" && requestId && user?.id) {
+  // Step 1: User clicks Yes/Not yet — for "yes", show URL form instead of immediately publishing
+  const handlePublishAnswer = (answer: "yes" | "not_yet") => {
+    setPublishAnswer(answer);
+    if (answer === "yes") {
+      // Pre-fill creator URL if collab_link exists
+      setPublishUrls({ creatorUrl: request?.collab_link || "", requesterUrl: "" });
+    } else {
+      // "Not yet" — just log feedback
+      logPublishFeedback("not_yet");
+      toast.success("No rush — we'll be here when it's ready!");
+    }
+  };
+
+  // Step 2: Submit post URLs, update status, trigger metrics
+  const handlePublishWithUrls = async () => {
+    if (!requestId || !user?.id) return;
+    setIsSavingPublish(true);
+    try {
+      // Save URLs + flip status to published
+      const updatePayload: Record<string, unknown> = { status: "published" };
+      if (publishUrls.creatorUrl.trim()) updatePayload.collab_link = publishUrls.creatorUrl.trim();
+      if (publishUrls.requesterUrl.trim()) updatePayload.requester_collab_link = publishUrls.requesterUrl.trim();
+
       const { error: publishError } = await supabase
         .from("collab_requests")
-        .update({ status: "published" })
+        .update(updatePayload)
         .eq("id", requestId);
 
       if (publishError) {
         console.error("[Workspace] Failed to update status to published:", publishError);
         toast.error("Couldn't mark as published — please try again.");
-        setPublishAnswer(null);
+        setIsSavingPublish(false);
         return;
       }
 
-      setRequest(prev => prev ? { ...prev, status: "published" } : prev);
+      setRequest(prev => prev ? { ...prev, ...updatePayload, status: "published" } as any : prev);
 
       // Notify the guest partner — non-fatal
       try {
@@ -521,9 +538,25 @@ export default function Workspace() {
       } catch (emailErr) {
         console.error("Failed to send collab_published email:", emailErr);
       }
-    }
 
-    // Step 2: Log feedback separately — failure here must NOT block the status update above
+      // Auto-trigger metrics snapshot
+      try {
+        await supabase.functions.invoke("fetch-collab-metrics", {
+          body: { requestId, snapshotDay: 0 },
+        });
+      } catch (metricsErr) {
+        console.error("Failed to trigger metrics snapshot:", metricsErr);
+      }
+
+      // Log feedback
+      await logPublishFeedback("yes");
+      toast.success("Congrats on publishing! 🎉 Engagement data is being collected.");
+    } finally {
+      setIsSavingPublish(false);
+    }
+  };
+
+  const logPublishFeedback = async (answer: string) => {
     try {
       await supabase.from("user_feedback").insert({
         user_id: user?.id || null,
@@ -535,8 +568,6 @@ export default function Workspace() {
     } catch (e) {
       console.error("Feedback log failed (non-fatal):", e);
     }
-
-    toast.success(answer === "yes" ? "Congrats on publishing! 🎉" : "No rush — we'll be here when it's ready!");
   };
 
   const dismissRetro = () => {
