@@ -107,6 +107,7 @@ const EMAIL_TYPE_ROLES: Record<EmailRequest["type"], "creator" | "requester" | "
   collab_rescheduled: "creator",
   workspace_updated_by_creator: "creator",
   workspace_updated_by_guest: "requester",
+  collab_published: "creator",
 };
 
 serve(async (req: Request): Promise<Response> => {
