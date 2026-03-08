@@ -13,6 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { CollabRequest, CollabDraft } from "@/lib/storage";
 import { cn, parseDateString } from "@/lib/utils";
 import { CollabDraftModal } from "./CollabDraftModal";
+import { CollabImpactCard } from "./CollabImpactCard";
 import { SendMessageModal } from "./SendMessageModal";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
