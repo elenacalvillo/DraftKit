@@ -89,6 +89,8 @@ export default function Workspace() {
     localStorage.getItem(`retro-dismissed-${requestId}`) === "true"
   );
   const [publishAnswer, setPublishAnswer] = useState<string | null>(null);
+  const [publishUrls, setPublishUrls] = useState<{ creatorUrl: string; requesterUrl: string }>({ creatorUrl: "", requesterUrl: "" });
+  const [isSavingPublish, setIsSavingPublish] = useState(false);
   // undefined = loading, null = not answered, {message} = already answered
   const [existingRetroFeedback, setExistingRetroFeedback] = useState<{ message: string } | null | undefined>(undefined);
 
