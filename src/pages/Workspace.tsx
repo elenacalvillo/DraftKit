@@ -21,6 +21,7 @@ import { useAdmin } from "@/hooks/useAdmin";
 import { supabase } from "@/integrations/supabase/client";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { CollabDraft } from "@/lib/storage";
+import { CollabImpactCard } from "@/components/requests/CollabImpactCard";
 import { parseDateString, cn } from "@/lib/utils";
 import { extractSubstackUsername, normalizeSubstackUrl } from "@/lib/substack-url";
 import { toast } from "sonner";

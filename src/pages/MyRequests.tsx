@@ -326,6 +326,13 @@ export default function MyRequests() {
 
                     {(request.status === 'approved' || request.status === 'published') && (
                       <div className="space-y-3 pt-3 border-t mt-3">
+                        {request.status === 'published' && (
+                          <CollabImpactCard
+                            requestId={request.id}
+                            creatorName={request.creator?.name}
+                            requesterName={request.requester_name}
+                          />
+                        )}
                         <Button
                           variant="default"
                           className="w-full"
