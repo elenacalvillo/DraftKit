@@ -155,6 +155,7 @@ export type Database = {
           message: string | null
           reminder_sent_at: string | null
           requested_date: string | null
+          requester_collab_link: string | null
           requester_email: string
           requester_name: string
           requester_profile_image_url: string | null
@@ -185,6 +186,7 @@ export type Database = {
           message?: string | null
           reminder_sent_at?: string | null
           requested_date?: string | null
+          requester_collab_link?: string | null
           requester_email: string
           requester_name: string
           requester_profile_image_url?: string | null
@@ -215,6 +217,7 @@ export type Database = {
           message?: string | null
           reminder_sent_at?: string | null
           requested_date?: string | null
+          requester_collab_link?: string | null
           requester_email?: string
           requester_name?: string
           requester_profile_image_url?: string | null
