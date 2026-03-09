@@ -92,11 +92,13 @@ export type Database = {
           creator_comments: number | null
           creator_likes: number | null
           creator_post_url: string | null
+          creator_subscribers: number | null
           id: string
           request_id: string
           requester_comments: number | null
           requester_likes: number | null
           requester_post_url: string | null
+          requester_subscribers: number | null
           snapshot_at: string
           snapshot_day: number
         }
@@ -105,11 +107,13 @@ export type Database = {
           creator_comments?: number | null
           creator_likes?: number | null
           creator_post_url?: string | null
+          creator_subscribers?: number | null
           id?: string
           request_id: string
           requester_comments?: number | null
           requester_likes?: number | null
           requester_post_url?: string | null
+          requester_subscribers?: number | null
           snapshot_at?: string
           snapshot_day?: number
         }
@@ -118,11 +122,13 @@ export type Database = {
           creator_comments?: number | null
           creator_likes?: number | null
           creator_post_url?: string | null
+          creator_subscribers?: number | null
           id?: string
           request_id?: string
           requester_comments?: number | null
           requester_likes?: number | null
           requester_post_url?: string | null
+          requester_subscribers?: number | null
           snapshot_at?: string
           snapshot_day?: number
         }
