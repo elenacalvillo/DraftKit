@@ -113,7 +113,7 @@ async function fetchArchivePosts(username: string): Promise<ArchivePost[]> {
     return [];
   }
 
-  const url = `https://${resolvedUsername}.substack.com/api/v1/archive?sort=new&limit=12`;
+  const url = `https://${resolvedUsername}.substack.com/api/v1/archive?sort=new&limit=30`;
   if (!isAllowedDomain(url)) {
     console.warn(`SSRF blocked: ${url}`);
     return [];
@@ -143,6 +143,90 @@ async function fetchArchivePosts(username: string): Promise<ArchivePost[]> {
     clearTimeout(timeout);
     console.error(`Archive fetch error for ${resolvedUsername}:`, err instanceof Error ? err.message : err);
     return [];
+  }
+}
+
+/**
+ * Fetch metrics directly from a specific Substack post URL by scraping the page.
+ * Returns post data with reaction_count and comment_count extracted from the page HTML.
+ */
+async function fetchPostByUrl(url: string): Promise<ArchivePost | null> {
+  if (!isAllowedDomain(url)) {
+    console.warn(`SSRF blocked: ${url}`);
+    return null;
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    const resp = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; DraftKit/1.0)",
+        "Accept": "text/html",
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    if (!resp.ok) {
+      console.error(`Direct post fetch failed for ${url}: ${resp.status}`);
+      return null;
+    }
+
+    const html = await resp.text();
+    
+    // Extract slug from URL
+    const slug = extractSlugFromUrl(url);
+    if (!slug) return null;
+
+    // Try to extract metrics from HTML
+    // Substack embeds post data in the page, look for reaction_count and comment_count
+    let reactionCount = 0;
+    let commentCount = 0;
+
+    // Pattern 1: Look for JSON-LD structured data
+    const jsonLdMatch = html.match(/<script type="application\/ld\+json"[^>]*>(.*?)<\/script>/s);
+    if (jsonLdMatch) {
+      try {
+        const jsonData = JSON.parse(jsonLdMatch[1]);
+        if (jsonData.commentCount) commentCount = jsonData.commentCount;
+      } catch { /* continue */ }
+    }
+
+    // Pattern 2: Look for embedded window data or direct mentions in HTML
+    const reactionMatch = html.match(/"reaction_count["']?\s*:\s*(\d+)/);
+    if (reactionMatch) reactionCount = parseInt(reactionMatch[1], 10);
+
+    const commentMatch = html.match(/"comment_count["']?\s*:\s*(\d+)/);
+    if (commentMatch) commentCount = parseInt(commentMatch[1], 10);
+
+    // Pattern 3: Alternative patterns for reactions (likes)
+    if (reactionCount === 0) {
+      const altReactionMatch = html.match(/"reactions?["']?\s*:\s*(\d+)/i);
+      if (altReactionMatch) reactionCount = parseInt(altReactionMatch[1], 10);
+    }
+
+    // Extract title if possible
+    const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
+    const title = titleMatch ? titleMatch[1].replace(/ - .* - Substack$/, "").trim() : "";
+
+    console.log(`Direct fetch for ${url}: ${reactionCount} likes, ${commentCount} comments`);
+
+    return {
+      id: 0,
+      title: title,
+      slug: slug,
+      post_date: new Date().toISOString(),
+      canonical_url: url,
+      reactions: reactionCount,
+      reaction_count: reactionCount,
+      comment_count: commentCount,
+    };
+  } catch (err) {
+    clearTimeout(timeout);
+    console.error(`Direct post fetch error for ${url}:`, err instanceof Error ? err.message : err);
+    return null;
   }
 }
 
@@ -191,8 +275,7 @@ function findCollabPost(posts: ArchivePost[], publishDate: string | null, collab
     if (match) return match;
   }
 
-  // Fallback: most recent post (but only if no URL was provided)
-  if (!collabLink && !strictMode) return posts[0];
+  // REMOVED: No longer fall back to "most recent post"
   return null;
 }
 
@@ -313,13 +396,20 @@ serve(async (req) => {
         const publishDate = request.retro_completed_at || request.approved_at || request.requested_date || request.created_at;
         
         // Use strict mode when manual URLs are provided (prioritize user input over heuristics)
-        const creatorPost = findCollabPost(
+        let creatorPost = findCollabPost(
           creatorPosts, 
           publishDate, 
           request.collab_link,
           !!request.collab_link // strict mode if manual URL provided
         );
-        const requesterPost = requesterPosts.length > 0 
+        
+        // NEW: If manual URL provided but not found in archive, try direct fetch
+        if (!creatorPost && request.collab_link) {
+          console.log(`Creator post not in archive, attempting direct fetch: ${request.collab_link}`);
+          creatorPost = await fetchPostByUrl(request.collab_link);
+        }
+        
+        let requesterPost = requesterPosts.length > 0 
           ? findCollabPost(
               requesterPosts, 
               publishDate, 
@@ -327,6 +417,12 @@ serve(async (req) => {
               !!request.requester_collab_link // strict mode if manual URL provided
             )
           : null;
+        
+        // NEW: If manual URL provided but not found in archive, try direct fetch
+        if (!requesterPost && request.requester_collab_link) {
+          console.log(`Requester post not in archive, attempting direct fetch: ${request.requester_collab_link}`);
+          requesterPost = await fetchPostByUrl(request.requester_collab_link);
+        }
 
         const day = snapshotDay ?? 0;
 

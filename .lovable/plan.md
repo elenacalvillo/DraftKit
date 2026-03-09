@@ -1,45 +1,41 @@
 
 
-## Plan: Fix metrics fetch + rename button labels
+## Redesign: "Membership" page replacing corporate "Subscription" page
 
-### Problem
-1. **Wrong/missing metrics**: The saved URL `are-product-managers-the-new-developers` is older than the 12 most recent posts, so it's not found in the archive. Strict mode correctly returns null, but the edge function should **directly fetch** the specific post when it has a manual URL.
-2. **Button label**: "Open External Document" should say "See Live Post" for published collabs, keep current wording for approved status.
+Inspired by CarouselBot's "Forever Free" approach, this transforms the transactional subscription page into a warm membership recognition page.
 
 ### Changes
 
-#### 1. Edge function: `supabase/functions/fetch-collab-metrics/index.ts`
+**1. Sidebar nav (`src/components/layout/DashboardLayout.tsx`)**
+- Rename "Subscription" to "Membership" in the nav items array
+- Keep the Crown icon and `/dashboard/subscription` path (no route change needed)
 
-Add a new `fetchPostByUrl(url)` function that fetches a specific Substack post page and extracts reaction_count and comment_count from the page's JSON metadata (Substack embeds post data as JSON-LD or in `window._preloads`).
+**2. Rewrite `src/pages/Subscription.tsx` with two distinct views:**
 
-Update the main processing logic:
-- When a manual URL is provided (`collab_link` or `requester_collab_link`), first try matching by slug in the archive (current behavior)
-- **NEW**: If slug match fails, call `fetchPostByUrl(manualUrl)` to directly scrape that specific post's metrics
-- For the requester side without a URL: use date-based matching but never fall back to "most recent post"
+**View A: Founding Members / Active Pro users (`isPro && !isInTrial`)**
+- Page title: "Membership" with Crown icon
+- Large status card: "Founding Member" badge (for users without `stripe_customer_id`) or "Pro Member" badge (for paying subscribers)
+- Warm copy: "You helped build DraftKit from day one. All Pro features are yours, forever." (founders) or "All features unlocked." (paid)
+- Feature checklist styled as "Features Unlocked" (not a sales pitch) with check marks instead of feature icons
+- "Manage Billing" button only shown if user has a `stripe_customer_id` (opens Stripe portal)
+- Creator Discovery teaser kept as a subtle note
 
-Also increase archive limit from 12 to 30 to catch more posts.
+**View B: Free / Trial users**
+- Page title: "Membership" 
+- If in trial: warm banner showing days left
+- Single clean upgrade card with billing toggle, price, features list, and "Upgrade to Pro" CTA
+- Keep existing checkout logic intact
 
-#### 2. UI label: `src/pages/Workspace.tsx` (line 932)
+**3. `src/components/subscription/UpgradePrompt.tsx`**
+- Update navigation text from "Upgrade to Pro" link text; no structural change needed since the route stays the same
 
-Change "Open External Document" to:
-- "See Live Post" when `request.status === 'published'`
-- Keep "Open External Document" otherwise (approved status)
+**4. `src/components/subscription/ProBadge.tsx`**
+- Add a "Founding Member" variant: when user is Pro without a Stripe customer ID, show "Founder" instead of "Pro" with a star/heart icon
 
-#### 3. UI label: `src/pages/MyRequests.tsx` (line 354)
+### No database or backend changes required
+All logic uses existing `usePro()` hook + `stripe_customer_id` check already in the Subscription page's `handleManage` function.
 
-Same conditional logic: "See Live Post" for published, "Open External Document" for approved.
-
-### Technical detail: Direct post fetching
-
-```text
-fetchPostByUrl("https://promptledproduct.substack.com/p/are-product-managers-the-new-developers")
-  → GET the URL, extract JSON from page
-  → Return { reaction_count, comment_count, canonical_url, title }
-```
-
-Substack post pages contain structured data we can parse. We'll look for:
-- The `<script type="application/ld+json">` block, or
-- Regex for `"reaction_count":N` and `"comment_count":N` in the page HTML
-
-This ensures that even very old posts are correctly measured when a user provides the exact URL.
+### Technical detail
+- The founding member detection reuses the existing pattern: query `creators.stripe_customer_id` for the current user. If `isPro` is true but `stripe_customer_id` is null, they're a founder.
+- This check will be lifted into a `useQuery` at the top of the component so both the status card and manage button can reference it.
 
