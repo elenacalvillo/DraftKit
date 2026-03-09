@@ -217,7 +217,11 @@ async function fetchPostByUrl(url: string): Promise<ArchivePost | null> {
       post_date: postDate,
       canonical_url: canonicalUrl,
       reactions,
-      reaction_count: typeof reactions === "number" ? reactions : 0,
+      reaction_count: typeof reactions === "number" 
+        ? reactions 
+        : (typeof reactions === "object" && reactions !== null
+            ? Object.values(reactions).reduce((a: number, b) => a + (typeof b === "number" ? b : 0), 0) 
+            : 0),
       comment_count: commentCount,
     };
   } catch (err) {
