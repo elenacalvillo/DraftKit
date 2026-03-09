@@ -147,8 +147,8 @@ async function fetchArchivePosts(username: string): Promise<ArchivePost[]> {
 }
 
 /**
- * Fetch metrics directly from a specific Substack post URL by scraping the page.
- * Returns post data with reaction_count and comment_count extracted from the page HTML.
+ * Fetch metrics for a specific Substack post using the Substack API.
+ * Extracts subdomain + slug from the URL and calls /api/v1/posts/{slug}.
  */
 async function fetchPostByUrl(url: string): Promise<ArchivePost | null> {
   if (!isAllowedDomain(url)) {
@@ -156,76 +156,73 @@ async function fetchPostByUrl(url: string): Promise<ArchivePost | null> {
     return null;
   }
 
+  const slug = extractSlugFromUrl(url);
+  if (!slug) {
+    console.warn(`Could not extract slug from URL: ${url}`);
+    return null;
+  }
+
+  // Extract subdomain (e.g. "promptledproduct" from "promptledproduct.substack.com/p/...")
+  let subdomain: string | null = null;
+  try {
+    const urlObj = new URL(url);
+    const subdomainMatch = urlObj.hostname.match(/^([a-zA-Z0-9_-]+)\.substack\.com$/i);
+    if (subdomainMatch) subdomain = subdomainMatch[1].toLowerCase();
+  } catch { /* continue */ }
+
+  if (!subdomain) {
+    console.warn(`Could not extract subdomain from URL: ${url}`);
+    return null;
+  }
+
+  const apiUrl = `https://${subdomain}.substack.com/api/v1/posts/${slug}`;
+  if (!isAllowedDomain(apiUrl)) {
+    console.warn(`SSRF blocked: ${apiUrl}`);
+    return null;
+  }
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10000);
 
   try {
-    const resp = await fetch(url, {
+    const resp = await fetch(apiUrl, {
       headers: {
         "User-Agent": "Mozilla/5.0 (compatible; DraftKit/1.0)",
-        "Accept": "text/html",
+        "Accept": "application/json",
       },
       signal: controller.signal,
     });
     clearTimeout(timeout);
 
     if (!resp.ok) {
-      console.error(`Direct post fetch failed for ${url}: ${resp.status}`);
+      console.error(`Substack API fetch failed for ${apiUrl}: ${resp.status}`);
       return null;
     }
 
-    const html = await resp.text();
-    
-    // Extract slug from URL
-    const slug = extractSlugFromUrl(url);
-    if (!slug) return null;
+    const data = await resp.json();
 
-    // Try to extract metrics from HTML
-    // Substack embeds post data in the page, look for reaction_count and comment_count
-    let reactionCount = 0;
-    let commentCount = 0;
+    // reactions is typically {"❤": 47, "🔥": 12} — sum all values
+    const reactions = data.reactions ?? data.reaction_count ?? 0;
+    const commentCount = data.comment_count ?? 0;
+    const title = data.title ?? "";
+    const postDate = data.post_date ?? new Date().toISOString();
+    const canonicalUrl = data.canonical_url ?? url;
 
-    // Pattern 1: Look for JSON-LD structured data
-    const jsonLdMatch = html.match(/<script type="application\/ld\+json"[^>]*>(.*?)<\/script>/s);
-    if (jsonLdMatch) {
-      try {
-        const jsonData = JSON.parse(jsonLdMatch[1]);
-        if (jsonData.commentCount) commentCount = jsonData.commentCount;
-      } catch { /* continue */ }
-    }
-
-    // Pattern 2: Look for embedded window data or direct mentions in HTML
-    const reactionMatch = html.match(/"reaction_count["']?\s*:\s*(\d+)/);
-    if (reactionMatch) reactionCount = parseInt(reactionMatch[1], 10);
-
-    const commentMatch = html.match(/"comment_count["']?\s*:\s*(\d+)/);
-    if (commentMatch) commentCount = parseInt(commentMatch[1], 10);
-
-    // Pattern 3: Alternative patterns for reactions (likes)
-    if (reactionCount === 0) {
-      const altReactionMatch = html.match(/"reactions?["']?\s*:\s*(\d+)/i);
-      if (altReactionMatch) reactionCount = parseInt(altReactionMatch[1], 10);
-    }
-
-    // Extract title if possible
-    const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
-    const title = titleMatch ? titleMatch[1].replace(/ - .* - Substack$/, "").trim() : "";
-
-    console.log(`Direct fetch for ${url}: ${reactionCount} likes, ${commentCount} comments`);
+    console.log(`API fetch for ${apiUrl}: reactions=${JSON.stringify(reactions)}, comments=${commentCount}`);
 
     return {
-      id: 0,
-      title: title,
-      slug: slug,
-      post_date: new Date().toISOString(),
-      canonical_url: url,
-      reactions: reactionCount,
-      reaction_count: reactionCount,
+      id: data.id ?? 0,
+      title,
+      slug,
+      post_date: postDate,
+      canonical_url: canonicalUrl,
+      reactions,
+      reaction_count: typeof reactions === "number" ? reactions : 0,
       comment_count: commentCount,
     };
   } catch (err) {
     clearTimeout(timeout);
-    console.error(`Direct post fetch error for ${url}:`, err instanceof Error ? err.message : err);
+    console.error(`Substack API fetch error for ${apiUrl}:`, err instanceof Error ? err.message : err);
     return null;
   }
 }
