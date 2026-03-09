@@ -396,13 +396,20 @@ serve(async (req) => {
         const publishDate = request.retro_completed_at || request.approved_at || request.requested_date || request.created_at;
         
         // Use strict mode when manual URLs are provided (prioritize user input over heuristics)
-        const creatorPost = findCollabPost(
+        let creatorPost = findCollabPost(
           creatorPosts, 
           publishDate, 
           request.collab_link,
           !!request.collab_link // strict mode if manual URL provided
         );
-        const requesterPost = requesterPosts.length > 0 
+        
+        // NEW: If manual URL provided but not found in archive, try direct fetch
+        if (!creatorPost && request.collab_link) {
+          console.log(`Creator post not in archive, attempting direct fetch: ${request.collab_link}`);
+          creatorPost = await fetchPostByUrl(request.collab_link);
+        }
+        
+        let requesterPost = requesterPosts.length > 0 
           ? findCollabPost(
               requesterPosts, 
               publishDate, 
@@ -410,6 +417,12 @@ serve(async (req) => {
               !!request.requester_collab_link // strict mode if manual URL provided
             )
           : null;
+        
+        // NEW: If manual URL provided but not found in archive, try direct fetch
+        if (!requesterPost && request.requester_collab_link) {
+          console.log(`Requester post not in archive, attempting direct fetch: ${request.requester_collab_link}`);
+          requesterPost = await fetchPostByUrl(request.requester_collab_link);
+        }
 
         const day = snapshotDay ?? 0;
 

@@ -351,7 +351,7 @@ export default function MyRequests() {
                                 onClick={() => window.open(request.collab_link!, "_blank")}
                               >
                                 <ExternalLink className="h-4 w-4 mr-1" />
-                                Open External Document
+                                {request.status === 'published' ? 'See Live Post' : 'Open External Document'}
                               </Button>
                             )}
                             <Button 

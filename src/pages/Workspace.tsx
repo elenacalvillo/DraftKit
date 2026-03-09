@@ -929,7 +929,7 @@ export default function Workspace() {
                   className="w-full"
                 >
                   <ExternalLink className="w-4 h-4 mr-2" />
-                  Open External Document
+                  {request.status === 'published' ? 'See Live Post' : 'Open External Document'}
                 </Button>
               )}
             </div>
