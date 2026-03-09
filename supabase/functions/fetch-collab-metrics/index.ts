@@ -157,7 +157,7 @@ function extractSlugFromUrl(url: string): string | null {
   }
 }
 
-function findCollabPost(posts: ArchivePost[], publishDate: string | null, collabLink: string | null): ArchivePost | null {
+function findCollabPost(posts: ArchivePost[], publishDate: string | null, collabLink: string | null, strictMode: boolean = false): ArchivePost | null {
   if (!posts.length) return null;
 
   // Priority 1: Match by exact slug from the provided URL
@@ -167,15 +167,21 @@ function findCollabPost(posts: ArchivePost[], publishDate: string | null, collab
       const match = posts.find(p => p.slug?.toLowerCase() === slug);
       if (match) return match;
     }
-    // Fallback: partial match
-    const match = posts.find(p => 
-      collabLink.includes(p.slug) || p.canonical_url === collabLink
-    );
-    if (match) return match;
+    // Fallback: partial match (only if not strict)
+    if (!strictMode) {
+      const match = posts.find(p => 
+        collabLink.includes(p.slug) || p.canonical_url === collabLink
+      );
+      if (match) return match;
+    }
+    
+    // In strict mode, if we have a manual URL but no match, return null
+    // (Don't fall through to date matching)
+    if (strictMode) return null;
   }
 
-  // Priority 2: Match by date proximity
-  if (publishDate) {
+  // Priority 2: Match by date proximity (only if not strict mode)
+  if (!strictMode && publishDate) {
     const target = new Date(publishDate).getTime();
     const THREE_DAYS = 3 * 24 * 60 * 60 * 1000;
     const match = posts.find(p => {
@@ -185,8 +191,8 @@ function findCollabPost(posts: ArchivePost[], publishDate: string | null, collab
     if (match) return match;
   }
 
-  // Fallback: most recent post (but only if no URL was provided — prevents wrong match)
-  if (!collabLink) return posts[0];
+  // Fallback: most recent post (but only if no URL was provided)
+  if (!collabLink && !strictMode) return posts[0];
   return null;
 }
 
