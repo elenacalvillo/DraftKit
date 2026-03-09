@@ -1,34 +1,41 @@
 
 
-## Root Cause
+## Redesign: "Membership" page replacing corporate "Subscription" page
 
-`fetchPostByUrl` is doing HTML scraping on `https://promptledproduct.substack.com/p/are-product-managers-the-new-developers` — but Substack pages are client-side rendered (JavaScript), so the raw HTML is empty. The regex patterns match nothing, returning 0 likes and 0 comments.
+Inspired by CarouselBot's "Forever Free" approach, this transforms the transactional subscription page into a warm membership recognition page.
 
-The real fix: Substack has a direct API endpoint:
-```
-GET https://{subdomain}.substack.com/api/v1/posts/{slug}
-```
+### Changes
 
-Which returns the actual post data including `"reactions":{"❤":47}` — already confirmed working via test fetch.
+**1. Sidebar nav (`src/components/layout/DashboardLayout.tsx`)**
+- Rename "Subscription" to "Membership" in the nav items array
+- Keep the Crown icon and `/dashboard/subscription` path (no route change needed)
 
-## Plan
+**2. Rewrite `src/pages/Subscription.tsx` with two distinct views:**
 
-**One file to change: `supabase/functions/fetch-collab-metrics/index.ts`**
+**View A: Founding Members / Active Pro users (`isPro && !isInTrial`)**
+- Page title: "Membership" with Crown icon
+- Large status card: "Founding Member" badge (for users without `stripe_customer_id`) or "Pro Member" badge (for paying subscribers)
+- Warm copy: "You helped build DraftKit from day one. All Pro features are yours, forever." (founders) or "All features unlocked." (paid)
+- Feature checklist styled as "Features Unlocked" (not a sales pitch) with check marks instead of feature icons
+- "Manage Billing" button only shown if user has a `stripe_customer_id` (opens Stripe portal)
+- Creator Discovery teaser kept as a subtle note
 
-Replace the current `fetchPostByUrl` function body with an API call instead of HTML scraping:
+**View B: Free / Trial users**
+- Page title: "Membership" 
+- If in trial: warm banner showing days left
+- Single clean upgrade card with billing toggle, price, features list, and "Upgrade to Pro" CTA
+- Keep existing checkout logic intact
 
-1. Extract subdomain from the post URL (e.g. `promptledproduct` from `promptledproduct.substack.com/p/...`)
-2. Extract slug from the URL path (e.g. `are-product-managers-the-new-developers`)
-3. Call `GET https://{subdomain}.substack.com/api/v1/posts/{slug}`
-4. Parse the JSON response — `reactions` is `{"❤": 47}`, sum all values for total likes
-5. Return the post object with the correct `reaction_count` and `comment_count`
+**3. `src/components/subscription/UpgradePrompt.tsx`**
+- Update navigation text from "Upgrade to Pro" link text; no structural change needed since the route stays the same
 
-The `getReactionCount` function already handles `reactions` as an object (summing emoji values), so that part works correctly. We just need to get the right data source.
+**4. `src/components/subscription/ProBadge.tsx`**
+- Add a "Founding Member" variant: when user is Pro without a Stripe customer ID, show "Founder" instead of "Pro" with a star/heart icon
 
-```text
-Old flow:  Manual URL → fetch HTML page → regex for reaction_count → returns 0 (JS rendered)
-New flow:  Manual URL → extract subdomain + slug → /api/v1/posts/{slug} → real JSON data
-```
+### No database or backend changes required
+All logic uses existing `usePro()` hook + `stripe_customer_id` check already in the Subscription page's `handleManage` function.
 
-This is a minimal, targeted fix — only the `fetchPostByUrl` function body changes.
+### Technical detail
+- The founding member detection reuses the existing pattern: query `creators.stripe_customer_id` for the current user. If `isPro` is true but `stripe_customer_id` is null, they're a founder.
+- This check will be lifted into a `useQuery` at the top of the component so both the status card and manage button can reference it.
 
