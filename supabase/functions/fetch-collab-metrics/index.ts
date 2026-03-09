@@ -275,8 +275,7 @@ function findCollabPost(posts: ArchivePost[], publishDate: string | null, collab
     if (match) return match;
   }
 
-  // Fallback: most recent post (but only if no URL was provided)
-  if (!collabLink && !strictMode) return posts[0];
+  // REMOVED: No longer fall back to "most recent post"
   return null;
 }
 
