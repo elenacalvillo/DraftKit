@@ -190,12 +190,26 @@ export function CollabImpactCard({ requestId, creatorName, requesterName }: Coll
         </div>
       )}
 
+      {/* Combined reach summary */}
+      {(latest.creator_subscribers || latest.requester_subscribers) && (
+        <div className="flex items-center gap-2 text-sm">
+          <Users className="w-3.5 h-3.5 text-primary" />
+          <span className="font-medium">
+            {((latest.creator_subscribers || 0) + (latest.requester_subscribers || 0)).toLocaleString()}
+          </span>
+          <span className="text-muted-foreground text-xs">combined subscriber reach</span>
+        </div>
+      )}
+
       <div className="grid gap-3">
         {/* Creator's post metrics */}
-        {(latest.creator_likes !== null || latest.creator_comments !== null) && (
+        {(latest.creator_likes !== null || latest.creator_comments !== null || latest.creator_subscribers !== null) && (
           <div className="space-y-1">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs text-muted-foreground">{creatorName || "Host"}</span>
+              {latest.creator_subscribers !== null && (
+                <MetricPill icon={Users} value={latest.creator_subscribers} label="subscribers" />
+              )}
               <MetricPill icon={Heart} value={latest.creator_likes} label="likes" />
               <MetricPill icon={MessageSquare} value={latest.creator_comments} label="comments" />
               {hasGrowth && (
@@ -219,10 +233,13 @@ export function CollabImpactCard({ requestId, creatorName, requesterName }: Coll
         )}
 
         {/* Requester's post metrics */}
-        {(latest.requester_likes !== null || latest.requester_comments !== null) && (
+        {(latest.requester_likes !== null || latest.requester_comments !== null || latest.requester_subscribers !== null) && (
           <div className="space-y-1">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs text-muted-foreground">{requesterName || "Guest"}</span>
+              {latest.requester_subscribers !== null && (
+                <MetricPill icon={Users} value={latest.requester_subscribers} label="subscribers" />
+              )}
               <MetricPill icon={Heart} value={latest.requester_likes} label="likes" />
               <MetricPill icon={MessageSquare} value={latest.requester_comments} label="comments" />
               {hasGrowth && (
