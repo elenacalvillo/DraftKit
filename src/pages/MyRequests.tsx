@@ -342,7 +342,7 @@ export default function MyRequests() {
                           {request.status === 'published' ? 'View Published Work' : 'Enter Workspace'}
                         </Button>
 
-                        {request.status === 'approved' && (
+                        {(request.status === 'approved' || request.status === 'published') && (
                           <div className="flex gap-2">
                             {request.collab_link && (
                               <Button 
@@ -354,14 +354,16 @@ export default function MyRequests() {
                                 {request.status === 'published' ? 'See Live Post' : 'Open External Document'}
                               </Button>
                             )}
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => setMessageModalRequest(request)}
-                            >
-                              <MessageSquare className="h-4 w-4 mr-1" />
-                              Message {request.creator?.name?.split(' ')[0] || 'Creator'}
-                            </Button>
+                            {request.status === 'approved' && (
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => setMessageModalRequest(request)}
+                              >
+                                <MessageSquare className="h-4 w-4 mr-1" />
+                                Message {request.creator?.name?.split(' ')[0] || 'Creator'}
+                              </Button>
+                            )}
                           </div>
                         )}
                       </div>
