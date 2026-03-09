@@ -1,41 +1,32 @@
 
+## Plan: Fix likes not appearing in Collab Impact
 
-## Redesign: "Membership" page replacing corporate "Subscription" page
+### Root Cause
+In `fetchPostByUrl()` (line 220), when the API returns `reactions: {"❤":47}` (an object), the code sets:
+```typescript
+reaction_count: typeof reactions === "number" ? reactions : 0
+```
 
-Inspired by CarouselBot's "Forever Free" approach, this transforms the transactional subscription page into a warm membership recognition page.
+This stores `0` because `reactions` is an object, not a number. Later, `getReactionCount()` checks `reaction_count` first and returns that `0` without ever summing the `reactions` object.
 
-### Changes
+### Fix
+**File:** `supabase/functions/fetch-collab-metrics/index.ts`
 
-**1. Sidebar nav (`src/components/layout/DashboardLayout.tsx`)**
-- Rename "Subscription" to "Membership" in the nav items array
-- Keep the Crown icon and `/dashboard/subscription` path (no route change needed)
+Change line 220 in `fetchPostByUrl()` to properly sum the reactions object when it's not a number:
 
-**2. Rewrite `src/pages/Subscription.tsx` with two distinct views:**
+```typescript
+// Before:
+reaction_count: typeof reactions === "number" ? reactions : 0,
 
-**View A: Founding Members / Active Pro users (`isPro && !isInTrial`)**
-- Page title: "Membership" with Crown icon
-- Large status card: "Founding Member" badge (for users without `stripe_customer_id`) or "Pro Member" badge (for paying subscribers)
-- Warm copy: "You helped build DraftKit from day one. All Pro features are yours, forever." (founders) or "All features unlocked." (paid)
-- Feature checklist styled as "Features Unlocked" (not a sales pitch) with check marks instead of feature icons
-- "Manage Billing" button only shown if user has a `stripe_customer_id` (opens Stripe portal)
-- Creator Discovery teaser kept as a subtle note
+// After:
+reaction_count: typeof reactions === "number" 
+  ? reactions 
+  : (typeof reactions === "object" 
+      ? Object.values(reactions).reduce((a: number, b) => a + (typeof b === "number" ? b : 0), 0) 
+      : 0),
+```
 
-**View B: Free / Trial users**
-- Page title: "Membership" 
-- If in trial: warm banner showing days left
-- Single clean upgrade card with billing toggle, price, features list, and "Upgrade to Pro" CTA
-- Keep existing checkout logic intact
+This ensures when the Substack API returns `{"❤":47}`, we sum all emoji values (47) and store that as `reaction_count`.
 
-**3. `src/components/subscription/UpgradePrompt.tsx`**
-- Update navigation text from "Upgrade to Pro" link text; no structural change needed since the route stays the same
-
-**4. `src/components/subscription/ProBadge.tsx`**
-- Add a "Founding Member" variant: when user is Pro without a Stripe customer ID, show "Founder" instead of "Pro" with a star/heart icon
-
-### No database or backend changes required
-All logic uses existing `usePro()` hook + `stripe_customer_id` check already in the Subscription page's `handleManage` function.
-
-### Technical detail
-- The founding member detection reuses the existing pattern: query `creators.stripe_customer_id` for the current user. If `isPro` is true but `stripe_customer_id` is null, they're a founder.
-- This check will be lifted into a `useQuery` at the top of the component so both the status card and manage button can reference it.
-
+### Result
+The API log shows `reactions={"❤":47}` but currently stores `creator_likes: 0`. After this fix, it will correctly store `creator_likes: 47`.
