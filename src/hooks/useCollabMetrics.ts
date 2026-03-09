@@ -13,6 +13,8 @@ export interface CollabMetric {
   requester_post_url: string | null;
   requester_likes: number | null;
   requester_comments: number | null;
+  creator_subscribers: number | null;
+  requester_subscribers: number | null;
 }
 
 export function useCollabMetrics(requestId: string | undefined) {

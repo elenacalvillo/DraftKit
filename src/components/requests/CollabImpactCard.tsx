@@ -1,4 +1,4 @@
-import { TrendingUp, Heart, MessageSquare, ExternalLink, BarChart3, RefreshCw, Edit2 } from "lucide-react";
+import { TrendingUp, Heart, MessageSquare, ExternalLink, BarChart3, RefreshCw, Edit2, Users } from "lucide-react";
 import { useCollabMetrics, useTriggerMetricsSnapshot, useCollabUrls, useUpdateCollabUrls } from "@/hooks/useCollabMetrics";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";

@@ -483,15 +483,23 @@ serve(async (req) => {
 
         const day = snapshotDay ?? 0;
 
+        // Fetch subscriber counts in parallel
+        const [creatorSubs, requesterSubs] = await Promise.all([
+          creatorUsername ? fetchSubscriberCount(creatorUsername) : Promise.resolve(null),
+          requesterUsername ? fetchSubscriberCount(requesterUsername) : Promise.resolve(null),
+        ]);
+
         const metric = {
           request_id: request.id,
           snapshot_day: day,
           creator_post_url: creatorPost?.canonical_url || null,
           creator_likes: creatorPost ? getReactionCount(creatorPost) : null,
           creator_comments: creatorPost?.comment_count ?? null,
+          creator_subscribers: creatorSubs,
           requester_post_url: requesterPost?.canonical_url || null,
           requester_likes: requesterPost ? getReactionCount(requesterPost) : null,
           requester_comments: requesterPost?.comment_count ?? null,
+          requester_subscribers: requesterSubs,
         };
 
         const { error: upsertError } = await supabase
