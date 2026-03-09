@@ -1,45 +1,41 @@
 
 
-## Add Subscriber Reach to Collab Impact
+## Redesign: "Membership" page replacing corporate "Subscription" page
 
-### What it does
-Show each publication's subscriber count alongside likes/comments so users can see how many subscribers they reached through the collaboration. For example: "Elena Calvillo — 2,400 subscribers • 47 likes • 32 comments".
+Inspired by CarouselBot's "Forever Free" approach, this transforms the transactional subscription page into a warm membership recognition page.
 
-### How
+### Changes
 
-#### 1. Database: Add subscriber columns to `collab_metrics`
-New migration adding two nullable integer columns:
-- `creator_subscribers`
-- `requester_subscribers`
+**1. Sidebar nav (`src/components/layout/DashboardLayout.tsx`)**
+- Rename "Subscription" to "Membership" in the nav items array
+- Keep the Crown icon and `/dashboard/subscription` path (no route change needed)
 
-#### 2. Edge function: Fetch subscriber counts
-Substack exposes publication metadata via `https://substack.com/api/v1/publication/search?query={name}`. We can also try the direct endpoint pattern. The edge function will:
-- Extract the subdomain from each post URL (already done)
-- Call `https://{subdomain}.substack.com` and parse the page's JSON metadata for `"subscribers"` or `"subscriberCount"`, OR use the publication search API
-- Store the count in the new columns
+**2. Rewrite `src/pages/Subscription.tsx` with two distinct views:**
 
-Since subscriber counts aren't reliably available via a single clean API, a more robust approach: fetch the publication's homepage HTML which embeds a JSON blob containing `"subscriber_count"` or similar fields in Substack's preloaded data.
+**View A: Founding Members / Active Pro users (`isPro && !isInTrial`)**
+- Page title: "Membership" with Crown icon
+- Large status card: "Founding Member" badge (for users without `stripe_customer_id`) or "Pro Member" badge (for paying subscribers)
+- Warm copy: "You helped build DraftKit from day one. All Pro features are yours, forever." (founders) or "All features unlocked." (paid)
+- Feature checklist styled as "Features Unlocked" (not a sales pitch) with check marks instead of feature icons
+- "Manage Billing" button only shown if user has a `stripe_customer_id` (opens Stripe portal)
+- Creator Discovery teaser kept as a subtle note
 
-#### 3. UI: Display subscriber reach in CollabImpactCard
-- Add a `Users` icon pill showing subscriber count per publication
-- Show combined reach as a summary line: "Combined reach: ~X subscribers"
-- Only show when data is available (nullable columns)
+**View B: Free / Trial users**
+- Page title: "Membership" 
+- If in trial: warm banner showing days left
+- Single clean upgrade card with billing toggle, price, features list, and "Upgrade to Pro" CTA
+- Keep existing checkout logic intact
+
+**3. `src/components/subscription/UpgradePrompt.tsx`**
+- Update navigation text from "Upgrade to Pro" link text; no structural change needed since the route stays the same
+
+**4. `src/components/subscription/ProBadge.tsx`**
+- Add a "Founding Member" variant: when user is Pro without a Stripe customer ID, show "Founder" instead of "Pro" with a star/heart icon
+
+### No database or backend changes required
+All logic uses existing `usePro()` hook + `stripe_customer_id` check already in the Subscription page's `handleManage` function.
 
 ### Technical detail
-
-```text
-Edge function flow:
-1. Already have subdomain from post URL
-2. GET https://{subdomain}.substack.com → HTML contains window._preloads or JSON-LD
-3. Regex for "subscriber_count":N or "freeSubscriberCount":N  
-4. Store in creator_subscribers / requester_subscribers columns
-```
-
-Fallback: If HTML scraping fails (same CSR issue), we can try `https://substack.com/api/v1/publication/search?query={subdomain}` which returns subscriber counts in search results.
-
-### Files to change
-- **Migration**: Add `creator_subscribers` and `requester_subscribers` to `collab_metrics`
-- **`supabase/functions/fetch-collab-metrics/index.ts`**: Add `fetchPublicationSubscribers(subdomain)` function, store results
-- **`src/hooks/useCollabMetrics.ts`**: Add new fields to `CollabMetric` interface
-- **`src/components/requests/CollabImpactCard.tsx`**: Display subscriber counts with Users icon
+- The founding member detection reuses the existing pattern: query `creators.stripe_customer_id` for the current user. If `isPro` is true but `stripe_customer_id` is null, they're a founder.
+- This check will be lifted into a `useQuery` at the top of the component so both the status card and manage button can reference it.
 

@@ -289,6 +289,62 @@ function getReactionCount(post: ArchivePost): number {
   return 0;
 }
 
+/**
+ * Fetch subscriber count for a Substack publication.
+ * Tries the homepage HTML which contains subscriber data in embedded JSON.
+ */
+async function fetchSubscriberCount(subdomain: string): Promise<number | null> {
+  const url = `https://${subdomain}.substack.com`;
+  if (!isAllowedDomain(url)) return null;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    const resp = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; DraftKit/1.0)",
+        "Accept": "text/html",
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    if (!resp.ok) {
+      console.warn(`Subscriber fetch failed for ${subdomain}: ${resp.status}`);
+      return null;
+    }
+
+    const html = await resp.text();
+
+    // Try multiple patterns for subscriber count in Substack's embedded data
+    const patterns = [
+      /"subscriber_count"\s*:\s*(\d+)/,
+      /"freeSubscriberCount"\s*:\s*(\d+)/,
+      /"subscriberCount"\s*:\s*(\d+)/,
+      /"active_subscription_count"\s*:\s*(\d+)/,
+    ];
+
+    for (const pattern of patterns) {
+      const match = html.match(pattern);
+      if (match) {
+        const count = parseInt(match[1], 10);
+        if (!isNaN(count) && count > 0) {
+          console.log(`Subscriber count for ${subdomain}: ${count}`);
+          return count;
+        }
+      }
+    }
+
+    console.log(`No subscriber count found in HTML for ${subdomain}`);
+    return null;
+  } catch (err) {
+    clearTimeout(timeout);
+    console.error(`Subscriber fetch error for ${subdomain}:`, err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -427,15 +483,23 @@ serve(async (req) => {
 
         const day = snapshotDay ?? 0;
 
+        // Fetch subscriber counts in parallel
+        const [creatorSubs, requesterSubs] = await Promise.all([
+          creatorUsername ? fetchSubscriberCount(creatorUsername) : Promise.resolve(null),
+          requesterUsername ? fetchSubscriberCount(requesterUsername) : Promise.resolve(null),
+        ]);
+
         const metric = {
           request_id: request.id,
           snapshot_day: day,
           creator_post_url: creatorPost?.canonical_url || null,
           creator_likes: creatorPost ? getReactionCount(creatorPost) : null,
           creator_comments: creatorPost?.comment_count ?? null,
+          creator_subscribers: creatorSubs,
           requester_post_url: requesterPost?.canonical_url || null,
           requester_likes: requesterPost ? getReactionCount(requesterPost) : null,
           requester_comments: requesterPost?.comment_count ?? null,
+          requester_subscribers: requesterSubs,
         };
 
         const { error: upsertError } = await supabase

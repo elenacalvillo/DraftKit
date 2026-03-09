@@ -1,0 +1,1 @@
+ALTER TABLE public.collab_metrics ADD COLUMN creator_subscribers integer, ADD COLUMN requester_subscribers integer;
