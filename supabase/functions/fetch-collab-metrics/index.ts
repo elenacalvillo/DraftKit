@@ -312,9 +312,20 @@ serve(async (req) => {
         // Use best available date reference
         const publishDate = request.retro_completed_at || request.approved_at || request.requested_date || request.created_at;
         
-        const creatorPost = findCollabPost(creatorPosts, publishDate, request.collab_link);
+        // Use strict mode when manual URLs are provided (prioritize user input over heuristics)
+        const creatorPost = findCollabPost(
+          creatorPosts, 
+          publishDate, 
+          request.collab_link,
+          !!request.collab_link // strict mode if manual URL provided
+        );
         const requesterPost = requesterPosts.length > 0 
-          ? findCollabPost(requesterPosts, publishDate, request.requester_collab_link) 
+          ? findCollabPost(
+              requesterPosts, 
+              publishDate, 
+              request.requester_collab_link,
+              !!request.requester_collab_link // strict mode if manual URL provided
+            )
           : null;
 
         const day = snapshotDay ?? 0;
