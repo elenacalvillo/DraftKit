@@ -37,7 +37,17 @@ const principles = [
   {
     question: "How do I get more collaboration credits?",
     answer:
-      "Simple—invite your friends. When a writer you invite joins DraftKit, we give both of you a free collaboration credit. It's our way of saying thanks for helping the community grow.",
+      "Simple—invite your friends. When a writer you invite joins DraftKit, we give both of you a collaboration credit. It's our way of saying thanks for helping the community grow.",
+  },
+  {
+    question: "Can I keep using DraftKit for free?",
+    answer:
+      "Yes. While our pro tools offer more, you can always earn collaboration credits by inviting other writers to join the community. We want to reward the people who help the network grow.",
+  },
+  {
+    question: "Can I use this for my guest post on Substack?",
+    answer:
+      "Absolutely. DraftKit is built for any type of collaboration—guest posts, interviews, co-written pieces. If two writers are working together, we make it easier.",
   },
 ];
 
