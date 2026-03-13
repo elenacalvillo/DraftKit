@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Heart, Shield, BookOpen, FileText } from "lucide-react";
+import { Heart, Shield, BookOpen, FileText, Zap } from "lucide-react";
 import { DraftKitLogo } from "@/components/icons/DraftKitLogo";
 
 export function Footer() {
