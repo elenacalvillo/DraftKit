@@ -25,7 +25,33 @@ function extractSubdomain(substackUrl: string): string | null {
   }
 }
 
-interface ParsedRec {
+const UA = "Mozilla/5.0 (compatible; DraftKit/1.0; +https://draftkit.app)";
+
+/** Resolve a subdomain to a Substack publication ID */
+async function resolvePublicationId(subdomain: string): Promise<number | null> {
+  // Try the search API first
+  const searchUrl = `https://substack.com/api/v1/publication/search?query=${encodeURIComponent(subdomain)}`;
+  console.log(`Resolving publication ID via: ${searchUrl}`);
+  const res = await fetch(searchUrl, { headers: { "User-Agent": UA } });
+  if (!res.ok) {
+    console.error(`Search API returned ${res.status}`);
+    return null;
+  }
+  const results = await res.json();
+  // results is an array of publications
+  if (Array.isArray(results)) {
+    // Find exact subdomain match
+    const exact = results.find(
+      (p: any) => p.subdomain?.toLowerCase() === subdomain.toLowerCase()
+    );
+    if (exact?.id) return exact.id;
+    // Fall back to first result if it looks right
+    if (results.length > 0 && results[0]?.id) return results[0].id;
+  }
+  return null;
+}
+
+interface RecommendationResult {
   subdomain: string;
   name: string;
   author_name: string | null;
@@ -33,121 +59,34 @@ interface ParsedRec {
   logo_url: string | null;
 }
 
-/** Parse recommendations from the /recommendations HTML page */
-function parseRecommendationsHtml(html: string): ParsedRec[] {
-  const results: ParsedRec[] = [];
-  
-  // Look for JSON data in __NEXT_DATA__ or window._preloads
-  const nextDataMatch = html.match(
-    /<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/
-  );
-  if (nextDataMatch) {
-    try {
-      const data = JSON.parse(nextDataMatch[1]);
-      const recs =
-        data?.props?.pageProps?.recommendations ||
-        data?.props?.pageProps?.initialRecommendations ||
-        [];
-      for (const rec of recs) {
-        const sd =
-          rec.subdomain ||
-          (rec.publication_url
-            ? extractSubdomain(rec.publication_url)
-            : null);
-        if (!sd) continue;
-        results.push({
-          subdomain: sd,
-          name: rec.name || rec.publication_name || sd,
-          author_name: rec.author_name || rec.byline || null,
-          description: rec.description || rec.tagline || null,
-          logo_url: rec.logo_url || rec.photo_url || null,
-        });
-      }
-      if (results.length > 0) return results;
-    } catch {
-      // Fall through to HTML parsing
-    }
+/** Fetch recommendations using Substack's public API */
+async function fetchRecommendationsApi(
+  publicationId: number
+): Promise<RecommendationResult[]> {
+  const apiUrl = `https://substack.com/api/v1/recommendations/from/${publicationId}`;
+  console.log(`Fetching recommendations from: ${apiUrl}`);
+  const res = await fetch(apiUrl, { headers: { "User-Agent": UA } });
+  if (!res.ok) {
+    console.error(`Recommendations API returned ${res.status}`);
+    return [];
   }
+  const data = await res.json();
+  const items = Array.isArray(data) ? data : data?.recommendations || [];
+  const results: RecommendationResult[] = [];
 
-  // Fallback: parse recommendation links from HTML
-  // Pattern: links like https://buildtolaunch.substack.com/?utm_source=recommendations_page
-  // with names in nearby alt text or link text
-  const linkRegex =
-    /\[([^\]]*?)\]\((https?:\/\/([a-z0-9-]+)\.substack\.com\/?\?utm_source=recommendations_page[^)]*)\)/g;
-  const seen = new Set<string>();
-  let match;
-
-  while ((match = linkRegex.exec(html)) !== null) {
-    const linkText = match[1];
-    const sd = match[3];
-    if (seen.has(sd)) continue;
-    seen.add(sd);
-
-    // Skip image-only links (logo references)
-    if (linkText.startsWith("http") || linkText.includes("substackcdn")) continue;
-
+  for (const item of items) {
+    const pub = item.recommendedPublication || item;
+    const sd = pub.subdomain || pub.custom_domain_optional;
+    if (!sd) continue;
     results.push({
       subdomain: sd,
-      name: linkText.trim(),
-      author_name: null,
-      description: null,
-      logo_url: null,
+      name: pub.name || sd,
+      author_name: pub.author_name || pub.author?.name || null,
+      description: pub.hero_text || pub.description || null,
+      logo_url: pub.logo_url || pub.author?.photo_url || null,
     });
   }
-
-  // Also match custom domain recommendations: www.toxsec.com etc
-  // These come as (https://www.domain.com/?utm_source=recommendations_page...)
-  // We can't easily map those to subdomains, skip for now
-
   return results;
-}
-
-/** Parse description text that follows a recommendation link */
-function enrichWithDescriptions(
-  html: string,
-  recs: ParsedRec[]
-): ParsedRec[] {
-  for (const rec of recs) {
-    // Look for description text after the subscribe button for this subdomain
-    const pattern = new RegExp(
-      `${rec.subdomain}\\.substack\\.com\\/\\?utm_source=recommendations_page[^)]*\\)\\s*Subscribe\\s*\\n\\n([^\\n]+)`,
-      "i"
-    );
-    const m = html.match(pattern);
-    if (m && m[1] && !m[1].startsWith("[") && !m[1].startsWith("\\")) {
-      rec.description = m[1].trim();
-    }
-
-    // Look for "By AuthorName" pattern
-    const byPattern = new RegExp(
-      `${rec.subdomain}\\.substack\\.com[^)]*\\)\\s*Subscribe[\\s\\S]*?By ([^\\]\\n]+?)\\]`,
-      "i"
-    );
-    const byMatch = html.match(byPattern);
-    if (byMatch && byMatch[1]) {
-      rec.author_name = byMatch[1].trim();
-    }
-
-    // Look for logo URL in nearby image
-    const logoPattern = new RegExp(
-      `\\!\\[(?:${rec.name}|User's avatar)\\]\\((https://substackcdn\\.com/[^)]+)\\)\\\\\\n\\\\\\n${rec.name}`,
-      "i"
-    );
-    const logoMatch = html.match(logoPattern);
-    if (logoMatch && logoMatch[1]) {
-      // Extract the original image URL from the Substack CDN wrapper
-      const cdnUrl = logoMatch[1];
-      const origMatch = cdnUrl.match(/https%3A%2F%2F(.+?)(?:\)|$)/);
-      if (origMatch) {
-        rec.logo_url = decodeURIComponent(
-          `https://${origMatch[1]}`
-        ).replace(/\)$/, "");
-      } else {
-        rec.logo_url = cdnUrl;
-      }
-    }
-  }
-  return recs;
 }
 
 Deno.serve(async (req) => {
@@ -223,24 +162,14 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch the recommendations HTML page
-    const recsPageUrl = `https://${subdomain}.substack.com/recommendations`;
-    console.log(`Fetching recommendations page: ${recsPageUrl}`);
+    console.log(`Resolved subdomain: ${subdomain}`);
 
-    const recsResponse = await fetch(recsPageUrl, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (compatible; DraftKit/1.0; +https://draftkit.app)",
-        Accept: "text/html",
-      },
-    });
-
-    if (!recsResponse.ok) {
-      const body = await recsResponse.text();
-      console.error(`Page fetch error: ${recsResponse.status}`, body);
+    // Step 1: Resolve publication ID
+    const pubId = await resolvePublicationId(subdomain);
+    if (!pubId) {
       return new Response(
         JSON.stringify({
-          error: "Could not fetch recommendations from Substack",
+          error: `Could not find Substack publication for "${subdomain}"`,
           recommendations: [],
         }),
         {
@@ -249,12 +178,11 @@ Deno.serve(async (req) => {
         }
       );
     }
+    console.log(`Publication ID: ${pubId}`);
 
-    const html = await recsResponse.text();
-    let parsedRecs = parseRecommendationsHtml(html);
-    parsedRecs = enrichWithDescriptions(html, parsedRecs);
-
-    console.log(`Parsed ${parsedRecs.length} recommendations`);
+    // Step 2: Fetch recommendations via API
+    const parsedRecs = await fetchRecommendationsApi(pubId);
+    console.log(`Fetched ${parsedRecs.length} recommendations via API`);
 
     // Build DraftKit creator map for cross-referencing
     const { data: existingCreators } = await serviceClient
@@ -288,7 +216,6 @@ Deno.serve(async (req) => {
     const results: any[] = [];
 
     for (const rec of parsedRecs) {
-      // Upsert into discovered_publications
       const { data: pub, error: pubErr } = await serviceClient
         .from("discovered_publications")
         .upsert(
@@ -312,7 +239,6 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Link to creator
       await serviceClient.from("creator_recommendations").upsert(
         {
           creator_id: creator.id,
