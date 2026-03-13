@@ -1,31 +1,27 @@
-import * as React from "react";
 import { useId } from "react";
 
-export const DraftKitLogo = React.forwardRef<SVGSVGElement, { size?: number }>(
-  ({ size = 32 }, ref) => {
-    const uid = useId();
-    const patternId = `dk-lines-${uid}`;
-    const clipId = `dk-clip-${uid}`;
+export function DraftKitLogo({ size = 32 }: { size?: number }) {
+  const uid = useId();
+  const patternId = `dk-lines-${uid}`;
+  const clipId = `dk-clip-${uid}`;
 
-    return (
-      <svg ref={ref} width={size} height={size} viewBox="30 45 140 110" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <pattern id={patternId} patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
-            <line x1="0" y1="0" x2="0" y2="8" stroke="#e29e8d" strokeWidth="6" />
-          </pattern>
-          <clipPath id={clipId}>
-            <circle cx="85" cy="100" r="45" />
-          </clipPath>
-        </defs>
+  return (
+    <svg width={size} height={size} viewBox="30 45 140 110" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <pattern id={patternId} patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
+          <line x1="0" y1="0" x2="0" y2="8" stroke="#e29e8d" strokeWidth="6" />
+        </pattern>
+        <clipPath id={clipId}>
+          <circle cx="85" cy="100" r="45" />
+        </clipPath>
+      </defs>
 
-        {/* Hatched overlap fill — right circle's area clipped to left circle shape */}
-        <circle cx="115" cy="100" r="45" fill={`url(#${patternId})`} clipPath={`url(#${clipId})`} opacity="1" />
-        {/* Left circle outline — dark */}
-        <circle cx="85" cy="100" r="45" stroke="#2a2318" strokeWidth="6" />
-        {/* Right circle outline — coral */}
-        <circle cx="115" cy="100" r="45" stroke="#e07b6c" strokeWidth="6" />
-      </svg>
-    );
-  }
-);
-DraftKitLogo.displayName = "DraftKitLogo";
+      {/* Hatched overlap fill — right circle's area clipped to left circle shape */}
+      <circle cx="115" cy="100" r="45" fill={`url(#${patternId})`} clipPath={`url(#${clipId})`} opacity="1" />
+      {/* Left circle outline — dark */}
+      <circle cx="85" cy="100" r="45" stroke="#2a2318" strokeWidth="6" />
+      {/* Right circle outline — coral */}
+      <circle cx="115" cy="100" r="45" stroke="#e07b6c" strokeWidth="6" />
+    </svg>
+  );
+}
