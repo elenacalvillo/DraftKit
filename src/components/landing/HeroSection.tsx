@@ -101,7 +101,7 @@ export function HeroSection() {
             </Link>
           </motion.div>
 
-          <p className="text-sm text-muted-foreground mb-20">No credit card. No time limits.</p>
+          <p className="text-sm text-muted-foreground mb-20">No credit card. Earn more free collabs by inviting friends.</p>
         </div>
       </div>
     </section>

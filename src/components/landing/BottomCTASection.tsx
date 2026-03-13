@@ -14,16 +14,13 @@ export function BottomCTASection() {
           transition={{ duration: 0.6 }}
           className="glass-card p-12 text-center border border-primary/20"
         >
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">Grow first. Pay later.</h2>
-          <p className="text-lg font-semibold text-foreground mb-2">
-            Your first 3 published collaborations are free.
-          </p>
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">Grow together. Stay free.</h2>
           <p className="text-muted-foreground max-w-md mx-auto mb-8 text-sm leading-relaxed">
-            No credit card. No 7-day trial limits. Just human growth.
+            Your first 3 collaborations are free. Want more? Unlock 1 extra collaboration for every friend who joins.
           </p>
           <Link to="/signup">
             <Button variant="hero" size="xl">
-              Get your 3 free collaborations (Free)
+              Start growing for free
               <ArrowRight className="w-5 h-5 ml-2" />
             </Button>
           </Link>

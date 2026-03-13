@@ -1,5 +1,12 @@
 import { motion } from "framer-motion";
 
+const outerDots = Array.from({ length: 10 }, (_, i) => {
+  const angle = (i * 360) / 10 - 90;
+  const rad = (angle * Math.PI) / 180;
+  const r = 80;
+  return { x: 140 + r * Math.cos(rad), y: 100 + r * Math.sin(rad) };
+});
+
 export function DirectDiscoveryCard() {
   return (
     <section className="py-20 px-6">
@@ -11,67 +18,68 @@ export function DirectDiscoveryCard() {
           transition={{ duration: 0.6 }}
           className="glass-card p-10 md:p-14 text-center"
         >
-          {/* Animated A→B graphic */}
+          {/* Network graphic */}
           <div className="flex justify-center mb-8">
-            <svg width="280" height="100" viewBox="0 0 280 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-              {/* Cloud shape (Search Index) - faded */}
-              <motion.g
-                initial={{ opacity: 0.5 }}
-                whileInView={{ opacity: 0.15 }}
-                viewport={{ once: true }}
-                transition={{ duration: 1.2, delay: 0.8 }}
-              >
-                <ellipse cx="140" cy="45" rx="50" ry="28" className="fill-muted stroke-border" strokeWidth="1" />
-                <text x="140" y="48" textAnchor="middle" className="fill-muted-foreground" fontSize="9" fontFamily="monospace">
-                  Search Index
-                </text>
-              </motion.g>
+            <svg width="280" height="200" viewBox="0 0 280 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+              {/* Connection lines */}
+              {outerDots.map((dot, i) => (
+                <motion.line
+                  key={`line-${i}`}
+                  x1="140" y1="100" x2={dot.x} y2={dot.y}
+                  stroke="hsl(var(--primary))"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  initial={{ pathLength: 0, opacity: 0 }}
+                  whileInView={{ pathLength: 1, opacity: 0.6 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5, delay: 0.4 + i * 0.08 }}
+                />
+              ))}
 
-              {/* Point A */}
+              {/* Center dot with glow */}
               <motion.circle
-                cx="40" cy="75" r="8"
-                className="fill-primary"
+                cx="140" cy="100" r="14"
+                fill="hsl(var(--primary))"
                 initial={{ scale: 0 }}
                 whileInView={{ scale: 1 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.3, delay: 0.2 }}
+                transition={{ duration: 0.4, delay: 0.1 }}
               />
-              <text x="40" y="95" textAnchor="middle" className="fill-foreground" fontSize="11" fontWeight="600">A</text>
-
-              {/* Point B */}
               <motion.circle
-                cx="240" cy="75" r="8"
-                className="fill-primary"
+                cx="140" cy="100" r="22"
+                fill="hsl(var(--primary))"
+                opacity="0.15"
                 initial={{ scale: 0 }}
                 whileInView={{ scale: 1 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.3, delay: 0.4 }}
-              />
-              <text x="240" y="95" textAnchor="middle" className="fill-foreground" fontSize="11" fontWeight="600">B</text>
-
-              {/* Direct line A→B */}
-              <motion.line
-                x1="50" y1="75" x2="230" y2="75"
-                className="stroke-primary"
-                strokeWidth="3"
-                strokeLinecap="round"
-                initial={{ pathLength: 0 }}
-                whileInView={{ pathLength: 1 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.8, delay: 0.6, ease: "easeOut" }}
+                transition={{ duration: 0.5, delay: 0.2 }}
               />
 
-              {/* Arrowhead */}
-              <motion.polygon
-                points="228,69 240,75 228,81"
-                className="fill-primary"
-                initial={{ opacity: 0 }}
-                whileInView={{ opacity: 1 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.2, delay: 1.3 }}
-              />
+              {/* Outer dots */}
+              {outerDots.map((dot, i) => (
+                <motion.circle
+                  key={`dot-${i}`}
+                  cx={dot.x} cy={dot.y} r="7"
+                  fill="hsl(var(--primary))"
+                  opacity="0.7"
+                  initial={{ scale: 0 }}
+                  whileInView={{ scale: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.3, delay: 0.6 + i * 0.06 }}
+                />
+              ))}
             </svg>
           </div>
+
+          {/* Growth Tip badge */}
+          <div className="flex justify-center">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium mb-4">
+              Growth Tip
+            </span>
+          </div>
+          <p className="text-sm text-primary font-medium mb-6">
+            Invite a writer friend and you both get a free collaboration credit.
+          </p>
 
           <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-4">
             Find new voices to grow with.
