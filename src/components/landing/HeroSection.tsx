@@ -72,7 +72,7 @@ export function HeroSection() {
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary mb-8"
           >
             <Zap className="w-4 h-4" />
-            <span className="text-sm font-medium">Built for creators who ship, not just schedule</span>
+            <span className="text-sm font-medium">Built to solve the 8.5-hour busywork tax</span>
           </motion.div>
 
           {/* Logo mark */}
