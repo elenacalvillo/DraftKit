@@ -1,31 +1,22 @@
 
 
-# Update Demo Page — 6 Pillar Vertical List
+## Value-Based Trial: "Free for Your First 3 Collabs"
 
-## Single file: `src/pages/Demo.tsx`
+**Status: IMPLEMENTED**
 
-### Header update
-- Headline: "How we break the loneliness wall"
-- Subheadline: "We automate the busywork so you can focus on the relationship."
+Replaced the 7-day time-based trial with a usage-based model: every new user gets full Pro features until they've published 3 collaborations. After that, they hit the paywall. Founding members and paid Pro users are completely unaffected.
 
-### Replace 4 steps with 6 pillars
-Keep the existing vertical list layout and `Step` component structure. Update the data:
+### What Changed
 
-| # | Icon | Title | Body |
-|---|------|-------|------|
-| 01 | `Search` | Smart Discovery | Find the right voices even when standard search fails. We look at the source to find collaborators ready to grow with you. |
-| 02 | `Send` | The Front Door | Replace messy DMs with a professional request page. Your invite earns both of you a collaboration credit toward your next growth milestone. |
-| 03 | `Zap` | The Smart Draft | Start your collaboration with an AI-powered foundation. We automate the ideation phase so you can focus on high-value writing. |
-| 04 | `Users` | The Shared Room | A dedicated workspace for your team. Manage edits, feedback, and final approvals in one centralized location. |
-| 05 | `Gift` | The Growth Loop | DraftKit grows when you grow. Earn extra credits for every writer you bring into the community to scale your network. |
-| 06 | `Trophy` | The Milestone | Finalize and ship your post instantly. Preserving your layout kills the manual friction that causes most writers to quit. |
+1. **Database**: Dropped `set_founder_trial()` trigger — new signups start as `free` with no trial period
+2. **`usePro.ts`**: Counts published collabs dynamically; returns `publishedCount`, `freeCollabsRemaining`, `isInFreeTier`; Pro = founder OR paid OR legacy trial OR < 3 published
+3. **`useActiveCollabs.ts`**: Removed 1-collab approval gate — free users can approve unlimited collabs; gate is at publish step
+4. **`Subscription.tsx`**: Free-tier users see collab progress bar ("2 of 3 free collaborations used"); CTA = "Unlock Unlimited Collabs"; legacy trial banner still shown for existing trial users
+5. **`Workspace.tsx`**: `handlePublishAnswer("yes")` checks `!isPro` and blocks with upgrade toast if at limit; recovery "Mark as Published" button also gated
+6. **`UpgradePrompt.tsx`**: Updated collabs copy to "You've used your 3 free collaborations"
 
-### Step component tweak
-- Change label from `Step {number}` to zero-padded format: `0{number}` (matching the landing page pillar numbering)
+### Safety
 
-### Imports
-- Replace `Calendar, Users, CheckCircle, Heart` with `Search, Send, Zap, Users, Gift, Trophy`
-
-### CTA delay
-- Bump CTA transition delay from `0.5` to `0.7` to account for the 6 steps
-
+- Founders (`pro` role): untouched — `has_role` check runs first
+- Paid subscribers (`subscription_tier = 'pro'`): untouched
+- Legacy trial users (existing `trial_ends_at` in future): still honored
