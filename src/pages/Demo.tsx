@@ -1,7 +1,52 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { ArrowRight, Calendar, Users, CheckCircle, Heart } from "lucide-react";
+import { ArrowRight, Search, Send, Zap, Users, Gift, Trophy } from "lucide-react";
+
+const pillars = [
+  {
+    number: "01",
+    icon: <Search className="w-7 h-7" />,
+    title: "Smart Discovery",
+    description:
+      "Find the right voices even when standard search fails. We look at the source to find collaborators ready to grow with you.",
+  },
+  {
+    number: "02",
+    icon: <Send className="w-7 h-7" />,
+    title: "The Front Door",
+    description:
+      "Replace messy DMs with a professional request page. Your invite earns both of you a collaboration credit toward your next growth milestone.",
+  },
+  {
+    number: "03",
+    icon: <Zap className="w-7 h-7" />,
+    title: "The Smart Draft",
+    description:
+      "Start your collaboration with an AI-powered foundation. We automate the ideation phase so you can focus on high-value writing.",
+  },
+  {
+    number: "04",
+    icon: <Users className="w-7 h-7" />,
+    title: "The Shared Room",
+    description:
+      "A dedicated workspace for your team. Manage edits, feedback, and final approvals in one centralized location.",
+  },
+  {
+    number: "05",
+    icon: <Gift className="w-7 h-7" />,
+    title: "The Growth Loop",
+    description:
+      "DraftKit grows when you grow. Earn extra credits for every writer you bring into the community to scale your network.",
+  },
+  {
+    number: "06",
+    icon: <Trophy className="w-7 h-7" />,
+    title: "The Milestone",
+    description:
+      "Finalize and ship your post instantly. Preserving your layout kills the manual friction that causes most writers to quit.",
+  },
+];
 
 export default function Demo() {
   return (
@@ -24,7 +69,7 @@ export default function Demo() {
       </header>
 
       <main className="pt-32 pb-20 px-6">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           {/* Hero */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -32,50 +77,43 @@ export default function Demo() {
             className="text-center mb-16"
           >
             <h1 className="text-4xl md:text-5xl font-bold mb-4">
-              How <span className="gradient-text">DraftKit</span> Works
+              How we break the <span className="gradient-text">loneliness wall</span>
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              A simple, beautiful way to connect with fellow creators—on your terms.
+              We automate the busywork so you can focus on the relationship.
             </p>
           </motion.div>
 
-          {/* Steps */}
-          <div className="space-y-12">
-            <Step
-              number={1}
-              icon={<Users className="w-6 h-6" />}
-              title="Create Your Profile"
-              description="Sign up and set up your creator profile with your name, bio, and a personal welcome message. Your unique username becomes your public booking link."
-              delay={0.1}
-            />
-            <Step
-              number={2}
-              icon={<Calendar className="w-6 h-6" />}
-              title="Set Your Availability"
-              description="Use our beautiful calendar to mark when you're open to new connections. Block out busy days and set recurring availability."
-              delay={0.2}
-            />
-            <Step
-              number={3}
-              icon={<Heart className="w-6 h-6" />}
-              title="Share Your Link"
-              description="Share your personalized booking page (draftkit.app/yourname) with potential collaborators. They'll see your availability and can tell you why they want to connect."
-              delay={0.3}
-            />
-            <Step
-              number={4}
-              icon={<CheckCircle className="w-6 h-6" />}
-              title="Start the Conversation"
-              description="Review requests, get ready-to-use talking points based on both newsletters, and jump straight into meaningful conversations—no small talk needed."
-              delay={0.4}
-            />
+          {/* 6-Pillar Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {pillars.map((pillar, index) => (
+              <motion.div
+                key={pillar.title}
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: index * 0.1 }}
+                className="glass-card p-6 flex gap-5 border-l-2 border-primary/40 hover:border-primary/50 transition-colors h-full"
+              >
+                <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center text-primary-foreground shrink-0">
+                  {pillar.icon}
+                </div>
+
+                <div>
+                  <div className="flex items-baseline gap-2 mb-2">
+                    <span className="text-lg font-bold text-primary">{pillar.number}</span>
+                    <h3 className="font-semibold text-lg text-foreground">{pillar.title}</h3>
+                  </div>
+                  <p className="text-muted-foreground text-sm leading-relaxed">{pillar.description}</p>
+                </div>
+              </motion.div>
+            ))}
           </div>
 
           {/* CTA */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
+            transition={{ delay: 0.7 }}
             className="text-center mt-16"
           >
             <Button variant="hero" size="xl" asChild>
@@ -88,41 +126,5 @@ export default function Demo() {
         </div>
       </main>
     </div>
-  );
-}
-
-function Step({
-  number,
-  icon,
-  title,
-  description,
-  delay,
-}: {
-  number: number;
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  delay: number;
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay }}
-      className="flex gap-6 items-start"
-    >
-      <div className="flex-shrink-0">
-        <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center text-primary-foreground">
-          {icon}
-        </div>
-      </div>
-      <div className="glass-card p-6 flex-1">
-        <div className="flex items-center gap-3 mb-2">
-          <span className="text-sm font-medium text-primary">Step {number}</span>
-        </div>
-        <h3 className="text-xl font-semibold mb-2">{title}</h3>
-        <p className="text-muted-foreground">{description}</p>
-      </div>
-    </motion.div>
   );
 }
