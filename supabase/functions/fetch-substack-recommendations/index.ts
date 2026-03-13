@@ -76,7 +76,7 @@ async function fetchRecommendationsApi(
 
   for (const item of items) {
     const pub = item.recommendedPublication || item;
-    const sd = pub.subdomain || pub.custom_domain_optional;
+    const sd = pub.subdomain || (typeof pub.custom_domain === 'string' ? pub.custom_domain : null);
     if (!sd) continue;
     results.push({
       subdomain: sd,

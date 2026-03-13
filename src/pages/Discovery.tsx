@@ -90,7 +90,7 @@ export default function Discovery() {
   };
 
   // No Substack URL set
-  if (creator && !creator.substack_url) {
+  if (creator && !creator.substack_url && !creator.newsletter_url) {
     return (
       <DashboardLayout>
         <div className="max-w-2xl mx-auto text-center py-20">
