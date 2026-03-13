@@ -150,12 +150,17 @@ Deno.serve(async (req) => {
     for (const c of existingCreators || []) {
       if (c.substack_url) {
         try {
-          const u = c.substack_url.startsWith("http")
-            ? c.substack_url
-            : `https://${c.substack_url}`;
+          const raw = c.substack_url.replace(/\?+$/, ""); // strip trailing ?
+          const u = raw.startsWith("http") ? raw : `https://${raw}`;
           const parsed = new URL(u);
-          const sd = parsed.hostname.replace(".substack.com", "");
-          creatorBySubdomain.set(sd, {
+          let sd: string;
+          if (parsed.hostname === "substack.com" || parsed.hostname === "www.substack.com") {
+            const m = parsed.pathname.match(/^\/@([^/?]+)/);
+            sd = m ? m[1] : parsed.pathname.replace(/^\//, "");
+          } else {
+            sd = parsed.hostname.replace(".substack.com", "");
+          }
+          creatorBySubdomain.set(sd.toLowerCase(), {
             id: c.id,
             username: c.username,
             name: c.name,
