@@ -48,7 +48,7 @@ export function FeatureRoadmapSection() {
           </p>
         </motion.div>
 
-        <div className="grid md:grid-cols-3 gap-6 mb-12">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
           {principles.map((principle, index) => (
             <motion.div
               key={principle.question}
