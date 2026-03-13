@@ -34,6 +34,11 @@ const principles = [
     answer:
       "It doesn't have to. DraftKit uses direct metadata resolution and archive indexing. If your publication is live on the web, we can find it, connect it, and start growing it immediately.",
   },
+  {
+    question: "How do I get more collaboration credits?",
+    answer:
+      "Simple—invite your friends. When a writer you invite joins DraftKit, we give both of you a free collaboration credit. It's our way of saying thanks for helping the community grow.",
+  },
 ];
 
 export function FeatureRoadmapSection() {
