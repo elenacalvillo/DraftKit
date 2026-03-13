@@ -491,6 +491,17 @@ export default function Workspace() {
 
   // Step 1: User clicks Yes/Not yet — for "yes", show URL form instead of immediately publishing
   const handlePublishAnswer = (answer: "yes" | "not_yet") => {
+    // Gate: check if free-tier user has exhausted their 3 free collabs
+    if (answer === "yes" && !isPro) {
+      toast.error("You've used your 3 free collaborations", {
+        description: "Upgrade to Pro to publish unlimited collabs.",
+        action: {
+          label: "Upgrade",
+          onClick: () => navigate("/dashboard/subscription"),
+        },
+      });
+      return;
+    }
     setPublishAnswer(answer);
     if (answer === "yes") {
       // Pre-fill creator URL if collab_link exists
@@ -619,7 +630,7 @@ export default function Workspace() {
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {/* Recovery button: feedback says "yes" but status never updated */}
-                    {publishAnswer === "yes" && request.status !== "published" && (
+                    {publishAnswer === "yes" && request.status !== "published" && isPro && (
                       <Button
                         size="sm"
                         variant="outline"

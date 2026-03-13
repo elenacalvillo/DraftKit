@@ -1,13 +1,9 @@
 import { useAuth } from "./useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { usePro } from "./usePro";
-
-const FREE_TIER_LIMIT = 1;
 
 export function useActiveCollabs() {
   const { creator } = useAuth();
-  const { isPro } = usePro();
   
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["activeCollabs", creator?.id],
@@ -31,15 +27,13 @@ export function useActiveCollabs() {
   });
 
   const activeCount = data?.count ?? 0;
-  const limit = isPro ? Infinity : FREE_TIER_LIMIT;
-  const canApprove = isPro || activeCount < FREE_TIER_LIMIT;
-  const remainingSlots = isPro ? Infinity : Math.max(0, FREE_TIER_LIMIT - activeCount);
+  // Value-based trial: free users can approve unlimited collabs
+  // The gate is at the publish step (handled in Workspace.tsx)
+  const canApprove = true;
 
   return { 
     activeCount, 
-    limit,
     canApprove,
-    remainingSlots,
     isLoading,
     refetch,
   };
