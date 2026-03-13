@@ -29,7 +29,6 @@ const UA = "Mozilla/5.0 (compatible; DraftKit/1.0; +https://draftkit.app)";
 
 /** Resolve a subdomain to a Substack publication ID */
 async function resolvePublicationId(subdomain: string): Promise<number | null> {
-  // Try the search API first
   const searchUrl = `https://substack.com/api/v1/publication/search?query=${encodeURIComponent(subdomain)}`;
   console.log(`Resolving publication ID via: ${searchUrl}`);
   const res = await fetch(searchUrl, { headers: { "User-Agent": UA } });
@@ -37,17 +36,18 @@ async function resolvePublicationId(subdomain: string): Promise<number | null> {
     console.error(`Search API returned ${res.status}`);
     return null;
   }
-  const results = await res.json();
-  // results is an array of publications
-  if (Array.isArray(results)) {
-    // Find exact subdomain match
-    const exact = results.find(
-      (p: any) => p.subdomain?.toLowerCase() === subdomain.toLowerCase()
-    );
-    if (exact?.id) return exact.id;
-    // Fall back to first result if it looks right
-    if (results.length > 0 && results[0]?.id) return results[0].id;
-  }
+  const data = await res.json();
+  // Handle both array (legacy) and object with results array (current)
+  const publications = Array.isArray(data) ? data : (data?.results || data?.publications || []);
+  console.log(`Search returned ${Array.isArray(data) ? 'array' : 'object'} with ${publications.length} candidates`);
+  if (!Array.isArray(publications) || publications.length === 0) return null;
+  // Exact subdomain match first
+  const exact = publications.find(
+    (p: any) => p.subdomain?.toLowerCase() === subdomain.toLowerCase()
+  );
+  if (exact?.id) return exact.id;
+  // Fallback to first result with a valid id
+  if (publications[0]?.id) return publications[0].id;
   return null;
 }
 
@@ -76,7 +76,7 @@ async function fetchRecommendationsApi(
 
   for (const item of items) {
     const pub = item.recommendedPublication || item;
-    const sd = pub.subdomain || pub.custom_domain_optional;
+    const sd = pub.subdomain || (typeof pub.custom_domain === 'string' ? pub.custom_domain : null);
     if (!sd) continue;
     results.push({
       subdomain: sd,
