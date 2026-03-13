@@ -630,7 +630,7 @@ export default function Workspace() {
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {/* Recovery button: feedback says "yes" but status never updated */}
-                    {publishAnswer === "yes" && request.status !== "published" && (
+                    {publishAnswer === "yes" && request.status !== "published" && isPro && (
                       <Button
                         size="sm"
                         variant="outline"
