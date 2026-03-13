@@ -52,7 +52,7 @@ export function BusyworkComparisonSection() {
                   whileInView={{ opacity: 1, x: 0 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.3, delay: 0.1 + i * 0.1 }}
-                  className="flex items-center gap-3 text-muted-foreground"
+                  className="flex items-center gap-3 text-muted-foreground/60"
                 >
                   <span className="text-destructive/60">{item.icon}</span>
                   <span className="text-sm line-through decoration-destructive/40">{item.text}</span>
