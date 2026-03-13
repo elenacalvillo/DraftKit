@@ -26,6 +26,7 @@ import NotFound from "./pages/NotFound";
 import Workspace from "./pages/Workspace";
 import Subscription from "./pages/Subscription";
 import Retrospective from "./pages/Retrospective";
+import Discovery from "./pages/Discovery";
 
 const queryClient = new QueryClient();
 
