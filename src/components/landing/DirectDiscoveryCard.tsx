@@ -78,7 +78,7 @@ export function DirectDiscoveryCard() {
             </span>
           </div>
           <p className="text-sm text-primary font-medium mb-6">
-            Invite a writer friend and you both get a free collaboration credit.
+            Pro tip: Invite your favorite writers to DraftKit. When they join, you both earn a collaboration credit.
           </p>
 
           <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-4">

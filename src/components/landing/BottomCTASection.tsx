@@ -15,8 +15,11 @@ export function BottomCTASection() {
           className="glass-card p-12 text-center border border-primary/20"
         >
           <h2 className="text-3xl md:text-4xl font-bold mb-4">Grow together. Stay free.</h2>
-          <p className="text-muted-foreground max-w-md mx-auto mb-8 text-sm leading-relaxed">
-            Your first 3 collaborations are free. Want more? Unlock 1 extra collaboration for every friend who joins.
+          <p className="text-muted-foreground max-w-md mx-auto mb-2 text-sm leading-relaxed">
+            Your first 3 collaborations are free.
+          </p>
+          <p className="text-primary font-medium max-w-md mx-auto mb-8 text-sm leading-relaxed">
+            Unlock 1 extra collaboration credit for every new writer you invite who registers.
           </p>
           <Link to="/signup">
             <Button variant="hero" size="xl">

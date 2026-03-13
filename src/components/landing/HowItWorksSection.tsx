@@ -7,7 +7,7 @@ const steps = [
     icon: <Send className="w-7 h-7" />,
     title: "The Request",
     description:
-      "Send a professional front-door invite that replaces messy DMs.",
+      "Send a professional front-door invite that replaces messy DMs. When you invite a new partner to the platform, you both earn a collaboration credit.",
   },
   {
     number: "02",
@@ -57,7 +57,7 @@ export function HowItWorksSection() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: index * 0.12 }}
-              className="glass-card p-6 flex gap-5 border-l-2 border-primary/40"
+              className="glass-card p-6 flex gap-5 border-l-2 border-primary/40 h-full"
             >
               {/* Icon */}
               <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center text-primary-foreground shrink-0">
