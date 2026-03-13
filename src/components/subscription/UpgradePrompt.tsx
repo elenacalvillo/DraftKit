@@ -23,7 +23,7 @@ const FEATURE_COPY: Record<FeatureType, {
   },
   collabs: {
     title: "Unlimited Collaborations",
-    description: "Work with as many creators as you want, simultaneously",
+    description: "You've used your 3 free collaborations — upgrade to keep publishing",
     icon: Users,
   },
   mode: {

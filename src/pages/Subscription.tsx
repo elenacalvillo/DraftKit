@@ -4,6 +4,7 @@ import { Crown, Sparkles, Users, MessageSquare, PenLine, Palette, Rocket, Check,
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { usePro } from "@/hooks/usePro";
@@ -26,7 +27,7 @@ const features = [
 export default function Subscription() {
   const [billing, setBilling] = useState<"monthly" | "yearly">("yearly");
   const [loading, setLoading] = useState(false);
-  const { isPro, isInTrial, trialEndsAt, tier } = usePro();
+  const { isPro, isInTrial, trialEndsAt, isInFreeTier, publishedCount, freeCollabsRemaining } = usePro();
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -44,8 +45,8 @@ export default function Subscription() {
     enabled: !!user?.id,
   });
 
-  const isFounder = isPro && !isInTrial && !creatorBilling?.stripe_customer_id;
-  const isPaidPro = isPro && !isInTrial && !!creatorBilling?.stripe_customer_id;
+  const isFounder = isPro && !isInTrial && !isInFreeTier && !creatorBilling?.stripe_customer_id;
+  const isPaidPro = isPro && !isInTrial && !isInFreeTier && !!creatorBilling?.stripe_customer_id;
 
   useEffect(() => {
     if (searchParams.get("success") === "true") {
@@ -92,12 +93,8 @@ export default function Subscription() {
     }
   };
 
-  const trialDaysLeft = trialEndsAt
-    ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
-    : 0;
-
-  // View A: Founding Members & Active Pro
-  if (isPro && !isInTrial) {
+  // View A: Founding Members & Paid Pro (not free-tier users)
+  if (isPro && !isInTrial && !isInFreeTier) {
     return (
       <DashboardLayout>
         <div className="max-w-xl mx-auto">
@@ -172,7 +169,9 @@ export default function Subscription() {
     );
   }
 
-  // View B: Free / Trial users
+  // View B: Free / Trial / Free-tier users
+  const progressPercent = Math.round((publishedCount / 3) * 100);
+
   return (
     <DashboardLayout>
       <div className="max-w-xl mx-auto">
@@ -182,23 +181,50 @@ export default function Subscription() {
             <h1 className="text-2xl font-bold">Membership</h1>
           </div>
           <p className="text-muted-foreground">
-            Professional tools for serious newsletter collaborators.
+            Free to start. Upgrade when you're ready.
           </p>
         </div>
 
-        {/* Trial banner */}
-        {isInTrial && (
+        {/* Collab progress banner (replaces trial days banner) */}
+        {isInFreeTier && (
           <Card className="mb-6 border-primary/30 bg-primary/5">
             <CardContent className="p-4">
-              <p className="font-medium text-sm">
-                You're exploring Pro — {trialDaysLeft} day{trialDaysLeft !== 1 ? "s" : ""} left
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Subscribe to keep all your Pro features.
-              </p>
+              <div className="flex items-center justify-between mb-2">
+                <p className="font-medium text-sm">
+                  {publishedCount} of 3 free collaborations used
+                </p>
+                <Badge variant="secondary" className="text-xs">
+                  {freeCollabsRemaining} left
+                </Badge>
+              </div>
+              <Progress value={progressPercent} className="h-2" />
+              {publishedCount >= 2 && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  Upgrade to unlock unlimited collaborations.
+                </p>
+              )}
             </CardContent>
           </Card>
         )}
+
+        {/* Legacy trial banner */}
+        {isInTrial && !isInFreeTier && (() => {
+          const trialDaysLeft = trialEndsAt
+            ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+            : 0;
+          return (
+            <Card className="mb-6 border-primary/30 bg-primary/5">
+              <CardContent className="p-4">
+                <p className="font-medium text-sm">
+                  You're exploring Pro — {trialDaysLeft} day{trialDaysLeft !== 1 ? "s" : ""} left
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Subscribe to keep all your Pro features.
+                </p>
+              </CardContent>
+            </Card>
+          );
+        })()}
 
         {/* Pricing card */}
         <Card className="overflow-hidden">
@@ -270,7 +296,7 @@ export default function Subscription() {
               disabled={loading}
             >
               <Crown className="w-4 h-4 mr-2" />
-              {isInTrial ? "Subscribe to Pro" : "Upgrade to Pro"}
+              Unlock Unlimited Collabs
             </Button>
           </CardContent>
         </Card>
