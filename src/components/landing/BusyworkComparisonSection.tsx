@@ -70,7 +70,7 @@ export function BusyworkComparisonSection() {
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
-            className="glass-card p-8 border border-primary/20"
+            className="glass-card p-8 border border-primary/20 shadow-[0_0_40px_-10px_hsl(var(--primary)/0.3)]"
           >
             <h3 className="text-lg font-bold text-foreground mb-6">The DraftKit Way</h3>
             <div className="space-y-4">

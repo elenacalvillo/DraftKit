@@ -43,9 +43,6 @@ export function FeatureRoadmapSection() {
           className="text-center mb-16"
         >
           <h2 className="text-3xl md:text-4xl font-bold mb-4">The honest answers</h2>
-          <p className="text-muted-foreground text-lg max-w-xl mx-auto">
-            Built for PMs and creators who ask the right questions before they commit.
-          </p>
         </motion.div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">

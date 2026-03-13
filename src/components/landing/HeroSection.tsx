@@ -1,35 +1,8 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { ArrowRight, Zap, Send, Sparkles, FileText, Trophy } from "lucide-react";
+import { ArrowRight, Zap } from "lucide-react";
 import { DraftKitLogo } from "@/components/icons/DraftKitLogo";
-
-const steps = [
-  {
-    number: "01",
-    icon: <Send className="w-7 h-7" />,
-    title: "The Pitch",
-    description: "A professional front door that replaces messy DMs.",
-  },
-  {
-    number: "02",
-    icon: <Sparkles className="w-7 h-7" />,
-    title: "The SMART Draft",
-    description: "Start 50% finished. No more blank pages.",
-  },
-  {
-    number: "03",
-    icon: <FileText className="w-7 h-7" />,
-    title: "The Workspace",
-    description: "One room for the partnership and the draft. No more email threads.",
-  },
-  {
-    number: "04",
-    icon: <Trophy className="w-7 h-7" />,
-    title: "The Milestone",
-    description: "Export to Substack in one click. No more copy-paste.",
-  },
-];
 
 export function HeroSection() {
   return (
@@ -113,7 +86,7 @@ export function HeroSection() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.3 }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-28"
+            className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-4"
           >
             <Link to="/signup">
               <Button variant="hero" size="xl">
@@ -126,44 +99,9 @@ export function HeroSection() {
                 See a Demo Workspace
               </Button>
             </Link>
-            <p className="text-sm text-muted-foreground mt-2">No credit card. No time limits.</p>
           </motion.div>
 
-          {/* Product Loop Preview */}
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.4 }}
-            className="grid grid-cols-2 md:grid-cols-4 gap-12 max-w-5xl mx-auto"
-          >
-            {steps.map((step, index) => (
-              <div key={step.number} className="relative flex items-stretch">
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: 0.5 + index * 0.1 }}
-                  className="glass-card p-6 text-left flex-1"
-                >
-                  {/* Number + Icon row */}
-                  <div className="flex items-center gap-3 mb-4">
-                    <span className="inline-flex items-center justify-center w-12 h-12 rounded-full gradient-primary text-primary-foreground text-lg font-bold shrink-0">
-                      {step.number}
-                    </span>
-                    <span className="text-primary">{step.icon}</span>
-                  </div>
-                  <p className="text-lg font-bold text-foreground leading-tight mb-1">{step.title}</p>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{step.description}</p>
-                </motion.div>
-
-                {/* Arrow connector — desktop only, not after last item */}
-                {index < steps.length - 1 && (
-                  <div className="hidden md:flex items-center justify-center absolute -right-[43px] top-[44px] translate-y-1/2 z-20">
-                    <ArrowRight className="w-10 h-10 text-[#e29e8d]" strokeWidth={3.5} />
-                  </div>
-                )}
-              </div>
-            ))}
-          </motion.div>
+          <p className="text-sm text-muted-foreground mb-20">No credit card. No time limits.</p>
         </div>
       </div>
     </section>

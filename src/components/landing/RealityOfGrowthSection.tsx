@@ -131,7 +131,7 @@ export function RealityOfGrowthSection() {
                     contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
                     formatter={(value: number) => [`${value}%`, "Still active"]}
                   />
-                  <Area type="monotone" dataKey="active" stroke={ORANGE} fill="url(#orangeGradient)" strokeWidth={2} />
+                  <Area type="monotone" dataKey="active" stroke={ORANGE} fill="url(#orangeGradient)" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: ORANGE, stroke: "white", strokeWidth: 2 }} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
