@@ -64,25 +64,6 @@ export function FeatureRoadmapSection() {
           ))}
         </div>
 
-        {/* Bottom strip */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-          className="glass-card p-8 text-center"
-        >
-          <p className="text-lg font-semibold text-foreground mb-2">Built for the speed of now.</p>
-          <p className="text-muted-foreground max-w-lg mx-auto mb-6 text-sm leading-relaxed">
-            DraftKit was built fast because we listen to creators. No corporate fluff. No bloated features. Just the tools you need to collaborate at a professional level.
-          </p>
-          <Link to="/signup">
-            <Button variant="hero" size="lg">
-              Start Drafting Free
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
-          </Link>
-        </motion.div>
       </div>
     </section>
   );
