@@ -324,6 +324,49 @@ export type Database = {
           },
         ]
       }
+      creator_recommendations: {
+        Row: {
+          creator_id: string
+          fetched_at: string
+          id: string
+          publication_id: string
+        }
+        Insert: {
+          creator_id: string
+          fetched_at?: string
+          id?: string
+          publication_id: string
+        }
+        Update: {
+          creator_id?: string
+          fetched_at?: string
+          id?: string
+          publication_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creator_recommendations_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creator_recommendations_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "public_creator_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creator_recommendations_publication_id_fkey"
+            columns: ["publication_id"]
+            isOneToOne: false
+            referencedRelation: "discovered_publications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       creator_writing_samples: {
         Row: {
           creator_id: string
@@ -435,6 +478,42 @@ export type Database = {
           user_id?: string
           username?: string
           welcome_message?: string | null
+        }
+        Relationships: []
+      }
+      discovered_publications: {
+        Row: {
+          author_name: string | null
+          description: string | null
+          discovered_at: string
+          id: string
+          language: string | null
+          logo_url: string | null
+          name: string | null
+          subdomain: string
+          subscriber_count: number | null
+        }
+        Insert: {
+          author_name?: string | null
+          description?: string | null
+          discovered_at?: string
+          id?: string
+          language?: string | null
+          logo_url?: string | null
+          name?: string | null
+          subdomain: string
+          subscriber_count?: number | null
+        }
+        Update: {
+          author_name?: string | null
+          description?: string | null
+          discovered_at?: string
+          id?: string
+          language?: string | null
+          logo_url?: string | null
+          name?: string | null
+          subdomain?: string
+          subscriber_count?: number | null
         }
         Relationships: []
       }

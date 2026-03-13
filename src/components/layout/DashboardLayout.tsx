@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Calendar,
+  Compass,
   Crown,
   LayoutDashboard,
   MessageSquare,
@@ -42,6 +43,7 @@ const navItems = [
   { icon: Calendar, label: "Availability", path: "/dashboard/availability" },
   { icon: MessageSquare, label: "Requests", path: "/dashboard/requests" },
   { icon: Send, label: "Sent Requests", path: "/dashboard/my-requests" },
+  { icon: Compass, label: "Discovery", path: "/dashboard/discovery" },
   { icon: Settings, label: "Settings", path: "/dashboard/settings" },
   { icon: Crown, label: "Membership", path: "/dashboard/subscription" },
 ];
