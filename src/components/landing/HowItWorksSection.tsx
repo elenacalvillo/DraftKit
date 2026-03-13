@@ -7,28 +7,28 @@ const steps = [
     icon: <Send className="w-7 h-7" />,
     title: "The Request",
     description:
-      'Send one link. Your guest fills out a structured pitch with real research — not "let me know what you want to talk about."',
+      "Send a professional front-door invite that replaces messy DMs.",
   },
   {
     number: "02",
     icon: <Sparkles className="w-7 h-7" />,
     title: "The SMART Draft",
     description:
-      "The AI takes their research and generates a 1,000-word starting point in your tone. You start at 80% done, not zero.",
+      "Start with a structure that's already 50% finished. No more blank pages.",
   },
   {
     number: "03",
     icon: <FileText className="w-7 h-7" />,
     title: "The Shared Workspace",
     description:
-      'A distraction-free "meeting room" for two. No sidebars. No small talk. Just the text.',
+      'One shared room for the partnership and the draft. No more "which version is this?" email threads.',
   },
   {
     number: "04",
     icon: <Trophy className="w-7 h-7" />,
     title: "The Milestone",
     description:
-      "Export to Substack or Word in one click. A retrospective banner closes the loop and celebrates the win.",
+      "Export to Substack with one click. No more copy-paste or broken links.",
   },
 ];
 

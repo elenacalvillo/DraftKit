@@ -9,25 +9,25 @@ const steps = [
     number: "01",
     icon: <Send className="w-7 h-7" />,
     title: "The Pitch",
-    description: "Structured requests, not cold DMs",
+    description: "A professional front door that replaces messy DMs.",
   },
   {
     number: "02",
     icon: <Sparkles className="w-7 h-7" />,
     title: "The SMART Draft",
-    description: "Start at 80% done, not zero",
+    description: "Start 50% finished. No more blank pages.",
   },
   {
     number: "03",
     icon: <FileText className="w-7 h-7" />,
     title: "The Workspace",
-    description: "A meeting room for two",
+    description: "One room for the partnership and the draft. No more email threads.",
   },
   {
     number: "04",
     icon: <Trophy className="w-7 h-7" />,
     title: "The Milestone",
-    description: "Export and celebrate the win",
+    description: "Export to Substack in one click. No more copy-paste.",
   },
 ];
 
@@ -72,7 +72,7 @@ export function HeroSection() {
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary mb-8"
           >
             <Zap className="w-4 h-4" />
-            <span className="text-sm font-medium">Built for creators who ship, not just schedule</span>
+            <span className="text-sm font-medium">Built to solve the 8.5-hour busywork tax</span>
           </motion.div>
 
           {/* Logo mark */}
@@ -117,7 +117,7 @@ export function HeroSection() {
           >
             <Link to="/signup">
               <Button variant="hero" size="xl">
-                Start Drafting — It's Free
+                Start your first collab (Free)
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
             </Link>
@@ -126,6 +126,7 @@ export function HeroSection() {
                 See a Demo Workspace
               </Button>
             </Link>
+            <p className="text-sm text-muted-foreground mt-2">No credit card. No time limits.</p>
           </motion.div>
 
           {/* Product Loop Preview */}
