@@ -117,18 +117,6 @@ export default function Requests() {
   const handleApprove = async (id: string) => {
     if (!creator) return;
 
-    // Free tier limit: only 1 active collaboration
-    if (!isPro && !canApprove) {
-      toast.error("Free tier is limited to 1 active collaboration", {
-        description: "Upgrade to Pro for unlimited collaborations",
-        action: {
-          label: "Go Pro",
-          onClick: () => navigate("/dashboard/settings?upgrade=true"),
-        },
-      });
-      return;
-    }
-
     const request = requests.find((r) => r.id === id);
     if (!request) return;
 
