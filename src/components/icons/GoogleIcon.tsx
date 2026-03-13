@@ -1,9 +1,6 @@
-import * as React from "react";
-
-export const GoogleIcon = React.forwardRef<SVGSVGElement, { className?: string }>(
-  ({ className }, ref) => (
+export function GoogleIcon({ className }: { className?: string }) {
+  return (
     <svg
-      ref={ref}
       className={className}
       viewBox="0 0 24 24"
       fill="none"
@@ -26,6 +23,5 @@ export const GoogleIcon = React.forwardRef<SVGSVGElement, { className?: string }
         fill="#EA4335"
       />
     </svg>
-  )
-);
-GoogleIcon.displayName = "GoogleIcon";
+  );
+}
