@@ -9,25 +9,25 @@ const steps = [
     number: "01",
     icon: <Send className="w-7 h-7" />,
     title: "The Pitch",
-    description: "Structured requests, not cold DMs",
+    description: "A professional front door that replaces messy DMs.",
   },
   {
     number: "02",
     icon: <Sparkles className="w-7 h-7" />,
     title: "The SMART Draft",
-    description: "Start at 80% done, not zero",
+    description: "Start 50% finished. No more blank pages.",
   },
   {
     number: "03",
     icon: <FileText className="w-7 h-7" />,
     title: "The Workspace",
-    description: "A meeting room for two",
+    description: "One room for the partnership and the draft. No more email threads.",
   },
   {
     number: "04",
     icon: <Trophy className="w-7 h-7" />,
     title: "The Milestone",
-    description: "Export and celebrate the win",
+    description: "Export to Substack in one click. No more copy-paste.",
   },
 ];
 
