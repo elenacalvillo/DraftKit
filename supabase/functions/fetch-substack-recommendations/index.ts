@@ -201,7 +201,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (!creator.substack_url) {
+    const substackUrl = creator.newsletter_url || creator.substack_url;
+    if (!substackUrl) {
       return new Response(
         JSON.stringify({ error: "No Substack URL configured", recommendations: [] }),
         {
@@ -211,7 +212,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const subdomain = extractSubdomain(creator.substack_url);
+    const subdomain = extractSubdomain(substackUrl);
     if (!subdomain) {
       return new Response(
         JSON.stringify({ error: "Invalid Substack URL format" }),
