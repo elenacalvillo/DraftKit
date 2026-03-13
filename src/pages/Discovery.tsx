@@ -229,11 +229,10 @@ export default function Discovery() {
                       </div>
                       {pub.isOnDraftKit && (
                         <Badge
-                          variant="secondary"
-                          className="shrink-0 text-xs bg-success/10 text-success border-success/20"
+                          className="shrink-0 text-xs font-semibold bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-500"
                         >
-                          <Sparkles className="w-3 h-3 mr-1" />
-                          On DraftKit
+                          <CheckCircle2 className="w-3 h-3 mr-1" />
+                          Accepting Collabs
                         </Badge>
                       )}
                     </div>

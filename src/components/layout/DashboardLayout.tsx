@@ -43,7 +43,7 @@ const navItems = [
   { icon: Calendar, label: "Availability", path: "/dashboard/availability" },
   { icon: MessageSquare, label: "Requests", path: "/dashboard/requests" },
   { icon: Send, label: "Sent Requests", path: "/dashboard/my-requests" },
-  { icon: Compass, label: "Discovery", path: "/dashboard/discovery" },
+  { icon: Sparkles, label: "Discovery", path: "/dashboard/discovery" },
   { icon: Settings, label: "Settings", path: "/dashboard/settings" },
   { icon: Crown, label: "Membership", path: "/dashboard/subscription" },
 ];
