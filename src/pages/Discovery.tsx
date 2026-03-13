@@ -47,8 +47,9 @@ export default function Discovery() {
     );
     if (error) throw error;
     if (data?.error && !data?.recommendations?.length) throw new Error(data.error);
-    setLastFetchedAt(Date.now());
-    return (data?.recommendations || []) as DiscoveredPublication[];
+    const recs = (data?.recommendations || []) as DiscoveredPublication[];
+    if (recs.length > 0) setLastFetchedAt(Date.now());
+    return recs;
   }, []);
 
   const {

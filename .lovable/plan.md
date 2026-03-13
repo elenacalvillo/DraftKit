@@ -1,32 +1,22 @@
 
 
-# Fix: Discovery fetching wrong Substack URL + Refresh button stuck
+## Value-Based Trial: "Free for Your First 3 Collabs"
 
-## Root Cause
+**Status: IMPLEMENTED**
 
-**Problem 1 -- Wrong URL**: The edge function reads `creator.substack_url` which is `https://substack.com/@elenacalvillo` (a profile URL). `extractSubdomain` returns `elenacalvillo`, so it fetches `https://elenacalvillo.substack.com/recommendations` -- a non-existent publication. Your actual publication subdomain is `productreleasenotes` (stored in `newsletter_url`).
+Replaced the 7-day time-based trial with a usage-based model: every new user gets full Pro features until they've published 3 collaborations. After that, they hit the paywall. Founding members and paid Pro users are completely unaffected.
 
-**Problem 2 -- Refresh locked**: After the first fetch (even with 0 results), `setLastFetchedAt(Date.now())` fires, disabling the button for 1 hour.
+### What Changed
 
-## Fix
+1. **Database**: Dropped `set_founder_trial()` trigger — new signups start as `free` with no trial period
+2. **`usePro.ts`**: Counts published collabs dynamically; returns `publishedCount`, `freeCollabsRemaining`, `isInFreeTier`; Pro = founder OR paid OR legacy trial OR < 3 published
+3. **`useActiveCollabs.ts`**: Removed 1-collab approval gate — free users can approve unlimited collabs; gate is at publish step
+4. **`Subscription.tsx`**: Free-tier users see collab progress bar ("2 of 3 free collaborations used"); CTA = "Unlock Unlimited Collabs"; legacy trial banner still shown for existing trial users
+5. **`Workspace.tsx`**: `handlePublishAnswer("yes")` checks `!isPro` and blocks with upgrade toast if at limit; recovery "Mark as Published" button also gated
+6. **`UpgradePrompt.tsx`**: Updated collabs copy to "You've used your 3 free collaborations"
 
-### Edge Function (`supabase/functions/fetch-substack-recommendations/index.ts`)
+### Safety
 
-- Change the query to also select `newsletter_url`
-- Use `newsletter_url` as the primary source for the subdomain (it's always a publication URL like `productreleasenotes.substack.com`)
-- Fall back to `substack_url` only if `newsletter_url` is not set
-- This respects the existing validation rule that profile URLs (`substack.com/@...`) lack RSS/recommendation data
-
-### Discovery Page (`src/pages/Discovery.tsx`)
-
-- Only set `lastFetchedAt` when the fetch actually returns results (`data.recommendations.length > 0`)
-- Allow refresh immediately if the previous fetch returned 0 results or an error
-- This way the user isn't locked out after a failed/empty fetch
-
-### Files Modified
-
-| File | Change |
-|---|---|
-| `supabase/functions/fetch-substack-recommendations/index.ts` | Select `newsletter_url`, prefer it over `substack_url` for subdomain extraction |
-| `src/pages/Discovery.tsx` | Only lock refresh cooldown when results were actually found |
-
+- Founders (`pro` role): untouched — `has_role` check runs first
+- Paid subscribers (`subscription_tier = 'pro'`): untouched
+- Legacy trial users (existing `trial_ends_at` in future): still honored
