@@ -73,14 +73,27 @@ Deno.serve(async (req) => {
     }
 
     // Extract subdomain from substack_url
-    // Formats: "https://name.substack.com" or "name.substack.com"
+    // Formats: "https://name.substack.com", "name.substack.com",
+    //          "https://substack.com/@name", "substack.com/@name"
     let subdomain: string;
     try {
-      const url = creator.substack_url.startsWith("http")
+      const rawUrl = creator.substack_url.startsWith("http")
         ? creator.substack_url
         : `https://${creator.substack_url}`;
-      const parsed = new URL(url);
-      subdomain = parsed.hostname.replace(".substack.com", "");
+      const parsed = new URL(rawUrl);
+
+      if (parsed.hostname === "substack.com" || parsed.hostname === "www.substack.com") {
+        // Profile URL format: substack.com/@username
+        const match = parsed.pathname.match(/^\/@([^/?]+)/);
+        if (match) {
+          subdomain = match[1];
+        } else {
+          throw new Error("Could not extract username from profile URL");
+        }
+      } else {
+        // Publication URL format: name.substack.com
+        subdomain = parsed.hostname.replace(".substack.com", "");
+      }
     } catch {
       return new Response(
         JSON.stringify({ error: "Invalid Substack URL format" }),
