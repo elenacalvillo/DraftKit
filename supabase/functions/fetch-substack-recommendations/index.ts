@@ -245,7 +245,7 @@ Deno.serve(async (req) => {
       );
 
       // Check if on DraftKit
-      const dkCreator = creatorBySubdomain.get(recSubdomain);
+      const dkCreator = creatorBySubdomain.get(recSubdomain.toLowerCase());
 
       results.push({
         id: pub.id,
