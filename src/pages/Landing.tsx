@@ -1,6 +1,7 @@
 import { Navbar } from "@/components/layout/Navbar";
 import { HeroSection } from "@/components/landing/HeroSection";
 import { RealityOfGrowthSection } from "@/components/landing/RealityOfGrowthSection";
+import { DirectDiscoveryCard } from "@/components/landing/DirectDiscoveryCard";
 import { BusyworkComparisonSection } from "@/components/landing/BusyworkComparisonSection";
 import { HowItWorksSection } from "@/components/landing/HowItWorksSection";
 import { TestimonialsSection } from "@/components/landing/TestimonialsSection";
@@ -14,6 +15,7 @@ export default function Landing() {
       <Navbar />
       <HeroSection />
       <RealityOfGrowthSection />
+      <DirectDiscoveryCard />
       <BusyworkComparisonSection />
       <HowItWorksSection />
       <TestimonialsSection />

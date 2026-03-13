@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Heart, Shield, BookOpen, FileText } from "lucide-react";
+import { Heart, Shield, BookOpen, FileText, Zap } from "lucide-react";
 import { DraftKitLogo } from "@/components/icons/DraftKitLogo";
 
 export function Footer() {
@@ -67,6 +67,13 @@ export function Footer() {
             <span className="mx-2">·</span>
             <span>© {currentYear}</span>
           </div>
+        </div>
+
+        <div className="text-center mt-6 pt-6 border-t border-border/30">
+          <span className="inline-flex items-center gap-1.5 text-[10px] text-muted-foreground/50 font-mono tracking-wider uppercase">
+            <Zap className="w-3 h-3" />
+            Powered by Direct Metadata Resolution v1.0
+          </span>
         </div>
       </div>
     </footer>
