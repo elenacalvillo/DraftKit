@@ -117,7 +117,7 @@ export function HeroSection() {
           >
             <Link to="/signup">
               <Button variant="hero" size="xl">
-                Start Drafting — It's Free
+                Start your first collab (Free)
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
             </Link>
@@ -126,6 +126,7 @@ export function HeroSection() {
                 See a Demo Workspace
               </Button>
             </Link>
+            <p className="text-sm text-muted-foreground mt-2">No credit card. No time limits.</p>
           </motion.div>
 
           {/* Product Loop Preview */}
