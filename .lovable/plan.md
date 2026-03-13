@@ -1,50 +1,22 @@
-# Fix Discovery: Substack Search API Returns Zero Results
 
-## Root Cause (Confirmed)
 
-The Substack search API (`/api/v1/publication/search?query=promptledproduct`) returns **zero results** — it simply doesn't index this publication. The parsing logic is correct; there's nothing to parse.
+## Value-Based Trial: "Free for Your First 3 Collabs"
 
-However, the publication exists at `promptledproduct.substack.com` with `publication_id: 1252952`. We confirmed this via the archive endpoint.
+**Status: IMPLEMENTED**
 
-## Fix: Add Direct Fallback in Edge Function
+Replaced the 7-day time-based trial with a usage-based model: every new user gets full Pro features until they've published 3 collaborations. After that, they hit the paywall. Founding members and paid Pro users are completely unaffected.
 
-**File:** `supabase/functions/fetch-substack-recommendations/index.ts`
+### What Changed
 
-Update `resolvePublicationId()` to add two fallbacks when search returns nothing:
+1. **Database**: Dropped `set_founder_trial()` trigger — new signups start as `free` with no trial period
+2. **`usePro.ts`**: Counts published collabs dynamically; returns `publishedCount`, `freeCollabsRemaining`, `isInFreeTier`; Pro = founder OR paid OR legacy trial OR < 3 published
+3. **`useActiveCollabs.ts`**: Removed 1-collab approval gate — free users can approve unlimited collabs; gate is at publish step
+4. **`Subscription.tsx`**: Free-tier users see collab progress bar ("2 of 3 free collaborations used"); CTA = "Unlock Unlimited Collabs"; legacy trial banner still shown for existing trial users
+5. **`Workspace.tsx`**: `handlePublishAnswer("yes")` checks `!isPro` and blocks with upgrade toast if at limit; recovery "Mark as Published" button also gated
+6. **`UpgradePrompt.tsx`**: Updated collabs copy to "You've used your 3 free collaborations"
 
-1. **Fallback 1 — Archive endpoint**: Fetch `https://{subdomain}.substack.com/api/v1/archive?limit=1`. The response includes `publication_id` on each post object. Extract it from `data[0].publication_id`.
-2. **Fallback 2 — Publication metadata**: If archive is empty, try `https://{subdomain}.substack.com/api/v1/publication` which returns the publication object directly with its `id`.
-3. **Add raw response logging** as requested: `console.log('RAW SEARCH RESPONSE:', JSON.stringify(data))` after the search call, and similar for fallbacks.
-4. **Use `String()` coercion** on ID comparisons to handle string vs number edge cases.
+### Safety
 
-```text
-resolvePublicationId(subdomain)
-  ├─ Try search API → if results, match & return
-  ├─ Fallback: archive endpoint → extract publication_id from first post
-  └─ Fallback: /api/v1/publication → return id directly
-```
-
-No other files need changes. The UI and query logic are already correct — the only issue is the edge function failing to resolve the publication ID.
-
-&nbsp;
-
-**1. Bulletproof Discovery Fix (Edge Function)** Update `supabase/functions/fetch-substack-recommendations/index.ts`. Replace the `resolvePublicationId` function with this multi-layered fallback logic:
-
-- **Step 1: Search API.** Try the standard search. Add `console.log('RAW SEARCH RESPONSE:', JSON.stringify(data))`.
-- **Step 2: Archive Fallback.** If search returns zero, fetch `https://{subdomain}.substack.com/api/v1/archive?limit=1`. Extract the `publication_id` from the first post object (`data[0].publication_id`). Add `console.log('ARCHIVE FALLBACK SUCCESS', id)`.
-- **Step 3: Metadata Fallback.** If archive fails, fetch `https://{subdomain}.substack.com/api/v1/publication`. Return the `id` from the root of that object.
-- **Safety:** Use `String()` coercion on all IDs to ensure type safety between Substack's API and our database.
-
-**2. Global Console & Ref Cleanup** Convert the following components to use `React.forwardRef` to eliminate the 'Function components cannot be given refs' warnings:
-
-- `src/components/ui/skeleton.tsx`
-- `src/components/ui/badge.tsx`
-- `src/components/icons/DraftKitLogo.tsx`
-- `src/components/icons/GoogleIcon.tsx`
-- `src/components/subscription/ProBadge.tsx`
-- `src/components/feedback/FeedbackWidget.tsx`
-- `src/components/ui/button.tsx` (ensure it passes the ref to the underlying button/slot)
-
-**3. Fix HTML Nesting Bug** In `src/components/layout/DashboardLayout.tsx`, find where `ProBadge` is rendered. It is currently inside a `<p>` tag. Change that `<p>` tag to a `<div>` or move the `ProBadge` outside of it to fix the `validateDOMNesting` error.
-
-**4. Verification** Confirm that the Discovery page now successfully resolves `promptledproduct` and that the browser console is clear of Redux/Ref warnings."
+- Founders (`pro` role): untouched — `has_role` check runs first
+- Paid subscribers (`subscription_tier = 'pro'`): untouched
+- Legacy trial users (existing `trial_ends_at` in future): still honored
