@@ -183,10 +183,10 @@ export function DashboardLayout({ children, zenMode, zenTitle, zenBackPath }: Da
                 {creator.name.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-medium truncate flex items-center gap-1.5">
+                <div className="font-medium truncate flex items-center gap-1.5">
                   {creator.name}
                   {isPro && <ProBadge size="sm" />}
-                </p>
+                </div>
                 <p className="text-sm text-muted-foreground truncate">@{creator.username}</p>
               </div>
             </div>

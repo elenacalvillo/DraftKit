@@ -27,27 +27,72 @@ function extractSubdomain(substackUrl: string): string | null {
 
 const UA = "Mozilla/5.0 (compatible; DraftKit/1.0; +https://draftkit.app)";
 
-/** Resolve a subdomain to a Substack publication ID */
+/** Resolve a subdomain to a Substack publication ID with multi-layer fallback */
 async function resolvePublicationId(subdomain: string): Promise<number | null> {
+  // --- Step 1: Search API ---
   const searchUrl = `https://substack.com/api/v1/publication/search?query=${encodeURIComponent(subdomain)}`;
   console.log(`Resolving publication ID via: ${searchUrl}`);
-  const res = await fetch(searchUrl, { headers: { "User-Agent": UA } });
-  if (!res.ok) {
-    console.error(`Search API returned ${res.status}`);
-    return null;
+  try {
+    const res = await fetch(searchUrl, { headers: { "User-Agent": UA } });
+    if (res.ok) {
+      const data = await res.json();
+      console.log("RAW SEARCH RESPONSE:", JSON.stringify(data));
+      const publications = Array.isArray(data) ? data : (data?.results || data?.publications || []);
+      if (Array.isArray(publications) && publications.length > 0) {
+        const exact = publications.find(
+          (p: any) => String(p.subdomain || "").toLowerCase() === subdomain.toLowerCase()
+        );
+        if (exact?.id) return Number(exact.id);
+        if (publications[0]?.id) return Number(publications[0].id);
+      }
+    } else {
+      console.error(`Search API returned ${res.status}`);
+    }
+  } catch (e) {
+    console.error("Search API error:", e);
   }
-  const data = await res.json();
-  // Handle both array (legacy) and object with results array (current)
-  const publications = Array.isArray(data) ? data : (data?.results || data?.publications || []);
-  console.log(`Search returned ${Array.isArray(data) ? 'array' : 'object'} with ${publications.length} candidates`);
-  if (!Array.isArray(publications) || publications.length === 0) return null;
-  // Exact subdomain match first
-  const exact = publications.find(
-    (p: any) => p.subdomain?.toLowerCase() === subdomain.toLowerCase()
-  );
-  if (exact?.id) return exact.id;
-  // Fallback to first result with a valid id
-  if (publications[0]?.id) return publications[0].id;
+
+  // --- Step 2: Archive Fallback ---
+  const archiveUrl = `https://${subdomain}.substack.com/api/v1/archive?limit=1`;
+  console.log(`Search returned 0 results. Trying archive fallback: ${archiveUrl}`);
+  try {
+    const archRes = await fetch(archiveUrl, { headers: { "User-Agent": UA } });
+    if (archRes.ok) {
+      const archData = await archRes.json();
+      console.log("ARCHIVE FALLBACK RESPONSE:", JSON.stringify(archData).slice(0, 500));
+      if (Array.isArray(archData) && archData.length > 0 && archData[0].publication_id) {
+        const id = Number(archData[0].publication_id);
+        console.log("ARCHIVE FALLBACK SUCCESS:", id);
+        return id;
+      }
+    } else {
+      console.error(`Archive API returned ${archRes.status}`);
+    }
+  } catch (e) {
+    console.error("Archive fallback error:", e);
+  }
+
+  // --- Step 3: Publication metadata fallback ---
+  const metaUrl = `https://${subdomain}.substack.com/api/v1/publication`;
+  console.log(`Archive fallback failed. Trying metadata: ${metaUrl}`);
+  try {
+    const metaRes = await fetch(metaUrl, { headers: { "User-Agent": UA } });
+    if (metaRes.ok) {
+      const metaData = await metaRes.json();
+      console.log("METADATA FALLBACK RESPONSE:", JSON.stringify(metaData).slice(0, 500));
+      if (metaData?.id) {
+        const id = Number(metaData.id);
+        console.log("METADATA FALLBACK SUCCESS:", id);
+        return id;
+      }
+    } else {
+      console.error(`Metadata API returned ${metaRes.status}`);
+    }
+  } catch (e) {
+    console.error("Metadata fallback error:", e);
+  }
+
+  console.error(`All resolution methods failed for subdomain: ${subdomain}`);
   return null;
 }
 
