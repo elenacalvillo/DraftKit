@@ -61,7 +61,7 @@ export default function Discovery() {
   } = useQuery({
     queryKey: ["discovery-recommendations", creator?.id],
     queryFn: fetchRecommendations,
-    enabled: !!creator?.substack_url,
+    enabled: !!(creator?.newsletter_url || creator?.substack_url),
     staleTime: REFRESH_COOLDOWN_MS,
     retry: 1,
   });
