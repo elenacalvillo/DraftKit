@@ -19,6 +19,16 @@ const principles = [
     answer:
       "DraftKit uses Prompt-Led Product principles. The AI does not write for you — it writes with you, using the research your guest provided to stay grounded in fact and tone.",
   },
+  {
+    question: "Is this just another AI content factory?",
+    answer:
+      "Actually, it's the opposite. DraftKit is built for human-to-human partnerships that AI cannot replicate. We just automate the boring chores so you can focus on the relationship.",
+  },
+  {
+    question: "Why not just use the Substack Recommendation engine?",
+    answer:
+      "Because the data shows that for writers under 1k subs, recommendations drive less than 5% of growth. You need a system to reach new audiences actively.",
+  },
 ];
 
 export function FeatureRoadmapSection() {
