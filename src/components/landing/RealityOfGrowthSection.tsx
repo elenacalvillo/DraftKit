@@ -89,8 +89,7 @@ export function RealityOfGrowthSection() {
             <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={barData} layout="vertical" margin={{ left: -10, right: 10, top: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
-                  <XAxis type="number" hide />
+                   <XAxis type="number" hide />
                   <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} width={90} />
                   <Tooltip
                     contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
@@ -126,14 +125,13 @@ export function RealityOfGrowthSection() {
                       <stop offset="100%" stopColor={ORANGE} stopOpacity={0.05} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="subs" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                  <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                   <XAxis dataKey="subs" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+                   <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
                   <Tooltip
                     contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
                     formatter={(value: number) => [`${value}%`, "Still active"]}
                   />
-                  <Area type="monotone" dataKey="active" stroke={ORANGE} fill="url(#orangeGradient)" strokeWidth={2} />
+                  <Area type="monotone" dataKey="active" stroke={ORANGE} fill="url(#orangeGradient)" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: ORANGE, stroke: "white", strokeWidth: 2 }} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>

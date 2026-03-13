@@ -1,53 +1,22 @@
 
 
-# Landing Page Surgical Cleanup
+## Value-Based Trial: "Free for Your First 3 Collabs"
 
-Five targeted edits across 4 files. No new files needed.
+**Status: IMPLEMENTED**
 
-## 1. HeroSection.tsx — Remove 01–04 step cards, fix microcopy position
+Replaced the 7-day time-based trial with a usage-based model: every new user gets full Pro features until they've published 3 collaborations. After that, they hit the paywall. Founding members and paid Pro users are completely unaffected.
 
-**Remove lines 7–32** (the `steps` array) and **lines 132–166** (the entire "Product Loop Preview" grid with arrows). Also remove unused imports (`Send`, `Sparkles`, `FileText`, `Trophy`).
+### What Changed
 
-**Move microcopy**: The `<p>No credit card...</p>` on line 129 is inside the flex row with the buttons. Move it outside the button flex container so it sits below both CTAs. Change `mb-28` on the button container to `mb-4`, then add the microcopy `<p>` after the closing `</motion.div>` with `mb-20` spacing.
+1. **Database**: Dropped `set_founder_trial()` trigger — new signups start as `free` with no trial period
+2. **`usePro.ts`**: Counts published collabs dynamically; returns `publishedCount`, `freeCollabsRemaining`, `isInFreeTier`; Pro = founder OR paid OR legacy trial OR < 3 published
+3. **`useActiveCollabs.ts`**: Removed 1-collab approval gate — free users can approve unlimited collabs; gate is at publish step
+4. **`Subscription.tsx`**: Free-tier users see collab progress bar ("2 of 3 free collaborations used"); CTA = "Unlock Unlimited Collabs"; legacy trial banner still shown for existing trial users
+5. **`Workspace.tsx`**: `handlePublishAnswer("yes")` checks `!isPro` and blocks with upgrade toast if at limit; recovery "Mark as Published" button also gated
+6. **`UpgradePrompt.tsx`**: Updated collabs copy to "You've used your 3 free collaborations"
 
-## 2. FeatureRoadmapSection.tsx — Remove duplicate subtitle
+### Safety
 
-The subtitle on lines 47–49 ("Built for PMs and creators...") appears once. The user says it's duplicated — checking the render, it only exists once in this file. However, the `TestimonialsSection` or another section may echo similar text. I'll remove the subtitle line (47–49) entirely per the user's request, keeping just the "The honest answers" heading.
-
-## 3. RealityOfGrowthSection.tsx — Chart styling cleanup
-
-**Bar Chart (Card 1)**:
-- Remove `CartesianGrid` component (line 92) — no grid lines
-- Already horizontal (`layout="vertical"`) with left-aligned labels ✓
-
-**Area Chart (Card 2)**:
-- Remove `CartesianGrid` (line 129) — no grid lines
-- Increase `strokeWidth` from `2` to `3` on the `<Area>` element
-- Add `dot={false}` and `activeDot={{ r: 6, fill: ORANGE, stroke: "white", strokeWidth: 2 }}` to show interactive dot on hover
-
-**Donut Chart (Card 3)**:
-- No grid to remove — already clean ✓
-
-## 4. BusyworkComparisonSection.tsx — Visual polish
-
-**Old Way panel**:
-- Change text class from `text-muted-foreground` to `text-muted-foreground/60` for lighter gray
-- Change icon color from `text-destructive/60` to `text-destructive` for stronger red
-- Keep `line-through decoration-destructive/40` on text
-
-**DraftKit Way panel**:
-- Add a soft orange glow: wrap or update the card's className to include `shadow-[0_0_40px_-10px_hsl(var(--primary)/0.3)]` for a diffused orange glow behind the card
-
-## 5. HowItWorksSection.tsx — Already correct
-
-The descriptions are already the updated versions (Request, SMART Draft, Shared Workspace, Milestone). No changes needed.
-
-## Files to modify
-
-| File | Changes |
-|---|---|
-| `src/components/landing/HeroSection.tsx` | Remove `steps` array, step grid, unused imports; reposition microcopy below CTAs |
-| `src/components/landing/FeatureRoadmapSection.tsx` | Remove subtitle paragraph |
-| `src/components/landing/RealityOfGrowthSection.tsx` | Remove CartesianGrid from bar & area charts; thicker area line; add activeDot |
-| `src/components/landing/BusyworkComparisonSection.tsx` | Lighter Old Way text; stronger red icons; orange glow on DraftKit Way card |
-
+- Founders (`pro` role): untouched — `has_role` check runs first
+- Paid subscribers (`subscription_tier = 'pro'`): untouched
+- Legacy trial users (existing `trial_ends_at` in future): still honored
