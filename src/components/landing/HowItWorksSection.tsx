@@ -7,7 +7,7 @@ const steps = [
     icon: <Send className="w-7 h-7" />,
     title: "The Request",
     description:
-      "Send a professional front-door invite that replaces messy DMs.",
+      "Send a professional front-door invite that replaces messy DMs. When you invite a new partner to the platform, you both earn a collaboration credit.",
   },
   {
     number: "02",
