@@ -187,7 +187,7 @@ Deno.serve(async (req) => {
     // Get creator
     const { data: creator, error: creatorErr } = await serviceClient
       .from("creators")
-      .select("id, substack_url, username")
+      .select("id, substack_url, newsletter_url, username")
       .eq("user_id", userId)
       .maybeSingle();
 
