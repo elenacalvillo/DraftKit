@@ -15,6 +15,7 @@ export default function Landing() {
       <Navbar />
       <HeroSection />
       <RealityOfGrowthSection />
+      <DirectDiscoveryCard />
       <BusyworkComparisonSection />
       <HowItWorksSection />
       <TestimonialsSection />

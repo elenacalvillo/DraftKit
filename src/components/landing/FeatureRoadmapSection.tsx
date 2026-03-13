@@ -29,6 +29,11 @@ const principles = [
     answer:
       "Because the data shows that for writers under 1k subs, recommendations drive less than 5% of growth. You need a system to reach new audiences actively.",
   },
+  {
+    question: "What if my Substack doesn't show up in search yet?",
+    answer:
+      "It doesn't have to. DraftKit uses direct metadata resolution and archive indexing. If your publication is live on the web, we can find it, connect it, and start growing it immediately.",
+  },
 ];
 
 export function FeatureRoadmapSection() {
