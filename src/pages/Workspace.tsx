@@ -859,7 +859,7 @@ export default function Workspace() {
               lastEditedBy={request.content_last_edited_by}
               lastEditedAt={request.content_last_edited_at}
               currentUserName={currentUserName}
-              canEdit={effectiveCanEdit}
+              canEdit={true}
               partnerName={partnerName || undefined}
               isCreator={isCreator}
               editingSessions={(request as any).editing_sessions || []}
