@@ -69,12 +69,7 @@ export default function Workspace() {
   const isCreator = !!creator && creator.id === request?.creator_id;
   const isGuest = !!user && user.id === request?.requester_user_id;
 
-  // Host-pays model: workspace access is determined by the HOST creator's Pro status,
-  // not the current visitor's. Guests inherit the host's tier.
-  const { isPro: isHostPro, isLoading: isHostProLoading } = useCreatorPro(request?.creator_id);
   const { isAdmin } = useAdmin();
-  // Admins bypass all paywalls
-  const effectiveCanEdit = isAdmin || isHostPro;
 
   // Modals
   const [showDraftModal, setShowDraftModal] = useState(false);

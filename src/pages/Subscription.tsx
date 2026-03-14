@@ -213,7 +213,7 @@ export default function Subscription() {
         )}
 
         {/* Legacy trial banner */}
-        {isInTrial && !isInFreeTier && (() => {
+        {isInTrial && (() => {
           const trialDaysLeft = trialEndsAt
             ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
             : 0;
