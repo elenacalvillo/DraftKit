@@ -7,12 +7,11 @@ interface CreatorProStatus {
 }
 
 /**
- * Checks whether the HOST creator (identified by their creators.id) has Pro access.
- * Used by the workspace so that the guest inherits the host's tier — never their own.
- *
- * Checks BOTH:
- *  1. creators.subscription_tier / trial_ends_at (paying subscribers & trial users)
- *  2. user_roles with role = 'pro' (early adopters / VIP grants)
+ * Checks whether the HOST creator has Pro access.
+ * 
+ * IMPORTANT: This hook is now ONLY used to determine if the host is a paying/founder member
+ * for features like AI draft generation. It does NOT gate workspace access.
+ * Workspace access is always open for approved/published collabs regardless of tier.
  */
 export function useCreatorPro(creatorId: string | undefined): CreatorProStatus {
   const { data, isLoading } = useQuery({
