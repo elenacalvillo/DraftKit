@@ -57,7 +57,7 @@ export default function Workspace() {
   const { requestId } = useParams<{ requestId: string }>();
   const navigate = useNavigate();
   const { user, creator, loading: authLoading } = useAuth();
-  const { isPro } = usePro(); // Current user's own Pro status (for creator-only features)
+  const { isPro, canHostMore } = usePro();
   const { trackEvent } = useAnalytics();
 
   const [request, setRequest] = useState<WorkspaceRequest | null>(null);
