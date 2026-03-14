@@ -93,8 +93,8 @@ export default function Subscription() {
     }
   };
 
-  // View A: Founding Members & Paid Pro (not free-tier users)
-  if (isPro && !isInTrial && !isInFreeTier) {
+  // View A: Founding Members & Paid Pro
+  if (isPro && !isInTrial) {
     return (
       <DashboardLayout>
         <div className="max-w-xl mx-auto">
