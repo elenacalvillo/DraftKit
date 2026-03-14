@@ -250,8 +250,7 @@ export default function PublicBooking() {
         const cap = capData as any;
         const limit = (cap.base_limit || 3) + (cap.referral_bonus || 0);
         const used = cap.used || 0;
-        // Also check if the host is a paid/founder user (no capacity limit)
-        const { data: isPro } = await supabase.rpc("is_pro_user", { _user_id: creatorData.id });
+        const isPro = cap.is_pro === true;
         if (!isPro && used >= limit) {
           setIsAtCapacity(true);
         }
