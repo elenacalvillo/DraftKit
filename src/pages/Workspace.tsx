@@ -838,31 +838,11 @@ export default function Workspace() {
               <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
                 Conversation
               </h4>
-              {effectiveCanEdit ? (
-                <WorkspaceConversation
+              <WorkspaceConversation
                   requestId={request.id}
                   currentUserIsCreator={isCreator}
                   refreshKey={msgRefreshKey}
                 />
-              ) : isGuest ? (
-                // Guests never see billing walls — the host needs to upgrade
-                <p className="text-xs text-muted-foreground text-center py-4">
-                  Conversation will be available once the workspace is unlocked.
-                </p>
-              ) : (
-                // Creator (host) sees the upgrade prompt
-                <div className="relative">
-                  <div className="opacity-20 pointer-events-none blur-[2px]">
-                    <div className="space-y-3">
-                      <div className="rounded-lg bg-muted px-3 py-2 text-xs">Sample message…</div>
-                      <div className="rounded-lg bg-primary/10 px-3 py-2 text-xs">Reply message…</div>
-                    </div>
-                  </div>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <UpgradePrompt feature="workspace" variant="card" />
-                  </div>
-                </div>
-              )}
             </div>
           </motion.div>
 
