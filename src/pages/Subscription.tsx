@@ -169,8 +169,8 @@ export default function Subscription() {
     );
   }
 
-  // View B: Free / Trial / Free-tier users
-  const progressPercent = Math.round((publishedCount / 3) * 100);
+  // View B: Free / Trial users
+  const progressPercent = hostCapacity.limit > 0 ? Math.round((hostCapacity.used / hostCapacity.limit) * 100) : 0;
 
   return (
     <DashboardLayout>
@@ -185,22 +185,27 @@ export default function Subscription() {
           </p>
         </div>
 
-        {/* Collab progress banner (replaces trial days banner) */}
-        {isInFreeTier && (
+        {/* Host capacity banner */}
+        {!isPro && (
           <Card className="mb-6 border-primary/30 bg-primary/5">
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-2">
                 <p className="font-medium text-sm">
-                  {publishedCount} of 3 free collaborations used
+                  {hostCapacity.used} of {hostCapacity.limit} host spots used
                 </p>
                 <Badge variant="secondary" className="text-xs">
-                  {freeCollabsRemaining} left
+                  {hostCapacity.remaining} left
                 </Badge>
               </div>
               <Progress value={progressPercent} className="h-2" />
-              {publishedCount >= 2 && (
+              {hostCapacity.referralBonus > 0 && (
                 <p className="text-xs text-muted-foreground mt-2">
-                  Upgrade to unlock unlimited collaborations.
+                  You've earned {hostCapacity.referralBonus} bonus spot{hostCapacity.referralBonus !== 1 ? "s" : ""} by inviting friends.
+                </p>
+              )}
+              {hostCapacity.remaining <= 1 && hostCapacity.referralBonus === 0 && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  Invite friends or upgrade to unlock unlimited host spots.
                 </p>
               )}
             </CardContent>
