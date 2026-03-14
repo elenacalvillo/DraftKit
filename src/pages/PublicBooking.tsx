@@ -243,6 +243,23 @@ export default function PublicBooking() {
     // Fetch booked dates from public view (accessible to anonymous users)
     await fetchBookedDates(creatorData.id);
 
+    // Check host capacity (free users have limited host spots)
+    try {
+      const { data: capData } = await supabase.rpc("get_host_capacity", { _creator_id: creatorData.id });
+      if (capData) {
+        const cap = capData as any;
+        const limit = (cap.base_limit || 3) + (cap.referral_bonus || 0);
+        const used = cap.used || 0;
+        // Also check if the host is a paid/founder user (no capacity limit)
+        const { data: isPro } = await supabase.rpc("is_pro_user", { _user_id: creatorData.id });
+        if (!isPro && used >= limit) {
+          setIsAtCapacity(true);
+        }
+      }
+    } catch (e) {
+      console.log("Could not check host capacity:", e);
+    }
+
     setIsLoading(false);
 
     // Subscribe to real-time updates for collab_requests
