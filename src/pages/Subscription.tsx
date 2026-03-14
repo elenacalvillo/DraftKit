@@ -45,8 +45,8 @@ export default function Subscription() {
     enabled: !!user?.id,
   });
 
-  const isFounder = isPro && !isInTrial && !isInFreeTier && !creatorBilling?.stripe_customer_id;
-  const isPaidPro = isPro && !isInTrial && !isInFreeTier && !!creatorBilling?.stripe_customer_id;
+  const isFounder = isPro && !isInTrial && !creatorBilling?.stripe_customer_id;
+  const isPaidPro = isPro && !isInTrial && !!creatorBilling?.stripe_customer_id;
 
   useEffect(() => {
     if (searchParams.get("success") === "true") {
