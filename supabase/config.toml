@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.fetch-substack-recommendations]
 verify_jwt = false
+
+[functions.sync-to-resend]
+verify_jwt = false
