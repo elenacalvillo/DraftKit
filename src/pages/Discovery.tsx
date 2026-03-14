@@ -81,7 +81,7 @@ export default function Discovery() {
 
   const handleCopyInviteLink = (pubName: string) => {
     if (!creator?.username) return;
-    const link = `${window.location.origin}/${creator.username}?ref=discovery`;
+    const link = `${window.location.origin}/${creator.username}?ref=${creator.username}`;
     navigator.clipboard.writeText(link);
     toast({
       title: "Invite link copied!",

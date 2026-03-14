@@ -16,7 +16,6 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/useAuth";
 import { usePro } from "@/hooks/usePro";
-import { useCreatorPro } from "@/hooks/useCreatorPro";
 import { useAdmin } from "@/hooks/useAdmin";
 import { supabase } from "@/integrations/supabase/client";
 import { useAnalytics } from "@/hooks/useAnalytics";
@@ -58,7 +57,7 @@ export default function Workspace() {
   const { requestId } = useParams<{ requestId: string }>();
   const navigate = useNavigate();
   const { user, creator, loading: authLoading } = useAuth();
-  const { isPro } = usePro(); // Current user's own Pro status (for creator-only features)
+  const { isPro, canHostMore } = usePro();
   const { trackEvent } = useAnalytics();
 
   const [request, setRequest] = useState<WorkspaceRequest | null>(null);
@@ -70,12 +69,7 @@ export default function Workspace() {
   const isCreator = !!creator && creator.id === request?.creator_id;
   const isGuest = !!user && user.id === request?.requester_user_id;
 
-  // Host-pays model: workspace access is determined by the HOST creator's Pro status,
-  // not the current visitor's. Guests inherit the host's tier.
-  const { isPro: isHostPro, isLoading: isHostProLoading } = useCreatorPro(request?.creator_id);
   const { isAdmin } = useAdmin();
-  // Admins bypass all paywalls
-  const effectiveCanEdit = isAdmin || isHostPro;
 
   // Modals
   const [showDraftModal, setShowDraftModal] = useState(false);
@@ -359,123 +353,8 @@ export default function Workspace() {
     );
   }
 
-  // --- PRO GATE ---
-  // Wait for host Pro status to resolve before gating (prevents flash of wrong content).
-  if (!loading && !authLoading && isHostProLoading) {
-    return (
-      <DashboardLayout>
-        <div className="max-w-6xl mx-auto space-y-6">
-          <Skeleton className="h-6 w-40" />
-          <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6">
-            <Skeleton className="h-96" />
-            <Skeleton className="h-96" />
-          </div>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
-  // Hard gate: creator (host) is free tier — show upgrade wall
-  if (isCreator && !effectiveCanEdit) {
-    return (
-      <DashboardLayout>
-        <div className="max-w-2xl mx-auto py-20 px-4 text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-            className="glass-card p-10 flex flex-col items-center gap-6"
-          >
-            <div className="w-20 h-20 rounded-2xl gradient-primary flex items-center justify-center shadow-glow">
-              <Crown className="w-10 h-10 text-primary-foreground" />
-            </div>
-
-            <div className="space-y-3 max-w-md">
-              <h2 className="text-2xl font-bold">The Shared Workspace is a Pro Feature</h2>
-              <p className="text-muted-foreground leading-relaxed">
-                Unlock async drafting, real-time conversation history, and a beautiful co-writing
-                environment — built to turn collab ideas into published posts, fast.
-              </p>
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-center gap-3 w-full max-w-sm">
-              <Button
-                variant="hero"
-                size="lg"
-                className="w-full"
-                onClick={() => navigate("/dashboard/subscription")}
-              >
-                <Crown className="w-5 h-5" />
-                Unlock the Workspace &amp; Start Shipping
-              </Button>
-            </div>
-
-            <button
-              onClick={() => navigate(backPath)}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              ← Back to Requests
-            </button>
-          </motion.div>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
-  // Hard gate: guest of a free-tier host — neutral waiting screen (no billing CTA)
-  if (isGuest && !isHostPro && !isAdmin) {
-    return (
-      <DashboardLayout>
-        <div className="max-w-2xl mx-auto py-20 px-4 text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-            className="glass-card p-10 flex flex-col items-center gap-6"
-          >
-            <div className="w-20 h-20 rounded-2xl bg-muted flex items-center justify-center">
-              <Clock className="w-10 h-10 text-muted-foreground" />
-            </div>
-
-            <div className="space-y-3 max-w-md">
-              <h2 className="text-2xl font-bold">Workspace Coming Soon</h2>
-              <p className="text-muted-foreground leading-relaxed">
-                Your collaboration partner hasn't unlocked the workspace yet. Once they do,
-                you'll both have access to the shared drafting space and conversation history.
-              </p>
-            </div>
-
-            <Button
-              variant="outline"
-              size="lg"
-              onClick={() => setShowMessageModal(true)}
-            >
-              <MessageSquare className="w-5 h-5" />
-              Message {partnerName?.split(" ")[0] || "Partner"}
-            </Button>
-
-            <button
-              onClick={() => navigate(backPath)}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              ← Back to My Requests
-            </button>
-          </motion.div>
-        </div>
-
-        {isGuest && (
-          <GuestMessageModal
-            open={showMessageModal}
-            onOpenChange={setShowMessageModal}
-            requestId={request.id}
-            creatorName={creatorInfo?.name || "Creator"}
-            requesterEmail={request.requester_email}
-            onMessageSent={handleMessageSent}
-          />
-        )}
-      </DashboardLayout>
-    );
-  }
+  // Workspace is always accessible for approved/published collabs — no pro gate here.
+  // The gate is on the booking page (incoming requests) and the publish action.
 
   // Retrospective banner logic
   const isRetroEligible = (() => {
@@ -491,10 +370,10 @@ export default function Workspace() {
 
   // Step 1: User clicks Yes/Not yet — for "yes", show URL form instead of immediately publishing
   const handlePublishAnswer = (answer: "yes" | "not_yet") => {
-    // Gate: check if free-tier user has exhausted their 3 free collabs
-    if (answer === "yes" && !isPro) {
-      toast.error("You've used your 3 free collaborations", {
-        description: "Upgrade to Pro to publish unlimited collabs.",
+    // Gate: check if free-tier user has exhausted their host capacity
+    if (answer === "yes" && !canHostMore) {
+      toast.error("You've reached your host capacity", {
+        description: "Invite friends or upgrade to Pro to publish more collabs.",
         action: {
           label: "Upgrade",
           onClick: () => navigate("/dashboard/subscription"),
@@ -959,31 +838,11 @@ export default function Workspace() {
               <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
                 Conversation
               </h4>
-              {effectiveCanEdit ? (
-                <WorkspaceConversation
+              <WorkspaceConversation
                   requestId={request.id}
                   currentUserIsCreator={isCreator}
                   refreshKey={msgRefreshKey}
                 />
-              ) : isGuest ? (
-                // Guests never see billing walls — the host needs to upgrade
-                <p className="text-xs text-muted-foreground text-center py-4">
-                  Conversation will be available once the workspace is unlocked.
-                </p>
-              ) : (
-                // Creator (host) sees the upgrade prompt
-                <div className="relative">
-                  <div className="opacity-20 pointer-events-none blur-[2px]">
-                    <div className="space-y-3">
-                      <div className="rounded-lg bg-muted px-3 py-2 text-xs">Sample message…</div>
-                      <div className="rounded-lg bg-primary/10 px-3 py-2 text-xs">Reply message…</div>
-                    </div>
-                  </div>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <UpgradePrompt feature="workspace" variant="card" />
-                  </div>
-                </div>
-              )}
             </div>
           </motion.div>
 
@@ -1000,7 +859,7 @@ export default function Workspace() {
               lastEditedBy={request.content_last_edited_by}
               lastEditedAt={request.content_last_edited_at}
               currentUserName={currentUserName}
-              canEdit={effectiveCanEdit}
+              canEdit={true}
               partnerName={partnerName || undefined}
               isCreator={isCreator}
               editingSessions={(request as any).editing_sessions || []}

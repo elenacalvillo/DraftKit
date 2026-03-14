@@ -27,7 +27,7 @@ const features = [
 export default function Subscription() {
   const [billing, setBilling] = useState<"monthly" | "yearly">("yearly");
   const [loading, setLoading] = useState(false);
-  const { isPro, isInTrial, trialEndsAt, isInFreeTier, publishedCount, freeCollabsRemaining } = usePro();
+  const { isPro, isInTrial, trialEndsAt, hostCapacity, canHostMore } = usePro();
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -45,8 +45,8 @@ export default function Subscription() {
     enabled: !!user?.id,
   });
 
-  const isFounder = isPro && !isInTrial && !isInFreeTier && !creatorBilling?.stripe_customer_id;
-  const isPaidPro = isPro && !isInTrial && !isInFreeTier && !!creatorBilling?.stripe_customer_id;
+  const isFounder = isPro && !isInTrial && !creatorBilling?.stripe_customer_id;
+  const isPaidPro = isPro && !isInTrial && !!creatorBilling?.stripe_customer_id;
 
   useEffect(() => {
     if (searchParams.get("success") === "true") {
@@ -93,8 +93,8 @@ export default function Subscription() {
     }
   };
 
-  // View A: Founding Members & Paid Pro (not free-tier users)
-  if (isPro && !isInTrial && !isInFreeTier) {
+  // View A: Founding Members & Paid Pro
+  if (isPro && !isInTrial) {
     return (
       <DashboardLayout>
         <div className="max-w-xl mx-auto">
@@ -169,8 +169,8 @@ export default function Subscription() {
     );
   }
 
-  // View B: Free / Trial / Free-tier users
-  const progressPercent = Math.round((publishedCount / 3) * 100);
+  // View B: Free / Trial users
+  const progressPercent = hostCapacity.limit > 0 ? Math.round((hostCapacity.used / hostCapacity.limit) * 100) : 0;
 
   return (
     <DashboardLayout>
@@ -185,22 +185,27 @@ export default function Subscription() {
           </p>
         </div>
 
-        {/* Collab progress banner (replaces trial days banner) */}
-        {isInFreeTier && (
+        {/* Host capacity banner */}
+        {!isPro && (
           <Card className="mb-6 border-primary/30 bg-primary/5">
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-2">
                 <p className="font-medium text-sm">
-                  {publishedCount} of 3 free collaborations used
+                  {hostCapacity.used} of {hostCapacity.limit} host spots used
                 </p>
                 <Badge variant="secondary" className="text-xs">
-                  {freeCollabsRemaining} left
+                  {hostCapacity.remaining} left
                 </Badge>
               </div>
               <Progress value={progressPercent} className="h-2" />
-              {publishedCount >= 2 && (
+              {hostCapacity.referralBonus > 0 && (
                 <p className="text-xs text-muted-foreground mt-2">
-                  Upgrade to unlock unlimited collaborations.
+                  You've earned {hostCapacity.referralBonus} bonus spot{hostCapacity.referralBonus !== 1 ? "s" : ""} by inviting friends.
+                </p>
+              )}
+              {hostCapacity.remaining <= 1 && hostCapacity.referralBonus === 0 && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  Invite friends or upgrade to unlock unlimited host spots.
                 </p>
               )}
             </CardContent>
@@ -208,7 +213,7 @@ export default function Subscription() {
         )}
 
         {/* Legacy trial banner */}
-        {isInTrial && !isInFreeTier && (() => {
+        {isInTrial && (() => {
           const trialDaysLeft = trialEndsAt
             ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
             : 0;

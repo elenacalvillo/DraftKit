@@ -420,6 +420,7 @@ export type Database = {
           newsletter_url: string | null
           profile_image_url: string | null
           profile_theme: Json | null
+          referred_by: string | null
           reminder_days_before: number | null
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
@@ -444,6 +445,7 @@ export type Database = {
           newsletter_url?: string | null
           profile_image_url?: string | null
           profile_theme?: Json | null
+          referred_by?: string | null
           reminder_days_before?: number | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
@@ -468,6 +470,7 @@ export type Database = {
           newsletter_url?: string | null
           profile_image_url?: string | null
           profile_theme?: Json | null
+          referred_by?: string | null
           reminder_days_before?: number | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
@@ -544,6 +547,27 @@ export type Database = {
           status?: string
           to_email?: string
           type?: string
+        }
+        Relationships: []
+      }
+      referral_credits: {
+        Row: {
+          created_at: string
+          id: string
+          referred_user_id: string
+          referrer_user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          referred_user_id: string
+          referrer_user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          referred_user_id?: string
+          referrer_user_id?: string
         }
         Relationships: []
       }
@@ -689,6 +713,7 @@ export type Database = {
       }
     }
     Functions: {
+      get_host_capacity: { Args: { _creator_id: string }; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
