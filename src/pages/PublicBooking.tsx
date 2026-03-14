@@ -627,6 +627,43 @@ export default function PublicBooking() {
     return null;
   }
 
+  // Host is at capacity — show friendly message instead of booking form
+  if (isAtCapacity) {
+    return (
+      <div className="min-h-screen gradient-bg flex items-center justify-center p-6">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="glass-card p-12 text-center max-w-md"
+        >
+          <div className="w-16 h-16 rounded-full bg-muted mx-auto mb-6 flex items-center justify-center">
+            <AlertCircle className="w-8 h-8 text-muted-foreground" />
+          </div>
+          <h1 className="text-2xl font-bold mb-2">At Capacity</h1>
+          <p className="text-muted-foreground mb-4">
+            {creator.name} has reached the limit for incoming requests right now. Please check back later or reach out on Substack to coordinate.
+          </p>
+          {creator.substack_url && (
+            <Button variant="outline" asChild className="mb-3">
+              <a href={creator.substack_url} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="w-4 h-4 mr-2" />
+                Visit on Substack
+              </a>
+            </Button>
+          )}
+          <div>
+            <Link
+              to="/"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              ← Back to DraftKit
+            </Link>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
     <div 
       className="min-h-screen"

@@ -269,6 +269,20 @@ export default function Signup() {
       }
     }
 
+    // Look up referrer from ?ref= URL param
+    const refUsername = searchParams.get('ref');
+    let referredByUserId: string | null = null;
+    if (refUsername) {
+      const { data: referrer } = await supabase
+        .from('creators')
+        .select('user_id')
+        .eq('username', refUsername)
+        .maybeSingle();
+      if (referrer) {
+        referredByUserId = referrer.user_id;
+      }
+    }
+
     // Create creator profile
     const { data: newCreator, error } = await supabase
       .from('creators')
@@ -281,7 +295,8 @@ export default function Signup() {
         welcome_message: formData.welcomeMessage || `Hi! I'm ${formData.name}. Let's collaborate!`,
         join_directory_waitlist: formData.joinDirectory,
         profile_image_url: profileImageUrl,
-      })
+        referred_by: referredByUserId,
+      } as any)
       .select()
       .single();
 
