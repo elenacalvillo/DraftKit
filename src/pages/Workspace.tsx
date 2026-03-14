@@ -370,10 +370,10 @@ export default function Workspace() {
 
   // Step 1: User clicks Yes/Not yet — for "yes", show URL form instead of immediately publishing
   const handlePublishAnswer = (answer: "yes" | "not_yet") => {
-    // Gate: check if free-tier user has exhausted their 3 free collabs
-    if (answer === "yes" && !isPro) {
-      toast.error("You've used your 3 free collaborations", {
-        description: "Upgrade to Pro to publish unlimited collabs.",
+    // Gate: check if free-tier user has exhausted their host capacity
+    if (answer === "yes" && !canHostMore) {
+      toast.error("You've reached your host capacity", {
+        description: "Invite friends or upgrade to Pro to publish more collabs.",
         action: {
           label: "Upgrade",
           onClick: () => navigate("/dashboard/subscription"),
