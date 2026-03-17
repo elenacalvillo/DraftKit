@@ -493,7 +493,7 @@ export default function PublicBooking() {
       );
       
       if (!profileError && profileData?.imageUrl) {
-        requesterProfileImageUrl = profileData.imageUrl;
+        requesterProfileImageUrl = sanitizeSubstackImageUrl(profileData.imageUrl);
       }
     } catch (e) {
       // Continue without profile image - it's not critical
