@@ -1,43 +1,54 @@
 
-## Value-Based Trial: "Free for Your First 3 Collabs"
 
-**Status: IMPLEMENTED (v2 — Host Gate Architecture)**
+# Fix Missing Profile Images - Full Durable Fix
 
-### Architecture (v2)
+## Root Cause
 
-The gate moved from "can you enter the workspace" to "can your booking page accept new requests."
+15 of 18 collab requests have `requester_profile_image_url = NULL`. The previous sanitization fix only cleaned URLs that already existed -- it did nothing for the majority of requests that never had an image stored. The `fetch-substack-profile` edge function either wasn't called at booking time (early requests) or returned nothing.
 
+The good news: many of these requesters are registered creators with valid `profile_image_url` in the `creators` table. We can use this as a fallback.
+
+## Plan
+
+### 1. UI Fallback: Resolve requester image from their creator profile
+
+When rendering requester avatars, if `requester_profile_image_url` is null but `requester_user_id` is set, look up the requester's creator profile image instead.
+
+**Where to apply:**
+- **`Requests.tsx`** -- fetches `collab_requests` for RequestCard display. Join with creators table to get the requester's creator profile image as fallback.
+- **`Dashboard.tsx`** -- same pattern for the recent requests list.
+- **`Workspace.tsx`** -- already fetches creator info for the partner sidebar, just needs to also check the requester's creator profile image.
+- **`CollabCalendar.tsx`** -- receives booking details from parent, so the parent must pass the resolved image.
+
+**Implementation approach:** After fetching requests, for any request where `requester_profile_image_url` is null AND `requester_user_id` is not null, do a single batch query to `public_creator_profiles` to get their `profile_image_url` and merge it in. This avoids N+1 queries.
+
+### 2. Database Backfill: Populate missing `requester_profile_image_url` from creators table
+
+Run a one-time SQL update to copy `profile_image_url` from `creators` to `collab_requests.requester_profile_image_url` where:
+- The request has `requester_user_id` matching a creator's `user_id`
+- The request's `requester_profile_image_url` is currently NULL
+- The creator has a non-null `profile_image_url`
+
+```sql
+UPDATE collab_requests cr
+SET requester_profile_image_url = c.profile_image_url
+FROM creators c
+WHERE cr.requester_user_id = c.user_id
+  AND cr.requester_profile_image_url IS NULL
+  AND c.profile_image_url IS NOT NULL;
 ```
-Booking page → checks host capacity → blocks new incoming requests when at capacity
-Workspace → always open for approved/published collabs (no pro gate)
-Publish → gated for free users who exhausted host spots
-```
 
-### Rules
+### 3. Settings.tsx: Fix image not being sanitized before save
 
-1. **Permanent Access**: Users are never locked out of a workspace they have already started or finished. All 3 default collabs are theirs forever.
-2. **Host Gate**: The credit limit only applies to incoming requests on a creator's booking page. Once host spots are filled, the booking page shows an "At Capacity" message.
-3. **Guest Permission**: A free user can always send a request to another writer. Their own host credit count does not restrict them from acting as a guest.
-4. **Referral Credits**: When a new writer registers through an invite link (`?ref={username}`), the referrer earns 1 additional host spot via the `referral_credits` table and a DB trigger.
-5. **Paid Accounts**: Paid or founder accounts have zero restrictions — unlimited host spots and requests.
+The `Settings.tsx` `autoFetchProfileImage` and `handleSave` functions store the raw image URL from `fetch-substack-profile` without sanitizing it. Apply `sanitizeSubstackImageUrl` before saving to the database.
 
-### What Changed (v2)
+## Files Changed
 
-1. **Database**: Added `referral_credits` table, `referred_by` column on `creators`, `get_host_capacity` RPC function, `award_referral_credit` trigger
-2. **`usePro.ts`**: Removed `isInFreeTier`/`isPro` conflation. Now returns `hostCapacity` (limit, used, remaining, referralBonus) and `canHostMore`. `isPro` = paid/founder/trial only.
-3. **`useCreatorPro.ts`**: Simplified — no longer gates workspace access. Only used for feature checks (AI drafts etc).
-4. **`Workspace.tsx`**: Removed the pro gate walls entirely. Workspace is always open. Publish gate uses `canHostMore` instead of `!isPro`.
-5. **`PublicBooking.tsx`**: Added capacity check via `get_host_capacity` RPC. Shows "At Capacity" message when free host has no remaining spots.
-6. **`Signup.tsx`**: Captures `?ref={username}` from URL and stores `referred_by` on the new creator row. DB trigger auto-awards the referral credit.
-7. **`Subscription.tsx`**: Shows dynamic host capacity (base + referral bonuses) instead of hardcoded 3. Shows referral bonus count.
-8. **`Discovery.tsx`**: Invite link uses `?ref={referrerUsername}` instead of `?ref=discovery`.
+| File | Change |
+|------|--------|
+| `src/pages/Requests.tsx` | After fetching requests, batch-resolve missing images from `public_creator_profiles` |
+| `src/pages/Dashboard.tsx` | Same batch-resolve pattern for recent requests |
+| `src/pages/Workspace.tsx` | Resolve partner image from creator profile when request image is null |
+| `src/pages/Settings.tsx` | Sanitize image URL before saving to DB |
+| Migration SQL (data update) | Backfill `requester_profile_image_url` from `creators.profile_image_url` |
 
-### Host "Home Court" Advantage
-
-The host has exclusive controls that guests do not:
-- Generate/regenerate AI drafts
-- Approve/decline requests
-- Set collab link
-- Mark as published
-- Export controls
-- Analytics/retrospective ownership
