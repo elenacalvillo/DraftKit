@@ -147,7 +147,20 @@ export default function Workspace() {
         return;
       }
 
-      setRequest(data as WorkspaceRequest);
+      // Resolve missing requester profile image from their creator profile
+      let resolvedData = data;
+      if (!data.requester_profile_image_url && data.requester_user_id) {
+        const { data: reqCreator } = await supabase
+          .from('creators')
+          .select('profile_image_url')
+          .eq('user_id', data.requester_user_id)
+          .maybeSingle();
+        if (reqCreator?.profile_image_url) {
+          resolvedData = { ...data, requester_profile_image_url: reqCreator.profile_image_url };
+        }
+      }
+
+      setRequest(resolvedData as WorkspaceRequest);
       setLocalDraft((data.ai_draft as unknown as CollabDraft) || null);
 
       // Fetch creator info

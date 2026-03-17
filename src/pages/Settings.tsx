@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/hooks/useAuth";
 import { usePro } from "@/hooks/usePro";
 import { supabase } from "@/integrations/supabase/client";
+import { sanitizeSubstackImageUrl } from "@/lib/utils";
 import { settingsSchema, COLLAB_TYPE_METADATA, COLLAB_MODE_METADATA, COLLAB_MODE_OPTIONS, type CollabStyle, type DateMeaning, type CollabMode } from "@/lib/validations";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";

@@ -110,7 +110,31 @@ export default function Requests() {
       .order('created_at', { ascending: false });
 
     if (data) {
-      setRequests(data as DbCollabRequest[]);
+      // Batch-resolve missing profile images from creator profiles
+      const missingImageUserIds = data
+        .filter((r: any) => !r.requester_profile_image_url && r.requester_user_id)
+        .map((r: any) => r.requester_user_id!);
+
+      let imageMap: Record<string, string> = {};
+      if (missingImageUserIds.length > 0) {
+        const { data: creators } = await supabase
+          .from('creators')
+          .select('user_id, profile_image_url')
+          .in('user_id', missingImageUserIds)
+          .not('profile_image_url', 'is', null);
+        if (creators) {
+          imageMap = Object.fromEntries(creators.map(c => [c.user_id, c.profile_image_url!]));
+        }
+      }
+
+      const resolvedReqs = data.map((r: any) => ({
+        ...r,
+        requester_profile_image_url: r.requester_profile_image_url 
+          || (r.requester_user_id && imageMap[r.requester_user_id]) 
+          || null,
+      }));
+
+      setRequests(resolvedReqs as DbCollabRequest[]);
     }
   };
 

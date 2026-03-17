@@ -88,13 +88,37 @@ export default function Dashboard() {
     // Fetch requests
     const { data: reqData } = await supabase
       .from('collab_requests')
-      .select('id, requester_name, requester_email, requester_profile_image_url, requester_substack_url, requested_date, status, created_at, ai_draft')
+      .select('id, requester_name, requester_email, requester_profile_image_url, requester_substack_url, requester_user_id, requested_date, status, created_at, ai_draft')
       .eq('creator_id', creator.id)
       .eq('hidden_by_creator', false)
       .order('created_at', { ascending: false });
 
     if (reqData) {
-      setRequests(reqData);
+      // Batch-resolve missing profile images from creator profiles
+      const missingImageUserIds = reqData
+        .filter(r => !r.requester_profile_image_url && r.requester_user_id)
+        .map(r => r.requester_user_id!);
+
+      let imageMap: Record<string, string> = {};
+      if (missingImageUserIds.length > 0) {
+        const { data: creators } = await supabase
+          .from('creators')
+          .select('user_id, profile_image_url')
+          .in('user_id', missingImageUserIds)
+          .not('profile_image_url', 'is', null);
+        if (creators) {
+          imageMap = Object.fromEntries(creators.map(c => [c.user_id, c.profile_image_url!]));
+        }
+      }
+
+      const resolvedReqs = reqData.map(r => ({
+        ...r,
+        requester_profile_image_url: r.requester_profile_image_url 
+          || (r.requester_user_id && imageMap[r.requester_user_id]) 
+          || null,
+      }));
+
+      setRequests(resolvedReqs);
 
       const approvedRequests = reqData.filter((r) => r.status === "approved" && r.requested_date);
       const publishedRequests = reqData.filter((r) => r.status === "published" && r.requested_date);
