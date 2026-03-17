@@ -165,17 +165,24 @@ function normalizeSubstackUrl(url: string): string {
 function isValidProfileImage(url: string): boolean {
   // Reject social cards, subscribe cards, and other non-profile images
   if (!url) return false;
+  const lowerUrl = url.toLowerCase();
   const invalidPatterns = [
     'subscribe-card',
-    'aspectRatio%3Dlink',
-    'aspectRatio=link',
+    'twitter/subscribe-card',
+    'aspectratio%3dlink',
+    'aspectratio=link',
     'twitter_name',
     'og_image',
     'social',
     'cover_image',
     'newsletter_logo',
   ];
-  return !invalidPatterns.some(pattern => url.toLowerCase().includes(pattern.toLowerCase()));
+  return !invalidPatterns.some(pattern => lowerUrl.includes(pattern));
+}
+
+function sanitizeSubstackImageUrl(url: string): string {
+  if (!url) return url;
+  return url.replace(/\$s_![^!]*!,?/, '');
 }
 
 function extractProfileData(html: string, isProfilePage: boolean): SubstackProfile {
