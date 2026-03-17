@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { CollabRequest, CollabDraft } from "@/lib/storage";
-import { cn, parseDateString } from "@/lib/utils";
+import { cn, parseDateString, sanitizeSubstackImageUrl } from "@/lib/utils";
 import { CollabDraftModal } from "./CollabDraftModal";
 import { CollabImpactCard } from "./CollabImpactCard";
 import { SendMessageModal } from "./SendMessageModal";
