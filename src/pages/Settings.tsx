@@ -174,7 +174,7 @@ export default function Settings() {
         );
         
         if (!profileError && profileData?.imageUrl) {
-          profileImageUrl = profileData.imageUrl;
+          profileImageUrl = sanitizeSubstackImageUrl(profileData.imageUrl);
           setPreviewImageUrl(profileImageUrl);
         }
       } catch (e) {
