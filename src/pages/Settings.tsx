@@ -102,13 +102,14 @@ export default function Settings() {
       );
       
       if (!profileError && profileData?.imageUrl) {
-        setPreviewImageUrl(profileData.imageUrl);
+        const sanitizedUrl = sanitizeSubstackImageUrl(profileData.imageUrl);
+        setPreviewImageUrl(sanitizedUrl);
         
         // Also save to database immediately
         if (creator) {
           await supabase
             .from('creators')
-            .update({ profile_image_url: profileData.imageUrl })
+            .update({ profile_image_url: sanitizedUrl })
             .eq('id', creator.id);
           await refreshCreator();
         }
