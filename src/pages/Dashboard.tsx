@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
-import { parseDateString } from "@/lib/utils";
+import { parseDateString, sanitizeSubstackImageUrl } from "@/lib/utils";
 import { Copy, ExternalLink, Globe, MessageSquare, TrendingUp, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
