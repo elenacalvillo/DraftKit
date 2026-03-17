@@ -461,6 +461,10 @@ serve(async (req) => {
       console.log(`Page type: ${isProfilePage ? "profile" : "publication"}`);
       
       const profileData = extractProfileData(html, isProfilePage);
+      // Sanitize the image URL before returning
+      if (profileData.imageUrl) {
+        profileData.imageUrl = sanitizeSubstackImageUrl(profileData.imageUrl);
+      }
       console.log(`Extracted profile data:`, JSON.stringify(profileData));
       
       return new Response(

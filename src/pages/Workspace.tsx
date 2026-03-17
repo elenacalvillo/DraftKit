@@ -660,7 +660,7 @@ export default function Workspace() {
               <div className="flex items-center gap-3">
                 {partnerProfileImage ? (
                   <img
-                    src={partnerProfileImage}
+                    src={sanitizeSubstackImageUrl(partnerProfileImage)}
                     alt={partnerName || ""}
                     className="w-12 h-12 rounded-full object-cover border-2 border-primary/20"
                   />
