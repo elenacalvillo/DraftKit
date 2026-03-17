@@ -240,7 +240,7 @@ export function CollabCalendar({
             className="absolute -top-1 -right-1 z-10"
           >
             <Avatar className="w-5 h-5 border-2 border-background shadow-sm">
-              <AvatarImage src={bookingInfo.requesterProfileImageUrl || undefined} alt={bookingInfo.requesterName} />
+              <AvatarImage src={bookingInfo.requesterProfileImageUrl ? sanitizeSubstackImageUrl(bookingInfo.requesterProfileImageUrl) : undefined} alt={bookingInfo.requesterName} />
               <AvatarFallback className="text-[8px] bg-booked text-booked-foreground">
                 {bookingInfo.requesterName.slice(0, 2).toUpperCase()}
               </AvatarFallback>
