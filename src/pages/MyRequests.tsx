@@ -225,7 +225,7 @@ export default function MyRequests() {
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-12 w-12">
-                          <AvatarImage src={request.creator?.profile_image_url || undefined} />
+                          <AvatarImage src={request.creator?.profile_image_url ? sanitizeSubstackImageUrl(request.creator.profile_image_url) : undefined} />
                           <AvatarFallback>
                             {request.creator?.name?.charAt(0) || '?'}
                           </AvatarFallback>

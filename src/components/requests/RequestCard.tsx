@@ -295,7 +295,7 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
             <div className="relative flex-shrink-0">
               {showImage ? (
                 <img
-                  src={request.requesterProfileImageUrl!}
+                  src={sanitizedImageUrl!}
                   alt={request.requesterName}
                   className="w-10 h-10 rounded-full object-cover border-2 border-primary/20"
                   onError={() => setImageError(true)}

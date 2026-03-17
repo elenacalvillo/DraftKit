@@ -262,7 +262,8 @@ export default function Signup() {
           { body: { substackUrl: formData.substackUrl } }
         );
         if (profileData?.imageUrl) {
-          profileImageUrl = profileData.imageUrl;
+          const { sanitizeSubstackImageUrl } = await import("@/lib/utils");
+          profileImageUrl = sanitizeSubstackImageUrl(profileData.imageUrl);
         }
       } catch (e) {
         console.log("Could not fetch profile image during signup:", e);
