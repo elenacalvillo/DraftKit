@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, CalendarDays, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn, parseDateString } from "@/lib/utils";
+import { cn, parseDateString, sanitizeSubstackImageUrl } from "@/lib/utils";
 import { toast } from "sonner";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
