@@ -21,7 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { CollabDraft } from "@/lib/storage";
 import { CollabImpactCard } from "@/components/requests/CollabImpactCard";
-import { parseDateString, cn } from "@/lib/utils";
+import { parseDateString, cn, sanitizeSubstackImageUrl } from "@/lib/utils";
 import { extractSubstackUsername, normalizeSubstackUrl } from "@/lib/substack-url";
 import { toast } from "sonner";
 
@@ -660,7 +660,7 @@ export default function Workspace() {
               <div className="flex items-center gap-3">
                 {partnerProfileImage ? (
                   <img
-                    src={partnerProfileImage}
+                    src={sanitizeSubstackImageUrl(partnerProfileImage)}
                     alt={partnerName || ""}
                     className="w-12 h-12 rounded-full object-cover border-2 border-primary/20"
                   />

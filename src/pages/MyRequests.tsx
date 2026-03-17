@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { parseDateString } from '@/lib/utils';
+import { parseDateString, sanitizeSubstackImageUrl } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -225,7 +225,7 @@ export default function MyRequests() {
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-12 w-12">
-                          <AvatarImage src={request.creator?.profile_image_url || undefined} />
+                          <AvatarImage src={request.creator?.profile_image_url ? sanitizeSubstackImageUrl(request.creator.profile_image_url) : undefined} />
                           <AvatarFallback>
                             {request.creator?.name?.charAt(0) || '?'}
                           </AvatarFallback>

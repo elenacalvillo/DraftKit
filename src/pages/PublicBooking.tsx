@@ -15,7 +15,7 @@ import { analyzeCollabMatch, type CollabSuggestion, type CollabMatchResult } fro
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { useAuth } from "@/hooks/useAuth";
 import { parseProfileTheme, getThemeStyles, type ProfileTheme } from "@/lib/theme-presets";
-import { parseDateString } from "@/lib/utils";
+import { parseDateString, sanitizeSubstackImageUrl } from "@/lib/utils";
 import { TurnstileWidget } from "@/components/turnstile/TurnstileWidget";
 import { verifyTurnstileToken } from "@/lib/turnstile";
 
@@ -493,7 +493,7 @@ export default function PublicBooking() {
       );
       
       if (!profileError && profileData?.imageUrl) {
-        requesterProfileImageUrl = profileData.imageUrl;
+        requesterProfileImageUrl = sanitizeSubstackImageUrl(profileData.imageUrl);
       }
     } catch (e) {
       // Continue without profile image - it's not critical

@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { CollabRequest, CollabDraft } from "@/lib/storage";
-import { cn, parseDateString } from "@/lib/utils";
+import { cn, parseDateString, sanitizeSubstackImageUrl } from "@/lib/utils";
 import { CollabDraftModal } from "./CollabDraftModal";
 import { CollabImpactCard } from "./CollabImpactCard";
 import { SendMessageModal } from "./SendMessageModal";
@@ -265,7 +265,8 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
     }
   };
 
-  const showImage = request.requesterProfileImageUrl && !imageError;
+  const sanitizedImageUrl = request.requesterProfileImageUrl ? sanitizeSubstackImageUrl(request.requesterProfileImageUrl) : null;
+  const showImage = sanitizedImageUrl && !imageError;
   const isApproved = request.status === "approved";
 
   // Check if this is a past collab (archive view)
@@ -294,7 +295,7 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
             <div className="relative flex-shrink-0">
               {showImage ? (
                 <img
-                  src={request.requesterProfileImageUrl!}
+                  src={sanitizedImageUrl!}
                   alt={request.requesterName}
                   className="w-10 h-10 rounded-full object-cover border-2 border-primary/20"
                   onError={() => setImageError(true)}

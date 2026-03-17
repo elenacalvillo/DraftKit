@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
-import { parseDateString } from "@/lib/utils";
+import { parseDateString, sanitizeSubstackImageUrl } from "@/lib/utils";
 import { Copy, ExternalLink, Globe, MessageSquare, TrendingUp, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -365,7 +365,7 @@ export default function Dashboard() {
                   >
                     {request.requester_profile_image_url && !imageErrors.has(request.id) ? (
                       <img 
-                        src={request.requester_profile_image_url} 
+                        src={sanitizeSubstackImageUrl(request.requester_profile_image_url)} 
                         alt={request.requester_name}
                         className="w-10 h-10 rounded-full object-cover"
                         onError={() => handleImageError(request.id)}

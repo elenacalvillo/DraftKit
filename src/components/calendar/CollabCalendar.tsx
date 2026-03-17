@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, CalendarDays, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn, parseDateString } from "@/lib/utils";
+import { cn, parseDateString, sanitizeSubstackImageUrl } from "@/lib/utils";
 import { toast } from "sonner";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -240,7 +240,7 @@ export function CollabCalendar({
             className="absolute -top-1 -right-1 z-10"
           >
             <Avatar className="w-5 h-5 border-2 border-background shadow-sm">
-              <AvatarImage src={bookingInfo.requesterProfileImageUrl || undefined} alt={bookingInfo.requesterName} />
+              <AvatarImage src={bookingInfo.requesterProfileImageUrl ? sanitizeSubstackImageUrl(bookingInfo.requesterProfileImageUrl) : undefined} alt={bookingInfo.requesterName} />
               <AvatarFallback className="text-[8px] bg-booked text-booked-foreground">
                 {bookingInfo.requesterName.slice(0, 2).toUpperCase()}
               </AvatarFallback>
@@ -271,7 +271,7 @@ export function CollabCalendar({
             <TooltipContent side="top" className="p-3">
               <div className="flex items-center gap-3">
                 <Avatar className="w-10 h-10">
-                  <AvatarImage src={bookingInfo.requesterProfileImageUrl || undefined} alt={bookingInfo.requesterName} />
+                  <AvatarImage src={bookingInfo.requesterProfileImageUrl ? sanitizeSubstackImageUrl(bookingInfo.requesterProfileImageUrl) : undefined} alt={bookingInfo.requesterName} />
                   <AvatarFallback className="bg-booked text-booked-foreground">
                     {bookingInfo.requesterName.slice(0, 2).toUpperCase()}
                   </AvatarFallback>
