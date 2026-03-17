@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/hooks/useAuth";
 import { usePro } from "@/hooks/usePro";
 import { supabase } from "@/integrations/supabase/client";
+import { sanitizeSubstackImageUrl } from "@/lib/utils";
 import { settingsSchema, COLLAB_TYPE_METADATA, COLLAB_MODE_METADATA, COLLAB_MODE_OPTIONS, type CollabStyle, type DateMeaning, type CollabMode } from "@/lib/validations";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -101,13 +102,14 @@ export default function Settings() {
       );
       
       if (!profileError && profileData?.imageUrl) {
-        setPreviewImageUrl(profileData.imageUrl);
+        const sanitizedUrl = sanitizeSubstackImageUrl(profileData.imageUrl);
+        setPreviewImageUrl(sanitizedUrl);
         
         // Also save to database immediately
         if (creator) {
           await supabase
             .from('creators')
-            .update({ profile_image_url: profileData.imageUrl })
+            .update({ profile_image_url: sanitizedUrl })
             .eq('id', creator.id);
           await refreshCreator();
         }
@@ -172,7 +174,7 @@ export default function Settings() {
         );
         
         if (!profileError && profileData?.imageUrl) {
-          profileImageUrl = profileData.imageUrl;
+          profileImageUrl = sanitizeSubstackImageUrl(profileData.imageUrl);
           setPreviewImageUrl(profileImageUrl);
         }
       } catch (e) {
