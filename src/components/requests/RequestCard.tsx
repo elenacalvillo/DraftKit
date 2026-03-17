@@ -265,7 +265,8 @@ export function RequestCard({ request, creatorEmail, creatorCollabStyles, canApp
     }
   };
 
-  const showImage = request.requesterProfileImageUrl && !imageError;
+  const sanitizedImageUrl = request.requesterProfileImageUrl ? sanitizeSubstackImageUrl(request.requesterProfileImageUrl) : null;
+  const showImage = sanitizedImageUrl && !imageError;
   const isApproved = request.status === "approved";
 
   // Check if this is a past collab (archive view)
