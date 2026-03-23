@@ -164,9 +164,11 @@ export default function Dashboard() {
   const reach = uniqueUrls.size;
   const reachDisplay = `${reach} ${reach === 1 ? "Newsletter" : "Newsletters"}`;
 
-  // Time Saved: ai_draft count * 1.5 hrs
-  const draftsGenerated = requests.filter((r) => r.ai_draft !== null).length;
-  const hoursSaved = draftsGenerated * 1.5;
+  // Time Saved: published collabs × (manual baseline − DraftKit efficiency)
+  const MANUAL_TAX_HOURS = 8.5;
+  const DRAFTKIT_EFFICIENCY_HOURS = 1.0;
+  const publishedCount = publishedRequests.length;
+  const hoursSaved = publishedCount * (MANUAL_TAX_HOURS - DRAFTKIT_EFFICIENCY_HOURS);
   const timeSavedDisplay = hoursSaved % 1 === 0 ? `${hoursSaved} hrs` : `${hoursSaved.toFixed(1)} hrs`;
 
   const stats = [
@@ -196,11 +198,11 @@ export default function Dashboard() {
     },
     {
       icon: Zap,
-      label: "Time Saved Drafting",
-      subLabel: "Estimated drafting time saved",
+      label: "Time Saved",
+      subLabel: "vs. manual coordination baseline",
       value: timeSavedDisplay,
-      isEmpty: draftsGenerated === 0,
-      emptyTip: "Generate a SMART draft to start tracking how much drafting time DraftKit saves you",
+      isEmpty: publishedCount === 0,
+      emptyTip: "Publish your first collab to start tracking time saved vs. manual coordination",
       iconClassName: "",
       bgClassName: "",
       iconStyle: { color: "#2a2318" } as React.CSSProperties,
