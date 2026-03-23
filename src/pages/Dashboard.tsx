@@ -164,9 +164,11 @@ export default function Dashboard() {
   const reach = uniqueUrls.size;
   const reachDisplay = `${reach} ${reach === 1 ? "Newsletter" : "Newsletters"}`;
 
-  // Time Saved: ai_draft count * 1.5 hrs
-  const draftsGenerated = requests.filter((r) => r.ai_draft !== null).length;
-  const hoursSaved = draftsGenerated * 1.5;
+  // Time Saved: published collabs × (manual baseline − DraftKit efficiency)
+  const MANUAL_TAX_HOURS = 8.5;
+  const DRAFTKIT_EFFICIENCY_HOURS = 1.0;
+  const publishedCount = publishedRequests.length;
+  const hoursSaved = publishedCount * (MANUAL_TAX_HOURS - DRAFTKIT_EFFICIENCY_HOURS);
   const timeSavedDisplay = hoursSaved % 1 === 0 ? `${hoursSaved} hrs` : `${hoursSaved.toFixed(1)} hrs`;
 
   const stats = [
