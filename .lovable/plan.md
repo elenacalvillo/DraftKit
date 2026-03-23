@@ -1,43 +1,43 @@
 
-## Value-Based Trial: "Free for Your First 3 Collabs"
 
-**Status: IMPLEMENTED (v2 — Host Gate Architecture)**
+# Update "Time Saved" to a Research-Backed Dynamic Formula
 
-### Architecture (v2)
+## Problem
 
-The gate moved from "can you enter the workspace" to "can your booking page accept new requests."
+The current "Time Saved Drafting" metric uses `ai_draft count × 1.5 hrs`, which only measures AI draft generation. It ignores the broader coordination savings DraftKit provides (scheduling, messaging, workspace, etc.). The number barely moves and understates real value.
+
+## New Formula
+
+Based on the "8.5-hour coordination tax" research:
 
 ```
-Booking page → checks host capacity → blocks new incoming requests when at capacity
-Workspace → always open for approved/published collabs (no pro gate)
-Publish → gated for free users who exhausted host spots
+Time Saved = published_count × (MANUAL_TAX_HOURS - DRAFTKIT_EFFICIENCY_HOURS)
+           = published_count × (8.5 - 1.0)
+           = published_count × 7.5
 ```
 
-### Rules
+- `published_count`: collab requests with `status = 'published'` for the current creator
+- `MANUAL_TAX_HOURS = 8.5`: baseline manual coordination time per collab
+- `DRAFTKIT_EFFICIENCY_HOURS = 1.0`: estimated DraftKit workflow time
 
-1. **Permanent Access**: Users are never locked out of a workspace they have already started or finished. All 3 default collabs are theirs forever.
-2. **Host Gate**: The credit limit only applies to incoming requests on a creator's booking page. Once host spots are filled, the booking page shows an "At Capacity" message.
-3. **Guest Permission**: A free user can always send a request to another writer. Their own host credit count does not restrict them from acting as a guest.
-4. **Referral Credits**: When a new writer registers through an invite link (`?ref={username}`), the referrer earns 1 additional host spot via the `referral_credits` table and a DB trigger.
-5. **Paid Accounts**: Paid or founder accounts have zero restrictions — unlimited host spots and requests.
+The metric label changes from "Time Saved Drafting" to "Time Saved" with sub-label "vs. manual coordination baseline".
 
-### What Changed (v2)
+## Changes
 
-1. **Database**: Added `referral_credits` table, `referred_by` column on `creators`, `get_host_capacity` RPC function, `award_referral_credit` trigger
-2. **`usePro.ts`**: Removed `isInFreeTier`/`isPro` conflation. Now returns `hostCapacity` (limit, used, remaining, referralBonus) and `canHostMore`. `isPro` = paid/founder/trial only.
-3. **`useCreatorPro.ts`**: Simplified — no longer gates workspace access. Only used for feature checks (AI drafts etc).
-4. **`Workspace.tsx`**: Removed the pro gate walls entirely. Workspace is always open. Publish gate uses `canHostMore` instead of `!isPro`.
-5. **`PublicBooking.tsx`**: Added capacity check via `get_host_capacity` RPC. Shows "At Capacity" message when free host has no remaining spots.
-6. **`Signup.tsx`**: Captures `?ref={username}` from URL and stores `referred_by` on the new creator row. DB trigger auto-awards the referral credit.
-7. **`Subscription.tsx`**: Shows dynamic host capacity (base + referral bonuses) instead of hardcoded 3. Shows referral bonus count.
-8. **`Discovery.tsx`**: Invite link uses `?ref={referrerUsername}` instead of `?ref=discovery`.
+### `src/pages/Dashboard.tsx`
 
-### Host "Home Court" Advantage
+1. Replace the `draftsGenerated` / `hoursSaved` calculation:
+   - Remove: `const draftsGenerated = requests.filter(r => r.ai_draft !== null).length`
+   - Remove: `const hoursSaved = draftsGenerated * 1.5`
+   - Add constants: `MANUAL_TAX_HOURS = 8.5`, `DRAFTKIT_EFFICIENCY_HOURS = 1.0`
+   - Add: `const publishedCount = publishedRequests.length` (already computed above)
+   - Add: `const hoursSaved = publishedCount * (MANUAL_TAX_HOURS - DRAFTKIT_EFFICIENCY_HOURS)`
 
-The host has exclusive controls that guests do not:
-- Generate/regenerate AI drafts
-- Approve/decline requests
-- Set collab link
-- Mark as published
-- Export controls
-- Analytics/retrospective ownership
+2. Update the stat card:
+   - Label: "Time Saved" (drop "Drafting")
+   - Sub-label: "vs. manual coordination baseline"
+   - Empty check: `publishedCount === 0` instead of `draftsGenerated === 0`
+   - Empty tip: "Publish your first collab to start tracking time saved vs. manual coordination"
+
+No other files change. The `publishedRequests` array is already computed for Ship Rate, so we reuse it.
+
