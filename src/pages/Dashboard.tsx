@@ -155,14 +155,14 @@ export default function Dashboard() {
     : null;
   const shipRateDisplay = shipRate === null ? "—" : `${shipRate}%`;
 
-  // Collaborator Reach: unique requester_substack_url values
-  const uniqueUrls = new Set(
+  // Published Collabs: unique requester_substack_url from published requests
+  const uniquePublishedUrls = new Set(
     requests
-      .filter((r) => r.requester_substack_url)
+      .filter((r) => r.status === "published" && r.requester_substack_url)
       .map((r) => r.requester_substack_url!.trim().toLowerCase())
   );
-  const reach = uniqueUrls.size;
-  const reachDisplay = `${reach} ${reach === 1 ? "Newsletter" : "Newsletters"}`;
+  const publishedReach = uniquePublishedUrls.size;
+  const reachDisplay = `${publishedReach} ${publishedReach === 1 ? "Collab" : "Collabs"}`;
 
   // Time Saved: published collabs × (manual baseline − DraftKit efficiency)
   const MANUAL_TAX_HOURS = 8.5;
