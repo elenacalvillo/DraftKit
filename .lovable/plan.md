@@ -1,43 +1,36 @@
 
 
-# Update "Time Saved" to a Research-Backed Dynamic Formula
+# Sync Dashboard Metric Cards
 
 ## Problem
-
-The current "Time Saved Drafting" metric uses `ai_draft count × 1.5 hrs`, which only measures AI draft generation. It ignores the broader coordination savings DraftKit provides (scheduling, messaging, workspace, etc.). The number barely moves and understates real value.
-
-## New Formula
-
-Based on the "8.5-hour coordination tax" research:
-
-```
-Time Saved = published_count × (MANUAL_TAX_HOURS - DRAFTKIT_EFFICIENCY_HOURS)
-           = published_count × (8.5 - 1.0)
-           = published_count × 7.5
-```
-
-- `published_count`: collab requests with `status = 'published'` for the current creator
-- `MANUAL_TAX_HOURS = 8.5`: baseline manual coordination time per collab
-- `DRAFTKIT_EFFICIENCY_HOURS = 1.0`: estimated DraftKit workflow time
-
-The metric label changes from "Time Saved Drafting" to "Time Saved" with sub-label "vs. manual coordination baseline".
+The "Collaborator Reach" card counts all unique requester URLs (7), but "Time Saved" only counts published collabs (3). This makes the cards look disconnected — users expect the numbers to tell a coherent story.
 
 ## Changes
 
 ### `src/pages/Dashboard.tsx`
 
-1. Replace the `draftsGenerated` / `hoursSaved` calculation:
-   - Remove: `const draftsGenerated = requests.filter(r => r.ai_draft !== null).length`
-   - Remove: `const hoursSaved = draftsGenerated * 1.5`
-   - Add constants: `MANUAL_TAX_HOURS = 8.5`, `DRAFTKIT_EFFICIENCY_HOURS = 1.0`
-   - Add: `const publishedCount = publishedRequests.length` (already computed above)
-   - Add: `const hoursSaved = publishedCount * (MANUAL_TAX_HOURS - DRAFTKIT_EFFICIENCY_HOURS)`
+**Collaborator Reach card** (lines 158-165):
+- Change the count logic from "unique requester URLs across all requests" to "unique requester URLs from published requests only"
+- Change label from "Collaborator Reach" to "Published Collabs"
+- Change sub-label from "Unique audiences reached" to "Unique audiences you've shipped with"
+- Update the display to show count + "Collab"/"Collabs" instead of "Newsletter"/"Newsletters"
+- Update empty tip accordingly
 
-2. Update the stat card:
-   - Label: "Time Saved" (drop "Drafting")
-   - Sub-label: "vs. manual coordination baseline"
-   - Empty check: `publishedCount === 0` instead of `draftsGenerated === 0`
-   - Empty tip: "Publish your first collab to start tracking time saved vs. manual coordination"
+```typescript
+// Published Collabs: unique requester_substack_url from published requests
+const uniquePublishedUrls = new Set(
+  requests
+    .filter((r) => r.status === "published" && r.requester_substack_url)
+    .map((r) => r.requester_substack_url!.trim().toLowerCase())
+);
+const publishedReach = uniquePublishedUrls.size;
+const reachDisplay = `${publishedReach} ${publishedReach === 1 ? "Collab" : "Collabs"}`;
+```
 
-No other files change. The `publishedRequests` array is already computed for Ship Rate, so we reuse it.
+**Ship Rate card**: Keep as-is (43% is the funnel efficiency metric — it complements the other two cards).
+
+This way all three cards tell a consistent story:
+- **Ship Rate**: What % of your pipeline converts
+- **Published Collabs**: How many unique audiences you've shipped with
+- **Time Saved**: Hours saved from those published collabs
 
