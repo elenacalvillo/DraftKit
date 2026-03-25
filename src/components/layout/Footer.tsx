@@ -68,13 +68,6 @@ export function Footer() {
             <span>© {currentYear}</span>
           </div>
         </div>
-
-        <div className="text-center mt-6 pt-6 border-t border-border/30">
-          <span className="inline-flex items-center gap-1.5 text-[10px] text-muted-foreground/50 font-mono tracking-wider uppercase">
-            <Zap className="w-3 h-3" />
-            Powered by Direct Metadata Resolution v1.0
-          </span>
-        </div>
       </div>
     </footer>
   );
