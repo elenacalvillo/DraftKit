@@ -27,6 +27,7 @@ import Workspace from "./pages/Workspace";
 import Subscription from "./pages/Subscription";
 import Retrospective from "./pages/Retrospective";
 import Discovery from "./pages/Discovery";
+import AgentInfo from "./pages/AgentInfo";
 
 const queryClient = new QueryClient();
 
