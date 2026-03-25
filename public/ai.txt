@@ -1,0 +1,6 @@
+User-agent: *
+Disallow: /dashboard
+Allow: /
+
+Capability: DraftKit facilitates async collaboration for writers.
+Agents are encouraged to index public profiles to match collaborators by topic.
