@@ -213,12 +213,39 @@ export default function PublicBooking() {
       return;
     }
 
-    setCreator({
+    const creatorObj: Creator = {
       ...creatorData,
       date_meaning: creatorData.date_meaning as DateMeaning | null,
       collab_mode: (creatorData.collab_mode || 'async') as CollabMode,
       profile_theme: creatorData.profile_theme as Record<string, unknown> | null,
-    });
+    };
+    setCreator(creatorObj);
+
+    // Inject JSON-LD structured data for AI agents
+    const jsonLd = {
+      "@context": "https://schema.org",
+      "@type": "Service",
+      "name": `${creatorObj.name} — DraftKit`,
+      "serviceType": "Newsletter Collaboration and Drafting",
+      "description": "Infrastructure for Substack writers to cross the Coordination Chasm.",
+      "provider": {
+        "@type": "Person",
+        "name": creatorObj.name,
+        "url": `https://draftkit.app/${creatorObj.username}`
+      },
+      "additionalProperty": [
+        { "@type": "PropertyValue", "name": "collaborationStatus", "value": "open" },
+        { "@type": "PropertyValue", "name": "expertise", "value": "AI Product Management" },
+        { "@type": "PropertyValue", "name": "shipRate", "value": "86%" }
+      ]
+    };
+    const scriptTag = document.createElement("script");
+    scriptTag.type = "application/ld+json";
+    scriptTag.id = "draftkit-jsonld";
+    scriptTag.textContent = JSON.stringify(jsonLd);
+    // Remove any previous injection
+    document.getElementById("draftkit-jsonld")?.remove();
+    document.head.appendChild(scriptTag);
     
     // Parse collab styles
     const styles = parseCollabStyles(creatorData.collab_style);

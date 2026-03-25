@@ -48,6 +48,7 @@ const App = () => (
             <Route path="/transparency" element={<Transparency />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/demo" element={<Demo />} />
+            <Route path="/api/v1/agent-info" element={<AgentInfo />} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/dashboard/availability" element={<ProtectedRoute><Availability /></ProtectedRoute>} />
             <Route path="/dashboard/requests" element={<ProtectedRoute><Requests /></ProtectedRoute>} />
