@@ -13,8 +13,8 @@ import { WorkspaceEditor } from "./WorkspaceEditor";
 import { cn } from "@/lib/utils";
 import { exportWorkspaceHtmlToDocx } from "@/lib/export-draft";
 
-const ALLOWED_TAGS = ["p", "h1", "h2", "h3", "strong", "em", "s", "code", "pre", "a", "ul", "ol", "li", "br", "hr"];
-const ALLOWED_ATTR = ["href", "target", "rel"];
+const ALLOWED_TAGS = ["p", "h1", "h2", "h3", "strong", "em", "s", "code", "pre", "a", "ul", "ol", "li", "br", "hr", "table", "thead", "tbody", "tr", "th", "td", "span"];
+const ALLOWED_ATTR = ["href", "target", "rel", "colspan", "rowspan", "colwidth", "class", "data-comment", "data-author"];
 
 function sanitize(html: string): string {
   return DOMPurify.sanitize(html, { ALLOWED_TAGS, ALLOWED_ATTR });
@@ -205,6 +205,7 @@ export function SharedWorkspace({
               content={editContent}
               onChange={setEditContent}
               editable={true}
+              currentUserName={currentUserName}
             />
 
             {/* Zen header portal: Save & Notify */}
