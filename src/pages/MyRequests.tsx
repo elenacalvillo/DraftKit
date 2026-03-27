@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Send, Calendar, Clock, ExternalLink, Inbox, ArrowRight, X, CalendarClock, Trash2, MessageSquare, PenLine } from 'lucide-react';
+import { Send, Calendar, Clock, ExternalLink, Inbox, ArrowRight, X, CalendarClock, Trash2, MessageSquare, PenLine, Eye, EyeOff } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { toast } from 'sonner';
@@ -63,6 +63,7 @@ export default function MyRequests() {
   const [loading, setLoading] = useState(true);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [messageModalRequest, setMessageModalRequest] = useState<SentRequest | null>(null);
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -191,14 +192,31 @@ export default function MyRequests() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Sent Requests</h1>
-          <p className="text-muted-foreground">
-            Track collaboration requests you've sent to other creators
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Sent Requests</h1>
+            <p className="text-muted-foreground">
+              Track collaboration requests you've sent to other creators
+            </p>
+          </div>
+          {requests.some(r => r.status === 'declined' || r.status === 'cancelled') && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowAll(!showAll)}
+              className="shrink-0 text-muted-foreground"
+            >
+              {showAll ? <EyeOff className="h-4 w-4 mr-1" /> : <Eye className="h-4 w-4 mr-1" />}
+              {showAll ? 'Hide Declined' : 'Show All'}
+            </Button>
+          )}
         </div>
 
-        {requests.length === 0 ? (
+        {(() => {
+          const filtered = showAll
+            ? requests
+            : requests.filter(r => r.status !== 'declined' && r.status !== 'cancelled');
+          return filtered.length === 0 ? (
           <Card className="border-dashed">
             <CardContent className="flex flex-col items-center justify-center py-12">
               <div className="rounded-full bg-muted p-4 mb-4">
@@ -216,7 +234,7 @@ export default function MyRequests() {
           </Card>
         ) : (
           <div className="grid gap-4">
-            {requests.map((request) => {
+            {filtered.map((request) => {
               const status = statusVariants[request.status] || statusVariants.pending;
               
               return (
@@ -230,8 +248,8 @@ export default function MyRequests() {
                             {request.creator?.name?.charAt(0) || '?'}
                           </AvatarFallback>
                         </Avatar>
-                        <div>
-                          <CardTitle className="text-lg">
+                        <div className="min-w-0">
+                          <CardTitle className="text-lg break-words">
                             {request.creator?.name || 'Unknown Creator'}
                           </CardTitle>
                           <CardDescription className="flex items-center gap-1">
@@ -275,7 +293,7 @@ export default function MyRequests() {
                       </div>
                       <div className="flex items-center gap-1.5">
                         <Send className="h-4 w-4" />
-                        <span>{request.requester_email}</span>
+                        <span>You</span>
                       </div>
                     </div>
 
@@ -389,7 +407,8 @@ export default function MyRequests() {
               );
             })}
           </div>
-        )}
+        );
+        })()}
 
         {/* Guest Message Modal */}
         {messageModalRequest && (

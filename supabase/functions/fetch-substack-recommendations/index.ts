@@ -230,10 +230,10 @@ Deno.serve(async (req) => {
     console.log(`Fetched ${parsedRecs.length} recommendations via API`);
 
     // Build DraftKit creator map for cross-referencing
+    // Fetch ALL creators (with substack_url OR newsletter_url) for cross-referencing
     const { data: existingCreators } = await serviceClient
       .from("creators")
-      .select("id, substack_url, username, name, profile_image_url")
-      .not("substack_url", "is", null);
+      .select("id, substack_url, newsletter_url, username, name, profile_image_url");
 
     const creatorBySubdomain = new Map<
       string,
@@ -245,6 +245,7 @@ Deno.serve(async (req) => {
       }
     >();
     for (const c of existingCreators || []) {
+      // Index by substack_url subdomain
       if (c.substack_url) {
         const sd = extractSubdomain(c.substack_url);
         if (sd) {
@@ -255,6 +256,31 @@ Deno.serve(async (req) => {
             profile_image_url: c.profile_image_url,
           });
         }
+      }
+      // Also index by newsletter_url hostname (for custom domains)
+      if (c.newsletter_url) {
+        const nlSd = extractSubdomain(c.newsletter_url);
+        if (nlSd && !creatorBySubdomain.has(nlSd.toLowerCase())) {
+          creatorBySubdomain.set(nlSd.toLowerCase(), {
+            id: c.id,
+            username: c.username,
+            name: c.name,
+            profile_image_url: c.profile_image_url,
+          });
+        }
+        // Also try raw hostname for custom domains (e.g. "karensmiley.com")
+        try {
+          const raw = c.newsletter_url.startsWith("http") ? c.newsletter_url : `https://${c.newsletter_url}`;
+          const hostname = new URL(raw).hostname.replace("www.", "");
+          if (!creatorBySubdomain.has(hostname.toLowerCase())) {
+            creatorBySubdomain.set(hostname.toLowerCase(), {
+              id: c.id,
+              username: c.username,
+              name: c.name,
+              profile_image_url: c.profile_image_url,
+            });
+          }
+        } catch {}
       }
     }
 
@@ -293,7 +319,20 @@ Deno.serve(async (req) => {
         { onConflict: "creator_id,publication_id" }
       );
 
-      const dkCreator = creatorBySubdomain.get(rec.subdomain.toLowerCase());
+      // Try matching by subdomain, then by custom_domain hostname
+      let dkCreator = creatorBySubdomain.get(rec.subdomain.toLowerCase());
+      if (!dkCreator) {
+        // Also try matching by custom_domain if present
+        const pub2 = (items.find((i: any) => {
+          const p = i.recommendedPublication || i;
+          return (p.subdomain || "") === rec.subdomain;
+        }) as any);
+        const customDomain = pub2?.recommendedPublication?.custom_domain || pub2?.custom_domain;
+        if (customDomain) {
+          const domainKey = String(customDomain).replace("www.", "").toLowerCase();
+          dkCreator = creatorBySubdomain.get(domainKey);
+        }
+      }
 
       results.push({
         id: pub.id,
@@ -308,6 +347,9 @@ Deno.serve(async (req) => {
         draftKitProfileImage: dkCreator?.profile_image_url || null,
       });
     }
+
+    // Sort: isOnDraftKit first
+    results.sort((a, b) => (a.isOnDraftKit === b.isOnDraftKit ? 0 : a.isOnDraftKit ? -1 : 1));
 
     return new Response(JSON.stringify({ recommendations: results }), {
       status: 200,
