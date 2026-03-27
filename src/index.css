@@ -225,3 +225,18 @@
   pointer-events: none;
   height: 0;
 }
+
+/* Table styles */
+.workspace-prose table { border-collapse: collapse; width: 100%; margin: 0.75rem 0; }
+.workspace-prose th, .workspace-prose td { border: 1px solid hsl(var(--border) / 0.5); padding: 0.5rem 0.75rem; text-align: left; min-width: 80px; }
+.workspace-prose th { background: hsl(var(--muted) / 0.3); font-weight: 600; }
+.workspace-prose .selectedCell { background: hsl(var(--primary) / 0.08); }
+
+/* Sticky highlight comments */
+.workspace-prose .dk-highlight {
+  background: hsl(45 93% 80% / 0.4);
+  border-bottom: 2px solid hsl(45 93% 60% / 0.6);
+  padding: 1px 0;
+  cursor: pointer;
+  border-radius: 2px;
+}
