@@ -1,6 +1,11 @@
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
+import Table from "@tiptap/extension-table";
+import TableRow from "@tiptap/extension-table-row";
+import TableCell from "@tiptap/extension-table-cell";
+import TableHeader from "@tiptap/extension-table-header";
+import { StickyComment } from "@/lib/tiptap-sticky-comment";
 import {
   Bold,
   Italic,
@@ -12,6 +17,8 @@ import {
   ListOrdered,
   Minus,
   ChevronDown,
+  Table2,
+  Highlighter,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,26 +30,34 @@ import {
 import { cn } from "@/lib/utils";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { CommentInput } from "./CommentInput";
+import { HighlightTooltip } from "./HighlightTooltip";
 
 interface WorkspaceEditorProps {
   content: string;
   onChange: (html: string) => void;
   editable: boolean;
+  currentUserName?: string;
 }
 
-const extensions = [
-  StarterKit.configure({
-    heading: { levels: [1, 2, 3] },
-    blockquote: false,
-  }),
-  Link.configure({
-    openOnClick: false,
-    HTMLAttributes: { rel: "noopener noreferrer", target: "_blank" },
-    validate: (href) => /^https?:\/\//.test(href),
-  }),
-];
+export function WorkspaceEditor({ content, onChange, editable, currentUserName }: WorkspaceEditorProps) {
+  const extensions = [
+    StarterKit.configure({
+      heading: { levels: [1, 2, 3] },
+      blockquote: false,
+    }),
+    Link.configure({
+      openOnClick: false,
+      HTMLAttributes: { rel: "noopener noreferrer", target: "_blank" },
+      validate: (href) => /^https?:\/\//.test(href),
+    }),
+    Table.configure({ resizable: false }),
+    TableRow,
+    TableCell,
+    TableHeader,
+    StickyComment,
+  ];
 
-export function WorkspaceEditor({ content, onChange, editable }: WorkspaceEditorProps) {
   const editor = useEditor({
     extensions,
     content,
@@ -81,6 +96,64 @@ export function WorkspaceEditor({ content, onChange, editable }: WorkspaceEditor
     editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
   }, [editor]);
 
+  // Comment input state
+  const [commentState, setCommentState] = useState<{
+    show: boolean;
+    existingComment?: string;
+    anchorRect?: { top: number; left: number } | null;
+  }>({ show: false });
+
+  const handleHighlighter = useCallback(() => {
+    if (!editor) return;
+
+    // Check if cursor is inside an existing highlight
+    if (editor.isActive("stickyComment")) {
+      const attrs = editor.getAttributes("stickyComment");
+      const { view } = editor;
+      const { from } = view.state.selection;
+      const coords = view.coordsAtPos(from);
+      setCommentState({
+        show: true,
+        existingComment: attrs.comment || "",
+        anchorRect: { top: coords.top - 80, left: coords.left },
+      });
+      return;
+    }
+
+    // Must have a selection
+    const { from, to } = editor.state.selection;
+    if (from === to) return;
+
+    const coords = editor.view.coordsAtPos(from);
+    setCommentState({
+      show: true,
+      anchorRect: { top: coords.top - 80, left: coords.left },
+    });
+  }, [editor]);
+
+  const handleCommentSave = useCallback(
+    (comment: string) => {
+      if (!editor) return;
+      const author = currentUserName || "Unknown";
+
+      if (commentState.existingComment !== undefined) {
+        // Update existing
+        editor.chain().focus().extendMarkRange("stickyComment").updateStickyComment({ comment }).run();
+      } else {
+        // New highlight
+        editor.chain().focus().setStickyComment({ comment, author }).run();
+      }
+      setCommentState({ show: false });
+    },
+    [editor, currentUserName, commentState.existingComment]
+  );
+
+  const handleCommentDelete = useCallback(() => {
+    if (!editor) return;
+    editor.chain().focus().extendMarkRange("stickyComment").unsetStickyComment().run();
+    setCommentState({ show: false });
+  }, [editor]);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const [bounds, setBounds] = useState<{ left: number; width: number } | null>(null);
 
@@ -114,6 +187,23 @@ export function WorkspaceEditor({ content, onChange, editable }: WorkspaceEditor
       <div className="overflow-hidden min-w-0">
         <EditorContent editor={editor} />
       </div>
+
+      {/* Highlight tooltip for view mode */}
+      <HighlightTooltip containerRef={containerRef as React.RefObject<HTMLDivElement>} />
+
+      {/* Comment input popover */}
+      {commentState.show &&
+        createPortal(
+          <CommentInput
+            initialComment={commentState.existingComment || ""}
+            isEditing={commentState.existingComment !== undefined}
+            onSave={handleCommentSave}
+            onCancel={() => setCommentState({ show: false })}
+            onDelete={commentState.existingComment !== undefined ? handleCommentDelete : undefined}
+            anchorRect={commentState.anchorRect}
+          />,
+          document.body
+        )}
 
       {/* Floating Pill Toolbar -- portaled to body */}
       {editable && createPortal(
@@ -193,6 +283,11 @@ export function WorkspaceEditor({ content, onChange, editable }: WorkspaceEditor
             <LinkIcon className="w-4 h-4" />
           </ToolbarButton>
 
+          {/* Highlighter */}
+          <ToolbarButton active={editor.isActive("stickyComment")} onClick={handleHighlighter} title="Add comment highlight">
+            <Highlighter className="w-4 h-4" />
+          </ToolbarButton>
+
           <div className="w-px h-5 bg-border/40 mx-1" />
 
           {/* Lists */}
@@ -209,6 +304,51 @@ export function WorkspaceEditor({ content, onChange, editable }: WorkspaceEditor
           <ToolbarButton active={false} onClick={() => editor.chain().focus().setHorizontalRule().run()} title="Divider (---)">
             <Minus className="w-4 h-4" />
           </ToolbarButton>
+
+          {/* Table dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                title="Table"
+                className={cn(
+                  "h-8 w-8 flex items-center justify-center rounded-md transition-all hover:scale-105",
+                  editor.isActive("table")
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                )}
+              >
+                <Table2 className="w-4 h-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-[150px]">
+              <DropdownMenuItem onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}>
+                Insert Table (3×3)
+              </DropdownMenuItem>
+              {editor.isActive("table") && (
+                <>
+                  <DropdownMenuItem onClick={() => editor.chain().focus().addRowAfter().run()}>
+                    Add Row
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => editor.chain().focus().addColumnAfter().run()}>
+                    Add Column
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => editor.chain().focus().deleteRow().run()}>
+                    Delete Row
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => editor.chain().focus().deleteColumn().run()}>
+                    Delete Column
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => editor.chain().focus().deleteTable().run()}
+                    className="text-destructive"
+                  >
+                    Delete Table
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>,
         document.body
       )}
