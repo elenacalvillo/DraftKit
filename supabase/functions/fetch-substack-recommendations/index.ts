@@ -321,18 +321,6 @@ Deno.serve(async (req) => {
 
       // Try matching by subdomain, then by custom_domain hostname
       let dkCreator = creatorBySubdomain.get(rec.subdomain.toLowerCase());
-      if (!dkCreator) {
-        // Also try matching by custom_domain if present
-        const pub2 = (items.find((i: any) => {
-          const p = i.recommendedPublication || i;
-          return (p.subdomain || "") === rec.subdomain;
-        }) as any);
-        const customDomain = pub2?.recommendedPublication?.custom_domain || pub2?.custom_domain;
-        if (customDomain) {
-          const domainKey = String(customDomain).replace("www.", "").toLowerCase();
-          dkCreator = creatorBySubdomain.get(domainKey);
-        }
-      }
 
       results.push({
         id: pub.id,
