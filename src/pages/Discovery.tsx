@@ -327,6 +327,9 @@ export default function Discovery() {
         {/* Creator Search */}
         <CreatorSearchSection currentUsername={creator?.username} />
 
+        {/* New on DraftKit */}
+        <NewOnDraftKitSection currentUsername={creator?.username} />
+
         {/* Substack Recommendations */}
         <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">
           Your Substack Recommendations
