@@ -1,53 +1,66 @@
-# Fix Discovery Ranking, Sent Requests Cleanup, and Creator Search
 
-## Three Issues
 
-### 1. Registered Users Missing from Discovery (Karen Smiley bug)
+# Discovery Gap: Why Karen and New Creators Don't Appear
 
-**Root cause**: The edge function (`fetch-substack-recommendations`) matches recommendations to DraftKit creators only by `substack_url` subdomain. If a creator registered with a `newsletter_url` (custom domain) or a slightly different URL format, the match fails silently. Karen has an account but her subdomain doesn't match any recommendation entry.
+## The Problem
 
-**Fix — Edge Function** (`supabase/functions/fetch-substack-recommendations/index.ts`):
+The Discovery page has **two separate data sources** that don't overlap:
 
-- Also index creators by `newsletter_url` in the `creatorBySubdomain` map (extract hostname for custom domains)
-- After building the recommendations list, sort results so `isOnDraftKit: true` entries come first (pinned to top)
+1. **Substack Recommendations grid** — Only shows creators who appear in YOUR Substack recommendation list (fetched via Substack API). If Karen isn't someone you explicitly recommend on Substack, she will never appear here regardless of having a DraftKit account.
 
-**Fix — Frontend** (`src/pages/Discovery.tsx`):
+2. **Creator Search bar** — Queries `public_creator_profiles` by name/username, but ONLY when the user actively types a search query. It shows nothing by default.
 
-- Sort the returned recommendations client-side as well: `isOnDraftKit` entries first
-- Add a "Registered on DraftKit" section separator or just pin them to the top of the grid
+So new DraftKit creators who aren't in your Substack recommendations are invisible unless you already know their name and search for them.
 
-### 2. Creator Search from Discovery
+## Architecture Assessment: Should We Merge Tables?
 
-`**src/pages/Discovery.tsx**`:
+No. The current table separation is correct and should stay:
 
-- Add a search input above the grid that queries `public_creator_profiles` by name (case-insensitive `ilike`)
-- Show search results as a separate section ("All DraftKit Creators") above the Substack recommendations
-- Each result shows avatar, name, username, and a "View Profile" button linking to `/{username}`
-- Search is debounced (300ms), minimum 2 characters
+- `creators` — Full profile with sensitive fields (Stripe IDs, subscription tier, user_id). Protected by owner-only + username-based RLS.
+- `public_creator_profiles` — Security-invoker view that strips sensitive columns. This is the right pattern.
+- `discovered_publications` — Substack metadata catalog (external data, not DraftKit users).
+- `creator_recommendations` — Junction table mapping your recs to discovered pubs.
 
-### 3. Hide Declined Requests in Sent Requests
+Merging would create security regressions. The real fix is a **UI/query gap**, not a schema problem.
 
-`**src/pages/MyRequests.tsx**`:
+## The Fix
 
-- Add a `showAll` toggle state (default `false`)
-- Filter `requests` to exclude `status === 'declined'` and `status === 'cancelled'` when `showAll` is false
-- Add a small "Show All" / "Hide Declined" toggle button near the page header
-- Declined requests already have a dismiss (hide) button but the user shouldn't need to manually trash each one
+Add a **"New on DraftKit" section** to Discovery that loads automatically (no search required) and shows all registered creators the current user hasn't collaborated with yet.
 
-### 4. Name Truncation Fix in Sent Requests
+### Changes
 
-`**src/pages/MyRequests.tsx**`:
+**`src/pages/Discovery.tsx`**
 
-- The `CardTitle` uses default styling which may truncate on narrow cards
-- Remove any `truncate` class if present, or ensure the name area has `break-words` and no max-width constraint
-- The `text-lg` on `CardTitle` is fine; the issue is likely the flex layout compressing the name div when the badge takes space — give the name container `min-w-0` and ensure the title can wrap
-- Also, the emails are not being treated correctly in this screen, they are visible and we agreed to not make it visible in the front end, they should be treated as the other pages to address privacy and security.
+1. Add a new query that fetches the latest creators from `public_creator_profiles` on page load (no search needed):
+   - `SELECT id, name, username, profile_image_url, bio, created_at FROM public_creator_profiles WHERE username IS NOT NULL ORDER BY created_at DESC LIMIT 20`
+   - Filter out the current user
+   - Display as a grid section titled "New on DraftKit" between the search bar and the Substack Recommendations section
+   - Each card shows avatar, name, username, and a "View Profile" button (same card component as search results)
+
+2. Keep the existing search bar — it becomes a filter/discovery tool on top of the auto-loaded section.
+
+3. Keep the Substack Recommendations section below — it shows cross-platform network data.
+
+### Layout Order
+```text
+┌─────────────────────────────┐
+│ Search bar                  │
+├─────────────────────────────┤
+│ Search results (if typing)  │
+├─────────────────────────────┤
+│ "New on DraftKit" grid      │  ← NEW: auto-loaded, no search needed
+│ (latest 20 creators)        │
+├─────────────────────────────┤
+│ "Your Substack Recs" grid   │  ← existing
+└─────────────────────────────┘
+```
+
+### No database changes needed
+The `public_creator_profiles` view already has the data. We just need to query it on mount instead of only on search.
 
 ## Files Changed
 
+| File | Change |
+|------|--------|
+| `src/pages/Discovery.tsx` | Add auto-loaded "New on DraftKit" section using `useQuery` on `public_creator_profiles` |
 
-| File                                                         | Change                                                                                          |
-| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
-| `supabase/functions/fetch-substack-recommendations/index.ts` | Also match by `newsletter_url`, sort `isOnDraftKit` first                                       |
-| `src/pages/Discovery.tsx`                                    | Add creator search input querying `public_creator_profiles`, sort results with registered first |
-| `src/pages/MyRequests.tsx`                                   | Add show/hide toggle for declined+cancelled, fix name truncation                                |
