@@ -212,7 +212,7 @@ function NewOnDraftKitSection({ currentUsername }: { currentUsername?: string })
   );
 }
 
-
+function RecommendationCard({
   pub,
   index,
   onCopyInvite,
