@@ -144,6 +144,74 @@ function CreatorSearchSection({ currentUsername }: { currentUsername?: string })
   );
 }
 
+function NewOnDraftKitSection({ currentUsername }: { currentUsername?: string }) {
+  const { data: creators, isLoading } = useQuery({
+    queryKey: ["new-on-draftkit"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("public_creator_profiles")
+        .select("id, name, username, profile_image_url, bio, created_at")
+        .not("username", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      return (data || []).filter((c) => c.username !== currentUsername);
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="mb-8">
+        <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">New on DraftKit</p>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <Card key={i}><CardContent className="p-4"><Skeleton className="h-12 w-full" /></CardContent></Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (!creators || creators.length === 0) return null;
+
+  return (
+    <div className="mb-8">
+      <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">New on DraftKit</p>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {creators.map((c) => (
+          <Card key={c.id} className="hover:shadow-md transition-shadow">
+            <CardContent className="p-4 flex items-center gap-3">
+              {c.profile_image_url ? (
+                <img
+                  src={sanitizeSubstackImageUrl(c.profile_image_url)}
+                  alt={c.name || ""}
+                  className="w-10 h-10 rounded-full object-cover shrink-0"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
+                  <span className="text-sm font-semibold text-muted-foreground">
+                    {c.name?.charAt(0)?.toUpperCase() || "?"}
+                  </span>
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm truncate">{c.name}</p>
+                <p className="text-xs text-muted-foreground truncate">@{c.username}</p>
+              </div>
+              <Button variant="default" size="sm" asChild>
+                <a href={`/${c.username}`}>
+                  <ExternalLink className="w-3.5 h-3.5 mr-1" />
+                  View
+                </a>
+              </Button>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function RecommendationCard({
   pub,
   index,
@@ -326,6 +394,9 @@ export default function Discovery() {
 
         {/* Creator Search */}
         <CreatorSearchSection currentUsername={creator?.username} />
+
+        {/* New on DraftKit */}
+        <NewOnDraftKitSection currentUsername={creator?.username} />
 
         {/* Substack Recommendations */}
         <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">
