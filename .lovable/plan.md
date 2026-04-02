@@ -1,66 +1,51 @@
 
 
-# Discovery Gap: Why Karen and New Creators Don't Appear
+# Add "Cancel Collab" to Workspace Sidebar
 
-## The Problem
+## Problem
 
-The Discovery page has **two separate data sources** that don't overlap:
+Once a collaboration is approved, neither the host (creator) nor the guest can cancel it from the workspace. The only existing cancel logic works on `pending` requests via a different RLS policy.
 
-1. **Substack Recommendations grid** — Only shows creators who appear in YOUR Substack recommendation list (fetched via Substack API). If Karen isn't someone you explicitly recommend on Substack, she will never appear here regardless of having a DraftKit account.
+## Changes
 
-2. **Creator Search bar** — Queries `public_creator_profiles` by name/username, but ONLY when the user actively types a search query. It shows nothing by default.
+### 1. Database: New RLS policy for cancelling approved collabs
 
-So new DraftKit creators who aren't in your Substack recommendations are invisible unless you already know their name and search for them.
+The current RLS only allows creators to update approved requests (for workspace edits, publishing, etc.) and requesters to edit `shared_content` on approved requests. Neither policy restricts the status transition, but the creator's update policy is broad enough to allow setting `status = 'cancelled'`. However, the **guest** cannot cancel an approved collab — their update policy only covers `status = 'pending'`.
 
-## Architecture Assessment: Should We Merge Tables?
+**Migration**: Add a new RLS policy so requesters can also cancel approved collabs:
 
-No. The current table separation is correct and should stay:
-
-- `creators` — Full profile with sensitive fields (Stripe IDs, subscription tier, user_id). Protected by owner-only + username-based RLS.
-- `public_creator_profiles` — Security-invoker view that strips sensitive columns. This is the right pattern.
-- `discovered_publications` — Substack metadata catalog (external data, not DraftKit users).
-- `creator_recommendations` — Junction table mapping your recs to discovered pubs.
-
-Merging would create security regressions. The real fix is a **UI/query gap**, not a schema problem.
-
-## The Fix
-
-Add a **"New on DraftKit" section** to Discovery that loads automatically (no search required) and shows all registered creators the current user hasn't collaborated with yet.
-
-### Changes
-
-**`src/pages/Discovery.tsx`**
-
-1. Add a new query that fetches the latest creators from `public_creator_profiles` on page load (no search needed):
-   - `SELECT id, name, username, profile_image_url, bio, created_at FROM public_creator_profiles WHERE username IS NOT NULL ORDER BY created_at DESC LIMIT 20`
-   - Filter out the current user
-   - Display as a grid section titled "New on DraftKit" between the search bar and the Substack Recommendations section
-   - Each card shows avatar, name, username, and a "View Profile" button (same card component as search results)
-
-2. Keep the existing search bar — it becomes a filter/discovery tool on top of the auto-loaded section.
-
-3. Keep the Substack Recommendations section below — it shows cross-platform network data.
-
-### Layout Order
-```text
-┌─────────────────────────────┐
-│ Search bar                  │
-├─────────────────────────────┤
-│ Search results (if typing)  │
-├─────────────────────────────┤
-│ "New on DraftKit" grid      │  ← NEW: auto-loaded, no search needed
-│ (latest 20 creators)        │
-├─────────────────────────────┤
-│ "Your Substack Recs" grid   │  ← existing
-└─────────────────────────────┘
+```sql
+CREATE POLICY "Requesters can cancel approved requests"
+ON public.collab_requests
+FOR UPDATE
+TO public
+USING (requester_user_id = auth.uid() AND status = 'approved')
+WITH CHECK (status = 'cancelled');
 ```
 
-### No database changes needed
-The `public_creator_profiles` view already has the data. We just need to query it on mount instead of only on search.
+### 2. `src/pages/Workspace.tsx`
+
+In the sidebar "Action Buttons" section (around line 804), add a "Cancel Collab" button **for both creator and guest** when `request.status === 'approved'`:
+
+- Wrapped in an `AlertDialog` for confirmation (same pattern as MyRequests.tsx)
+- Confirmation text: "This will cancel the collaboration with [partner name]. The workspace content will be preserved but editing will be locked."
+- On confirm: update `collab_requests` set `status = 'cancelled'` where `id = request.id`
+- Send notification email via `send-collab-email` with type `collab_cancelled`
+- After success: navigate back to `/dashboard/requests` (creator) or `/dashboard/my-requests` (guest)
+- Button styled as `variant="ghost"` with destructive hover colors, placed below the Message button
+- Import `Trash2` icon (or `XCircle`) and `AlertDialog` components
+
+### 3. `src/pages/MyRequests.tsx`
+
+The cancel button currently only shows for `pending` requests. Add the same cancel option for `approved` requests:
+- Reuse the existing `AlertDialog` pattern but adjust the confirmation text for approved collabs
+- The handler updates status to `cancelled` (same DB call)
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| `src/pages/Discovery.tsx` | Add auto-loaded "New on DraftKit" section using `useQuery` on `public_creator_profiles` |
+| Migration SQL | New RLS policy for requesters cancelling approved collabs |
+| `src/pages/Workspace.tsx` | Add "Cancel Collab" button with AlertDialog in sidebar |
+| `src/pages/MyRequests.tsx` | Extend cancel option to approved requests |
 
