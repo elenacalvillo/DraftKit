@@ -128,7 +128,7 @@ export default function MyRequests() {
         .update({ status: 'cancelled' })
         .eq('id', requestId)
         .eq('requester_user_id', user?.id)
-        .eq('status', 'pending');
+        .in('status', ['pending', 'approved']);
 
       if (error) throw error;
 
