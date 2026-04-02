@@ -846,6 +846,54 @@ export default function Workspace() {
                   {request.status === 'published' ? 'See Live Post' : 'Open External Document'}
                 </Button>
               )}
+
+              {request.status === 'approved' && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    >
+                      <XCircle className="w-4 h-4 mr-2" />
+                      Cancel Collab
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Cancel this collaboration?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will cancel the collaboration with {partnerName}. The workspace content will be preserved but editing will be locked.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Keep Collab</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        onClick={async () => {
+                          try {
+                            const { error } = await supabase
+                              .from('collab_requests')
+                              .update({ status: 'cancelled' })
+                              .eq('id', request.id);
+                            if (error) throw error;
+                            toast.success('Collaboration cancelled');
+                            supabase.functions.invoke('send-collab-email', {
+                              body: { type: 'collab_cancelled', requestId: request.id }
+                            }).catch(err => console.error('Failed to send cancellation email:', err));
+                            navigate(isCreator ? '/dashboard/requests' : '/dashboard/my-requests');
+                          } catch (err) {
+                            console.error('Error cancelling collab:', err);
+                            toast.error('Failed to cancel collaboration');
+                          }
+                        }}
+                      >
+                        Cancel Collab
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
             </div>
 
             {/* Collab Impact Metrics (published collabs) */}

@@ -297,8 +297,8 @@ export default function MyRequests() {
                       </div>
                     </div>
 
-                    {/* Action buttons for pending requests */}
-                    {request.status === 'pending' && (
+                    {/* Action buttons for pending or approved requests */}
+                    {(request.status === 'pending' || request.status === 'approved') && (
                       <div className="flex gap-2 pt-3 border-t mt-3">
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
@@ -308,37 +308,42 @@ export default function MyRequests() {
                               disabled={cancellingId === request.id}
                             >
                               <X className="h-4 w-4 mr-1" />
-                              Cancel Request
+                              {request.status === 'approved' ? 'Cancel Collab' : 'Cancel Request'}
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
-                              <AlertDialogTitle>Cancel this request?</AlertDialogTitle>
+                              <AlertDialogTitle>
+                                {request.status === 'approved' ? 'Cancel this collaboration?' : 'Cancel this request?'}
+                              </AlertDialogTitle>
                               <AlertDialogDescription>
-                                This will cancel your collaboration request with {request.creator?.name}. 
-                                You can always submit a new request later.
+                                {request.status === 'approved'
+                                  ? `This will cancel your approved collaboration with ${request.creator?.name}. The workspace content will be preserved but editing will be locked.`
+                                  : `This will cancel your collaboration request with ${request.creator?.name}. You can always submit a new request later.`}
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                              <AlertDialogCancel>Keep Request</AlertDialogCancel>
+                              <AlertDialogCancel>{request.status === 'approved' ? 'Keep Collab' : 'Keep Request'}</AlertDialogCancel>
                               <AlertDialogAction
                                 onClick={() => handleCancelRequest(request.id)}
                                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                               >
-                                Cancel Request
+                                {request.status === 'approved' ? 'Cancel Collab' : 'Cancel Request'}
                               </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
 
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => request.creator?.username && handleReschedule(request.creator.username)}
-                        >
-                          <CalendarClock className="h-4 w-4 mr-1" />
-                          Reschedule
-                        </Button>
+                        {request.status === 'pending' && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => request.creator?.username && handleReschedule(request.creator.username)}
+                          >
+                            <CalendarClock className="h-4 w-4 mr-1" />
+                            Reschedule
+                          </Button>
+                        )}
                       </div>
                     )}
 
