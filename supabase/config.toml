@@ -45,3 +45,9 @@ verify_jwt = false
 [functions.sync-to-resend]
 verify_jwt = false
 
+[functions.purchase-credits]
+verify_jwt = false
+
+[functions.fulfill-credits]
+verify_jwt = false
+
