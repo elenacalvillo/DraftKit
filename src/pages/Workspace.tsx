@@ -921,6 +921,73 @@ export default function Workspace() {
               )}
             </div>
 
+            {/* Writer's Room — Collaborators */}
+            {(isCreator || collaborators.length > 0) && (
+              <div className="glass-card p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5" />
+                    Writer's Room
+                  </h4>
+                  {isCreator && request.status === "approved" && (isPro || credits > 0) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => setShowInviteModal(true)}
+                    >
+                      <UserPlus className="w-3.5 h-3.5 mr-1" />
+                      Invite
+                    </Button>
+                  )}
+                </div>
+
+                {/* Participants list */}
+                <div className="space-y-2">
+                  {/* Owner */}
+                  <div className="flex items-center gap-2 text-sm">
+                    <div className="w-6 h-6 rounded-full gradient-primary flex items-center justify-center text-[10px] font-bold text-primary-foreground">
+                      {(creatorInfo?.name || "C").charAt(0)}
+                    </div>
+                    <span className="truncate">{creatorInfo?.name}</span>
+                    <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Owner</span>
+                  </div>
+                  {/* Original requester */}
+                  <div className="flex items-center gap-2 text-sm">
+                    <div className="w-6 h-6 rounded-full bg-secondary flex items-center justify-center text-[10px] font-bold text-secondary-foreground">
+                      {(request.requester_name || "G").charAt(0)}
+                    </div>
+                    <span className="truncate">{request.requester_name}</span>
+                    <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Guest</span>
+                  </div>
+                  {/* Invited collaborators */}
+                  {collaborators.map((c) => (
+                    <div key={c.id} className="flex items-center gap-2 text-sm">
+                      <div className="w-6 h-6 rounded-full bg-accent/30 flex items-center justify-center text-[10px] font-bold text-accent-foreground">
+                        {c.email.charAt(0).toUpperCase()}
+                      </div>
+                      <span className="truncate text-muted-foreground">{c.email}</span>
+                      {c.joined_at ? (
+                        <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Joined</span>
+                      ) : (
+                        <span className="text-[10px] text-warning bg-warning/10 px-1.5 py-0.5 rounded">Pending</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Active Editor Presence Banner */}
+            {activeEditors.length > 0 && (
+              <div className="flex items-center gap-2 px-4 py-2.5 bg-warning/10 border border-warning/20 rounded-lg text-sm text-warning-foreground">
+                <AlertCircle className="w-4 h-4 text-warning flex-shrink-0" />
+                <span>
+                  <strong>{activeEditors[0].user_name}</strong> is currently editing. Wait for them to save before making changes.
+                </span>
+              </div>
+            )}
+
             {/* Collab Impact Metrics (published collabs) */}
             {request.status === "published" && (
               <CollabImpactCard
