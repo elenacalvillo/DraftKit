@@ -261,14 +261,29 @@ async function fetchPostByUrl(url: string): Promise<ArchivePost | null> {
     }
   }
 
-  // --- Strategy 3: Username resolution + numeric post ID ---
+  // --- Strategy 3: Username resolution + numeric post ID via archive ---
+  // Substack's /api/v1/posts/{id} doesn't accept numeric IDs, only slugs.
+  // So we fetch the archive and match by numeric post ID to get the slug.
   const username = extractUsername(url);
   if (username && slug && /^\d+$/.test(slug)) {
     console.log(`Trying username resolution for @${username} with post ID ${slug}...`);
     const resolvedSubdomain = await resolvePublicationUsername(username);
     if (resolvedSubdomain) {
-      const result = await fetchPostFromApi(resolvedSubdomain, slug);
-      if (result) return result;
+      // Fetch archive and find the post by numeric ID
+      const archivePosts = await fetchArchivePosts(resolvedSubdomain);
+      const numericId = parseInt(slug, 10);
+      const matchedPost = archivePosts.find(p => p.id === numericId);
+      if (matchedPost) {
+        console.log(`Found post by ID ${numericId} → slug: ${matchedPost.slug}`);
+        return matchedPost;
+      }
+      // If not in recent 30 posts, try fetching by slug from the HTML page
+      console.log(`Post ID ${numericId} not in recent archive, trying HTML scrape...`);
+      const pageSlug = await scrapeSlugFromProfilePage(url);
+      if (pageSlug) {
+        const result = await fetchPostFromApi(resolvedSubdomain, pageSlug);
+        if (result) return result;
+      }
     }
   }
 
