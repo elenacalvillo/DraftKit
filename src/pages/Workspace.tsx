@@ -465,31 +465,34 @@ export default function Workspace() {
 
       setRequest(prev => prev ? { ...prev, ...updatePayload, status: "published" } as any : prev);
 
-      // Notify the guest partner — non-fatal
+      // Status update succeeded — show success immediately (DB is source of truth)
+      toast.success("Congrats on publishing! 🎉 Engagement data is being collected.");
+
+      // Non-fatal background tasks — errors are swallowed so the user never sees them
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
-          await supabase.functions.invoke("send-collab-email", {
+          const emailResult = await supabase.functions.invoke("send-collab-email", {
             body: { type: "collab_published", requestId },
             headers: { Authorization: `Bearer ${session.access_token}` },
           });
+          if (emailResult?.error) console.error("collab_published email error (non-fatal):", emailResult.error);
         }
       } catch (emailErr) {
-        console.error("Failed to send collab_published email:", emailErr);
+        console.error("Failed to send collab_published email (non-fatal):", emailErr);
       }
 
-      // Auto-trigger metrics snapshot
       try {
-        await supabase.functions.invoke("fetch-collab-metrics", {
+        const metricsResult = await supabase.functions.invoke("fetch-collab-metrics", {
           body: { requestId, snapshotDay: 0 },
         });
+        if (metricsResult?.error) console.error("Metrics snapshot error (non-fatal):", metricsResult.error);
       } catch (metricsErr) {
-        console.error("Failed to trigger metrics snapshot:", metricsErr);
+        console.error("Failed to trigger metrics snapshot (non-fatal):", metricsErr);
       }
 
       // Log feedback
       await logPublishFeedback("yes");
-      toast.success("Congrats on publishing! 🎉 Engagement data is being collected.");
     } finally {
       setIsSavingPublish(false);
     }

@@ -14,7 +14,7 @@ function isAllowedDomain(url: string): boolean {
     const hostname = urlObj.hostname.toLowerCase();
     const blocked = [/^localhost$/i, /^127\./, /^10\./, /^172\.(1[6-9]|2\d|3[01])\./, /^192\.168\./, /^169\.254\./];
     if (blocked.some(p => p.test(hostname))) return false;
-    return hostname.endsWith(".substack.com") || hostname === "substack.com";
+    return hostname.endsWith(".substack.com") || hostname === "substack.com" || hostname === "substack.app";
   } catch {
     return false;
   }
@@ -58,11 +58,8 @@ function extractUsername(url: string): string | null {
 
 /**
  * Try to resolve a username to a working publication subdomain.
- * Profile URLs (substack.com/@user) may differ from publication subdomains.
- * Strategy: try archive API directly, if 404 try fetching profile page for redirect.
  */
 async function resolvePublicationUsername(username: string): Promise<string | null> {
-  // First, try the username directly
   const directUrl = `https://${username}.substack.com/api/v1/archive?sort=new&limit=1`;
   if (!isAllowedDomain(directUrl)) return null;
 
@@ -77,7 +74,6 @@ async function resolvePublicationUsername(username: string): Promise<string | nu
     }
   } catch { /* continue */ }
 
-  // If direct failed, try fetching the profile page to find the publication
   const profileUrl = `https://substack.com/@${username}`;
   if (!isAllowedDomain(profileUrl)) return null;
 
@@ -89,7 +85,6 @@ async function resolvePublicationUsername(username: string): Promise<string | nu
     if (!resp.ok) return null;
 
     const html = await resp.text();
-    // Look for publication subdomain in the HTML (e.g., href="https://realusername.substack.com")
     const pubMatch = html.match(/href="https:\/\/([a-zA-Z0-9_-]+)\.substack\.com\/?"/i);
     if (pubMatch) {
       const resolved = pubMatch[1].toLowerCase();
@@ -105,8 +100,54 @@ async function resolvePublicationUsername(username: string): Promise<string | nu
   return null;
 }
 
+/**
+ * Follow redirects to resolve any Substack URL to its canonical form.
+ * Substack always redirects to username.substack.com/p/slug eventually.
+ */
+async function resolveCanonicalUrl(url: string): Promise<string | null> {
+  if (!isAllowedDomain(url)) return null;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    const resp = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; DraftKit/1.0)",
+        "Accept": "text/html",
+      },
+      redirect: "follow",
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    const finalUrl = resp.url;
+    if (!finalUrl) return null;
+
+    // Validate the resolved URL is on an allowed domain and has /p/ path
+    if (!isAllowedDomain(finalUrl)) return null;
+
+    const finalObj = new URL(finalUrl);
+    if (finalObj.pathname.match(/\/p\/[a-zA-Z0-9_-]+/)) {
+      console.log(`Resolved canonical: ${url} → ${finalUrl}`);
+      return finalUrl;
+    }
+
+    // Even without /p/, return if it landed on a substack subdomain
+    if (finalObj.hostname.match(/^[a-zA-Z0-9_-]+\.substack\.com$/i)) {
+      console.log(`Resolved to subdomain (no /p/): ${url} → ${finalUrl}`);
+      return finalUrl;
+    }
+
+    return null;
+  } catch (err) {
+    clearTimeout(timeout);
+    console.error(`Canonical resolution failed for ${url}:`, err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
 async function fetchArchivePosts(username: string): Promise<ArchivePost[]> {
-  // Try direct first, then resolve if needed
   const resolvedUsername = await resolvePublicationUsername(username);
   if (!resolvedUsername) {
     console.warn(`Could not resolve publication for username: ${username}`);
@@ -147,8 +188,80 @@ async function fetchArchivePosts(username: string): Promise<ArchivePost[]> {
 }
 
 /**
- * Fetch metrics for a specific Substack post using the Substack API.
- * Extracts subdomain + slug from the URL and calls /api/v1/posts/{slug}.
+ * Extract slug or numeric post ID from a Substack URL.
+ * Supports:
+ *   - /p/my-post-slug (classic)
+ *   - /p-192157347 (profile-style numeric ID)
+ *   - /pub/username/p/slug (open.substack.com mobile)
+ */
+function extractSlugFromUrl(url: string): string | null {
+  try {
+    const urlObj = new URL(url);
+    // Classic: /p/my-post-slug or /pub/username/p/slug
+    const classicMatch = urlObj.pathname.match(/\/p\/([a-zA-Z0-9_-]+)/);
+    if (classicMatch) return classicMatch[1].toLowerCase();
+
+    // Profile-style: /p-192157347
+    const numericMatch = urlObj.pathname.match(/\/p-(\d+)/);
+    if (numericMatch) return numericMatch[1];
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Scrape the slug from a profile-style Substack post page by parsing the HTML.
+ * Looks for the post slug in embedded JSON data on the page.
+ */
+async function scrapeSlugFromProfilePage(url: string): Promise<string | null> {
+  if (!isAllowedDomain(url)) return null;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    const resp = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; DraftKit/1.0)", "Accept": "text/html" },
+      redirect: "follow",
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    if (!resp.ok) return null;
+    const html = await resp.text();
+
+    // Look for the slug in embedded JSON: "slug":"my-post-slug"
+    // Match near the post ID to avoid picking up unrelated slugs
+    const slugMatch = html.match(/"slug"\s*:\s*"([a-zA-Z0-9_-]+)"/);
+    if (slugMatch) {
+      console.log(`Scraped slug from profile page: ${slugMatch[1]}`);
+      return slugMatch[1].toLowerCase();
+    }
+
+    // Fallback: look for canonical subdomain URL with /p/ in the page
+    const canonMatch = html.match(/https:\/\/([a-zA-Z0-9_-]+)\.substack\.com\/p\/([a-zA-Z0-9_-]+)/);
+    if (canonMatch) {
+      console.log(`Found canonical link in page: ${canonMatch[0]}`);
+      return canonMatch[2].toLowerCase();
+    }
+
+    return null;
+  } catch (err) {
+    clearTimeout(timeout);
+    console.error(`Slug scrape failed for ${url}:`, err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+
+/**
+ * Fetch metrics for a specific Substack post.
+ * Tries multiple strategies:
+ *   1. Direct subdomain + slug extraction (classic URLs)
+ *   2. Follow redirects to find canonical URL (profile/mobile/app URLs)
+ *   3. Username resolution + numeric post ID via archive
  */
 async function fetchPostByUrl(url: string): Promise<ArchivePost | null> {
   if (!isAllowedDomain(url)) {
@@ -157,25 +270,77 @@ async function fetchPostByUrl(url: string): Promise<ArchivePost | null> {
   }
 
   const slug = extractSlugFromUrl(url);
-  if (!slug) {
-    console.warn(`Could not extract slug from URL: ${url}`);
-    return null;
-  }
 
-  // Extract subdomain (e.g. "promptledproduct" from "promptledproduct.substack.com/p/...")
+  // --- Strategy 1: Direct subdomain + slug (classic URLs) ---
   let subdomain: string | null = null;
   try {
     const urlObj = new URL(url);
     const subdomainMatch = urlObj.hostname.match(/^([a-zA-Z0-9_-]+)\.substack\.com$/i);
-    if (subdomainMatch) subdomain = subdomainMatch[1].toLowerCase();
+    if (subdomainMatch && subdomainMatch[1].toLowerCase() !== "open" && subdomainMatch[1].toLowerCase() !== "www") {
+      subdomain = subdomainMatch[1].toLowerCase();
+    }
   } catch { /* continue */ }
 
-  if (!subdomain) {
-    console.warn(`Could not extract subdomain from URL: ${url}`);
-    return null;
+  if (subdomain && slug) {
+    const result = await fetchPostFromApi(subdomain, slug);
+    if (result) return result;
   }
 
-  const apiUrl = `https://${subdomain}.substack.com/api/v1/posts/${slug}`;
+  // --- Strategy 2: Follow redirects to canonical URL ---
+  console.log(`Strategy 1 failed for ${url}, trying redirect resolution...`);
+  const canonical = await resolveCanonicalUrl(url);
+  if (canonical && canonical !== url) {
+    const canonSlug = extractSlugFromUrl(canonical);
+    let canonSubdomain: string | null = null;
+    try {
+      const canonObj = new URL(canonical);
+      const m = canonObj.hostname.match(/^([a-zA-Z0-9_-]+)\.substack\.com$/i);
+      if (m && m[1].toLowerCase() !== "open" && m[1].toLowerCase() !== "www") {
+        canonSubdomain = m[1].toLowerCase();
+      }
+    } catch { /* continue */ }
+
+    if (canonSubdomain && canonSlug) {
+      const result = await fetchPostFromApi(canonSubdomain, canonSlug);
+      if (result) return result;
+    }
+  }
+
+  // --- Strategy 3: Username resolution + numeric post ID via archive ---
+  // Substack's /api/v1/posts/{id} doesn't accept numeric IDs, only slugs.
+  // So we fetch the archive and match by numeric post ID to get the slug.
+  const username = extractUsername(url);
+  if (username && slug && /^\d+$/.test(slug)) {
+    console.log(`Trying username resolution for @${username} with post ID ${slug}...`);
+    const resolvedSubdomain = await resolvePublicationUsername(username);
+    if (resolvedSubdomain) {
+      // Fetch archive and find the post by numeric ID
+      const archivePosts = await fetchArchivePosts(resolvedSubdomain);
+      const numericId = parseInt(slug, 10);
+      const matchedPost = archivePosts.find(p => p.id === numericId);
+      if (matchedPost) {
+        console.log(`Found post by ID ${numericId} → slug: ${matchedPost.slug}`);
+        return matchedPost;
+      }
+      // If not in recent 30 posts, try fetching by slug from the HTML page
+      console.log(`Post ID ${numericId} not in recent archive, trying HTML scrape...`);
+      const pageSlug = await scrapeSlugFromProfilePage(url);
+      if (pageSlug) {
+        const result = await fetchPostFromApi(resolvedSubdomain, pageSlug);
+        if (result) return result;
+      }
+    }
+  }
+
+  console.warn(`All strategies failed for URL: ${url}`);
+  return null;
+}
+
+/**
+ * Fetch a single post from the Substack API given subdomain + slug/id.
+ */
+async function fetchPostFromApi(subdomain: string, slugOrId: string): Promise<ArchivePost | null> {
+  const apiUrl = `https://${subdomain}.substack.com/api/v1/posts/${slugOrId}`;
   if (!isAllowedDomain(apiUrl)) {
     console.warn(`SSRF blocked: ${apiUrl}`);
     return null;
@@ -201,43 +366,31 @@ async function fetchPostByUrl(url: string): Promise<ArchivePost | null> {
 
     const data = await resp.json();
 
-    // reactions is typically {"❤": 47, "🔥": 12} — sum all values
     const reactions = data.reactions ?? data.reaction_count ?? 0;
     const commentCount = data.comment_count ?? 0;
     const title = data.title ?? "";
     const postDate = data.post_date ?? new Date().toISOString();
-    const canonicalUrl = data.canonical_url ?? url;
+    const canonicalUrl = data.canonical_url ?? `https://${subdomain}.substack.com/p/${data.slug || slugOrId}`;
 
     console.log(`API fetch for ${apiUrl}: reactions=${JSON.stringify(reactions)}, comments=${commentCount}`);
 
     return {
       id: data.id ?? 0,
       title,
-      slug,
+      slug: data.slug || slugOrId,
       post_date: postDate,
       canonical_url: canonicalUrl,
       reactions,
-      reaction_count: typeof reactions === "number" 
-        ? reactions 
+      reaction_count: typeof reactions === "number"
+        ? reactions
         : (typeof reactions === "object" && reactions !== null
-            ? Object.values(reactions).reduce((a: number, b) => a + (typeof b === "number" ? b : 0), 0) 
+            ? Object.values(reactions).reduce((a: number, b) => a + (typeof b === "number" ? b : 0), 0)
             : 0),
       comment_count: commentCount,
     };
   } catch (err) {
     clearTimeout(timeout);
     console.error(`Substack API fetch error for ${apiUrl}:`, err instanceof Error ? err.message : err);
-    return null;
-  }
-}
-
-function extractSlugFromUrl(url: string): string | null {
-  try {
-    const urlObj = new URL(url);
-    // e.g. /p/my-post-slug or /p/my-post-slug/comments
-    const match = urlObj.pathname.match(/\/p\/([a-zA-Z0-9_-]+)/);
-    return match ? match[1].toLowerCase() : null;
-  } catch {
     return null;
   }
 }
@@ -260,8 +413,6 @@ function findCollabPost(posts: ArchivePost[], publishDate: string | null, collab
       if (match) return match;
     }
     
-    // In strict mode, if we have a manual URL but no match, return null
-    // (Don't fall through to date matching)
     if (strictMode) return null;
   }
 
@@ -276,7 +427,6 @@ function findCollabPost(posts: ArchivePost[], publishDate: string | null, collab
     if (match) return match;
   }
 
-  // REMOVED: No longer fall back to "most recent post"
   return null;
 }
 
@@ -291,7 +441,6 @@ function getReactionCount(post: ArchivePost): number {
 
 /**
  * Fetch subscriber count for a Substack publication.
- * Tries the homepage HTML which contains subscriber data in embedded JSON.
  */
 async function fetchSubscriberCount(subdomain: string): Promise<number | null> {
   const url = `https://${subdomain}.substack.com`;
@@ -317,7 +466,6 @@ async function fetchSubscriberCount(subdomain: string): Promise<number | null> {
 
     const html = await resp.text();
 
-    // Try multiple patterns for subscriber count in Substack's embedded data
     const patterns = [
       /"subscriber_count"\s*:\s*(\d+)/,
       /"freeSubscriberCount"\s*:\s*(\d+)/,
@@ -378,7 +526,6 @@ serve(async (req) => {
     } else {
       const day = snapshotDay ?? 0;
       
-      // Get ALL published requests (removed retro_completed_at filter)
       const { data: published, error } = await supabase
         .from("collab_requests")
         .select("id, creator_id, collab_link, requester_collab_link, requested_date, requester_substack_url, approved_at, retro_completed_at, created_at")
@@ -404,7 +551,6 @@ serve(async (req) => {
         if (existingIds.has(r.id)) return false;
         if (day === 0) return true;
         
-        // Use retro_completed_at, approved_at, or created_at as publish reference
         const publishRef = r.retro_completed_at || r.approved_at || r.created_at;
         const publishedAt = new Date(publishRef).getTime();
         const daysSincePublish = (now - publishedAt) / (24 * 60 * 60 * 1000);
@@ -449,18 +595,15 @@ serve(async (req) => {
           requesterUsername ? fetchArchivePosts(requesterUsername) : Promise.resolve([]),
         ]);
 
-        // Use best available date reference
         const publishDate = request.retro_completed_at || request.approved_at || request.requested_date || request.created_at;
         
-        // Use strict mode when manual URLs are provided (prioritize user input over heuristics)
         let creatorPost = findCollabPost(
           creatorPosts, 
           publishDate, 
           request.collab_link,
-          !!request.collab_link // strict mode if manual URL provided
+          !!request.collab_link
         );
         
-        // NEW: If manual URL provided but not found in archive, try direct fetch
         if (!creatorPost && request.collab_link) {
           console.log(`Creator post not in archive, attempting direct fetch: ${request.collab_link}`);
           creatorPost = await fetchPostByUrl(request.collab_link);
@@ -471,11 +614,10 @@ serve(async (req) => {
               requesterPosts, 
               publishDate, 
               request.requester_collab_link,
-              !!request.requester_collab_link // strict mode if manual URL provided
+              !!request.requester_collab_link
             )
           : null;
         
-        // NEW: If manual URL provided but not found in archive, try direct fetch
         if (!requesterPost && request.requester_collab_link) {
           console.log(`Requester post not in archive, attempting direct fetch: ${request.requester_collab_link}`);
           requesterPost = await fetchPostByUrl(request.requester_collab_link);
@@ -483,7 +625,6 @@ serve(async (req) => {
 
         const day = snapshotDay ?? 0;
 
-        // Fetch subscriber counts in parallel
         const [creatorSubs, requesterSubs] = await Promise.all([
           creatorUsername ? fetchSubscriberCount(creatorUsername) : Promise.resolve(null),
           requesterUsername ? fetchSubscriberCount(requesterUsername) : Promise.resolve(null),
@@ -495,24 +636,26 @@ serve(async (req) => {
           creator_post_url: creatorPost?.canonical_url || null,
           creator_likes: creatorPost ? getReactionCount(creatorPost) : null,
           creator_comments: creatorPost?.comment_count ?? null,
-          creator_subscribers: creatorSubs,
           requester_post_url: requesterPost?.canonical_url || null,
           requester_likes: requesterPost ? getReactionCount(requesterPost) : null,
           requester_comments: requesterPost?.comment_count ?? null,
+          creator_subscribers: creatorSubs,
           requester_subscribers: requesterSubs,
         };
 
-        const { error: upsertError } = await supabase
+        const { error: insertError } = await supabase
           .from("collab_metrics")
-          .upsert(metric, { onConflict: "request_id,snapshot_day" });
+          .insert(metric);
 
-        if (upsertError) {
-          console.error(`Failed to upsert metrics for ${request.id}:`, upsertError);
-        } else {
-          results.push({ requestId: request.id, day, creatorPost: creatorPost?.title, requesterPost: requesterPost?.title });
+        if (insertError) {
+          console.error(`Failed to insert metric for ${request.id}:`, insertError);
+          continue;
         }
+
+        results.push({ request_id: request.id, ...metric });
+        console.log(`Metrics saved for ${request.id}: creator=${creatorPost ? "found" : "not found"}, requester=${requesterPost ? "found" : "not found"}`);
       } catch (err) {
-        console.error(`Error processing ${request.id}:`, err);
+        console.error(`Error processing request ${request.id}:`, err instanceof Error ? err.message : err);
       }
     }
 
@@ -521,9 +664,9 @@ serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
-    console.error("fetch-collab-metrics error:", err);
+    console.error("Fatal error:", err instanceof Error ? err.message : err);
     return new Response(
-      JSON.stringify({ error: "Internal error" }),
+      JSON.stringify({ error: err instanceof Error ? err.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
