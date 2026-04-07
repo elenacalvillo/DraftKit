@@ -101,6 +101,28 @@ export default function Workspace() {
   const [isSavingPublish, setIsSavingPublish] = useState(false);
   // undefined = loading, null = not answered, {message} = already answered
   const [existingRetroFeedback, setExistingRetroFeedback] = useState<{ message: string } | null | undefined>(undefined);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+
+  // Collaborators & presence
+  const { collaborators, refetch: refetchCollaborators } = useWorkspaceCollaborators(requestId || "");
+  const { activeEditors } = useWorkspacePresence({
+    requestId: requestId || "",
+    userId: user?.id,
+    userName: currentUserName || "User",
+    isEditing: false, // Workspace page doesn't track editing — SharedWorkspace does
+  });
+
+  // Credits for invite gating
+  const [credits, setCredits] = useState(0);
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase
+      .from("creators")
+      .select("credits")
+      .eq("user_id", user.id)
+      .maybeSingle()
+      .then(({ data }) => setCredits(data?.credits ?? 0));
+  }, [user?.id]);
 
   // On mount, check if the user has already answered the retrospective check-in
   useEffect(() => {
