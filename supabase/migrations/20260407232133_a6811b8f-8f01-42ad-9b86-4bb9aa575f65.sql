@@ -1,0 +1,1 @@
+DELETE FROM collab_metrics WHERE request_id = '8a73f9cc-407c-4899-921e-75ba7cfc328b';
