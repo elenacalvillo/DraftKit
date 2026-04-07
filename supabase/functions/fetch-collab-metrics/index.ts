@@ -256,10 +256,12 @@ async function scrapeSlugFromProfilePage(url: string): Promise<string | null> {
 }
 
 
+/**
+ * Fetch metrics for a specific Substack post.
  * Tries multiple strategies:
  *   1. Direct subdomain + slug extraction (classic URLs)
  *   2. Follow redirects to find canonical URL (profile/mobile/app URLs)
- *   3. Username resolution + numeric post ID API
+ *   3. Username resolution + numeric post ID via archive
  */
 async function fetchPostByUrl(url: string): Promise<ArchivePost | null> {
   if (!isAllowedDomain(url)) {
