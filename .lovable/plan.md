@@ -1,51 +1,91 @@
 
 
-# Add "Cancel Collab" to Workspace Sidebar
+# Integrated Membership: Pricing Fix + Credit Foundation
 
-## Problem
+## Overview
 
-Once a collaboration is approved, neither the host (creator) nor the guest can cancel it from the workspace. The only existing cancel logic works on `pending` requests via a different RLS policy.
+Fix the broken pricing math, add a `credits` column to the database, seed 3 credits for new users, and add one-time credit top-up buttons to the Membership page. No gating yet — just the financial foundation.
 
-## Changes
+## Step 1: Fix the Yearly Stripe Price
 
-### 1. Database: New RLS policy for cancelling approved collabs
+The current yearly price is $149.00 (`price_1Szs8KAgAh00fVW1sKwidi8l`). It needs to be $149.90 to give exactly 2 months free.
 
-The current RLS only allows creators to update approved requests (for workspace edits, publishing, etc.) and requesters to edit `shared_content` on approved requests. Neither policy restricts the status transition, but the creator's update policy is broad enough to allow setting `status = 'cancelled'`. However, the **guest** cannot cancel an approved collab — their update policy only covers `status = 'pending'`.
+- Create a new Stripe price on the existing product (`prod_Txnjt0JKCsMyCP`): $149.90/year
+- Update `YEARLY_PRICE_ID` in `Subscription.tsx` to the new price ID
+- The old $149 price remains in Stripe but is no longer referenced
 
-**Migration**: Add a new RLS policy so requesters can also cancel approved collabs:
+## Step 2: Fix Display Math in `Subscription.tsx`
+
+- Yearly display: `$12.49/mo` (was `$12.42`)
+- Annual note: `$149.90 billed annually — 2 months free` (was `$149`)
+- Save badge: `Save $29.98` (was `Save $30`)
+
+## Step 3: Database — Add Credits Column
+
+Migration:
 
 ```sql
-CREATE POLICY "Requesters can cancel approved requests"
-ON public.collab_requests
-FOR UPDATE
-TO public
-USING (requester_user_id = auth.uid() AND status = 'approved')
-WITH CHECK (status = 'cancelled');
+ALTER TABLE public.creators ADD COLUMN credits integer NOT NULL DEFAULT 3;
 ```
 
-### 2. `src/pages/Workspace.tsx`
+All existing users get 3 credits. New users auto-get 3 via the default.
 
-In the sidebar "Action Buttons" section (around line 804), add a "Cancel Collab" button **for both creator and guest** when `request.status === 'approved'`:
+## Step 4: Create Stripe Credit Pack Products
 
-- Wrapped in an `AlertDialog` for confirmation (same pattern as MyRequests.tsx)
-- Confirmation text: "This will cancel the collaboration with [partner name]. The workspace content will be preserved but editing will be locked."
-- On confirm: update `collab_requests` set `status = 'cancelled'` where `id = request.id`
-- Send notification email via `send-collab-email` with type `collab_cancelled`
-- After success: navigate back to `/dashboard/requests` (creator) or `/dashboard/my-requests` (guest)
-- Button styled as `variant="ghost"` with destructive hover colors, placed below the Message button
-- Import `Trash2` icon (or `XCircle`) and `AlertDialog` components
+Two one-time products:
+- **10 Credits** — $10.00 one-time
+- **30 Credits** — $25.00 one-time
 
-### 3. `src/pages/MyRequests.tsx`
+## Step 5: Create `purchase-credits` Edge Function
 
-The cancel button currently only shows for `pending` requests. Add the same cancel option for `approved` requests:
-- Reuse the existing `AlertDialog` pattern but adjust the confirmation text for approved collabs
-- The handler updates status to `cancelled` (same DB call)
+A new edge function that:
+- Accepts a `packId` (maps to a price ID)
+- Creates a one-time Stripe checkout session (`mode: "payment"`)
+- On `success_url`, includes `?credits_purchased=10` or `?credits_purchased=30`
+- Returns the checkout URL
+
+## Step 6: Credit Fulfillment via `success_url` Parameter
+
+When the user returns to `/dashboard/subscription?credits_purchased=10`:
+- The Subscription page detects the param
+- Calls a new `fulfill-credits` edge function that verifies the Stripe session and increments `creators.credits`
+- Shows a success toast
+
+The `fulfill-credits` function:
+- Takes a Stripe checkout session ID
+- Verifies payment is `paid`
+- Reads quantity from session metadata
+- Increments credits using a service-role update
+- Returns updated credit count
+
+## Step 7: Update Membership Page UI
+
+Add a "Need a quick boost?" section below the subscription card for free/trial users:
+
+```text
+┌─────────────────────────────────┐
+│  Need a quick boost?            │
+│                                 │
+│  ┌──────────┐  ┌──────────────┐ │
+│  │ 10 for   │  │ 30 for $25   │ │
+│  │ $10      │  │ Best value   │ │
+│  └──────────┘  └──────────────┘ │
+│                                 │
+│  You have X credits remaining   │
+└─────────────────────────────────┘
+```
+
+- Show current credit balance (queried from `creators.credits`)
+- Two buttons trigger `purchase-credits` with the respective pack
+- Pro members see their credit balance but with a note that credits aren't consumed on Pro
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| Migration SQL | New RLS policy for requesters cancelling approved collabs |
-| `src/pages/Workspace.tsx` | Add "Cancel Collab" button with AlertDialog in sidebar |
-| `src/pages/MyRequests.tsx` | Extend cancel option to approved requests |
+| Migration SQL | Add `credits` column to `creators` |
+| `src/pages/Subscription.tsx` | Fix pricing math, add credit balance display, add top-up section |
+| `supabase/functions/purchase-credits/index.ts` | New: one-time Stripe checkout for credit packs |
+| `supabase/functions/fulfill-credits/index.ts` | New: verify payment + increment credits |
+| Stripe | New yearly price $149.90, two one-time credit pack products |
 
