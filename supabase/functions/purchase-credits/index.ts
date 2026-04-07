@@ -40,7 +40,12 @@ serve(async (req) => {
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
     let customerId: string | undefined;
     if (customers.data.length > 0) {
-      customerId = customers.data[0].id;
+      const existing = customers.data[0];
+      if (existing.currency && existing.currency !== "usd") {
+        customerId = undefined;
+      } else {
+        customerId = existing.id;
+      }
     }
 
     const origin = req.headers.get("origin") || "https://collabstack.lovable.app";

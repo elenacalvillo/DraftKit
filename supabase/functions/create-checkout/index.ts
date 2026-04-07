@@ -41,11 +41,18 @@ serve(async (req) => {
       apiVersion: "2025-08-27.basil",
     });
 
-    // Find or reference existing customer
+    // Find or reference existing customer, but skip if currency conflicts
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
     let customerId: string | undefined;
     if (customers.data.length > 0) {
-      customerId = customers.data[0].id;
+      const existing = customers.data[0];
+      // Check if this customer has a conflicting currency (e.g. MXN vs USD)
+      if (existing.currency && existing.currency !== "usd") {
+        // Don't attach — let Stripe create a new customer with USD
+        customerId = undefined;
+      } else {
+        customerId = existing.id;
+      }
     }
 
     const origin = req.headers.get("origin") || "https://collabstack.lovable.app";
