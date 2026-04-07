@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Crown, Sparkles, Users, MessageSquare, PenLine, Palette, Rocket, Check, Heart } from "lucide-react";
+import { Crown, Sparkles, Users, MessageSquare, PenLine, Palette, Rocket, Check, Heart, Coins } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,10 +11,10 @@ import { usePro } from "@/hooks/usePro";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 const MONTHLY_PRICE_ID = "price_1Szs8CAgAh00fVW11BjTnSrF";
-const YEARLY_PRICE_ID = "price_1Szs8KAgAh00fVW1sKwidi8l";
+const YEARLY_PRICE_ID = "price_1TJRLwAgAh00fVW16vp9a32v";
 
 const features = [
   { icon: Users, label: "Unlimited Collaborative Workspaces" },
@@ -30,14 +30,14 @@ export default function Subscription() {
   const { isPro, isInTrial, trialEndsAt, hostCapacity, canHostMore } = usePro();
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+  const queryClient = useQueryClient();
 
-  // Detect founding member status
   const { data: creatorBilling } = useQuery({
     queryKey: ["creator-billing", user?.id],
     queryFn: async () => {
       const { data } = await supabase
         .from("creators")
-        .select("stripe_customer_id")
+        .select("stripe_customer_id, credits")
         .eq("user_id", user!.id)
         .maybeSingle();
       return data;
@@ -47,7 +47,9 @@ export default function Subscription() {
 
   const isFounder = isPro && !isInTrial && !creatorBilling?.stripe_customer_id;
   const isPaidPro = isPro && !isInTrial && !!creatorBilling?.stripe_customer_id;
+  const creditBalance = creatorBilling?.credits ?? 3;
 
+  // Handle success params
   useEffect(() => {
     if (searchParams.get("success") === "true") {
       toast({
@@ -58,6 +60,34 @@ export default function Subscription() {
       setSearchParams(searchParams, { replace: true });
     }
   }, []);
+
+  // Handle credit fulfillment
+  useEffect(() => {
+    const sessionId = searchParams.get("credits_session");
+    const creditsAmount = searchParams.get("credits_amount");
+    if (!sessionId || !creditsAmount || !user) return;
+
+    const fulfill = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("fulfill-credits", {
+          body: { sessionId, credits: parseInt(creditsAmount, 10) },
+        });
+        if (error) throw error;
+        toast({
+          title: `${creditsAmount} credits added! 🎉`,
+          description: `Your new balance is ${data.credits} credits.`,
+        });
+        queryClient.invalidateQueries({ queryKey: ["creator-billing", user.id] });
+      } catch (err: any) {
+        toast({ title: "Credit fulfillment failed", description: err.message, variant: "destructive" });
+      } finally {
+        searchParams.delete("credits_session");
+        searchParams.delete("credits_amount");
+        setSearchParams(searchParams, { replace: true });
+      }
+    };
+    fulfill();
+  }, [user]);
 
   const handleCheckout = async () => {
     if (!user) {
@@ -92,6 +122,74 @@ export default function Subscription() {
       setLoading(false);
     }
   };
+
+  const handlePurchaseCredits = async (packId: string) => {
+    if (!user) {
+      toast({ title: "Please sign in first", variant: "destructive" });
+      return;
+    }
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("purchase-credits", {
+        body: { packId },
+      });
+      if (error) throw error;
+      if (data?.url) window.open(data.url, "_blank");
+    } catch (err: any) {
+      toast({ title: "Purchase failed", description: err.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Credit balance display component
+  const CreditSection = ({ showTopUp }: { showTopUp: boolean }) => (
+    <Card className="mb-6">
+      <CardContent className="p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Coins className="w-5 h-5 text-primary" />
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Credits</h3>
+        </div>
+        <div className="flex items-baseline gap-2 mb-1">
+          <span className="text-3xl font-bold">{creditBalance}</span>
+          <span className="text-sm text-muted-foreground">credits remaining</span>
+        </div>
+        {isPro && !isInTrial && (
+          <p className="text-xs text-muted-foreground mt-1">
+            Credits aren't consumed on Pro — they're saved for later.
+          </p>
+        )}
+        {showTopUp && (
+          <>
+            <p className="text-sm text-muted-foreground mt-4 mb-3">Need a quick boost?</p>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => handlePurchaseCredits("10")}
+                disabled={loading}
+                className="flex flex-col items-center p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-primary/5 transition-all"
+              >
+                <span className="text-lg font-bold">10</span>
+                <span className="text-xs text-muted-foreground">credits</span>
+                <span className="text-sm font-semibold mt-1">$10</span>
+              </button>
+              <button
+                onClick={() => handlePurchaseCredits("30")}
+                disabled={loading}
+                className="flex flex-col items-center p-4 rounded-lg border border-primary/30 bg-primary/5 hover:border-primary/50 hover:bg-primary/10 transition-all relative"
+              >
+                <Badge variant="secondary" className="absolute -top-2 text-[10px] px-1.5 py-0 bg-accent text-accent-foreground">
+                  Best value
+                </Badge>
+                <span className="text-lg font-bold">30</span>
+                <span className="text-xs text-muted-foreground">credits</span>
+                <span className="text-sm font-semibold mt-1">$25</span>
+              </button>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
 
   // View A: Founding Members & Paid Pro
   if (isPro && !isInTrial) {
@@ -145,6 +243,9 @@ export default function Subscription() {
             </CardContent>
           </Card>
 
+          {/* Credit balance (no top-up for Pro) */}
+          <CreditSection showTopUp={false} />
+
           {/* Creator Discovery teaser */}
           <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 mb-6">
             <Rocket className="w-4 h-4 text-accent-foreground" />
@@ -153,7 +254,6 @@ export default function Subscription() {
             </span>
           </div>
 
-          {/* Manage Billing — only for paying subscribers */}
           {isPaidPro && (
             <Button
               variant="outline"
@@ -256,7 +356,7 @@ export default function Subscription() {
             >
               Yearly
               <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-accent text-accent-foreground">
-                Save $30
+                Save $29.98
               </Badge>
             </button>
           </div>
@@ -265,13 +365,13 @@ export default function Subscription() {
             <div className="text-center mb-6">
               <div className="flex items-baseline justify-center gap-1">
                 <span className="text-4xl font-bold">
-                  {billing === "monthly" ? "$14.99" : "$12.42"}
+                  {billing === "monthly" ? "$14.99" : "$12.49"}
                 </span>
                 <span className="text-muted-foreground text-sm">/mo</span>
               </div>
               {billing === "yearly" && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  $149 billed annually — 2 months free
+                  $149.90 billed annually — 2 months free
                 </p>
               )}
             </div>
@@ -305,6 +405,11 @@ export default function Subscription() {
             </Button>
           </CardContent>
         </Card>
+
+        {/* Credit top-up section */}
+        <div className="mt-6">
+          <CreditSection showTopUp={true} />
+        </div>
       </div>
     </DashboardLayout>
   );
