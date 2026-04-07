@@ -108,7 +108,7 @@ export default function Workspace() {
   const { activeEditors } = useWorkspacePresence({
     requestId: requestId || "",
     userId: user?.id,
-    userName: currentUserName || "User",
+    userName: creator?.name || request?.requester_name || "User",
     isEditing: false, // Workspace page doesn't track editing — SharedWorkspace does
   });
 
