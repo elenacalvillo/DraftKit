@@ -413,6 +413,7 @@ export type Database = {
           collab_mode: string | null
           collab_style: string | null
           created_at: string
+          credits: number
           date_meaning: string | null
           id: string
           join_directory_waitlist: boolean | null
@@ -438,6 +439,7 @@ export type Database = {
           collab_mode?: string | null
           collab_style?: string | null
           created_at?: string
+          credits?: number
           date_meaning?: string | null
           id?: string
           join_directory_waitlist?: boolean | null
@@ -463,6 +465,7 @@ export type Database = {
           collab_mode?: string | null
           collab_style?: string | null
           created_at?: string
+          credits?: number
           date_meaning?: string | null
           id?: string
           join_directory_waitlist?: boolean | null

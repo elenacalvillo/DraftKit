@@ -1,0 +1,1 @@
+ALTER TABLE public.creators ADD COLUMN credits integer NOT NULL DEFAULT 3;
