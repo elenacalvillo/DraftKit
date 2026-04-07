@@ -41,18 +41,11 @@ serve(async (req) => {
       apiVersion: "2025-08-27.basil",
     });
 
-    // Find or reference existing customer, but skip if currency conflicts
+    // Find existing Stripe customer
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
     let customerId: string | undefined;
     if (customers.data.length > 0) {
-      const existing = customers.data[0];
-      // Check if this customer has a conflicting currency (e.g. MXN vs USD)
-      if (existing.currency && existing.currency !== "usd") {
-        // Don't attach — let Stripe create a new customer with USD
-        customerId = undefined;
-      } else {
-        customerId = existing.id;
-      }
+      customerId = customers.data[0].id;
     }
 
     const origin = req.headers.get("origin") || "https://collabstack.lovable.app";
@@ -61,9 +54,7 @@ serve(async (req) => {
       ? `${origin}${returnTo}?pro_activated=true`
       : `${origin}/dashboard/subscription?success=true`;
 
-    const session = await stripe.checkout.sessions.create({
-      customer: customerId,
-      customer_email: customerId ? undefined : user.email,
+    const sessionParams: any = {
       line_items: [{ price: priceId, quantity: 1 }],
       mode: "subscription",
       automatic_tax: { enabled: true },
@@ -72,7 +63,27 @@ serve(async (req) => {
       success_url: successUrl,
       cancel_url: `${origin}/dashboard/subscription?canceled=true`,
       metadata: { user_id: user.id },
-    });
+    };
+
+    let session;
+    try {
+      // Try with existing customer first
+      session = await stripe.checkout.sessions.create({
+        ...sessionParams,
+        customer: customerId,
+        customer_email: customerId ? undefined : user.email,
+      });
+    } catch (err: any) {
+      // If currency conflict, retry without attaching to existing customer
+      if (err?.message?.includes("cannot combine currencies")) {
+        session = await stripe.checkout.sessions.create({
+          ...sessionParams,
+          customer_email: user.email,
+        });
+      } else {
+        throw err;
+      }
+    }
 
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
