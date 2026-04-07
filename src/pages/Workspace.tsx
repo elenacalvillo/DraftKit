@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Calendar as CalendarIcon, CalendarDays, ExternalLink, LinkIcon, Mail, Sparkles, FileText, MessageSquare, PenLine, Lock, X, PartyPopper, CheckCircle2, Copy, Check, Crown, Clock, XCircle } from "lucide-react";
+import { ArrowLeft, Calendar as CalendarIcon, CalendarDays, ExternalLink, LinkIcon, Mail, Sparkles, FileText, MessageSquare, PenLine, Lock, X, PartyPopper, CheckCircle2, Copy, Check, Crown, Clock, XCircle, UserPlus, Users, AlertCircle } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -32,9 +32,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { CollabDraft } from "@/lib/storage";
 import { CollabImpactCard } from "@/components/requests/CollabImpactCard";
+import { InviteCollaboratorModal } from "@/components/requests/InviteCollaboratorModal";
 import { parseDateString, cn, sanitizeSubstackImageUrl } from "@/lib/utils";
 import { extractSubstackUsername, normalizeSubstackUrl } from "@/lib/substack-url";
 import { toast } from "sonner";
+import { useWorkspacePresence } from "@/hooks/useWorkspacePresence";
+import { useWorkspaceCollaborators } from "@/hooks/useWorkspaceCollaborators";
 
 interface WorkspaceRequest {
   id: string;
