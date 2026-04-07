@@ -1045,6 +1045,18 @@ export default function Workspace() {
       </div>
 
       {/* Modals */}
+      <InviteCollaboratorModal
+        open={showInviteModal}
+        onOpenChange={setShowInviteModal}
+        requestId={request.id}
+        isPro={isPro}
+        credits={credits}
+        onInvited={() => {
+          refetchCollaborators();
+          if (!isPro) setCredits((c) => Math.max(0, c - 1));
+        }}
+      />
+
       {isCreator && (
         <>
         <CollabDraftModal
