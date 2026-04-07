@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { useWorkspacePresence } from "@/hooks/useWorkspacePresence";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { FileText, Save, X, AlertCircle, PenLine, Lock, Download } from "lucide-react";
@@ -57,6 +59,15 @@ export function SharedWorkspace({
   const [notifyPartner, setNotifyPartner] = useState(false);
   const [headerPortal, setHeaderPortal] = useState<HTMLElement | null>(null);
   const [editStartTime, setEditStartTime] = useState<number | null>(null);
+  const { user } = useAuth();
+
+  // Presence heartbeat: active while editing
+  const { activeEditors } = useWorkspacePresence({
+    requestId,
+    userId: user?.id,
+    userName: currentUserName,
+    isEditing,
+  });
 
   // Find the zen header portal target
   useEffect(() => {
@@ -65,6 +76,22 @@ export function SharedWorkspace({
   }, []);
 
   const handleStartEditing = () => {
+    // Warn if someone else is currently editing
+    if (activeEditors.length > 0) {
+      const editorName = activeEditors[0].user_name;
+      toast(`${editorName} is currently editing`, {
+        description: "Starting your own edit may cause conflicts. Consider waiting.",
+        action: {
+          label: "Edit Anyway",
+          onClick: () => {
+            setEditContent(sharedContent || "");
+            setIsEditing(true);
+            setEditStartTime(Date.now());
+          },
+        },
+      });
+      return;
+    }
     setEditContent(sharedContent || "");
     setIsEditing(true);
     setEditStartTime(Date.now());

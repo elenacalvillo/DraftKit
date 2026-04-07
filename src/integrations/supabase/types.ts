@@ -628,6 +628,82 @@ export type Database = {
         }
         Relationships: []
       }
+      workspace_collaborators: {
+        Row: {
+          email: string
+          id: string
+          invited_at: string
+          invited_by: string
+          joined_at: string | null
+          request_id: string
+          role: string
+          user_id: string | null
+        }
+        Insert: {
+          email: string
+          id?: string
+          invited_at?: string
+          invited_by: string
+          joined_at?: string | null
+          request_id: string
+          role?: string
+          user_id?: string | null
+        }
+        Update: {
+          email?: string
+          id?: string
+          invited_at?: string
+          invited_by?: string
+          joined_at?: string | null
+          request_id?: string
+          role?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_collaborators_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "collab_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_presence: {
+        Row: {
+          has_unsaved: boolean
+          id: string
+          last_active_at: string
+          request_id: string
+          user_id: string
+          user_name: string
+        }
+        Insert: {
+          has_unsaved?: boolean
+          id?: string
+          last_active_at?: string
+          request_id: string
+          user_id: string
+          user_name: string
+        }
+        Update: {
+          has_unsaved?: boolean
+          id?: string
+          last_active_at?: string
+          request_id?: string
+          user_id?: string
+          user_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_presence_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "collab_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       public_booked_dates: {
@@ -724,7 +800,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      has_workspace_access: {
+        Args: { _request_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_pro_user: { Args: { _user_id: string }; Returns: boolean }
+      is_request_owner: {
+        Args: { _request_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "user" | "pro"

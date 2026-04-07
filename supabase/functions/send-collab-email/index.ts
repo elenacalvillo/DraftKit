@@ -66,11 +66,12 @@ const corsHeaders = {
 };
 
 interface EmailRequest {
-  type: "request_approved" | "request_declined" | "request_received" | "request_submitted" | "request_cancelled_by_guest" | "collab_cancelled_by_host" | "new_message" | "new_message_from_guest" | "collab_reminder" | "collab_type_changed" | "workspace_updated_by_creator" | "workspace_updated_by_guest" | "collab_rescheduled" | "collab_published";
+  type: "request_approved" | "request_declined" | "request_received" | "request_submitted" | "request_cancelled_by_guest" | "collab_cancelled_by_host" | "new_message" | "new_message_from_guest" | "collab_reminder" | "collab_type_changed" | "workspace_updated_by_creator" | "workspace_updated_by_guest" | "collab_rescheduled" | "collab_published" | "workspace_invite";
   requestId: string;
   messageContent?: string;
   newCollabType?: string;
   newDate?: string;
+  inviteeEmail?: string;
 }
 
 interface CollabDraft {
@@ -108,6 +109,7 @@ const EMAIL_TYPE_ROLES: Record<EmailRequest["type"], "creator" | "requester" | "
   workspace_updated_by_creator: "creator",
   workspace_updated_by_guest: "requester",
   collab_published: "creator",
+  workspace_invite: "creator",
 };
 
 serve(async (req: Request): Promise<Response> => {
@@ -121,7 +123,7 @@ serve(async (req: Request): Promise<Response> => {
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    const { type, requestId, messageContent, newCollabType, newDate }: EmailRequest = await req.json();
+    const { type, requestId, messageContent, newCollabType, newDate, inviteeEmail }: EmailRequest = await req.json();
 
     if (!type || !requestId) {
       return new Response(
@@ -1010,6 +1012,61 @@ serve(async (req: Request): Promise<Response> => {
         </body>
         </html>
       `;
+    } else if (type === "workspace_invite") {
+      // Invitation to join a Writer's Room
+      if (!inviteeEmail) {
+        return new Response(
+          JSON.stringify({ error: "Missing inviteeEmail" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      toEmail = inviteeEmail;
+      const workspaceUrl = `${baseUrl}/dashboard/workspace/${requestId}`;
+      emailSubject = `✍️ ${creatorName} invited you to collaborate on DraftKit`;
+      emailHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; padding: 20px;">
+          ${brandHeader}
+          <div style="text-align: center; margin-bottom: 32px;">
+            <h1 style="margin: 0; font-size: 24px; color: #1e293b;">✍️ You're Invited to a Writer's Room</h1>
+          </div>
+
+          <p style="font-size: 16px; margin-bottom: 24px;">Hi there,</p>
+          
+          <p style="font-size: 16px; margin-bottom: 24px;">
+            <strong>${creatorName}</strong> has invited you to join a collaboration workspace on DraftKit — a shared space where writers draft together asynchronously.
+          </p>
+
+          <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #d9826b;">
+            <p style="margin: 0 0 8px 0; font-weight: 600; color: #475569;">About this collaboration:</p>
+            <p style="margin: 0; color: #1e293b;">
+              ${request.selected_collab_type ? `<strong>Type:</strong> ${request.selected_collab_type}<br>` : ""}
+              ${requestedDate ? `<strong>Target date:</strong> ${formattedDate}<br>` : ""}
+              <strong>With:</strong> ${creatorName} and ${requesterName}
+            </p>
+          </div>
+
+          <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
+            <p style="margin: 0 0 16px 0; color: #475569;">Join the workspace to start drafting:</p>
+            <a href="${workspaceUrl}" 
+               style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+              Open Writer's Room →
+            </a>
+            <p style="margin: 12px 0 0 0; font-size: 13px; color: #94a3b8;">You'll need a free DraftKit account to access the workspace.</p>
+          </div>
+
+          <p style="font-size: 14px; color: #64748b; margin-top: 32px;">
+            See you in the Room!<br>
+            The DraftKit Team
+          </p>
+        </body>
+        </html>
+      `;
     }
 
     if (!toEmail) {
@@ -1042,7 +1099,8 @@ serve(async (req: Request): Promise<Response> => {
       "workspace_updated_by_creator",
       "workspace_updated_by_guest",
       "collab_published",
-      "collab_rescheduled"
+      "collab_rescheduled",
+      "workspace_invite"
     ];
 
     if (DEDUP_TYPES.includes(type)) {
@@ -1084,6 +1142,7 @@ serve(async (req: Request): Promise<Response> => {
       collab_cancelled_by_host: creatorEmail || undefined,
       collab_published: creatorEmail || undefined,
       collab_rescheduled: creatorEmail || undefined,
+      workspace_invite: creatorEmail || undefined,
     };
     const replyTo = replyToMap[type];
 
