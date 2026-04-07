@@ -50,15 +50,31 @@ serve(async (req) => {
 
     const origin = req.headers.get("origin") || "https://collabstack.lovable.app";
 
-    const session = await stripe.checkout.sessions.create({
-      customer: customerId,
-      customer_email: customerId ? undefined : user.email,
+    const sessionParams: any = {
       line_items: [{ price: pack.priceId, quantity: 1 }],
       mode: "payment",
       success_url: `${origin}/dashboard/subscription?credits_session={CHECKOUT_SESSION_ID}&credits_amount=${pack.credits}`,
       cancel_url: `${origin}/dashboard/subscription?credits_canceled=true`,
       metadata: { user_id: user.id, credits: String(pack.credits) },
-    });
+    };
+
+    let session;
+    try {
+      session = await stripe.checkout.sessions.create({
+        ...sessionParams,
+        customer: customerId,
+        customer_email: customerId ? undefined : user.email,
+      });
+    } catch (err: any) {
+      if (err?.message?.includes("cannot combine currencies")) {
+        session = await stripe.checkout.sessions.create({
+          ...sessionParams,
+          customer_email: user.email,
+        });
+      } else {
+        throw err;
+      }
+    }
 
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
