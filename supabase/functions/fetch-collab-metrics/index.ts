@@ -212,7 +212,50 @@ function extractSlugFromUrl(url: string): string | null {
 }
 
 /**
- * Fetch metrics for a specific Substack post.
+ * Scrape the slug from a profile-style Substack post page by parsing the HTML.
+ * Looks for the post slug in embedded JSON data on the page.
+ */
+async function scrapeSlugFromProfilePage(url: string): Promise<string | null> {
+  if (!isAllowedDomain(url)) return null;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    const resp = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; DraftKit/1.0)", "Accept": "text/html" },
+      redirect: "follow",
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    if (!resp.ok) return null;
+    const html = await resp.text();
+
+    // Look for the slug in embedded JSON: "slug":"my-post-slug"
+    // Match near the post ID to avoid picking up unrelated slugs
+    const slugMatch = html.match(/"slug"\s*:\s*"([a-zA-Z0-9_-]+)"/);
+    if (slugMatch) {
+      console.log(`Scraped slug from profile page: ${slugMatch[1]}`);
+      return slugMatch[1].toLowerCase();
+    }
+
+    // Fallback: look for canonical subdomain URL with /p/ in the page
+    const canonMatch = html.match(/https:\/\/([a-zA-Z0-9_-]+)\.substack\.com\/p\/([a-zA-Z0-9_-]+)/);
+    if (canonMatch) {
+      console.log(`Found canonical link in page: ${canonMatch[0]}`);
+      return canonMatch[2].toLowerCase();
+    }
+
+    return null;
+  } catch (err) {
+    clearTimeout(timeout);
+    console.error(`Slug scrape failed for ${url}:`, err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+
  * Tries multiple strategies:
  *   1. Direct subdomain + slug extraction (classic URLs)
  *   2. Follow redirects to find canonical URL (profile/mobile/app URLs)
