@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { useWorkspacePresence } from "@/hooks/useWorkspacePresence";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { FileText, Save, X, AlertCircle, PenLine, Lock, Download } from "lucide-react";
@@ -57,6 +59,15 @@ export function SharedWorkspace({
   const [notifyPartner, setNotifyPartner] = useState(false);
   const [headerPortal, setHeaderPortal] = useState<HTMLElement | null>(null);
   const [editStartTime, setEditStartTime] = useState<number | null>(null);
+  const { user } = useAuth();
+
+  // Presence heartbeat: active while editing
+  const { activeEditors } = useWorkspacePresence({
+    requestId,
+    userId: user?.id,
+    userName: currentUserName,
+    isEditing,
+  });
 
   // Find the zen header portal target
   useEffect(() => {
