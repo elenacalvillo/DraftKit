@@ -1099,7 +1099,8 @@ serve(async (req: Request): Promise<Response> => {
       "workspace_updated_by_creator",
       "workspace_updated_by_guest",
       "collab_published",
-      "collab_rescheduled"
+      "collab_rescheduled",
+      "workspace_invite"
     ];
 
     if (DEDUP_TYPES.includes(type)) {
@@ -1141,6 +1142,7 @@ serve(async (req: Request): Promise<Response> => {
       collab_cancelled_by_host: creatorEmail || undefined,
       collab_published: creatorEmail || undefined,
       collab_rescheduled: creatorEmail || undefined,
+      workspace_invite: creatorEmail || undefined,
     };
     const replyTo = replyToMap[type];
 
