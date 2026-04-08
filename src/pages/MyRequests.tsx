@@ -56,6 +56,14 @@ const statusVariants: Record<string, { label: string; variant: 'default' | 'seco
   published: { label: '✨ Published', variant: 'default' },
 };
 
+interface SuggestedCreator {
+  id: string;
+  name: string | null;
+  username: string | null;
+  profile_image_url: string | null;
+  bio: string | null;
+}
+
 export default function MyRequests() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -64,12 +72,34 @@ export default function MyRequests() {
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [messageModalRequest, setMessageModalRequest] = useState<SentRequest | null>(null);
   const [showAll, setShowAll] = useState(false);
+  const [suggestedCreators, setSuggestedCreators] = useState<SuggestedCreator[]>([]);
 
   useEffect(() => {
     if (user) {
       fetchSentRequests();
+      fetchSuggestedCreators();
     }
   }, [user]);
+
+  const fetchSuggestedCreators = async () => {
+    try {
+      const { data } = await supabase
+        .from('public_creator_profiles')
+        .select('id, name, username, profile_image_url, bio')
+        .not('id', 'is', null)
+        .not('username', 'is', null)
+        .limit(20);
+      
+      if (data) {
+        // Filter out current user and pick 5 random
+        const filtered = data.filter(c => c.id !== user?.id);
+        const shuffled = filtered.sort(() => Math.random() - 0.5);
+        setSuggestedCreators(shuffled.slice(0, 5));
+      }
+    } catch (err) {
+      console.error('Error fetching suggested creators:', err);
+    }
+  };
 
   const fetchSentRequests = async () => {
     try {
