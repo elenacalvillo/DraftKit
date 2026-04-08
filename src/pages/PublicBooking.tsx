@@ -1404,7 +1404,7 @@ export default function PublicBooking() {
                     ) : (
                       <>
                         <Sparkles className="w-5 h-5 mr-2" />
-                        Request Collaboration
+                        Propose Collaboration
                       </>
                     )}
                   </Button>
@@ -1475,7 +1475,7 @@ export default function PublicBooking() {
                     <Calendar className="w-12 h-12 text-primary/50 mx-auto mb-4" />
                     <h3 className="font-semibold text-lg mb-2">Flexible Scheduling</h3>
                     <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
-                      {creator.name} hasn't set specific dates yet, but you can still send a collaboration request!
+                      {creator.name} hasn't set specific dates yet, but you can still propose a collaboration!
                     </p>
                     <Button 
                       variant="gradient" 
@@ -1483,7 +1483,7 @@ export default function PublicBooking() {
                       onClick={() => setIsFlexibleDate(true)}
                     >
                       <Sparkles className="w-4 h-4 mr-2" />
-                      Request with Flexible Date
+                      Propose with Flexible Date
                     </Button>
                   </motion.div>
                 )}

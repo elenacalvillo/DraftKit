@@ -41,9 +41,9 @@ const useIsDesktop = () => {
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
   { icon: Calendar, label: "Availability", path: "/dashboard/availability" },
-  { icon: MessageSquare, label: "Requests", path: "/dashboard/requests" },
-  { icon: Send, label: "Sent Requests", path: "/dashboard/my-requests" },
-  { icon: Sparkles, label: "Discovery", path: "/dashboard/discovery" },
+  { icon: MessageSquare, label: "Collabs", path: "/dashboard/requests" },
+  { icon: Send, label: "Proposals", path: "/dashboard/my-requests" },
+  { icon: Sparkles, label: "Network", path: "/dashboard/discovery" },
   { icon: Settings, label: "Settings", path: "/dashboard/settings" },
   { icon: Crown, label: "Membership", path: "/dashboard/subscription" },
 ];

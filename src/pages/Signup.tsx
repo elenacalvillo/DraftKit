@@ -906,7 +906,7 @@ export default function Signup() {
 
                 <h1 className="text-2xl font-bold mb-2">You're All Set!</h1>
                 <p className="text-muted-foreground mb-8">
-                  Share your link and start receiving collaboration requests
+                  Share your link and start receiving collaborations
                 </p>
 
                 <div className="bg-muted/50 rounded-xl p-4 mb-6">

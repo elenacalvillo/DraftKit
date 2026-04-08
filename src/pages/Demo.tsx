@@ -5,7 +5,7 @@ import { ArrowRight, Search, Send, Zap, Users, Gift, Trophy } from "lucide-react
 
 const pillars = [
   { number: "01", icon: <Search className="w-6 h-6" />, title: "Smart Discovery", description: "Find the right voices even when standard search fails. We look at the source to find collaborators ready to grow with you." },
-  { number: "02", icon: <Send className="w-6 h-6" />, title: "The Front Door", description: "Replace messy DMs with a professional request page. Your invite earns both of you a collaboration credit toward your next growth milestone." },
+  { number: "02", icon: <Send className="w-6 h-6" />, title: "The Front Door", description: "Replace messy DMs with a professional collaboration page. Your invite earns both of you a collaboration credit toward your next growth milestone." },
   { number: "03", icon: <Zap className="w-6 h-6" />, title: "The Smart Draft", description: "Start your collaboration with an AI-powered foundation. We automate the ideation phase so you can focus on high-value writing." },
   { number: "04", icon: <Users className="w-6 h-6" />, title: "The Shared Room", description: "A dedicated workspace for your team. Manage edits, feedback, and final approvals in one centralized location." },
   { number: "05", icon: <Gift className="w-6 h-6" />, title: "The Growth Loop", description: "DraftKit grows when you grow. Earn extra credits for every writer you bring into the community to scale your network." },
