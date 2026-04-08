@@ -1,66 +1,69 @@
-# Fix: Universal Substack URL Parsing + Guest Publish UX
+# Action-First Requests Redesign + Dashboard Priority + MyRequests Fix
 
-## What's Happening
+## Problem
 
-**Problem 1**: The `fetch-collab-metrics` edge function only understands `username.substack.com/p/slug` URLs. Substack has multiple URL formats that all point to the same post:
+1. **Requests page** defaults to "All" tab — users land on a wall of published/old collabs instead of seeing what needs action.
+2. **Dashboard "Recent Requests"** shows the 5 most recent by `created_at` regardless of status — published collabs push pending ones out of view.
+3. **MyRequests "Discover Creators" button** navigates to `/` (Landing page) instead of `/dashboard/discovery`. Empty state offers no creator suggestions.
 
-- `substack.com/@username/p-192157347` (profile-style)
-- `open.substack.com/pub/username/p/slug` (mobile share)
-- `substack.app/...` (app deep links)
-- `username.substack.com/p/slug` (classic — already works)
+## Changes
 
-When a URL like `substack.com/@codelikeagirl/p-192157347` is stored, `extractSlugFromUrl()` fails (no `/p/` segment), `fetchPostByUrl()` fails (no subdomain), and all metrics come back NULL.
+### 1. Requests Page — Default to "Pending" with Smart Fallback
 
-**Problem 2**: When the host marks a collab as published, the status update succeeds, but the background metrics fetch fails and may surface a confusing error toast to the guest. The UI should treat the DB status as the source of truth — if it says `published`, show the success state regardless of metrics fetch outcome.
+**File: `src/pages/Requests.tsx**`
 
-## Plan
+- Change `useState<FilterTab>("all")` to `useState<FilterTab>("pending")`.
+- After requests load, if the pending count is 0, auto-switch to the first non-empty actionable tab in this priority: `approved` → `all`.
+- Rename the section heading contextually: when on Pending tab, show "Needs Your Response" above the cards. When on Approved, show "Upcoming Collaborations". Other tabs keep the current generic heading.
+- Update the empty state for Pending tab specifically: "You're all caught up! No pending requests." with a CTA button "Explore Discovery" linking to `/dashboard/discovery`.
 
-### 1. Universal URL Parser with Follow-Redirect Fallback
+### 2. Dashboard "Recent Requests" — Prioritize Actionable Items
 
-In `supabase/functions/fetch-collab-metrics/index.ts`:
+**File: `src/pages/Dashboard.tsx**`
 
-**a) Update `isAllowedDomain()**` — Add `substack.app` to allowed domains so app deep-link URLs aren't SSRF-blocked.
+- Sort the `requests.slice(0, 5)` feed by action priority: pending first, then approved, then everything else — within each group, keep existing date/recency sort.
+- Rename the section from "Recent Requests" to "Action Required" when there are pending items, keeping "Recent Requests" as fallback when no pending exist.
+- When clicking a request row, navigate to `/dashboard/requests` with the appropriate tab pre-selected (e.g., `?tab=pending` if the request is pending).
 
-**b) Add `resolveCanonicalUrl(url)` function** — The "safety net":
+### The "Lovable" Risk: Tab Flickering
 
-- Takes any Substack URL (profile-style, mobile, app-link)
-- Does a `fetch(url, { redirect: "follow" })` with a timeout
-- Returns the final canonical URL after redirects (Substack always resolves to `username.substack.com/p/slug`)
-- If the redirect lands on an allowed domain and has `/p/` in the path, return it
-- If it fails or doesn't resolve cleanly, return `null`
+The only place where this might feel "janky" is the auto-switch logic in `Requests.tsx`.
 
-**c) Update `fetchPostByUrl(url)**` — Make it a "catch-all":
+If Lovable implements a simple `useEffect` that checks the count and then switches the tab, the user might see the "Pending" empty state for a split second before it jumps to "Approved." It feels like the app is glitching.
 
-- First, try the existing logic (extract subdomain + slug directly)
-- If that fails (no subdomain or no slug), call `resolveCanonicalUrl(url)` to follow redirects
-- Re-extract subdomain + slug from the resolved canonical URL
-- If still no luck, try extracting the username via `extractUsername()` + `resolvePublicationUsername()`, then use the numeric post ID from the URL path (for `p-{id}` format) with Substack's `/api/v1/posts/{id}` endpoint
-- All existing `/p/slug` URL handling remains untouched
+**The Guardrail:** Tell Lovable to "Handle the initial tab state before the first render." Instead of switching *after* loading, it should determine the `defaultTab` based on the data payload as soon as it arrives.
 
-**d) Update `extractSlugFromUrl(url)**` — Add pattern for `p-{numericId}`:
+### The URL Sync Win
 
-- Keep existing `/p/([a-zA-Z0-9_-]+)` match
-- Add `/p-(\d+)` match for profile-style URLs
-- Return the numeric ID as a string (Substack's API accepts both slugs and numeric IDs)
+Adding `?tab=` support is the most professional part of this plan. It means when you send a link to Edwin or Soribel to check a specific request, it will actually open the right view for them.
 
-**e) No changes to `extractUsername()**` — it already handles all three formats.
+### Final Tweak for your Instruction
 
-### 2. Guest Publish UX — Status is Source of Truth
+Add this one line to your prompt for Lovable:
 
-CAREFUL HERE THIS IS NOT JUST FOR THE GUEST OR FOR THE HOST, WHETER EACH ONE MARKS THE POST AS PUBLISHED THAT'S IT, NO ONE CAN MARK IT AS PUBLISHED AGAIN BECAUSE THAT IS CREATING AN ERROR FOR THE DATABASE TO TRY TO SUBMIT MORE THAN ONCE.
+> "For the Dashboard sort, ensure the 'Action Required' title only appears if there is at least one Pending request. If there are only Approved or Published items, stick to 'Recent Requests' to avoid sounding alarmist."
 
-In `src/pages/Workspace.tsx`, the `handlePublishWithUrls()` function already wraps the metrics fetch in a try/catch (lines 482-488) and the email send in a try/catch (lines 469-479). Both are non-fatal. The success toast fires at line 492 regardless.
+This keeps the tone "Natural" and not "Corporate Fluff."
 
-The issue is that `supabase.functions.invoke` may throw or return an error object that triggers an unhandled rejection. Fix:
+### 3. MyRequests — Fix "Discover Creators" CTA + Show Suggested Creators
 
-- Ensure the metrics invoke catch block doesn't re-throw
-- Add explicit `?.error` check on the invoke response so a 500 from the edge function doesn't bubble up as an uncaught error
-- The toast at line 492 ("Congrats on publishing!") already fires in the `finally` — confirm it fires even on metrics failure
+**File: `src/pages/MyRequests.tsx**`
 
-### Files Changed
+- Change the empty state button from `navigate('/')` to `navigate('/dashboard/discovery')`.
+- Below the empty state card, add a "Creators to Collaborate With" section that queries `public_creator_profiles` for 5 random active creators (excluding the current user), displaying their avatar, name, and a "View Profile" link to `/{username}`. This gives the page immediate value even when there are no sent requests.
+
+### 4. Requests Page — Tab URL Sync
+
+**File: `src/pages/Requests.tsx**`
+
+- Read `?tab=` from search params on mount to allow deep-linking from Dashboard clicks.
+- The highlight logic already handles `?highlight=` — add `tab` param support alongside it.
+
+## Files Changed
 
 
-| File                                               | Change                                                                                                                                                             |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `supabase/functions/fetch-collab-metrics/index.ts` | Add `resolveCanonicalUrl()`, update `isAllowedDomain` for `substack.app`, update `extractSlugFromUrl` for `p-{id}`, update `fetchPostByUrl` with redirect fallback |
-| `src/pages/Workspace.tsx`                          | Harden metrics/email invoke calls so errors never surface to the user when the publish status update succeeded                                                     |
+| File                       | Change                                                                                                      |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `src/pages/Requests.tsx`   | Default tab to pending, smart fallback, contextual headings, pending empty state CTA, `?tab=` param support |
+| `src/pages/Dashboard.tsx`  | Sort request feed by action priority (pending first), contextual section title, deep-link to correct tab    |
+| `src/pages/MyRequests.tsx` | Fix CTA to `/dashboard/discovery`, add 5 suggested creators in empty state                                  |
