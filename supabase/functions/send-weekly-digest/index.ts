@@ -68,6 +68,10 @@ Rules:
 - If a commit is a bug fix, explain why the user's life is easier now.
 - Each bullet: bold title (6 words max), then 1-2 sentence explanation.
 - Also generate a punchy email subject line (under 50 chars).
+- The Utility Rule: For every bullet, you must include a 'How to try it' sentence. Based on the commit content, determine the logical action a user needs to take to see the change:
+-- If it's a UI change, describe the navigation path.
+-- If it's a new feature, explain the first button to click.
+-- If it's a fix, explain what they'll notice is working now.
 - Do not invent features or benefits. If a commit message is ambiguous, ignore it. Use only the provided text as the source of truth.`;
 
   const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -150,7 +154,7 @@ function buildEmailHtml(digest: DigestOutput): string {
             <div style="font-weight: 700; color: #1a1a1a; margin-bottom: 6px; font-size: 16px;">${b.title}</div>
             <div style="color: #555555; font-size: 15px; line-height: 1.5;">${b.body}</div>
           </td>
-        </tr>`
+        </tr>`,
     )
     .join("");
 
@@ -244,16 +248,13 @@ async function sendBroadcast(digest: DigestOutput): Promise<any> {
   const broadcastId = broadcast.id;
 
   // Step 2: Send broadcast
-  const sendResp = await fetch(
-    `https://api.resend.com/broadcasts/${broadcastId}/send`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${RESEND_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-    }
-  );
+  const sendResp = await fetch(`https://api.resend.com/broadcasts/${broadcastId}/send`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+  });
 
   if (!sendResp.ok) {
     const text = await sendResp.text();
@@ -284,7 +285,7 @@ serve(async (req: Request) => {
       console.log("Skipping: insufficient signal");
       return new Response(
         JSON.stringify({ skipped: true, reason: "insufficient signal", commitCount: meaningful.length }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -296,15 +297,15 @@ serve(async (req: Request) => {
     const result = await sendBroadcast(digest);
     console.log("Broadcast sent:", JSON.stringify(result));
 
-    return new Response(
-      JSON.stringify({ success: true, subject: digest.subject, broadcastResult: result }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ success: true, subject: digest.subject, broadcastResult: result }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (error) {
     console.error("Weekly digest error:", error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
