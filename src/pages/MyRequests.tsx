@@ -262,6 +262,40 @@ export default function MyRequests() {
               </Button>
             </CardContent>
           </Card>
+
+          {/* Suggested creators */}
+          {suggestedCreators.length > 0 && (
+            <div className="mt-8">
+              <h3 className="text-lg font-semibold mb-4">Creators to Collaborate With</h3>
+              <div className="grid gap-3">
+                {suggestedCreators.map((creator) => (
+                  <Card key={creator.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="flex items-center gap-4 py-4">
+                      <Avatar className="h-12 w-12">
+                        <AvatarImage src={creator.profile_image_url ? sanitizeSubstackImageUrl(creator.profile_image_url) : undefined} />
+                        <AvatarFallback>
+                          {creator.name?.charAt(0) || '?'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{creator.name}</p>
+                        {creator.bio && (
+                          <p className="text-sm text-muted-foreground line-clamp-1">{creator.bio}</p>
+                        )}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/${creator.username}`)}
+                      >
+                        View Profile
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
         ) : (
           <div className="grid gap-4">
             {filtered.map((request) => {
