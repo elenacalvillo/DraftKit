@@ -226,7 +226,7 @@ export default function MyRequests() {
               <p className="text-muted-foreground text-center max-w-sm mb-4">
                 When you request collaborations with other creators, they'll appear here.
               </p>
-              <Button onClick={() => navigate('/')} variant="outline">
+              <Button onClick={() => navigate('/dashboard/discovery')} variant="outline">
                 Discover Creators
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
