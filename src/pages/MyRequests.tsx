@@ -56,6 +56,14 @@ const statusVariants: Record<string, { label: string; variant: 'default' | 'seco
   published: { label: '✨ Published', variant: 'default' },
 };
 
+interface SuggestedCreator {
+  id: string;
+  name: string | null;
+  username: string | null;
+  profile_image_url: string | null;
+  bio: string | null;
+}
+
 export default function MyRequests() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -64,12 +72,34 @@ export default function MyRequests() {
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [messageModalRequest, setMessageModalRequest] = useState<SentRequest | null>(null);
   const [showAll, setShowAll] = useState(false);
+  const [suggestedCreators, setSuggestedCreators] = useState<SuggestedCreator[]>([]);
 
   useEffect(() => {
     if (user) {
       fetchSentRequests();
+      fetchSuggestedCreators();
     }
   }, [user]);
+
+  const fetchSuggestedCreators = async () => {
+    try {
+      const { data } = await supabase
+        .from('public_creator_profiles')
+        .select('id, name, username, profile_image_url, bio')
+        .not('id', 'is', null)
+        .not('username', 'is', null)
+        .limit(20);
+      
+      if (data) {
+        // Filter out current user and pick 5 random
+        const filtered = data.filter(c => c.id !== user?.id);
+        const shuffled = filtered.sort(() => Math.random() - 0.5);
+        setSuggestedCreators(shuffled.slice(0, 5));
+      }
+    } catch (err) {
+      console.error('Error fetching suggested creators:', err);
+    }
+  };
 
   const fetchSentRequests = async () => {
     try {
@@ -217,6 +247,7 @@ export default function MyRequests() {
             ? requests
             : requests.filter(r => r.status !== 'declined' && r.status !== 'cancelled');
           return filtered.length === 0 ? (
+          <>
           <Card className="border-dashed">
             <CardContent className="flex flex-col items-center justify-center py-12">
               <div className="rounded-full bg-muted p-4 mb-4">
@@ -226,12 +257,46 @@ export default function MyRequests() {
               <p className="text-muted-foreground text-center max-w-sm mb-4">
                 When you request collaborations with other creators, they'll appear here.
               </p>
-              <Button onClick={() => navigate('/')} variant="outline">
+              <Button onClick={() => navigate('/dashboard/discovery')} variant="outline">
                 Discover Creators
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </CardContent>
           </Card>
+
+          {suggestedCreators.length > 0 && (
+            <div className="mt-8">
+              <h3 className="text-lg font-semibold mb-4">Creators to Collaborate With</h3>
+              <div className="grid gap-3">
+                {suggestedCreators.map((creator) => (
+                  <Card key={creator.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="flex items-center gap-4 py-4">
+                      <Avatar className="h-12 w-12">
+                        <AvatarImage src={creator.profile_image_url ? sanitizeSubstackImageUrl(creator.profile_image_url) : undefined} />
+                        <AvatarFallback>
+                          {creator.name?.charAt(0) || '?'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{creator.name}</p>
+                        {creator.bio && (
+                          <p className="text-sm text-muted-foreground line-clamp-1">{creator.bio}</p>
+                        )}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/${creator.username}`)}
+                      >
+                        View Profile
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+          </>
         ) : (
           <div className="grid gap-4">
             {filtered.map((request) => {

@@ -364,7 +364,9 @@ export default function Dashboard() {
             transition={{ delay: 0.4 }}
           >
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">Recent Requests</h2>
+              <h2 className="text-xl font-semibold">
+                {pendingCount > 0 ? "Action Required" : "Recent Requests"}
+              </h2>
               {pendingCount > 0 && (
                 <span className="px-2 py-1 rounded-full bg-accent/20 text-accent text-sm font-medium">
                   {pendingCount} new
@@ -382,44 +384,57 @@ export default function Dashboard() {
                   </p>
                 </div>
               ) : (
-                requests.slice(0, 5).map((request) => (
-                  <motion.div
-                    key={request.id}
-                    whileHover={{ x: 4 }}
-                    className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors cursor-pointer"
-                    onClick={() => navigate("/dashboard/requests")}
-                  >
-                    {request.requester_profile_image_url && !imageErrors.has(request.id) ? (
-                      <img 
-                        src={sanitizeSubstackImageUrl(request.requester_profile_image_url)} 
-                        alt={request.requester_name}
-                        className="w-10 h-10 rounded-full object-cover"
-                        onError={() => handleImageError(request.id)}
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center text-primary-foreground font-semibold text-sm">
-                        {request.requester_name.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{request.requester_name}</p>
-                      <p className="text-sm text-muted-foreground truncate">
-                        {parseDateString(request.requested_date).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs capitalize ${
-                        request.status === "pending"
-                          ? "bg-accent/10 text-accent"
-                          : request.status === "approved"
-                          ? "bg-success/10 text-success"
-                          : "bg-destructive/10 text-destructive"
-                      }`}
-                    >
-                      {request.status}
-                    </span>
-                  </motion.div>
-                ))
+                [...requests]
+                  .sort((a, b) => {
+                    const priority = (s: string) => s === 'pending' ? 0 : s === 'approved' ? 1 : 2;
+                    const pa = priority(a.status);
+                    const pb = priority(b.status);
+                    if (pa !== pb) return pa - pb;
+                    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+                  })
+                  .slice(0, 5)
+                  .map((request) => {
+                    const targetTab = request.status === 'pending' ? 'pending' : request.status === 'approved' ? 'approved' : '';
+                    const targetUrl = targetTab ? `/dashboard/requests?tab=${targetTab}` : '/dashboard/requests';
+                    return (
+                      <motion.div
+                        key={request.id}
+                        whileHover={{ x: 4 }}
+                        className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors cursor-pointer"
+                        onClick={() => navigate(targetUrl)}
+                      >
+                        {request.requester_profile_image_url && !imageErrors.has(request.id) ? (
+                          <img 
+                            src={sanitizeSubstackImageUrl(request.requester_profile_image_url)} 
+                            alt={request.requester_name}
+                            className="w-10 h-10 rounded-full object-cover"
+                            onError={() => handleImageError(request.id)}
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center text-primary-foreground font-semibold text-sm">
+                            {request.requester_name.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{request.requester_name}</p>
+                          <p className="text-sm text-muted-foreground truncate">
+                            {parseDateString(request.requested_date).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs capitalize ${
+                            request.status === "pending"
+                              ? "bg-accent/10 text-accent"
+                              : request.status === "approved"
+                              ? "bg-success/10 text-success"
+                              : "bg-destructive/10 text-destructive"
+                          }`}
+                        >
+                          {request.status}
+                        </span>
+                      </motion.div>
+                    );
+                  })
               )}
             </div>
           </motion.div>

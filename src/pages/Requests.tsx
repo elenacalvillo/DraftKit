@@ -1,7 +1,7 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { parseDateString } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { Inbox, ArrowLeft } from "lucide-react";
+import { Inbox, ArrowLeft, Compass } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { RequestCard } from "@/components/requests/RequestCard";
@@ -45,28 +45,49 @@ export default function Requests() {
   const { isPro } = usePro();
   const { activeCount, canApprove, refetch: refetchActiveCollabs } = useActiveCollabs();
   const [requests, setRequests] = useState<DbCollabRequest[]>([]);
-  const [activeTab, setActiveTab] = useState<FilterTab>("all");
+  const [activeTab, setActiveTab] = useState<FilterTab | null>(null);
+  const [tabInitialized, setTabInitialized] = useState(false);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Handle highlight query parameter
+  // Handle URL params: ?tab= and ?highlight=
   const highlightParam = searchParams.get('highlight');
+  const tabParam = searchParams.get('tab') as FilterTab | null;
+
+  // Determine initial tab once data loads — no flicker
+  useEffect(() => {
+    if (tabInitialized || requests.length === 0) return;
+
+    // If URL has ?highlight=, force "all" tab
+    if (highlightParam) {
+      setActiveTab("all");
+    } else if (tabParam && ["all", "pending", "approved", "declined", "cancelled", "published"].includes(tabParam)) {
+      setActiveTab(tabParam);
+    } else {
+      // Smart default: pending → approved → all
+      const pendingCount = requests.filter(r => r.status === "pending").length;
+      const approvedCount = requests.filter(r => r.status === "approved").length;
+      if (pendingCount > 0) {
+        setActiveTab("pending");
+      } else if (approvedCount > 0) {
+        setActiveTab("approved");
+      } else {
+        setActiveTab("all");
+      }
+    }
+    setTabInitialized(true);
+  }, [requests, tabInitialized, highlightParam, tabParam]);
 
   useEffect(() => {
-    if (highlightParam && requests.length > 0) {
-      // Find if the request exists in ALL requests (not just filtered)
+    if (highlightParam && requests.length > 0 && tabInitialized) {
       const requestExists = requests.some(r => r.id === highlightParam);
       
       if (requestExists) {
-        // Force "all" tab so the highlighted request is visible regardless of current filter
         if (activeTab !== "all") {
           setActiveTab("all");
         }
-        
-        // Set highlighted state
         setHighlightedId(highlightParam);
         
-        // Scroll to the element after a brief delay to ensure it's rendered
         setTimeout(() => {
           const element = document.getElementById(`request-${highlightParam}`);
           if (element) {
@@ -74,14 +95,11 @@ export default function Requests() {
           }
         }, 150);
         
-        // Clear highlight after 3 seconds
         highlightTimeoutRef.current = setTimeout(() => {
           setHighlightedId(null);
-          // Clear the URL parameter
           setSearchParams({});
         }, 3000);
       } else {
-        // Request not found, clear the param
         setSearchParams({});
       }
     }
@@ -91,7 +109,7 @@ export default function Requests() {
         clearTimeout(highlightTimeoutRef.current);
       }
     };
-  }, [highlightParam, requests, setSearchParams, activeTab]);
+  }, [highlightParam, requests, setSearchParams, activeTab, tabInitialized]);
 
   useEffect(() => {
     if (creator) {
@@ -353,29 +371,26 @@ export default function Requests() {
     toast.success("Request deleted");
   };
 
+  const resolvedTab = activeTab || "all";
+
   const filteredRequests = requests
     .filter((r) => {
-      if (activeTab === "all") return true;
-      return r.status === activeTab;
+      if (resolvedTab === "all") return true;
+      return r.status === resolvedTab;
     })
     .sort((a, b) => {
-      if (activeTab === "approved") {
-        // Calendar: next upcoming collab first (ascending date)
+      if (resolvedTab === "approved") {
         if (!a.requested_date && !b.requested_date) return 0;
         if (!a.requested_date) return 1;
         if (!b.requested_date) return -1;
         return a.requested_date.localeCompare(b.requested_date);
       }
-      if (activeTab === "published") {
-        // Trophy case: most recent win first (descending date)
+      if (resolvedTab === "published") {
         if (!a.requested_date && !b.requested_date) return 0;
         if (!a.requested_date) return 1;
         if (!b.requested_date) return -1;
         return b.requested_date.localeCompare(a.requested_date);
       }
-      // All other tabs (all, pending, declined, cancelled):
-      // prioritize by requested_date ascending (closest date first),
-      // fall back to newest submission for undated requests
       const aDate = a.requested_date;
       const bDate = b.requested_date;
       if (aDate && bDate) return aDate.localeCompare(bDate);
@@ -435,10 +450,12 @@ export default function Requests() {
           className="mb-10"
         >
           <h1 className="text-3xl font-bold mb-2">
-            <span className="gradient-text">Collaboration Requests</span>
+            <span className="gradient-text">
+              {resolvedTab === "pending" ? "Needs Your Response" : resolvedTab === "approved" ? "Upcoming Collaborations" : "Collaboration Requests"}
+            </span>
           </h1>
           <p className="text-muted-foreground">
-            Review and manage incoming collaboration requests
+            {resolvedTab === "pending" ? "Review and respond to incoming requests" : resolvedTab === "approved" ? "Collaborations coming up next" : "Review and manage incoming collaboration requests"}
           </p>
         </motion.div>
 
@@ -452,12 +469,12 @@ export default function Requests() {
           {tabs.map((tab) => (
             <Button
               key={tab.value}
-              variant={activeTab === tab.value ? "gradient" : "ghost"}
+              variant={resolvedTab === tab.value ? "gradient" : "ghost"}
               size="sm"
               onClick={() => setActiveTab(tab.value)}
               className={cn(
                 "relative",
-                activeTab === tab.value && "shadow-none"
+                resolvedTab === tab.value && "shadow-none"
               )}
             >
               {tab.label}
@@ -465,9 +482,11 @@ export default function Requests() {
                 <span
                   className={cn(
                     "ml-2 px-2 py-0.5 rounded-full text-xs",
-                    activeTab === tab.value
+                    resolvedTab === tab.value
                       ? "bg-primary-foreground/20"
-                      : "bg-muted"
+                      : tab.value === "pending" && tab.count > 0
+                        ? "bg-accent text-accent-foreground"
+                        : "bg-muted"
                   )}
                 >
                   {tab.count}
@@ -487,15 +506,29 @@ export default function Requests() {
               className="glass-card p-16 text-center"
             >
               <Inbox className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold mb-2">No requests yet</h3>
+              <h3 className="text-xl font-semibold mb-2">
+                {resolvedTab === "pending" ? "You're all caught up!" : "No requests yet"}
+              </h3>
               <p className="text-muted-foreground max-w-sm mx-auto">
-                Share your public link to start receiving collaboration requests from other creators.
+                {resolvedTab === "pending"
+                  ? "No pending requests right now. Find your next collaborator!"
+                  : "Share your public link to start receiving collaboration requests from other creators."}
               </p>
-              <div className="mt-6 p-4 bg-muted/50 rounded-xl inline-block">
-                <code className="text-sm text-primary">
-                  draftkit.app/{creator.username}
-                </code>
-              </div>
+              {resolvedTab === "pending" ? (
+                <Button
+                  className="mt-6"
+                  onClick={() => navigate("/dashboard/discovery")}
+                >
+                  <Compass className="w-4 h-4 mr-2" />
+                  Explore Discovery
+                </Button>
+              ) : (
+                <div className="mt-6 p-4 bg-muted/50 rounded-xl inline-block">
+                  <code className="text-sm text-primary">
+                    draftkit.app/{creator.username}
+                  </code>
+                </div>
+              )}
             </motion.div>
           ) : (
             <div className="grid gap-6">
