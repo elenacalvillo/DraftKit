@@ -247,6 +247,7 @@ export default function MyRequests() {
             ? requests
             : requests.filter(r => r.status !== 'declined' && r.status !== 'cancelled');
           return filtered.length === 0 ? (
+          <>
           <Card className="border-dashed">
             <CardContent className="flex flex-col items-center justify-center py-12">
               <div className="rounded-full bg-muted p-4 mb-4">
@@ -263,7 +264,6 @@ export default function MyRequests() {
             </CardContent>
           </Card>
 
-          {/* Suggested creators */}
           {suggestedCreators.length > 0 && (
             <div className="mt-8">
               <h3 className="text-lg font-semibold mb-4">Creators to Collaborate With</h3>
@@ -296,6 +296,7 @@ export default function MyRequests() {
               </div>
             </div>
           )}
+          </>
         ) : (
           <div className="grid gap-4">
             {filtered.map((request) => {
