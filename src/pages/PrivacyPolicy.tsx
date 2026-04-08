@@ -18,8 +18,8 @@ const sections = [
         text: "If you provide your Substack URL, we access your publicly available RSS feed to help generate collaboration ideas. We only read public content—never private posts or subscriber data."
       },
       {
-        title: "Collaboration Requests",
-        text: "We store the collaboration requests you send and receive, including messages, dates, and draft content you create within DraftKit."
+       title: "Collaborations",
+        text: "We store the collaborations you send and receive, including messages, dates, and draft content you create within DraftKit."
       },
       {
         title: "Usage Analytics",
@@ -33,7 +33,7 @@ const sections = [
     points: [
       {
         title: "Provide Our Services",
-        text: "To operate your booking page, manage collaboration requests, and generate draft content based on your preferences."
+        text: "To operate your booking page, manage collaborations, and generate draft content based on your preferences."
       },
       {
         title: "Improve DraftKit",
@@ -91,7 +91,7 @@ const sections = [
     points: [
       {
         title: "Access Your Data",
-        text: "You can view all your collaboration requests, drafts, and settings within your DraftKit dashboard at any time."
+        text: "You can view all your collaborations, drafts, and settings within your DraftKit dashboard at any time."
       },
       {
         title: "Correct Your Data",

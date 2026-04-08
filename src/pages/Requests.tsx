@@ -451,11 +451,11 @@ export default function Requests() {
         >
           <h1 className="text-3xl font-bold mb-2">
             <span className="gradient-text">
-              {resolvedTab === "pending" ? "Needs Your Response" : resolvedTab === "approved" ? "Upcoming Collaborations" : "Collaboration Requests"}
+              {resolvedTab === "pending" ? "Needs Your Response" : resolvedTab === "approved" ? "Upcoming Collaborations" : "Your Collabs"}
             </span>
           </h1>
           <p className="text-muted-foreground">
-            {resolvedTab === "pending" ? "Review and respond to incoming requests" : resolvedTab === "approved" ? "Collaborations coming up next" : "Review and manage incoming collaboration requests"}
+            {resolvedTab === "pending" ? "Review and respond to incoming proposals" : resolvedTab === "approved" ? "Collaborations coming up next" : "Review and manage your collaborations"}
           </p>
         </motion.div>
 
@@ -507,12 +507,12 @@ export default function Requests() {
             >
               <Inbox className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
               <h3 className="text-xl font-semibold mb-2">
-                {resolvedTab === "pending" ? "You're all caught up!" : "No requests yet"}
+                {resolvedTab === "pending" ? "You're all caught up!" : "No active collabs"}
               </h3>
               <p className="text-muted-foreground max-w-sm mx-auto">
                 {resolvedTab === "pending"
-                  ? "No pending requests right now. Find your next collaborator!"
-                  : "Share your public link to start receiving collaboration requests from other creators."}
+                  ? "No pending proposals right now. Find your next collaborator!"
+                  : "Share your public link to start receiving proposals from other creators."}
               </p>
               {resolvedTab === "pending" ? (
                 <Button
@@ -520,7 +520,7 @@ export default function Requests() {
                   onClick={() => navigate("/dashboard/discovery")}
                 >
                   <Compass className="w-4 h-4 mr-2" />
-                  Explore Discovery
+                  Explore Network
                 </Button>
               ) : (
                 <div className="mt-6 p-4 bg-muted/50 rounded-xl inline-block">

@@ -14,7 +14,7 @@ const pillars = [
     icon: <Send className="w-7 h-7" />,
     title: "The Front Door",
     description:
-      "Replace messy DMs with a professional request page. When you invite a partner to join, you both earn a collaboration credit.",
+      "Replace messy DMs with a professional collaboration page. When you invite a partner to join, you both earn a collaboration credit.",
   },
   {
     number: "03",

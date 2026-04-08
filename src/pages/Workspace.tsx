@@ -376,7 +376,7 @@ export default function Workspace() {
         <div className="max-w-6xl mx-auto text-center py-20">
           <h2 className="text-2xl font-bold mb-2">Workspace not found</h2>
           <p className="text-muted-foreground mb-6">
-            This collaboration request doesn't exist or you don't have access.
+            This collaboration doesn't exist or you don't have access.
           </p>
           <Button variant="outline" onClick={() => navigate("/dashboard")}>
             Back to Dashboard
@@ -395,7 +395,7 @@ export default function Workspace() {
             The workspace is only available for approved collaborations.
           </p>
           <Button variant="outline" onClick={() => navigate(backPath)}>
-            Back to Requests
+            Back to Collabs
           </Button>
         </div>
       </DashboardLayout>

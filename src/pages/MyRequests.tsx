@@ -224,9 +224,9 @@ export default function MyRequests() {
       <div className="space-y-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Sent Requests</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Your Proposals</h1>
             <p className="text-muted-foreground">
-              Track collaboration requests you've sent to other creators
+              Track proposals you've sent to other creators
             </p>
           </div>
           {requests.some(r => r.status === 'declined' || r.status === 'cancelled') && (
@@ -253,12 +253,12 @@ export default function MyRequests() {
               <div className="rounded-full bg-muted p-4 mb-4">
                 <Inbox className="h-8 w-8 text-muted-foreground" />
               </div>
-              <h3 className="font-semibold text-lg mb-1">No sent requests yet</h3>
+               <h3 className="font-semibold text-lg mb-1">No proposals yet</h3>
               <p className="text-muted-foreground text-center max-w-sm mb-4">
-                When you request collaborations with other creators, they'll appear here.
+                When you propose collaborations with other creators, they'll appear here.
               </p>
               <Button onClick={() => navigate('/dashboard/discovery')} variant="outline">
-                Discover Creators
+                Explore Network
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </CardContent>

@@ -365,7 +365,7 @@ export default function Dashboard() {
           >
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">
-                {pendingCount > 0 ? "Action Required" : "Recent Requests"}
+                {pendingCount > 0 ? "Action Required" : "Recent Collabs"}
               </h2>
               {pendingCount > 0 && (
                 <span className="px-2 py-1 rounded-full bg-accent/20 text-accent text-sm font-medium">
@@ -378,9 +378,9 @@ export default function Dashboard() {
               {requests.length === 0 ? (
                 <div className="text-center py-10">
                   <MessageSquare className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-                  <p className="text-muted-foreground">No requests yet</p>
+                   <p className="text-muted-foreground">No collabs yet</p>
                   <p className="text-sm text-muted-foreground/70 mt-1">
-                    Share your link to start receiving requests
+                    Share your link to start receiving proposals
                   </p>
                 </div>
               ) : (
