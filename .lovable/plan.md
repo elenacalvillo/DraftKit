@@ -1,58 +1,42 @@
 
 
-# Strategic Terminology Rename: From "Requests" to "Collabs & Proposals"
+# Send Test "What's New" Email — This Week's DraftKit Update
 
-## Overview
+## The Email Content (Based on This Week's Commits)
 
-Rename all user-facing navigation and copy to shift from transactional language ("Requests") to collaborative language ("Collabs", "Proposals", "Network"). No backend or route changes — this is purely a front-end copy sweep.
+Here's the email I'll craft and send to hello@elenacalvillo.com, written with the "PM-Led translation" approach — no jargon, all value:
 
-## The Rename Map
+**Subject:** Your Writer's Room just got a serious upgrade
 
-| Old Term | New Term | Where |
-|----------|----------|-------|
-| Requests (sidebar) | Collabs | Sidebar nav |
-| Sent Requests (sidebar) | Proposals | Sidebar nav |
-| Discovery (sidebar) | Network | Sidebar nav |
-| "Collaboration Requests" (page heading) | "Your Collabs" | Requests page |
-| "Sent Requests" (page heading) | "Your Proposals" | MyRequests page |
-| "No requests yet" | "No active collabs" | Empty states |
-| "No sent requests yet" | "No proposals yet" | MyRequests empty state |
-| "Request Collaboration" (button) | "Propose Collaboration" | PublicBooking page |
-| "send a collaboration request" | "propose a collaboration" | PublicBooking flexible scheduling |
-| "Action Required" / "Recent Requests" | "Action Required" / "Recent Collabs" | Dashboard section |
-| "No requests yet" / "receiving requests" | "No collabs yet" / "receiving proposals" | Dashboard empty state |
-| "Explore Discovery" (CTA) | "Explore Network" | Requests empty state |
-| "Discover Creators" (CTA) | "Explore Network" | MyRequests empty state |
-| "request page" | "collaboration page" | HowItWorksSection, Demo |
-| "collaboration requests" | "collaborations" | PrivacyPolicy, Settings |
-| "Collaboration Requests" (privacy title) | "Collaborations" | PrivacyPolicy |
-| "Track collaboration requests you've sent" | "Track proposals you've sent to other creators" | MyRequests subtitle |
-| "request collaborations with other creators" | "propose collaborations with other creators" | MyRequests empty body |
-| "Needs Your Response" | Keep as-is | Already good |
-| "Upcoming Collaborations" | Keep as-is | Already good |
-| Status labels (Pending, Approved, etc.) | Keep as-is | Internal status, not "request" language |
+**Body (3 bullets):**
 
-## What NOT to Change
+1. **"DraftKit is now a Network, not a task list."**
+We've completely rethought how DraftKit talks to you. "Requests" are now "Collabs." "Sent Requests" are now "Proposals." "Discovery" is now "Network." Every label in the app now reflects what you're actually doing: building intentional partnerships, not filing support tickets.
 
-- **Route paths** (`/dashboard/requests`, `/dashboard/my-requests`, `/dashboard/discovery`) — changing URLs would break bookmarks, emails, and deep-links. Routes stay the same.
-- **Database table/column names** — `collab_requests` stays. This is internal.
-- **Variable names in code** — no refactoring of `requests`, `fetchRequests`, etc. This is cosmetic copy only.
-- **Edge function email templates** — the `send-collab-email` function references are internal; email copy should say "collaboration" not "request" but that's a separate pass.
-- **Status labels** (Pending, Approved, Declined, Cancelled, Published) — these are action states, not "request" language. They stay.
+2. **"Your next action is always front and center."**
+We redesigned your Collabs page to work like a to-do list, not a history log. Pending proposals show up first under "Needs Your Response." Published collabs move to the archive. Your Dashboard now highlights what needs attention with an "Action Required" badge so you never miss an opportunity.
 
-## Files Changed
+3. **"Your Substack metrics are now bulletproof."**
+We rebuilt the URL parser from scratch. Whether someone shares a mobile link, an app link, a profile-style URL, or the classic format, DraftKit will track your engagement data every time. No more missing metrics on published collabs.
+
+**CTA:** "Open Your Writer's Room →" → links to `/dashboard`
+
+**Sign-off:** – Elena, Founder, DraftKit
+
+## How I'll Send It
+
+I'll use the existing `send-release-notes` edge function pattern to send a single email via Resend directly to hello@elenacalvillo.com. Since that function is admin-gated and sends to all pro users, I'll create a tiny one-off edge function that:
+
+1. Reads the `RESEND_API_KEY` from env
+2. Sends the crafted HTML to `hello@elenacalvillo.com` using `from: "DraftKit <hello@draftkit.app>"`
+3. Returns success/failure
+
+I'll deploy it, call it once to send the email, then delete it. The brand header, colors, and layout will match the existing `send-release-notes` template exactly (DraftKit wordmark, coral accent, warm gradient CTA button).
+
+## Files
 
 | File | Change |
 |------|--------|
-| `src/components/layout/DashboardLayout.tsx` | Sidebar labels: "Collabs", "Proposals", "Network" |
-| `src/pages/Requests.tsx` | Page heading, subheadings, empty state copy |
-| `src/pages/MyRequests.tsx` | Page heading, subtitle, empty state copy, CTA label |
-| `src/pages/Dashboard.tsx` | "Recent Collabs" fallback label, empty state copy |
-| `src/pages/PublicBooking.tsx` | "Propose Collaboration" button, flexible scheduling text |
-| `src/components/landing/HowItWorksSection.tsx` | "request page" → "collaboration page" |
-| `src/pages/Demo.tsx` | "request page" → "collaboration page" |
-| `src/pages/PrivacyPolicy.tsx` | "Collaboration Requests" → "Collaborations", update body copy |
-| `src/pages/Signup.tsx` | "collaboration request" → "collaboration", "receiving collaboration requests" → "receiving collaborations" |
-| `src/pages/Workspace.tsx` | "collaboration request" → "collaboration" in not-found message |
-| `src/components/requests/RequestCard.tsx` | "This collaboration was cancelled." stays (already good). No changes needed. |
+| `supabase/functions/send-test-whatsnew/index.ts` | Temporary: one-off email sender with hardcoded HTML |
+| (cleanup) | Delete the function after successful send |
 
