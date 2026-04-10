@@ -541,7 +541,7 @@ export default function PublicBooking() {
         message: formData.message.trim() || null,
         requested_date: isFlexibleDate ? null : selectedDate,
         status: 'pending' as const,
-        requester_user_id: null,
+        requester_user_id: user?.id ?? null,
         selected_collab_type: selectedCollabType,
         ai_suggestion_used: selectedAiSuggestion ? {
           topic: selectedAiSuggestion.topic,
@@ -565,7 +565,7 @@ export default function PublicBooking() {
         payload: {
           creator_id: creator.id,
           requester_email: formData.email.trim(),
-          requester_user_id: null,
+          requester_user_id: user?.id ?? null,
           selected_collab_type: selectedCollabType,
           requested_date: isFlexibleDate ? null : selectedDate,
         },
