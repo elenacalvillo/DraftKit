@@ -1,58 +1,57 @@
-# Fix: Privacy-First Writer's Room Member List
+# Add Collaborator Removal with Confirmation Dialog
 
-## Problems
+## What Changes
 
-1. **Email leak**: Collaborators invited via profile search show their raw email instead of their name (e.g., "[kjsmiley@ieee.org](mailto:kjsmiley@ieee.org)" instead of "Karen Smiley")
-2. **No profile images**: Avatar circles show email initials, not actual profile photos
-3. **No guest labeling**: Email-only invites (no account) should show "Guest 1", "Guest 2" — not their email
-4. **No collaborator limit**: Free accounts can invite unlimited collaborators
+### 1. Database: Allow owners to DELETE from `workspace_collaborators`
 
-## Solution
+Currently there's no DELETE policy on `workspace_collaborators`. Add one so the request owner can remove collaborators.
 
-### 1. Enrich the hook (`useWorkspaceCollaborators.ts`)
+**SQL migration:**
 
-Join `workspace_collaborators` with `creators` (via `user_id`) to fetch `name`, `username`, and `profile_image_url` for collaborators who have accounts. The query becomes a left join — collaborators without accounts get null for these fields.
+```sql
+CREATE POLICY "Owners can remove collaborators"
+ON public.workspace_collaborators
+FOR DELETE
+TO authenticated
+USING (is_request_owner(auth.uid(), request_id));
+```
 
-Since Supabase JS client can't do arbitrary joins without foreign keys, we'll query collaborators first, then batch-fetch creator profiles for those with `user_id` values from `public_creator_profiles`.
+### 2. UI: Add "X" button + AlertDialog confirmation (Workspace.tsx)
 
-### 2. Update the display logic (`Workspace.tsx`, lines 966-979)
+- Add a small `X` button next to each invited collaborator — **only visible when `isCreator` is true**
+- Guests see a clean list with no management controls (invite button is already hidden for guests)
+- Clicking `X` opens an `AlertDialog`: *"Remove [Name]? This will immediately revoke their access to this workspace."*
+- On confirm: `supabase.from('workspace_collaborators').delete().eq('id', collaboratorId)`, then call `refetchCollaborators()`
+- The `has_workspace_access()` function will automatically deny them on next page load
 
-- **Has `user_id` + name**: Show their real name and profile image
-- **No `user_id` (email-only invite)**: Show "Guest 1", "Guest 2", etc. (numbered by invite order)
-  Careful: There is one potential snag with the "Guest N" logic. If you have three guests (Guest 1, 2, 3) and Guest 1 signs up to become "Karen Smiley," make sure the numbering doesn't shift for the others. If Guest 2 suddenly becomes Guest 1, it will be confusing for the owner.
-  Ensure the numbering is tied to the **Invite ID** or a fixed index in the array so the labels stay consistent until they sign up.
-- **Hover tooltip**: Show email on hover for the workspace owner only, using the existing Tooltip component
-- **Profile images**: Use Avatar component with the fetched `profile_image_url`
+### 3. Guest permissions enforcement
 
-### 3. Cap free-tier collaborators
+- Verify the Invite button is already hidden for non-creators (it is — line 937 checks `isCreator`)
+- Guests see no X buttons, no Invite button — read-only member list
 
-In the invite button visibility check (line 935), add a limit: free accounts can invite max 5 collaborators per workspace. Show "Go Unlimited" prompt when limit is hit.
+### One "PM" Detail to Watch
+
+When you show the `AlertDialog`, make sure it explicitly mentions the collaborator's name (e.g., "Remove Karen Smiley?"). This prevents the "accident" you were worried about.
+
+Also, once the deletion is successful, make sure Lovable adds a simple toast notification: "Access revoked for [Name]". It gives the owner that final bit of confirmation that the door is locked.
 
 ## Files to Change
 
 
-| File                                     | Change                                                                                                                                               |
-| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/hooks/useWorkspaceCollaborators.ts` | Enrich collaborator data by fetching name/profile_image_url from `public_creator_profiles` for collaborators with `user_id`                          |
-| `src/pages/Workspace.tsx`                | Update Writer's Room member list: show name (not email), use Avatar for images, add Tooltip for email on hover, add 5-collaborator cap for free tier |
+| File                      | Change                                                                                                                                               |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SQL migration             | Add DELETE policy for owners on `workspace_collaborators`                                                                                            |
+| `src/pages/Workspace.tsx` | Add `handleRemoveCollaborator` function, X button per collaborator (owner-only), AlertDialog confirmation with collaborator name, refetch on success |
 
 
-## Display Rules
+## UI Detail
+
+Each collaborator row (lines 1000-1024) gets an X button at the far right, only when `isCreator`:
 
 ```text
-Collaborator has user_id?
-  YES → Show: [profile_image] [Full Name]  [Joined/Pending badge]
-         Hover: tooltip with @username
-  NO  → Show: [generic avatar] [Guest N]   [Pending badge]
-         Hover: tooltip with email (owner only)
-
-When guest signs up → link_requests_to_new_user trigger fills user_id
-                    → next refetch shows their real name automatically
+[Avatar] Karen Smiley  [Joined]  [X]   ← owner sees this
+[Avatar] Guest 1       [Pending] [X]   ← owner sees this
+[Avatar] Karen Smiley  [Joined]        ← guest sees this (no X)
 ```
 
-## Free Tier Limit
-
-- Max 5 email-only invites per workspace for free accounts
-- Profile-based invites (user already on DraftKit) count toward the same limit
-- Pro users: unlimited
-- When limit hit: hide Invite button, show "Go Unlimited for more collaborators"
+Confirmation dialog uses the existing `AlertDialog` component already imported in the file.
