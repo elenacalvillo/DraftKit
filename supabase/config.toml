@@ -51,6 +51,9 @@ verify_jwt = false
 [functions.fulfill-credits]
 verify_jwt = false
 
+[functions.invite-by-profile]
+verify_jwt = false
+
 [functions.send-weekly-digest]
 verify_jwt = false
 
