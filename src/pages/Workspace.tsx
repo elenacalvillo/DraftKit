@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Calendar as CalendarIcon, CalendarDays, ExternalLink, LinkIcon, Mail, Sparkles, FileText, MessageSquare, PenLine, Lock, X, PartyPopper, CheckCircle2, Copy, Check, Crown, Clock, XCircle, UserPlus, Users, AlertCircle } from "lucide-react";
+import { ArrowLeft, Calendar as CalendarIcon, CalendarDays, ExternalLink, LinkIcon, Mail, Sparkles, FileText, MessageSquare, PenLine, Lock, X, PartyPopper, CheckCircle2, Copy, Check, Crown, Clock, XCircle, UserPlus, Users, AlertCircle, User } from "lucide-react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { Calendar } from "@/components/ui/calendar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -932,52 +934,97 @@ export default function Workspace() {
                     <Users className="w-3.5 h-3.5" />
                     Writer's Room
                   </h4>
-                  {isCreator && request.status === "approved" && (isPro || credits > 0) && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-xs"
-                      onClick={() => setShowInviteModal(true)}
-                    >
-                      <UserPlus className="w-3.5 h-3.5 mr-1" />
-                      Invite
-                    </Button>
-                  )}
+                  {isCreator && request.status === "approved" && (() => {
+                    const maxCollabs = isPro ? Infinity : 5;
+                    const atLimit = collaborators.length >= maxCollabs;
+                    if (atLimit) {
+                      return (
+                        <span className="text-[10px] text-muted-foreground">
+                          <a href="/subscription" className="underline hover:text-primary">Go Unlimited</a> for more
+                        </span>
+                      );
+                    }
+                    if (isPro || credits > 0) {
+                      return (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => setShowInviteModal(true)}
+                        >
+                          <UserPlus className="w-3.5 h-3.5 mr-1" />
+                          Invite
+                        </Button>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
 
                 {/* Participants list */}
+                <TooltipProvider delayDuration={300}>
                 <div className="space-y-2">
                   {/* Owner */}
                   <div className="flex items-center gap-2 text-sm">
-                    <div className="w-6 h-6 rounded-full gradient-primary flex items-center justify-center text-[10px] font-bold text-primary-foreground">
-                      {(creatorInfo?.name || "C").charAt(0)}
-                    </div>
+                    <Avatar className="w-6 h-6">
+                      {creatorInfo?.profile_image_url && (
+                        <AvatarImage src={sanitizeSubstackImageUrl(creatorInfo.profile_image_url)} alt={creatorInfo?.name || "Owner"} />
+                      )}
+                      <AvatarFallback className="text-[10px] font-bold gradient-primary text-primary-foreground">
+                        {(creatorInfo?.name || "C").charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
                     <span className="truncate">{creatorInfo?.name}</span>
                     <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Owner</span>
                   </div>
                   {/* Original requester */}
                   <div className="flex items-center gap-2 text-sm">
-                    <div className="w-6 h-6 rounded-full bg-secondary flex items-center justify-center text-[10px] font-bold text-secondary-foreground">
-                      {(request.requester_name || "G").charAt(0)}
-                    </div>
+                    <Avatar className="w-6 h-6">
+                      {request.requester_profile_image_url && (
+                        <AvatarImage src={sanitizeSubstackImageUrl(request.requester_profile_image_url)} alt={request.requester_name} />
+                      )}
+                      <AvatarFallback className="text-[10px] font-bold bg-secondary text-secondary-foreground">
+                        {(request.requester_name || "G").charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
                     <span className="truncate">{request.requester_name}</span>
                     <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Guest</span>
                   </div>
                   {/* Invited collaborators */}
-                  {collaborators.map((c) => (
-                    <div key={c.id} className="flex items-center gap-2 text-sm">
-                      <div className="w-6 h-6 rounded-full bg-accent/30 flex items-center justify-center text-[10px] font-bold text-accent-foreground">
-                        {c.email.charAt(0).toUpperCase()}
-                      </div>
-                      <span className="truncate text-muted-foreground">{c.email}</span>
-                      {c.joined_at ? (
-                        <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Joined</span>
-                      ) : (
-                        <span className="text-[10px] text-warning bg-warning/10 px-1.5 py-0.5 rounded">Pending</span>
-                      )}
-                    </div>
-                  ))}
+                  {collaborators.map((c) => {
+                    const displayName = c.name || (c.guest_number != null ? `Guest ${c.guest_number}` : "Guest");
+                    const tooltipText = c.user_id
+                      ? (c.username ? `@${c.username}` : displayName)
+                      : (isCreator ? c.email : "Pending invite");
+
+                    return (
+                      <Tooltip key={c.id}>
+                        <TooltipTrigger asChild>
+                          <div className="flex items-center gap-2 text-sm cursor-default">
+                            <Avatar className="w-6 h-6">
+                              {c.profile_image_url && (
+                                <AvatarImage src={sanitizeSubstackImageUrl(c.profile_image_url)} alt={displayName} />
+                              )}
+                              <AvatarFallback className="text-[10px] font-bold bg-accent/30 text-accent-foreground">
+                                {c.name ? c.name.charAt(0).toUpperCase() : (c.guest_number != null ? `G${c.guest_number}` : <User className="w-3 h-3" />)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="truncate text-muted-foreground">{displayName}</span>
+                            {c.joined_at ? (
+                              <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Joined</span>
+                            ) : (
+                              <span className="text-[10px] text-warning bg-warning/10 px-1.5 py-0.5 rounded">Pending</span>
+                            )}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="left">
+                          <p className="text-xs">{tooltipText}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  })}
                 </div>
+                </TooltipProvider>
               </div>
             )}
 
