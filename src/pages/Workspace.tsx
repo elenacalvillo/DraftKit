@@ -1025,7 +1025,6 @@ export default function Workspace() {
                   })}
                 </div>
                 </TooltipProvider>
-                </div>
               </div>
             )}
 
