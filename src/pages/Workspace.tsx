@@ -104,6 +104,7 @@ export default function Workspace() {
   // undefined = loading, null = not answered, {message} = already answered
   const [existingRetroFeedback, setExistingRetroFeedback] = useState<{ message: string } | null | undefined>(undefined);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [removingCollaborator, setRemovingCollaborator] = useState<{ id: string; name: string } | null>(null);
 
   // Collaborators & presence
   const { collaborators, refetch: refetchCollaborators } = useWorkspaceCollaborators(requestId || "");
@@ -1000,7 +1001,7 @@ export default function Workspace() {
                     return (
                       <Tooltip key={c.id}>
                         <TooltipTrigger asChild>
-                          <div className="flex items-center gap-2 text-sm cursor-default">
+                          <div className="flex items-center gap-2 text-sm cursor-default group">
                             <Avatar className="w-6 h-6">
                               {c.profile_image_url && (
                                 <AvatarImage src={sanitizeSubstackImageUrl(c.profile_image_url)} alt={displayName} />
@@ -1009,11 +1010,23 @@ export default function Workspace() {
                                 {c.name ? c.name.charAt(0).toUpperCase() : (c.guest_number != null ? `G${c.guest_number}` : <User className="w-3 h-3" />)}
                               </AvatarFallback>
                             </Avatar>
-                            <span className="truncate text-muted-foreground">{displayName}</span>
+                            <span className="truncate text-muted-foreground flex-1">{displayName}</span>
                             {c.joined_at ? (
                               <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Joined</span>
                             ) : (
                               <span className="text-[10px] text-warning bg-warning/10 px-1.5 py-0.5 rounded">Pending</span>
+                            )}
+                            {isCreator && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setRemovingCollaborator({ id: c.id, name: displayName });
+                                }}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                                aria-label={`Remove ${displayName}`}
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
                             )}
                           </div>
                         </TooltipTrigger>
@@ -1023,6 +1036,41 @@ export default function Workspace() {
                       </Tooltip>
                     );
                   })}
+
+                  {/* Remove collaborator confirmation dialog */}
+                  <AlertDialog open={!!removingCollaborator} onOpenChange={(open) => !open && setRemovingCollaborator(null)}>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Remove {removingCollaborator?.name}?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will immediately revoke their access to this workspace. They won't be able to view or edit the draft.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          onClick={async () => {
+                            if (!removingCollaborator) return;
+                            const name = removingCollaborator.name;
+                            const { error } = await supabase
+                              .from("workspace_collaborators")
+                              .delete()
+                              .eq("id", removingCollaborator.id);
+                            setRemovingCollaborator(null);
+                            if (error) {
+                              toast.error("Failed to remove collaborator");
+                            } else {
+                              toast.success(`Access revoked for ${name}`);
+                              refetchCollaborators();
+                            }
+                          }}
+                        >
+                          Remove
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
                 </TooltipProvider>
               </div>
