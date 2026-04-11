@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Crown, Sparkles, Users, MessageSquare, PenLine, Palette, Rocket, Check, Heart, Coins } from "lucide-react";
+import { Crown, Sparkles, Users, MessageSquare, PenLine, Palette, Rocket, Check, Heart, Coins, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { usePro } from "@/hooks/usePro";
@@ -148,11 +147,11 @@ export default function Subscription() {
       <CardContent className="p-6">
         <div className="flex items-center gap-2 mb-4">
           <Coins className="w-5 h-5 text-primary" />
-          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Credits</h3>
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Writer's Credits</h3>
         </div>
         <div className="flex items-baseline gap-2 mb-1">
           <span className="text-3xl font-bold">{creditBalance}</span>
-          <span className="text-sm text-muted-foreground">credits remaining</span>
+          <span className="text-sm text-muted-foreground">credits in your pocket</span>
         </div>
         {isPro && !isInTrial && (
           <p className="text-xs text-muted-foreground mt-1">
@@ -270,7 +269,7 @@ export default function Subscription() {
   }
 
   // View B: Free / Trial users
-  const progressPercent = hostCapacity.limit > 0 ? Math.round((hostCapacity.used / hostCapacity.limit) * 100) : 0;
+  const slotsOpen = hostCapacity.remaining;
 
   return (
     <DashboardLayout>
@@ -285,27 +284,23 @@ export default function Subscription() {
           </p>
         </div>
 
-        {/* Host capacity banner */}
+        {/* Collaboration slots banner */}
         {!isPro && (
           <Card className="mb-6 border-primary/30 bg-primary/5">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <p className="font-medium text-sm">
-                  {hostCapacity.used} of {hostCapacity.limit} host spots used
-                </p>
-                <Badge variant="secondary" className="text-xs">
-                  {hostCapacity.remaining} left
-                </Badge>
-              </div>
-              <Progress value={progressPercent} className="h-2" />
+            <CardContent className="p-5">
+              <p className="font-semibold text-base">
+                {slotsOpen > 0
+                  ? `You have ${slotsOpen} collaboration slot${slotsOpen !== 1 ? "s" : ""} open`
+                  : "All collaboration slots are filled"}
+              </p>
+              <p className="text-sm text-muted-foreground mt-1">
+                {slotsOpen > 0
+                  ? "Ready for your next co-writer? Start a new collaboration anytime."
+                  : "Invite a friend or go unlimited to keep collaborating."}
+              </p>
               {hostCapacity.referralBonus > 0 && (
                 <p className="text-xs text-muted-foreground mt-2">
-                  You've earned {hostCapacity.referralBonus} bonus spot{hostCapacity.referralBonus !== 1 ? "s" : ""} by inviting friends.
-                </p>
-              )}
-              {hostCapacity.remaining <= 1 && hostCapacity.referralBonus === 0 && (
-                <p className="text-xs text-muted-foreground mt-2">
-                  Invite friends or upgrade to unlock unlimited host spots.
+                  You've earned {hostCapacity.referralBonus} bonus slot{hostCapacity.referralBonus !== 1 ? "s" : ""} by inviting friends.
                 </p>
               )}
             </CardContent>
@@ -330,6 +325,35 @@ export default function Subscription() {
             </Card>
           );
         })()}
+
+        {/* Invite & Earn card */}
+        <Card className="mb-6 border-primary/20 bg-gradient-to-br from-primary/5 to-accent/5">
+          <CardContent className="p-5">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <UserPlus className="w-5 h-5 text-primary" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-base">Bring a writer, get a credit</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Invite a co-writer to DraftKit. When they join, you both get +1 collaboration credit.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-3 border-primary/30 hover:bg-primary/5"
+                  onClick={() => {
+                    // Navigate to dashboard where they can invite from a workspace
+                    window.location.href = "/dashboard";
+                  }}
+                >
+                  <UserPlus className="w-3.5 h-3.5 mr-1.5" />
+                  Invite a Collaborator
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Pricing card */}
         <Card className="overflow-hidden">
@@ -401,7 +425,7 @@ export default function Subscription() {
               disabled={loading}
             >
               <Crown className="w-4 h-4 mr-2" />
-              Unlock Unlimited Collabs
+              Go Unlimited
             </Button>
           </CardContent>
         </Card>
