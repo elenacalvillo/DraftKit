@@ -427,6 +427,12 @@ export default function Subscription() {
               <Crown className="w-4 h-4 mr-2" />
               Go Unlimited
             </Button>
+            <p className="text-xs text-muted-foreground text-center mt-3">
+              By continuing, you agree to our{" "}
+              <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">Terms of Service</a>
+              {" "}and{" "}
+              <a href="/refund-policy" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground transition-colors">Refund Policy</a>.
+            </p>
           </CardContent>
         </Card>
 
