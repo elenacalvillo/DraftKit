@@ -28,6 +28,8 @@ import Subscription from "./pages/Subscription";
 import Retrospective from "./pages/Retrospective";
 import Discovery from "./pages/Discovery";
 import AgentInfo from "./pages/AgentInfo";
+import TermsOfService from "./pages/TermsOfService";
+import RefundPolicy from "./pages/RefundPolicy";
 
 const queryClient = new QueryClient();
 
@@ -48,6 +50,8 @@ const App = () => (
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/transparency" element={<Transparency />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/terms" element={<TermsOfService />} />
+            <Route path="/refund-policy" element={<RefundPolicy />} />
             <Route path="/demo" element={<Demo />} />
             <Route path="/api/v1/agent-info" element={<AgentInfo />} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />

@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Heart, Shield, BookOpen, FileText, Zap } from "lucide-react";
+import { Heart, Shield, BookOpen, FileText, ReceiptText, Scale } from "lucide-react";
 import { DraftKitLogo } from "@/components/icons/DraftKitLogo";
 
 export function Footer() {
@@ -26,6 +26,20 @@ export function Footer() {
             >
               <FileText className="w-3.5 h-3.5" />
               Privacy Policy
+            </Link>
+            <Link
+              to="/terms"
+              className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Scale className="w-3.5 h-3.5" />
+              Terms
+            </Link>
+            <Link
+              to="/refund-policy"
+              className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ReceiptText className="w-3.5 h-3.5" />
+              Refunds
             </Link>
             <Link
               to="/transparency"
