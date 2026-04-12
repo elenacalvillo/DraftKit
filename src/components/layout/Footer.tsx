@@ -8,7 +8,7 @@ export function Footer() {
   return (
     <footer className="border-t border-border/50 bg-background/50 backdrop-blur-sm">
       <div className="container mx-auto px-6 py-12">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="flex flex-col items-center gap-6 text-center">
           {/* Logo & Tagline */}
           <div className="flex items-center gap-3">
             <DraftKitLogo size={50} />
@@ -19,7 +19,7 @@ export function Footer() {
           </div>
 
           {/* Links */}
-          <div className="flex items-center gap-6 text-sm">
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
             <Link
               to="/privacy"
               className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
