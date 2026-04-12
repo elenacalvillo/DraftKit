@@ -1,57 +1,34 @@
-# Add Collaborator Removal with Confirmation Dialog
+
+
+# Add Terms of Service and Refund Policy Pages
 
 ## What Changes
 
-### 1. Database: Allow owners to DELETE from `workspace_collaborators`
+### 1. Create two new pages
 
-Currently there's no DELETE policy on `workspace_collaborators`. Add one so the request owner can remove collaborators.
+**`src/pages/TermsOfService.tsx`** — Uses the same glass-card aesthetic as `/privacy` (icon sections, motion animations, Navbar, back-to-home link, bottom CTA). Content covers: Account responsibility, IP ownership, Stripe as payment processor, Pro vs Free tiers, Writer's Credits (no cash value), conduct rules, liability disclaimer.
 
-**SQL migration:**
+**`src/pages/RefundPolicy.tsx`** — Same layout. Content covers: Subscription cancellation (no partial refunds), credits are final, technical error fix/refund guarantee, abuse exclusion, contact email.
 
-```sql
-CREATE POLICY "Owners can remove collaborators"
-ON public.workspace_collaborators
-FOR DELETE
-TO authenticated
-USING (is_request_owner(auth.uid(), request_id));
-```
+### 2. Register routes (`src/App.tsx`)
 
-### 2. UI: Add "X" button + AlertDialog confirmation (Workspace.tsx)
+Add `/terms` and `/refund-policy` routes pointing to the new page components.
 
-- Add a small `X` button next to each invited collaborator — **only visible when `isCreator` is true**
-- Guests see a clean list with no management controls (invite button is already hidden for guests)
-- Clicking `X` opens an `AlertDialog`: *"Remove [Name]? This will immediately revoke their access to this workspace."*
-- On confirm: `supabase.from('workspace_collaborators').delete().eq('id', collaboratorId)`, then call `refetchCollaborators()`
-- The `has_workspace_access()` function will automatically deny them on next page load
+### 3. Add footer links (`src/components/layout/Footer.tsx`)
 
-### 3. Guest permissions enforcement
+Add "Terms of Service" and "Refund Policy" links in the footer links section alongside Privacy Policy and Transparency.
 
-- Verify the Invite button is already hidden for non-creators (it is — line 937 checks `isCreator`)
-- Guests see no X buttons, no Invite button — read-only member list
+### 4. Add legal links near checkout (`src/pages/Subscription.tsx`)
 
-### One "PM" Detail to Watch
+Add a small text line near the subscribe/purchase buttons: "By continuing, you agree to our Terms of Service and Refund Policy" with links.
 
-When you show the `AlertDialog`, make sure it explicitly mentions the collaborator's name (e.g., "Remove Karen Smiley?"). This prevents the "accident" you were worried about.
+## Files
 
-Also, once the deletion is successful, make sure Lovable adds a simple toast notification: "Access revoked for [Name]". It gives the owner that final bit of confirmation that the door is locked.
+| File | Change |
+|------|--------|
+| `src/pages/TermsOfService.tsx` | New — glass-card legal page with provided content |
+| `src/pages/RefundPolicy.tsx` | New — glass-card legal page with provided content |
+| `src/App.tsx` | Add two route entries + imports |
+| `src/components/layout/Footer.tsx` | Add Terms and Refund Policy links |
+| `src/pages/Subscription.tsx` | Add legal agreement text near checkout buttons |
 
-## Files to Change
-
-
-| File                      | Change                                                                                                                                               |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| SQL migration             | Add DELETE policy for owners on `workspace_collaborators`                                                                                            |
-| `src/pages/Workspace.tsx` | Add `handleRemoveCollaborator` function, X button per collaborator (owner-only), AlertDialog confirmation with collaborator name, refetch on success |
-
-
-## UI Detail
-
-Each collaborator row (lines 1000-1024) gets an X button at the far right, only when `isCreator`:
-
-```text
-[Avatar] Karen Smiley  [Joined]  [X]   ← owner sees this
-[Avatar] Guest 1       [Pending] [X]   ← owner sees this
-[Avatar] Karen Smiley  [Joined]        ← guest sees this (no X)
-```
-
-Confirmation dialog uses the existing `AlertDialog` component already imported in the file.
