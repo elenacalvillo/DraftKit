@@ -19,7 +19,7 @@ export function Footer() {
           </div>
 
           {/* Links */}
-          <div className="flex items-center gap-6 text-sm">
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
             <Link
               to="/privacy"
               className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
