@@ -261,9 +261,15 @@ export default function Dashboard() {
 
       // Deduct credit for non-Pro users
       if (!isPro) {
+        const { data: creatorData } = await supabase
+          .from("creators")
+          .select("credits")
+          .eq("id", creator.id)
+          .single();
+        const currentCredits = creatorData?.credits ?? 3;
         await supabase
           .from("creators")
-          .update({ credits: Math.max(0, (creator.credits ?? 3) - 1) })
+          .update({ credits: Math.max(0, currentCredits - 1) })
           .eq("id", creator.id);
       }
 
