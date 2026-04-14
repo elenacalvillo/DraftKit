@@ -310,17 +310,24 @@ export default function Dashboard() {
         </motion.div>
 
         {/* Start Writing Card */}
-        <div className="flex items-center justify-between p-4 mb-8 bg-background/50 backdrop-blur-sm rounded-xl border border-border">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10 text-primary">
+        <div className="flex flex-col sm:flex-row items-center justify-between p-4 mb-8 bg-card/50 backdrop-blur-sm rounded-xl border border-border/50 gap-4">
+          <div className="flex items-start sm:items-center gap-4 w-full">
+            <div className="p-3 rounded-lg bg-primary/10 text-primary shrink-0">
               <PenLine className="w-5 h-5" />
             </div>
-            <div className="hidden sm:block">
-              <h3 className="text-sm font-medium">Ready for a new project?</h3>
-              <p className="text-xs text-muted-foreground">Draft solo and invite others later.</p>
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Start Writing</h3>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Start your draft now. Invite collaborators whenever you're ready.
+              </p>
             </div>
           </div>
-          <Button variant="default" size="sm" onClick={() => setShowStartWriting(true)} className="rounded-full px-6">
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => setShowStartWriting(true)}
+            className="w-full sm:w-auto rounded-full px-8 h-10 font-medium whitespace-nowrap"
+          >
             Start Writing
           </Button>
         </div>
