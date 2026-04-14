@@ -532,7 +532,7 @@ export default function Dashboard() {
                         <div className="flex-1 min-w-0">
                           <p className="font-medium truncate">{request.requester_name}</p>
                           <p className="text-sm text-muted-foreground truncate">
-                            {parseDateString(request.requested_date).toLocaleDateString()}
+                            {request.requested_date ? parseDateString(request.requested_date)?.toLocaleDateString() : 'No date set'}
                           </p>
                         </div>
                         <span
