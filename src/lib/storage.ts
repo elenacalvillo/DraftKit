@@ -46,6 +46,7 @@ export interface CollabRequest {
   createdAt: string;
   aiDraft?: CollabDraft | null;
   approvedAt?: string | null;
+  isSolo?: boolean;
 }
 
 const STORAGE_KEYS = {
