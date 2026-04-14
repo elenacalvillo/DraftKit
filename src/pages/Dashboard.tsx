@@ -310,25 +310,20 @@ export default function Dashboard() {
         </motion.div>
 
         {/* Start Writing Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.05 }}
-          className="glass-card p-6 mb-8 cursor-pointer hover-lift border-2 border-primary/20 hover:border-primary/40 transition-colors"
-          onClick={() => setShowStartWriting(true)}
-        >
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center">
-              <PenLine className="w-6 h-6 text-primary-foreground" />
+        <div className="flex items-center justify-between p-4 mb-8 bg-background/50 backdrop-blur-sm rounded-xl border border-border">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/10 text-primary">
+              <PenLine className="w-5 h-5" />
             </div>
-            <div>
-              <h3 className="font-semibold text-lg">Start Writing</h3>
-              <p className="text-sm text-muted-foreground">
-                Start your draft now. Invite collaborators whenever you're ready.
-              </p>
+            <div className="hidden sm:block">
+              <h3 className="text-sm font-medium">Ready for a new project?</h3>
+              <p className="text-xs text-muted-foreground">Draft solo and invite others later.</p>
             </div>
           </div>
-        </motion.div>
+          <Button variant="default" size="sm" onClick={() => setShowStartWriting(true)} className="rounded-full px-6">
+            Start Writing
+          </Button>
+        </div>
 
         {/* Start Writing Modal */}
         <Dialog open={showStartWriting} onOpenChange={setShowStartWriting}>
