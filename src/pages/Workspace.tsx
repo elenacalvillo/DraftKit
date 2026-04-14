@@ -852,8 +852,8 @@ export default function Workspace() {
               )}
             </div>
 
-            {/* Message */}
-            {request.message && (
+            {/* Message — for solo workspaces, message holds the project title (shown above), so skip */}
+            {request.message && !isSolo && (
               <div className="glass-card p-5">
                 <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">Original Message</p>
                 <p className="text-sm text-muted-foreground italic leading-relaxed">

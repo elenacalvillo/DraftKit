@@ -1,12 +1,15 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { parseDateString, sanitizeSubstackImageUrl } from "@/lib/utils";
-import { Copy, ExternalLink, Globe, MessageSquare, TrendingUp, Zap } from "lucide-react";
+import { Copy, ExternalLink, Globe, MessageSquare, PenLine, TrendingUp, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { CollabCalendar } from "@/components/calendar/CollabCalendar";
 import { useAuth } from "@/hooks/useAuth";
+import { usePro } from "@/hooks/usePro";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import type { Json } from "@/integrations/supabase/types";
@@ -33,6 +36,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, creator, loading } = useAuth();
+  const { isPro, canHostMore } = usePro();
   const [availability, setAvailability] = useState<string[]>([]);
   const [requests, setRequests] = useState<CollabRequest[]>([]);
   const [bookedDates, setBookedDates] = useState<string[]>([]);
@@ -40,6 +44,9 @@ export default function Dashboard() {
   const [publishedDates, setPublishedDates] = useState<string[]>([]);
   const [publishedBookingDetails, setPublishedBookingDetails] = useState<BookingInfo[]>([]);
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
+  const [showStartWriting, setShowStartWriting] = useState(false);
+  const [projectTitle, setProjectTitle] = useState("");
+  const [isCreatingSolo, setIsCreatingSolo] = useState(false);
 
   const handleImageError = useCallback((requestId: string) => {
     setImageErrors(prev => new Set(prev).add(requestId));
