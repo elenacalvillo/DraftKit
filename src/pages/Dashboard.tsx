@@ -311,6 +311,60 @@ export default function Dashboard() {
           </p>
         </motion.div>
 
+        {/* Start Writing Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="glass-card p-6 mb-8 cursor-pointer hover-lift border-2 border-primary/20 hover:border-primary/40 transition-colors"
+          onClick={() => setShowStartWriting(true)}
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center">
+              <PenLine className="w-6 h-6 text-primary-foreground" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-lg">Start Writing</h3>
+              <p className="text-sm text-muted-foreground">
+                Start your draft now. Invite collaborators whenever you're ready.
+              </p>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Start Writing Modal */}
+        <Dialog open={showStartWriting} onOpenChange={setShowStartWriting}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Start a new draft</DialogTitle>
+              <DialogDescription>
+                Give your project a title. You can invite collaborators anytime from inside the workspace.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <Input
+                placeholder="e.g. AI Everywhere Interview with Farida"
+                value={projectTitle}
+                onChange={(e) => setProjectTitle(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleCreateSoloWorkspace()}
+                autoFocus
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowStartWriting(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="gradient"
+                onClick={handleCreateSoloWorkspace}
+                disabled={isCreatingSolo || !projectTitle.trim()}
+              >
+                {isCreatingSolo ? "Creating…" : "Create Workspace"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         {/* Share Your Link Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
