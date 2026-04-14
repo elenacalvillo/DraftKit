@@ -4,7 +4,14 @@ import { parseDateString, sanitizeSubstackImageUrl } from "@/lib/utils";
 import { Copy, ExternalLink, Globe, MessageSquare, PenLine, TrendingUp, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { CollabCalendar } from "@/components/calendar/CollabCalendar";
@@ -49,23 +56,23 @@ export default function Dashboard() {
   const [isCreatingSolo, setIsCreatingSolo] = useState(false);
 
   const handleImageError = useCallback((requestId: string) => {
-    setImageErrors(prev => new Set(prev).add(requestId));
+    setImageErrors((prev) => new Set(prev).add(requestId));
   }, []);
 
   // Deep-link router: Handle ?open=requests&highlight=... from email CTAs
   // This works around server-side routing that may redirect /dashboard/requests -> /dashboard
   useEffect(() => {
     if (loading) return;
-    
+
     const openTarget = searchParams.get("open");
     const highlightId = searchParams.get("highlight");
-    
+
     if (openTarget === "requests") {
       // Build the target URL with highlight param if present
-      const targetUrl = highlightId 
+      const targetUrl = highlightId
         ? `/dashboard/requests?highlight=${encodeURIComponent(highlightId)}`
         : "/dashboard/requests";
-      
+
       // Use replace to avoid back-button confusion
       navigate(targetUrl, { replace: true });
       return;
@@ -83,9 +90,9 @@ export default function Dashboard() {
 
     // Fetch availability
     const { data: availData } = await supabase
-      .from('availability')
-      .select('*')
-      .eq('creator_id', creator.id)
+      .from("availability")
+      .select("*")
+      .eq("creator_id", creator.id)
       .maybeSingle();
 
     if (availData) {
@@ -94,35 +101,36 @@ export default function Dashboard() {
 
     // Fetch requests
     const { data: reqData } = await supabase
-      .from('collab_requests')
-      .select('id, requester_name, requester_email, requester_profile_image_url, requester_substack_url, requester_user_id, requested_date, status, created_at, ai_draft')
-      .eq('creator_id', creator.id)
-      .eq('hidden_by_creator', false)
-      .order('created_at', { ascending: false });
+      .from("collab_requests")
+      .select(
+        "id, requester_name, requester_email, requester_profile_image_url, requester_substack_url, requester_user_id, requested_date, status, created_at, ai_draft",
+      )
+      .eq("creator_id", creator.id)
+      .eq("hidden_by_creator", false)
+      .order("created_at", { ascending: false });
 
     if (reqData) {
       // Batch-resolve missing profile images from creator profiles
       const missingImageUserIds = reqData
-        .filter(r => !r.requester_profile_image_url && r.requester_user_id)
-        .map(r => r.requester_user_id!);
+        .filter((r) => !r.requester_profile_image_url && r.requester_user_id)
+        .map((r) => r.requester_user_id!);
 
       let imageMap: Record<string, string> = {};
       if (missingImageUserIds.length > 0) {
         const { data: creators } = await supabase
-          .from('creators')
-          .select('user_id, profile_image_url')
-          .in('user_id', missingImageUserIds)
-          .not('profile_image_url', 'is', null);
+          .from("creators")
+          .select("user_id, profile_image_url")
+          .in("user_id", missingImageUserIds)
+          .not("profile_image_url", "is", null);
         if (creators) {
-          imageMap = Object.fromEntries(creators.map(c => [c.user_id, c.profile_image_url!]));
+          imageMap = Object.fromEntries(creators.map((c) => [c.user_id, c.profile_image_url!]));
         }
       }
 
-      const resolvedReqs = reqData.map(r => ({
+      const resolvedReqs = reqData.map((r) => ({
         ...r,
-        requester_profile_image_url: r.requester_profile_image_url 
-          || (r.requester_user_id && imageMap[r.requester_user_id]) 
-          || null,
+        requester_profile_image_url:
+          r.requester_profile_image_url || (r.requester_user_id && imageMap[r.requester_user_id]) || null,
       }));
 
       setRequests(resolvedReqs);
@@ -137,7 +145,7 @@ export default function Dashboard() {
           requesterName: r.requester_name,
           requesterProfileImageUrl: r.requester_profile_image_url,
           requestId: r.id,
-        }))
+        })),
       );
 
       setPublishedDates(publishedRequests.map((r) => r.requested_date));
@@ -147,7 +155,7 @@ export default function Dashboard() {
           requesterName: r.requester_name,
           requesterProfileImageUrl: r.requester_profile_image_url,
           requestId: r.id,
-        }))
+        })),
       );
     }
   };
@@ -157,16 +165,15 @@ export default function Dashboard() {
   // Ship Rate: published / (non-pending, non-cancelled)
   const eligibleRequests = requests.filter((r) => r.status !== "pending" && r.status !== "cancelled");
   const publishedRequests = requests.filter((r) => r.status === "published");
-  const shipRate = eligibleRequests.length > 0
-    ? Math.round((publishedRequests.length / eligibleRequests.length) * 100)
-    : null;
+  const shipRate =
+    eligibleRequests.length > 0 ? Math.round((publishedRequests.length / eligibleRequests.length) * 100) : null;
   const shipRateDisplay = shipRate === null ? "—" : `${shipRate}%`;
 
   // Published Collabs: unique requester_substack_url from published requests
   const uniquePublishedUrls = new Set(
     requests
       .filter((r) => r.status === "published" && r.requester_substack_url)
-      .map((r) => r.requester_substack_url!.trim().toLowerCase())
+      .map((r) => r.requester_substack_url!.trim().toLowerCase()),
   );
   const publishedReach = uniquePublishedUrls.size;
   const reachDisplay = `${publishedReach} ${publishedReach === 1 ? "Collab" : "Collabs"}`;
@@ -237,7 +244,9 @@ export default function Dashboard() {
     setIsCreatingSolo(true);
     try {
       // Get the user's email
-      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser();
       const email = authUser?.email || "";
 
       const { data, error } = await supabase
@@ -261,11 +270,7 @@ export default function Dashboard() {
 
       // Deduct credit for non-Pro users
       if (!isPro) {
-        const { data: creatorData } = await supabase
-          .from("creators")
-          .select("credits")
-          .eq("id", creator.id)
-          .single();
+        const { data: creatorData } = await supabase.from("creators").select("credits").eq("id", creator.id).single();
         const currentCredits = creatorData?.credits ?? 3;
         await supabase
           .from("creators")
@@ -286,29 +291,22 @@ export default function Dashboard() {
   };
 
   // Mode-aware calendar section (must be after creator null-check)
-  const calendarHeader = creator.collab_mode === 'discovery' 
-    ? "Your Availability" 
-    : "Your Publication Schedule";
+  const calendarHeader = creator.collab_mode === "discovery" ? "Your Availability" : "Your Publication Schedule";
 
-  const emptyStateText = creator.collab_mode === 'discovery'
-    ? "No call slots set. Click 'Edit Availability' to mark when you're free — guests will book intro calls on these dates."
-    : "No publishing windows set. Click 'Edit Availability' to set dates when you can ship — guests will pick from these as target publish dates.";
+  const emptyStateText =
+    creator.collab_mode === "discovery"
+      ? "No call slots set. Click 'Edit Availability' to mark when you're free — guests will book intro calls on these dates."
+      : "No publishing windows set. Click 'Edit Availability' to set dates when you can ship — guests will pick from these as target publish dates.";
 
   return (
     <DashboardLayout>
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-6"
-        >
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
           <h1 className="text-3xl font-bold mb-2">
             Welcome back, <span className="gradient-text">{creator.name}</span>
           </h1>
-          <p className="text-muted-foreground">
-            Here's what's happening with your collaborations
-          </p>
+          <p className="text-muted-foreground">Here's what's happening with your collaborations</p>
         </motion.div>
 
         {/* Start Writing Card */}
@@ -343,7 +341,7 @@ export default function Dashboard() {
             </DialogHeader>
             <div className="py-4">
               <Input
-                placeholder="e.g. AI Everywhere Interview with Farida"
+                placeholder="e.g., New collab proposal, Interview draft, or Podcast outline"
                 value={projectTitle}
                 onChange={(e) => setProjectTitle(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleCreateSoloWorkspace()}
@@ -420,10 +418,7 @@ export default function Dashboard() {
                   className={`w-12 h-12 rounded-xl flex items-center justify-center ${stat.bgClassName}`}
                   style={stat.bgStyle}
                 >
-                  <stat.icon
-                    className={`w-6 h-6 ${stat.iconClassName}`}
-                    style={stat.iconStyle}
-                  />
+                  <stat.icon className={`w-6 h-6 ${stat.iconClassName}`} style={stat.iconStyle} />
                 </div>
                 <div className="flex-1">
                   <p className="text-3xl font-bold">{stat.value}</p>
@@ -432,9 +427,7 @@ export default function Dashboard() {
                 </div>
               </div>
               {stat.isEmpty && (
-                <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border/50">
-                  {stat.emptyTip}
-                </p>
+                <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border/50">{stat.emptyTip}</p>
               )}
             </motion.div>
           ))}
@@ -451,12 +444,8 @@ export default function Dashboard() {
           >
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">{calendarHeader}</h2>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => navigate('/dashboard/availability')}
-              >
-                {creator.collab_mode === 'discovery' ? 'Edit Availability' : 'Edit Publishing Dates'}
+              <Button variant="outline" size="sm" onClick={() => navigate("/dashboard/availability")}>
+                {creator.collab_mode === "discovery" ? "Edit Availability" : "Edit Publishing Dates"}
               </Button>
             </div>
             <CollabCalendar
@@ -465,7 +454,7 @@ export default function Dashboard() {
               bookingDetails={bookingDetails}
               publishedDates={publishedDates}
               publishedBookingDetails={publishedBookingDetails}
-              collabMode={creator.collab_mode as 'async' | 'discovery' | null}
+              collabMode={creator.collab_mode as "async" | "discovery" | null}
               onBookedDateClick={(requestId) => navigate(`/dashboard/workspace/${requestId}`)}
             />
             {availability.length === 0 && (
@@ -476,24 +465,18 @@ export default function Dashboard() {
               >
                 <p className="text-sm text-muted-foreground">
                   <span className="font-medium text-foreground">
-                    {creator.collab_mode === 'discovery' ? 'No availability set yet.' : 'No publishing dates set.'}
+                    {creator.collab_mode === "discovery" ? "No availability set yet." : "No publishing dates set."}
                   </span>{" "}
-                  {emptyStateText.split('. ').slice(1).join('. ')}
+                  {emptyStateText.split(". ").slice(1).join(". ")}
                 </p>
               </motion.div>
             )}
           </motion.div>
 
           {/* Recent requests */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-          >
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">
-                {pendingCount > 0 ? "Action Required" : "Recent Collabs"}
-              </h2>
+              <h2 className="text-xl font-semibold">{pendingCount > 0 ? "Action Required" : "Recent Collabs"}</h2>
               {pendingCount > 0 && (
                 <span className="px-2 py-1 rounded-full bg-accent/20 text-accent text-sm font-medium">
                   {pendingCount} new
@@ -505,15 +488,13 @@ export default function Dashboard() {
               {requests.length === 0 ? (
                 <div className="text-center py-10">
                   <MessageSquare className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-                   <p className="text-muted-foreground">No collabs yet</p>
-                  <p className="text-sm text-muted-foreground/70 mt-1">
-                    Share your link to start receiving proposals
-                  </p>
+                  <p className="text-muted-foreground">No collabs yet</p>
+                  <p className="text-sm text-muted-foreground/70 mt-1">Share your link to start receiving proposals</p>
                 </div>
               ) : (
                 [...requests]
                   .sort((a, b) => {
-                    const priority = (s: string) => s === 'pending' ? 0 : s === 'approved' ? 1 : 2;
+                    const priority = (s: string) => (s === "pending" ? 0 : s === "approved" ? 1 : 2);
                     const pa = priority(a.status);
                     const pb = priority(b.status);
                     if (pa !== pb) return pa - pb;
@@ -521,8 +502,9 @@ export default function Dashboard() {
                   })
                   .slice(0, 5)
                   .map((request) => {
-                    const targetTab = request.status === 'pending' ? 'pending' : request.status === 'approved' ? 'approved' : '';
-                    const targetUrl = targetTab ? `/dashboard/requests?tab=${targetTab}` : '/dashboard/requests';
+                    const targetTab =
+                      request.status === "pending" ? "pending" : request.status === "approved" ? "approved" : "";
+                    const targetUrl = targetTab ? `/dashboard/requests?tab=${targetTab}` : "/dashboard/requests";
                     return (
                       <motion.div
                         key={request.id}
@@ -531,8 +513,8 @@ export default function Dashboard() {
                         onClick={() => navigate(targetUrl)}
                       >
                         {request.requester_profile_image_url && !imageErrors.has(request.id) ? (
-                          <img 
-                            src={sanitizeSubstackImageUrl(request.requester_profile_image_url)} 
+                          <img
+                            src={sanitizeSubstackImageUrl(request.requester_profile_image_url)}
                             alt={request.requester_name}
                             className="w-10 h-10 rounded-full object-cover"
                             onError={() => handleImageError(request.id)}
@@ -553,8 +535,8 @@ export default function Dashboard() {
                             request.status === "pending"
                               ? "bg-accent/10 text-accent"
                               : request.status === "approved"
-                              ? "bg-success/10 text-success"
-                              : "bg-destructive/10 text-destructive"
+                                ? "bg-success/10 text-success"
+                                : "bg-destructive/10 text-destructive"
                           }`}
                         >
                           {request.status}
