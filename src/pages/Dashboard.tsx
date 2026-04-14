@@ -219,6 +219,66 @@ export default function Dashboard() {
 
   if (!creator) return null;
 
+  const handleCreateSoloWorkspace = async () => {
+    if (!user || !creator) return;
+    if (!projectTitle.trim()) {
+      toast.error("Please enter a project title");
+      return;
+    }
+    // Credit check for non-Pro
+    if (!isPro && !canHostMore) {
+      toast.error("You've used all your collaboration slots", {
+        description: "Invite friends or upgrade to Pro for unlimited workspaces.",
+        action: { label: "Upgrade", onClick: () => navigate("/dashboard/subscription") },
+      });
+      return;
+    }
+
+    setIsCreatingSolo(true);
+    try {
+      // Get the user's email
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const email = authUser?.email || "";
+
+      const { data, error } = await supabase
+        .from("collab_requests")
+        .insert({
+          creator_id: creator.id,
+          requester_name: creator.name,
+          requester_email: email,
+          requester_user_id: user.id,
+          requester_profile_image_url: creator.profile_image_url,
+          requester_substack_url: creator.substack_url,
+          status: "approved",
+          approved_at: new Date().toISOString(),
+          message: projectTitle.trim(),
+          is_solo: true,
+        })
+        .select("id")
+        .single();
+
+      if (error) throw error;
+
+      // Deduct credit for non-Pro users
+      if (!isPro) {
+        await supabase
+          .from("creators")
+          .update({ credits: Math.max(0, (creator.credits ?? 3) - 1) })
+          .eq("id", creator.id);
+      }
+
+      toast.success("Workspace created!");
+      setShowStartWriting(false);
+      setProjectTitle("");
+      navigate(`/dashboard/workspace/${data.id}`);
+    } catch (err) {
+      console.error("Failed to create solo workspace:", err);
+      toast.error("Failed to create workspace. Please try again.");
+    } finally {
+      setIsCreatingSolo(false);
+    }
+  };
+
   // Mode-aware calendar section (must be after creator null-check)
   const calendarHeader = creator.collab_mode === 'discovery' 
     ? "Your Availability" 
