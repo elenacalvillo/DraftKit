@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { parseDateString, sanitizeSubstackImageUrl } from "@/lib/utils";
-import { Copy, ExternalLink, Globe, MessageSquare, PenLine, TrendingUp, Zap } from "lucide-react";
+import { Copy, ExternalLink, Globe, MessageSquare, PenLine, TrendingUp, Zap, SquarePen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -316,8 +316,8 @@ export default function Dashboard() {
               <PenLine className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-foreground">Start Writing</h3>
-              <p className="text-xs text-muted-foreground leading-relaxed">
+              <h3 className="font-semibold text-foreground">Start Writing</h3>
+              <p className="text-smtext-muted-foreground leading-relaxed">
                 Start your draft now. Invite collaborators whenever you're ready.
               </p>
             </div>
@@ -329,6 +329,7 @@ export default function Dashboard() {
             className="w-full sm:w-auto rounded-full px-8 h-10 font-medium whitespace-nowrap"
           >
             Start Writing
+            <SquarePen className="w-4 h-4 text-primary" />
           </Button>
         </div>
 
