@@ -1,7 +1,31 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Calendar as CalendarIcon, CalendarDays, ExternalLink, LinkIcon, Mail, Sparkles, FileText, MessageSquare, PenLine, Lock, X, PartyPopper, CheckCircle2, Copy, Check, Crown, Clock, XCircle, UserPlus, Users, AlertCircle, User } from "lucide-react";
+import {
+  ArrowLeft,
+  Calendar as CalendarIcon,
+  CalendarDays,
+  ExternalLink,
+  LinkIcon,
+  Mail,
+  Sparkles,
+  FileText,
+  MessageSquare,
+  PenLine,
+  Lock,
+  X,
+  PartyPopper,
+  CheckCircle2,
+  Copy,
+  Check,
+  Crown,
+  Clock,
+  XCircle,
+  UserPlus,
+  Users,
+  AlertCircle,
+  User,
+} from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { Calendar } from "@/components/ui/calendar";
@@ -96,11 +120,14 @@ export default function Workspace() {
   const [showReschedulePicker, setShowReschedulePicker] = useState(false);
   const [bookedDates, setBookedDates] = useState<string[]>([]);
   const [msgRefreshKey, setMsgRefreshKey] = useState(0);
-  const [retroDismissed, setRetroDismissed] = useState(() =>
-    localStorage.getItem(`retro-dismissed-${requestId}`) === "true"
+  const [retroDismissed, setRetroDismissed] = useState(
+    () => localStorage.getItem(`retro-dismissed-${requestId}`) === "true",
   );
   const [publishAnswer, setPublishAnswer] = useState<string | null>(null);
-  const [publishUrls, setPublishUrls] = useState<{ creatorUrl: string; requesterUrl: string }>({ creatorUrl: "", requesterUrl: "" });
+  const [publishUrls, setPublishUrls] = useState<{ creatorUrl: string; requesterUrl: string }>({
+    creatorUrl: "",
+    requesterUrl: "",
+  });
   const [isSavingPublish, setIsSavingPublish] = useState(false);
   // undefined = loading, null = not answered, {message} = already answered
   const [existingRetroFeedback, setExistingRetroFeedback] = useState<{ message: string } | null | undefined>(undefined);
@@ -169,17 +196,13 @@ export default function Workspace() {
       .neq("id", requestId)
       .not("requested_date", "is", null)
       .then(({ data }) => {
-        if (data) setBookedDates(data.map(r => r.requested_date!));
+        if (data) setBookedDates(data.map((r) => r.requested_date!));
       });
   }, [request?.creator_id, requestId]);
 
   const fetchRequest = async () => {
     try {
-      const { data, error } = await supabase
-        .from("collab_requests")
-        .select("*")
-        .eq("id", requestId!)
-        .maybeSingle();
+      const { data, error } = await supabase.from("collab_requests").select("*").eq("id", requestId!).maybeSingle();
 
       if (error || !data) {
         setNotFound(true);
@@ -191,9 +214,9 @@ export default function Workspace() {
       let resolvedData = data;
       if (!data.requester_profile_image_url && data.requester_user_id) {
         const { data: reqCreator } = await supabase
-          .from('creators')
-          .select('profile_image_url')
-          .eq('user_id', data.requester_user_id)
+          .from("creators")
+          .select("profile_image_url")
+          .eq("user_id", data.requester_user_id)
           .maybeSingle();
         if (reqCreator?.profile_image_url) {
           resolvedData = { ...data, requester_profile_image_url: reqCreator.profile_image_url };
@@ -223,7 +246,9 @@ export default function Workspace() {
     setIsGeneratingDraft(true);
     setShowDraftModal(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) {
         toast.error("Session expired. Please log in again.");
         setShowDraftModal(false);
@@ -247,7 +272,7 @@ export default function Workspace() {
                   content_last_edited_by: "SMART Draft",
                   content_last_edited_at: new Date().toISOString(),
                 }
-              : prev
+              : prev,
           );
         }
         // Set first_draft_generated_at if not already set
@@ -256,7 +281,9 @@ export default function Workspace() {
             .from("collab_requests")
             .update({ first_draft_generated_at: new Date().toISOString() } as any)
             .eq("id", request!.id);
-          setRequest((prev) => prev ? { ...prev, first_draft_generated_at: new Date().toISOString() } as any : prev);
+          setRequest((prev) =>
+            prev ? ({ ...prev, first_draft_generated_at: new Date().toISOString() } as any) : prev,
+          );
         }
         const msg = data.human_content_preserved
           ? "SMART draft saved! Your manual work is untouched — view it in the SMART Draft panel."
@@ -275,10 +302,7 @@ export default function Workspace() {
 
   const handleDeleteDraft = async () => {
     try {
-      const { error } = await supabase
-        .from("collab_requests")
-        .update({ ai_draft: null })
-        .eq("id", request!.id);
+      const { error } = await supabase.from("collab_requests").update({ ai_draft: null }).eq("id", request!.id);
       if (error) throw error;
       setLocalDraft(null);
       setShowDraftModal(false);
@@ -300,41 +324,39 @@ export default function Workspace() {
   const handleReschedule = async (newDate: string) => {
     if (!creator || !request) return;
     const oldDate = request.requested_date;
-    const { error } = await supabase
-      .from('collab_requests')
-      .update({ requested_date: newDate })
-      .eq('id', request.id);
+    const { error } = await supabase.from("collab_requests").update({ requested_date: newDate }).eq("id", request.id);
     if (error) {
       toast.error("Failed to reschedule");
       return;
     }
     const { data: availData } = await supabase
-      .from('availability')
-      .select('*')
-      .eq('creator_id', creator.id)
+      .from("availability")
+      .select("*")
+      .eq("creator_id", creator.id)
       .maybeSingle();
     if (availData) {
       let dates: string[] = availData.available_dates || [];
       if (oldDate && !dates.includes(oldDate)) dates = [...dates, oldDate];
       dates = dates.filter((d: string) => d !== newDate);
-      await supabase
-        .from('availability')
-        .update({ available_dates: dates })
-        .eq('id', availData.id);
+      await supabase.from("availability").update({ available_dates: dates }).eq("id", availData.id);
     }
-    setRequest(prev => prev ? { ...prev, requested_date: newDate } : prev);
+    setRequest((prev) => (prev ? { ...prev, requested_date: newDate } : prev));
     setShowReschedulePicker(false);
-    const formattedNew = parseDateString(newDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    const formattedNew = parseDateString(newDate).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
     toast.success(`Rescheduled to ${formattedNew}. Old slot restored.`);
     trackEvent("collab_rescheduled", { request_id: request.id, new_date: newDate });
-    supabase.functions.invoke('send-collab-email', {
-      body: { type: 'collab_rescheduled', requestId: request.id, newDate }
-    }).catch(err => console.error('Failed to send reschedule email:', err));
+    supabase.functions
+      .invoke("send-collab-email", {
+        body: { type: "collab_rescheduled", requestId: request.id, newDate },
+      })
+      .catch((err) => console.error("Failed to send reschedule email:", err));
   };
 
-  const currentUserName = isCreator
-    ? creator!.name
-    : request?.requester_name || "Guest";
+  const currentUserName = isCreator ? creator!.name : request?.requester_name || "Guest";
 
   const backPath = isCreator ? "/dashboard/requests" : "/dashboard/my-requests";
 
@@ -353,16 +375,8 @@ export default function Workspace() {
   const isSolo = !!(request as any)?.is_solo;
 
   // The partner — the "other person" in the collab
-  const partnerName = isSolo
-    ? null
-    : isCreator
-      ? request?.requester_name
-      : creatorInfo?.name || "Creator";
-  const partnerSubstackUrl = isSolo
-    ? null
-    : isCreator
-      ? request?.requester_substack_url
-      : creatorInfo?.substack_url;
+  const partnerName = isSolo ? null : isCreator ? request?.requester_name : creatorInfo?.name || "Creator";
+  const partnerSubstackUrl = isSolo ? null : isCreator ? request?.requester_substack_url : creatorInfo?.substack_url;
   const partnerProfileImage = isSolo
     ? null
     : isCreator
@@ -388,9 +402,7 @@ export default function Workspace() {
       <DashboardLayout>
         <div className="max-w-6xl mx-auto text-center py-20">
           <h2 className="text-2xl font-bold mb-2">Workspace not found</h2>
-          <p className="text-muted-foreground mb-6">
-            This collaboration doesn't exist or you don't have access.
-          </p>
+          <p className="text-muted-foreground mb-6">This collaboration doesn't exist or you don't have access.</p>
           <Button variant="outline" onClick={() => navigate("/dashboard")}>
             Back to Dashboard
           </Button>
@@ -404,9 +416,7 @@ export default function Workspace() {
       <DashboardLayout>
         <div className="max-w-6xl mx-auto text-center py-20">
           <h2 className="text-2xl font-bold mb-2">Workspace unavailable</h2>
-          <p className="text-muted-foreground mb-6">
-            The workspace is only available for approved collaborations.
-          </p>
+          <p className="text-muted-foreground mb-6">The workspace is only available for approved collaborations.</p>
           <Button variant="outline" onClick={() => navigate(backPath)}>
             Back to Collabs
           </Button>
@@ -464,10 +474,7 @@ export default function Workspace() {
       if (publishUrls.creatorUrl.trim()) updatePayload.collab_link = publishUrls.creatorUrl.trim();
       if (publishUrls.requesterUrl.trim()) updatePayload.requester_collab_link = publishUrls.requesterUrl.trim();
 
-      const { error: publishError } = await supabase
-        .from("collab_requests")
-        .update(updatePayload)
-        .eq("id", requestId);
+      const { error: publishError } = await supabase.from("collab_requests").update(updatePayload).eq("id", requestId);
 
       if (publishError) {
         console.error("[Workspace] Failed to update status to published:", publishError);
@@ -476,14 +483,16 @@ export default function Workspace() {
         return;
       }
 
-      setRequest(prev => prev ? { ...prev, ...updatePayload, status: "published" } as any : prev);
+      setRequest((prev) => (prev ? ({ ...prev, ...updatePayload, status: "published" } as any) : prev));
 
       // Status update succeeded — show success immediately (DB is source of truth)
       toast.success("Congrats on publishing! 🎉 Engagement data is being collected.");
 
       // Non-fatal background tasks — errors are swallowed so the user never sees them
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
         if (session) {
           const emailResult = await supabase.functions.invoke("send-collab-email", {
             body: { type: "collab_published", requestId },
@@ -531,7 +540,11 @@ export default function Workspace() {
   };
 
   return (
-    <DashboardLayout zenMode zenTitle={`Drafting with ${partnerName}`} zenBackPath={backPath}>
+    <DashboardLayout
+      zenMode
+      zenTitle={isSolo ? `Drafting: ${request.message || "Untitled Project"}` : `Drafting with ${partnerName}`}
+      zenBackPath={backPath}
+    >
       <div className="max-w-6xl mx-auto min-w-0">
         {/* Retrospective Banner */}
         <AnimatePresence>
@@ -543,7 +556,7 @@ export default function Workspace() {
               exit={{ opacity: 0, y: -12 }}
               className={cn(
                 "glass-card p-5 mb-6 border-l-4 relative",
-                existingRetroFeedback ? "border-l-success" : "border-l-primary"
+                existingRetroFeedback ? "border-l-success" : "border-l-primary",
               )}
             >
               <button
@@ -567,8 +580,8 @@ export default function Workspace() {
                         {publishAnswer === "yes"
                           ? "You marked this collab as published 🎉"
                           : publishAnswer === "not_yet"
-                          ? "You noted it's not published yet — no rush!"
-                          : `Collab with ${partnerName} — ${formatDate(request.requested_date)}`}
+                            ? "You noted it's not published yet — no rush!"
+                            : `Collab with ${partnerName} — ${formatDate(request.requested_date)}`}
                       </p>
                     </div>
                   </div>
@@ -587,7 +600,7 @@ export default function Workspace() {
                           if (error) {
                             toast.error("Couldn't mark as published — please try again.");
                           } else {
-                            setRequest(prev => prev ? { ...prev, status: "published" } : prev);
+                            setRequest((prev) => (prev ? { ...prev, status: "published" } : prev));
                             toast.success("Marked as published! 🎉");
                           }
                         }}
@@ -625,9 +638,7 @@ export default function Workspace() {
                         <div className="flex flex-wrap items-center gap-3">
                           <span className="text-sm font-medium">Was this published?</span>
                           {publishAnswer ? (
-                            <Badge variant="secondary">
-                              {publishAnswer === "yes" ? "✅ Yes" : "⏳ Not yet"}
-                            </Badge>
+                            <Badge variant="secondary">{publishAnswer === "yes" ? "✅ Yes" : "⏳ Not yet"}</Badge>
                           ) : (
                             <>
                               <Button size="sm" variant="outline" onClick={() => handlePublishAnswer("yes")}>
@@ -663,22 +674,28 @@ export default function Workspace() {
                             </p>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               <div>
-                                <label className="text-xs font-medium text-muted-foreground mb-1 block">Your post URL</label>
+                                <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                                  Your post URL
+                                </label>
                                 <input
                                   type="text"
                                   placeholder="https://you.substack.com/p/..."
                                   value={publishUrls.creatorUrl}
-                                  onChange={(e) => setPublishUrls(prev => ({ ...prev, creatorUrl: e.target.value }))}
+                                  onChange={(e) => setPublishUrls((prev) => ({ ...prev, creatorUrl: e.target.value }))}
                                   className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                                 />
                               </div>
                               <div>
-                                <label className="text-xs font-medium text-muted-foreground mb-1 block">Guest's post URL (optional)</label>
+                                <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                                  Guest's post URL (optional)
+                                </label>
                                 <input
                                   type="text"
                                   placeholder="https://guest.substack.com/p/..."
                                   value={publishUrls.requesterUrl}
-                                  onChange={(e) => setPublishUrls(prev => ({ ...prev, requesterUrl: e.target.value }))}
+                                  onChange={(e) =>
+                                    setPublishUrls((prev) => ({ ...prev, requesterUrl: e.target.value }))
+                                  }
                                   className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                                 />
                               </div>
@@ -715,11 +732,7 @@ export default function Workspace() {
 
         <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
           {/* Left Panel — Context Sidebar */}
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="space-y-4"
-          >
+          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
             {/* Partner Card / Solo Project Card */}
             <div className="glass-card p-5 space-y-4">
               {isSolo ? (
@@ -771,24 +784,26 @@ export default function Workspace() {
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <CalendarIcon className="w-4 h-4" />
                 <span>
-                  {request.requested_date
-                    ? formatDate(request.requested_date)
-                    : "Flexible — To be scheduled"}
+                  {request.requested_date ? formatDate(request.requested_date) : "Flexible — To be scheduled"}
                 </span>
-                {isCreator && request.status === "approved" && (() => {
-                  if (!request.requested_date) return true;
-                  const today = new Date(); today.setHours(0, 0, 0, 0);
-                  const rd = parseDateString(request.requested_date); rd.setHours(0, 0, 0, 0);
-                  return rd >= today;
-                })() && (
-                  <button
-                    onClick={() => setShowReschedulePicker(!showReschedulePicker)}
-                    className="ml-1 p-1 rounded text-muted-foreground/50 hover:text-primary hover:bg-primary/10 transition-colors"
-                    title="Reschedule"
-                  >
-                    <CalendarDays className="w-4 h-4" />
-                  </button>
-                )}
+                {isCreator &&
+                  request.status === "approved" &&
+                  (() => {
+                    if (!request.requested_date) return true;
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const rd = parseDateString(request.requested_date);
+                    rd.setHours(0, 0, 0, 0);
+                    return rd >= today;
+                  })() && (
+                    <button
+                      onClick={() => setShowReschedulePicker(!showReschedulePicker)}
+                      className="ml-1 p-1 rounded text-muted-foreground/50 hover:text-primary hover:bg-primary/10 transition-colors"
+                      title="Reschedule"
+                    >
+                      <CalendarDays className="w-4 h-4" />
+                    </button>
+                  )}
               </div>
 
               {/* Reschedule date picker dialog */}
@@ -803,13 +818,13 @@ export default function Workspace() {
                     onSelect={(date) => {
                       if (date) {
                         const yyyy = date.getFullYear();
-                        const mm = String(date.getMonth() + 1).padStart(2, '0');
-                        const dd = String(date.getDate()).padStart(2, '0');
+                        const mm = String(date.getMonth() + 1).padStart(2, "0");
+                        const dd = String(date.getDate()).padStart(2, "0");
                         handleReschedule(`${yyyy}-${mm}-${dd}`);
                       }
                     }}
                     modifiers={{
-                      booked: bookedDates.map(d => parseDateString(d)),
+                      booked: bookedDates.map((d) => parseDateString(d)),
                     }}
                     modifiersClassNames={{
                       booked: "bg-destructive/20 text-destructive line-through",
@@ -819,8 +834,8 @@ export default function Workspace() {
                       today.setHours(0, 0, 0, 0);
                       if (date < today) return true;
                       const yyyy = date.getFullYear();
-                      const mm = String(date.getMonth() + 1).padStart(2, '0');
-                      const dd = String(date.getDate()).padStart(2, '0');
+                      const mm = String(date.getMonth() + 1).padStart(2, "0");
+                      const dd = String(date.getDate()).padStart(2, "0");
                       return bookedDates.includes(`${yyyy}-${mm}-${dd}`);
                     }}
                     className="p-3 pointer-events-auto mx-auto"
@@ -855,10 +870,10 @@ export default function Workspace() {
             {/* Message — for solo workspaces, message holds the project title (shown above), so skip */}
             {request.message && !isSolo && (
               <div className="glass-card p-5">
-                <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">Original Message</p>
-                <p className="text-sm text-muted-foreground italic leading-relaxed">
-                  "{request.message}"
+                <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">
+                  Original Message
                 </p>
+                <p className="text-sm text-muted-foreground italic leading-relaxed">"{request.message}"</p>
               </div>
             )}
 
@@ -876,12 +891,7 @@ export default function Workspace() {
                 </Button>
               )}
 
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowMessageModal(true)}
-                className="w-full"
-              >
+              <Button variant="outline" size="sm" onClick={() => setShowMessageModal(true)} className="w-full">
                 <MessageSquare className="w-4 h-4 mr-2" />
                 Message {partnerName?.split(" ")[0] || "Partner"}
               </Button>
@@ -894,11 +904,11 @@ export default function Workspace() {
                   className="w-full"
                 >
                   <ExternalLink className="w-4 h-4 mr-2" />
-                  {request.status === 'published' ? 'See Live Post' : 'Open External Document'}
+                  {request.status === "published" ? "See Live Post" : "Open External Document"}
                 </Button>
               )}
 
-              {request.status === 'approved' && (
+              {request.status === "approved" && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button
@@ -914,7 +924,8 @@ export default function Workspace() {
                     <AlertDialogHeader>
                       <AlertDialogTitle>Cancel this collaboration?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        This will cancel the collaboration with {partnerName}. The workspace content will be preserved but editing will be locked.
+                        This will cancel the collaboration with {partnerName}. The workspace content will be preserved
+                        but editing will be locked.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -924,18 +935,20 @@ export default function Workspace() {
                         onClick={async () => {
                           try {
                             const { error } = await supabase
-                              .from('collab_requests')
-                              .update({ status: 'cancelled' })
-                              .eq('id', request.id);
+                              .from("collab_requests")
+                              .update({ status: "cancelled" })
+                              .eq("id", request.id);
                             if (error) throw error;
-                            toast.success('Collaboration cancelled');
-                            supabase.functions.invoke('send-collab-email', {
-                              body: { type: 'collab_cancelled', requestId: request.id }
-                            }).catch(err => console.error('Failed to send cancellation email:', err));
-                            navigate(isCreator ? '/dashboard/requests' : '/dashboard/my-requests');
+                            toast.success("Collaboration cancelled");
+                            supabase.functions
+                              .invoke("send-collab-email", {
+                                body: { type: "collab_cancelled", requestId: request.id },
+                              })
+                              .catch((err) => console.error("Failed to send cancellation email:", err));
+                            navigate(isCreator ? "/dashboard/requests" : "/dashboard/my-requests");
                           } catch (err) {
-                            console.error('Error cancelling collab:', err);
-                            toast.error('Failed to cancel collaboration');
+                            console.error("Error cancelling collab:", err);
+                            toast.error("Failed to cancel collaboration");
                           }
                         }}
                       >
@@ -955,145 +968,174 @@ export default function Workspace() {
                     <Users className="w-3.5 h-3.5" />
                     Writer's Room
                   </h4>
-                  {isCreator && request.status === "approved" && (() => {
-                    const maxCollabs = isPro ? Infinity : 5;
-                    const atLimit = collaborators.length >= maxCollabs;
-                    if (atLimit) {
-                      return (
-                        <span className="text-[10px] text-muted-foreground">
-                          <a href="/subscription" className="underline hover:text-primary">Go Unlimited</a> for more
-                        </span>
-                      );
-                    }
-                    if (isPro || credits > 0) {
-                      return (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 text-xs"
-                          onClick={() => setShowInviteModal(true)}
-                        >
-                          <UserPlus className="w-3.5 h-3.5 mr-1" />
-                          Invite
-                        </Button>
-                      );
-                    }
-                    return null;
-                  })()}
+                  {isCreator &&
+                    request.status === "approved" &&
+                    (() => {
+                      const maxCollabs = isPro ? Infinity : 5;
+                      const atLimit = collaborators.length >= maxCollabs;
+                      if (atLimit) {
+                        return (
+                          <span className="text-[10px] text-muted-foreground">
+                            <a href="/subscription" className="underline hover:text-primary">
+                              Go Unlimited
+                            </a>{" "}
+                            for more
+                          </span>
+                        );
+                      }
+                      if (isPro || credits > 0) {
+                        return (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => setShowInviteModal(true)}
+                          >
+                            <UserPlus className="w-3.5 h-3.5 mr-1" />
+                            Invite
+                          </Button>
+                        );
+                      }
+                      return null;
+                    })()}
                 </div>
 
                 {/* Participants list */}
                 <TooltipProvider delayDuration={300}>
-                <div className="space-y-2">
-                  {/* Owner */}
-                  <div className="flex items-center gap-2 text-sm">
-                    <Avatar className="w-6 h-6">
-                      {creatorInfo?.profile_image_url && (
-                        <AvatarImage src={sanitizeSubstackImageUrl(creatorInfo.profile_image_url)} alt={creatorInfo?.name || "Owner"} />
-                      )}
-                      <AvatarFallback className="text-[10px] font-bold gradient-primary text-primary-foreground">
-                        {(creatorInfo?.name || "C").charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="truncate">{creatorInfo?.name}</span>
-                    <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Owner</span>
-                  </div>
-                  {/* Original requester — hide for solo workspaces (same person as owner) */}
-                  {!isSolo && (
+                  <div className="space-y-2">
+                    {/* Owner */}
                     <div className="flex items-center gap-2 text-sm">
                       <Avatar className="w-6 h-6">
-                        {request.requester_profile_image_url && (
-                          <AvatarImage src={sanitizeSubstackImageUrl(request.requester_profile_image_url)} alt={request.requester_name} />
+                        {creatorInfo?.profile_image_url && (
+                          <AvatarImage
+                            src={sanitizeSubstackImageUrl(creatorInfo.profile_image_url)}
+                            alt={creatorInfo?.name || "Owner"}
+                          />
                         )}
-                        <AvatarFallback className="text-[10px] font-bold bg-secondary text-secondary-foreground">
-                          {(request.requester_name || "G").charAt(0)}
+                        <AvatarFallback className="text-[10px] font-bold gradient-primary text-primary-foreground">
+                          {(creatorInfo?.name || "C").charAt(0)}
                         </AvatarFallback>
                       </Avatar>
-                      <span className="truncate">{request.requester_name}</span>
-                      <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Guest</span>
+                      <span className="truncate">{creatorInfo?.name}</span>
+                      <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Owner</span>
                     </div>
-                  )}
-                  {/* Invited collaborators */}
-                  {collaborators.map((c) => {
-                    const displayName = c.name || (c.guest_number != null ? `Guest ${c.guest_number}` : "Guest");
-                    const tooltipText = c.user_id
-                      ? (c.username ? `@${c.username}` : displayName)
-                      : (isCreator ? c.email : "Pending invite");
+                    {/* Original requester — hide for solo workspaces (same person as owner) */}
+                    {!isSolo && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Avatar className="w-6 h-6">
+                          {request.requester_profile_image_url && (
+                            <AvatarImage
+                              src={sanitizeSubstackImageUrl(request.requester_profile_image_url)}
+                              alt={request.requester_name}
+                            />
+                          )}
+                          <AvatarFallback className="text-[10px] font-bold bg-secondary text-secondary-foreground">
+                            {(request.requester_name || "G").charAt(0)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="truncate">{request.requester_name}</span>
+                        <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Guest</span>
+                      </div>
+                    )}
+                    {/* Invited collaborators */}
+                    {collaborators.map((c) => {
+                      const displayName = c.name || (c.guest_number != null ? `Guest ${c.guest_number}` : "Guest");
+                      const tooltipText = c.user_id
+                        ? c.username
+                          ? `@${c.username}`
+                          : displayName
+                        : isCreator
+                          ? c.email
+                          : "Pending invite";
 
-                    return (
-                      <Tooltip key={c.id}>
-                        <TooltipTrigger asChild>
-                          <div className="flex items-center gap-2 text-sm cursor-default group">
-                            <Avatar className="w-6 h-6">
-                              {c.profile_image_url && (
-                                <AvatarImage src={sanitizeSubstackImageUrl(c.profile_image_url)} alt={displayName} />
+                      return (
+                        <Tooltip key={c.id}>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center gap-2 text-sm cursor-default group">
+                              <Avatar className="w-6 h-6">
+                                {c.profile_image_url && (
+                                  <AvatarImage src={sanitizeSubstackImageUrl(c.profile_image_url)} alt={displayName} />
+                                )}
+                                <AvatarFallback className="text-[10px] font-bold bg-accent/30 text-accent-foreground">
+                                  {c.name ? (
+                                    c.name.charAt(0).toUpperCase()
+                                  ) : c.guest_number != null ? (
+                                    `G${c.guest_number}`
+                                  ) : (
+                                    <User className="w-3 h-3" />
+                                  )}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="truncate text-muted-foreground flex-1">{displayName}</span>
+                              {c.joined_at ? (
+                                <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                                  Joined
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-warning bg-warning/10 px-1.5 py-0.5 rounded">
+                                  Pending
+                                </span>
                               )}
-                              <AvatarFallback className="text-[10px] font-bold bg-accent/30 text-accent-foreground">
-                                {c.name ? c.name.charAt(0).toUpperCase() : (c.guest_number != null ? `G${c.guest_number}` : <User className="w-3 h-3" />)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span className="truncate text-muted-foreground flex-1">{displayName}</span>
-                            {c.joined_at ? (
-                              <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Joined</span>
-                            ) : (
-                              <span className="text-[10px] text-warning bg-warning/10 px-1.5 py-0.5 rounded">Pending</span>
-                            )}
-                            {isCreator && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setRemovingCollaborator({ id: c.id, name: displayName });
-                                }}
-                                className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-                                aria-label={`Remove ${displayName}`}
-                              >
-                                <X className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent side="left">
-                          <p className="text-xs">{tooltipText}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    );
-                  })}
+                              {isCreator && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setRemovingCollaborator({ id: c.id, name: displayName });
+                                  }}
+                                  className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                                  aria-label={`Remove ${displayName}`}
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="left">
+                            <p className="text-xs">{tooltipText}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      );
+                    })}
 
-                  {/* Remove collaborator confirmation dialog */}
-                  <AlertDialog open={!!removingCollaborator} onOpenChange={(open) => !open && setRemovingCollaborator(null)}>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Remove {removingCollaborator?.name}?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This will immediately revoke their access to this workspace. They won't be able to view or edit the draft.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          onClick={async () => {
-                            if (!removingCollaborator) return;
-                            const name = removingCollaborator.name;
-                            const { error } = await supabase
-                              .from("workspace_collaborators")
-                              .delete()
-                              .eq("id", removingCollaborator.id);
-                            setRemovingCollaborator(null);
-                            if (error) {
-                              toast.error("Failed to remove collaborator");
-                            } else {
-                              toast.success(`Access revoked for ${name}`);
-                              refetchCollaborators();
-                            }
-                          }}
-                        >
-                          Remove
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
+                    {/* Remove collaborator confirmation dialog */}
+                    <AlertDialog
+                      open={!!removingCollaborator}
+                      onOpenChange={(open) => !open && setRemovingCollaborator(null)}
+                    >
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Remove {removingCollaborator?.name}?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will immediately revoke their access to this workspace. They won't be able to view or
+                            edit the draft.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={async () => {
+                              if (!removingCollaborator) return;
+                              const name = removingCollaborator.name;
+                              const { error } = await supabase
+                                .from("workspace_collaborators")
+                                .delete()
+                                .eq("id", removingCollaborator.id);
+                              setRemovingCollaborator(null);
+                              if (error) {
+                                toast.error("Failed to remove collaborator");
+                              } else {
+                                toast.success(`Access revoked for ${name}`);
+                                refetchCollaborators();
+                              }
+                            }}
+                          >
+                            Remove
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
                 </TooltipProvider>
               </div>
             )}
@@ -1103,7 +1145,8 @@ export default function Workspace() {
               <div className="flex items-center gap-2 px-4 py-2.5 bg-warning/10 border border-warning/20 rounded-lg text-sm text-warning-foreground">
                 <AlertCircle className="w-4 h-4 text-warning flex-shrink-0" />
                 <span>
-                  <strong>{activeEditors[0].user_name}</strong> is currently editing. Wait for them to save before making changes.
+                  <strong>{activeEditors[0].user_name}</strong> is currently editing. Wait for them to save before
+                  making changes.
                 </span>
               </div>
             )}
@@ -1119,14 +1162,12 @@ export default function Workspace() {
 
             {/* Conversation Feed */}
             <div className="glass-card p-4">
-              <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
-                Conversation
-              </h4>
+              <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Conversation</h4>
               <WorkspaceConversation
-                  requestId={request.id}
-                  currentUserIsCreator={isCreator}
-                  refreshKey={msgRefreshKey}
-                />
+                requestId={request.id}
+                currentUserIsCreator={isCreator}
+                refreshKey={msgRefreshKey}
+              />
             </div>
           </motion.div>
 
@@ -1156,7 +1197,7 @@ export default function Workspace() {
                         content_last_edited_by: editedBy,
                         content_last_edited_at: editedAt,
                       }
-                    : prev
+                    : prev,
                 );
               }}
             />
@@ -1179,7 +1220,7 @@ export default function Workspace() {
 
       {isCreator && (
         <>
-        <CollabDraftModal
+          <CollabDraftModal
             open={showDraftModal}
             onOpenChange={setShowDraftModal}
             draft={localDraft}
