@@ -33,6 +33,7 @@ interface DbCollabRequest {
   shared_content: string | null;
   content_last_edited_by: string | null;
   content_last_edited_at: string | null;
+  is_solo: boolean;
 }
 
 type FilterTab = "all" | "pending" | "approved" | "declined" | "cancelled" | "published";
@@ -414,11 +415,11 @@ export default function Requests() {
   const mappedRequests = filteredRequests.map((r) => ({
     id: r.id,
     creatorUsername: creator.username,
-    requesterName: r.requester_name,
+    requesterName: r.is_solo ? (r.message || "Solo Draft") : r.requester_name,
     requesterEmail: r.requester_email,
     requesterSubstackUrl: r.requester_substack_url || '',
     requesterProfileImageUrl: r.requester_profile_image_url,
-    message: r.message || '',
+    message: r.is_solo ? '' : (r.message || ''),
     requestedDate: r.requested_date,
     status: r.status as 'pending' | 'approved' | 'declined' | 'cancelled' | 'published',
     createdAt: r.created_at,
@@ -429,6 +430,7 @@ export default function Requests() {
     content_last_edited_by: r.content_last_edited_by,
     content_last_edited_at: r.content_last_edited_at,
     _currentUserName: creator.name,
+    isSolo: r.is_solo,
   }));
 
   return (

@@ -59,6 +59,7 @@ interface WorkspaceRequest {
   content_last_edited_by: string | null;
   content_last_edited_at: string | null;
   selected_collab_type: string | null;
+  is_solo: boolean;
 }
 
 interface CreatorInfo {
@@ -348,16 +349,25 @@ export default function Workspace() {
     });
   };
 
+  // Solo workspace detection
+  const isSolo = !!(request as any)?.is_solo;
+
   // The partner — the "other person" in the collab
-  const partnerName = isCreator
-    ? request?.requester_name
-    : creatorInfo?.name || "Creator";
-  const partnerSubstackUrl = isCreator
-    ? request?.requester_substack_url
-    : creatorInfo?.substack_url;
-  const partnerProfileImage = isCreator
-    ? request?.requester_profile_image_url
-    : creatorInfo?.profile_image_url;
+  const partnerName = isSolo
+    ? null
+    : isCreator
+      ? request?.requester_name
+      : creatorInfo?.name || "Creator";
+  const partnerSubstackUrl = isSolo
+    ? null
+    : isCreator
+      ? request?.requester_substack_url
+      : creatorInfo?.substack_url;
+  const partnerProfileImage = isSolo
+    ? null
+    : isCreator
+      ? request?.requester_profile_image_url
+      : creatorInfo?.profile_image_url;
 
   if (authLoading || loading) {
     return (
@@ -710,40 +720,48 @@ export default function Workspace() {
             animate={{ opacity: 1, x: 0 }}
             className="space-y-4"
           >
-            {/* Partner Card */}
+            {/* Partner Card / Solo Project Card */}
             <div className="glass-card p-5 space-y-4">
-              <div className="flex items-center gap-3">
-                {partnerProfileImage ? (
-                  <img
-                    src={sanitizeSubstackImageUrl(partnerProfileImage)}
-                    alt={partnerName || ""}
-                    className="w-12 h-12 rounded-full object-cover border-2 border-primary/20"
-                  />
-                ) : (
-                  <div className="w-12 h-12 rounded-full gradient-primary flex items-center justify-center text-primary-foreground font-semibold text-lg">
-                    {(partnerName || "?").charAt(0).toUpperCase()}
-                  </div>
-                )}
-                <div className="min-w-0">
-                  <h3 className="font-semibold truncate">{partnerName}</h3>
-                  {partnerSubstackUrl && (
-                    <a
-                      href={normalizeSubstackUrl(partnerSubstackUrl).normalized || partnerSubstackUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-primary hover:underline flex items-center gap-1 truncate"
-                    >
-                      <LinkIcon className="w-3 h-3 flex-shrink-0" />
-                      <span className="truncate">
-                        {extractSubstackUsername(partnerSubstackUrl)
-                          ? `${extractSubstackUsername(partnerSubstackUrl)}.substack.com`
-                          : partnerSubstackUrl}
-                      </span>
-                      <ExternalLink className="w-3 h-3 flex-shrink-0" />
-                    </a>
-                  )}
+              {isSolo ? (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Solo Draft</p>
+                  <h3 className="font-semibold text-lg">{request.message || "Untitled Project"}</h3>
+                  <p className="text-sm text-muted-foreground mt-1">Invite collaborators when you're ready.</p>
                 </div>
-              </div>
+              ) : (
+                <div className="flex items-center gap-3">
+                  {partnerProfileImage ? (
+                    <img
+                      src={sanitizeSubstackImageUrl(partnerProfileImage)}
+                      alt={partnerName || ""}
+                      className="w-12 h-12 rounded-full object-cover border-2 border-primary/20"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full gradient-primary flex items-center justify-center text-primary-foreground font-semibold text-lg">
+                      {(partnerName || "?").charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <h3 className="font-semibold truncate">{partnerName}</h3>
+                    {partnerSubstackUrl && (
+                      <a
+                        href={normalizeSubstackUrl(partnerSubstackUrl).normalized || partnerSubstackUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-primary hover:underline flex items-center gap-1 truncate"
+                      >
+                        <LinkIcon className="w-3 h-3 flex-shrink-0" />
+                        <span className="truncate">
+                          {extractSubstackUsername(partnerSubstackUrl)
+                            ? `${extractSubstackUsername(partnerSubstackUrl)}.substack.com`
+                            : partnerSubstackUrl}
+                        </span>
+                        <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <Badge variant="secondary" className="capitalize">
                 {request.selected_collab_type || "Collaboration"}
@@ -810,30 +828,32 @@ export default function Workspace() {
                 </DialogContent>
               </Dialog>
 
-              {/* Email */}
-              <div className="flex items-center gap-1">
-                <a
-                  href={`mailto:${request.requester_email}`}
-                  className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
-                >
-                  <Mail className="w-4 h-4 flex-shrink-0" />
-                  <span>Send Email</span>
-                </a>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(request.requester_email);
-                    toast.success("Email copied!");
-                  }}
-                  title="Copy email address"
-                  className="ml-1 p-1 rounded text-muted-foreground/50 hover:text-primary hover:bg-primary/10 transition-colors"
-                >
-                  <Copy className="w-3 h-3" />
-                </button>
-              </div>
+              {/* Email — hide for solo workspaces (it's your own email) */}
+              {!isSolo && (
+                <div className="flex items-center gap-1">
+                  <a
+                    href={`mailto:${request.requester_email}`}
+                    className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    <Mail className="w-4 h-4 flex-shrink-0" />
+                    <span>Send Email</span>
+                  </a>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(request.requester_email);
+                      toast.success("Email copied!");
+                    }}
+                    title="Copy email address"
+                    className="ml-1 p-1 rounded text-muted-foreground/50 hover:text-primary hover:bg-primary/10 transition-colors"
+                  >
+                    <Copy className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
             </div>
 
-            {/* Message */}
-            {request.message && (
+            {/* Message — for solo workspaces, message holds the project title (shown above), so skip */}
+            {request.message && !isSolo && (
               <div className="glass-card p-5">
                 <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">Original Message</p>
                 <p className="text-sm text-muted-foreground italic leading-relaxed">
@@ -978,19 +998,21 @@ export default function Workspace() {
                     <span className="truncate">{creatorInfo?.name}</span>
                     <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Owner</span>
                   </div>
-                  {/* Original requester */}
-                  <div className="flex items-center gap-2 text-sm">
-                    <Avatar className="w-6 h-6">
-                      {request.requester_profile_image_url && (
-                        <AvatarImage src={sanitizeSubstackImageUrl(request.requester_profile_image_url)} alt={request.requester_name} />
-                      )}
-                      <AvatarFallback className="text-[10px] font-bold bg-secondary text-secondary-foreground">
-                        {(request.requester_name || "G").charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="truncate">{request.requester_name}</span>
-                    <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Guest</span>
-                  </div>
+                  {/* Original requester — hide for solo workspaces (same person as owner) */}
+                  {!isSolo && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Avatar className="w-6 h-6">
+                        {request.requester_profile_image_url && (
+                          <AvatarImage src={sanitizeSubstackImageUrl(request.requester_profile_image_url)} alt={request.requester_name} />
+                        )}
+                        <AvatarFallback className="text-[10px] font-bold bg-secondary text-secondary-foreground">
+                          {(request.requester_name || "G").charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="truncate">{request.requester_name}</span>
+                      <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Guest</span>
+                    </div>
+                  )}
                   {/* Invited collaborators */}
                   {collaborators.map((c) => {
                     const displayName = c.name || (c.guest_number != null ? `Guest ${c.guest_number}` : "Guest");

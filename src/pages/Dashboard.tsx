@@ -1,12 +1,15 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { parseDateString, sanitizeSubstackImageUrl } from "@/lib/utils";
-import { Copy, ExternalLink, Globe, MessageSquare, TrendingUp, Zap } from "lucide-react";
+import { Copy, ExternalLink, Globe, MessageSquare, PenLine, TrendingUp, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { CollabCalendar } from "@/components/calendar/CollabCalendar";
 import { useAuth } from "@/hooks/useAuth";
+import { usePro } from "@/hooks/usePro";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import type { Json } from "@/integrations/supabase/types";
@@ -33,6 +36,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, creator, loading } = useAuth();
+  const { isPro, canHostMore } = usePro();
   const [availability, setAvailability] = useState<string[]>([]);
   const [requests, setRequests] = useState<CollabRequest[]>([]);
   const [bookedDates, setBookedDates] = useState<string[]>([]);
@@ -40,6 +44,9 @@ export default function Dashboard() {
   const [publishedDates, setPublishedDates] = useState<string[]>([]);
   const [publishedBookingDetails, setPublishedBookingDetails] = useState<BookingInfo[]>([]);
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
+  const [showStartWriting, setShowStartWriting] = useState(false);
+  const [projectTitle, setProjectTitle] = useState("");
+  const [isCreatingSolo, setIsCreatingSolo] = useState(false);
 
   const handleImageError = useCallback((requestId: string) => {
     setImageErrors(prev => new Set(prev).add(requestId));
@@ -212,6 +219,72 @@ export default function Dashboard() {
 
   if (!creator) return null;
 
+  const handleCreateSoloWorkspace = async () => {
+    if (!user || !creator) return;
+    if (!projectTitle.trim()) {
+      toast.error("Please enter a project title");
+      return;
+    }
+    // Credit check for non-Pro
+    if (!isPro && !canHostMore) {
+      toast.error("You've used all your collaboration slots", {
+        description: "Invite friends or upgrade to Pro for unlimited workspaces.",
+        action: { label: "Upgrade", onClick: () => navigate("/dashboard/subscription") },
+      });
+      return;
+    }
+
+    setIsCreatingSolo(true);
+    try {
+      // Get the user's email
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const email = authUser?.email || "";
+
+      const { data, error } = await supabase
+        .from("collab_requests")
+        .insert({
+          creator_id: creator.id,
+          requester_name: creator.name,
+          requester_email: email,
+          requester_user_id: user.id,
+          requester_profile_image_url: creator.profile_image_url,
+          requester_substack_url: creator.substack_url,
+          status: "approved",
+          approved_at: new Date().toISOString(),
+          message: projectTitle.trim(),
+          is_solo: true,
+        })
+        .select("id")
+        .single();
+
+      if (error) throw error;
+
+      // Deduct credit for non-Pro users
+      if (!isPro) {
+        const { data: creatorData } = await supabase
+          .from("creators")
+          .select("credits")
+          .eq("id", creator.id)
+          .single();
+        const currentCredits = creatorData?.credits ?? 3;
+        await supabase
+          .from("creators")
+          .update({ credits: Math.max(0, currentCredits - 1) })
+          .eq("id", creator.id);
+      }
+
+      toast.success("Workspace created!");
+      setShowStartWriting(false);
+      setProjectTitle("");
+      navigate(`/dashboard/workspace/${data.id}`);
+    } catch (err) {
+      console.error("Failed to create solo workspace:", err);
+      toast.error("Failed to create workspace. Please try again.");
+    } finally {
+      setIsCreatingSolo(false);
+    }
+  };
+
   // Mode-aware calendar section (must be after creator null-check)
   const calendarHeader = creator.collab_mode === 'discovery' 
     ? "Your Availability" 
@@ -237,6 +310,60 @@ export default function Dashboard() {
             Here's what's happening with your collaborations
           </p>
         </motion.div>
+
+        {/* Start Writing Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="glass-card p-6 mb-8 cursor-pointer hover-lift border-2 border-primary/20 hover:border-primary/40 transition-colors"
+          onClick={() => setShowStartWriting(true)}
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center">
+              <PenLine className="w-6 h-6 text-primary-foreground" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-lg">Start Writing</h3>
+              <p className="text-sm text-muted-foreground">
+                Start your draft now. Invite collaborators whenever you're ready.
+              </p>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Start Writing Modal */}
+        <Dialog open={showStartWriting} onOpenChange={setShowStartWriting}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Start a new draft</DialogTitle>
+              <DialogDescription>
+                Give your project a title. You can invite collaborators anytime from inside the workspace.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <Input
+                placeholder="e.g. AI Everywhere Interview with Farida"
+                value={projectTitle}
+                onChange={(e) => setProjectTitle(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleCreateSoloWorkspace()}
+                autoFocus
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowStartWriting(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="gradient"
+                onClick={handleCreateSoloWorkspace}
+                disabled={isCreatingSolo || !projectTitle.trim()}
+              >
+                {isCreatingSolo ? "Creating…" : "Create Workspace"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Share Your Link Card */}
         <motion.div
