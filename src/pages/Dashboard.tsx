@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { parseDateString, sanitizeSubstackImageUrl } from "@/lib/utils";
-import { Copy, ExternalLink, Globe, MessageSquare, PenLine, TrendingUp, Zap, PenSquare } from "lucide-react";
+import { Copy, ExternalLink, Globe, MessageSquare, PenLine, TrendingUp, Zap, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -329,7 +329,7 @@ export default function Dashboard() {
             className="w-full sm:w-auto rounded-full px-8 h-10 font-medium whitespace-nowrap"
           >
             Start Writing
-            <PenSquare className="w-4 h-4 text-primary" />
+            <Pencil className="w-4 h-4 text-primary" />
           </Button>
         </div>
 
