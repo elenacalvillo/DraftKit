@@ -310,26 +310,28 @@ export default function Dashboard() {
         </motion.div>
 
         {/* Start Writing Card */}
-        <div className="flex flex-col sm:flex-row items-center justify-between p-4 mb-8 bg-card/50 backdrop-blur-sm rounded-xl border border-border/50 gap-4">
-          <div className="flex items-start sm:items-center gap-4 w-full">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between p-5 mb-8 bg-card/40 backdrop-blur-md rounded-xl border border-border/40 gap-4">
+          <div className="flex items-start gap-4">
             <div className="p-3 rounded-lg bg-primary/10 text-primary shrink-0">
-              <PenLine className="w-5 h-5" />
+              <NotebookPen className="w-5 h-5" />
             </div>
-            <div>
-              <h3 className="font-semibold text-foreground">Start Writing on Your Own</h3>
-              <p className="text-smtext-muted-foreground leading-relaxed">
-                Start your draft now. Invite collaborators whenever you're ready.
+            <div className="space-y-1">
+              <h3 className="text-sm font-bold text-foreground">Start writing on your own</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed max-w-md">
+                Draft your ideas now and invite collaborators whenever you're ready.
               </p>
             </div>
           </div>
+
           <Button
-            variant="default"
+            variant="gradient"
             size="sm"
             onClick={() => setShowStartWriting(true)}
-            className="w-full sm:w-auto rounded-full px-8 h-10 font-medium whitespace-nowrap"
+            className="w-full md:w-auto rounded-full px-8 h-10 font-bold flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 text-white"
           >
-            Start Writing
-            <NotebookPen className="w-4 h-4 text-primary" />
+            <span>Start Writing</span>
+            {/* Use text-white here so it pops against the gradient */}
+            <NotebookPen className="w-4 h-4 text-white shrink-0" />
           </Button>
         </div>
 
