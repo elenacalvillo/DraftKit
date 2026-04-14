@@ -158,6 +158,7 @@ export type Database = {
           hidden_by_creator: boolean
           hidden_by_requester: boolean
           id: string
+          is_solo: boolean
           message: string | null
           reminder_sent_at: string | null
           requested_date: string | null
@@ -189,6 +190,7 @@ export type Database = {
           hidden_by_creator?: boolean
           hidden_by_requester?: boolean
           id?: string
+          is_solo?: boolean
           message?: string | null
           reminder_sent_at?: string | null
           requested_date?: string | null
@@ -220,6 +222,7 @@ export type Database = {
           hidden_by_creator?: boolean
           hidden_by_requester?: boolean
           id?: string
+          is_solo?: boolean
           message?: string | null
           reminder_sent_at?: string | null
           requested_date?: string | null
