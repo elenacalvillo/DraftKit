@@ -118,10 +118,12 @@ export default function MyRequests() {
           collab_link,
           shared_content,
           content_last_edited_by,
-          content_last_edited_at
+          content_last_edited_at,
+          is_solo
         `)
         .eq('requester_user_id', user?.id)
         .eq('hidden_by_requester', false)
+        .eq('is_solo', false)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
