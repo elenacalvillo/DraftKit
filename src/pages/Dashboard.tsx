@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { parseDateString, sanitizeSubstackImageUrl } from "@/lib/utils";
+import { normalizeSubstackUrl } from "@/lib/substack-url";
 import { Copy, ExternalLink, Globe, MessageSquare, PenLine, TrendingUp, Zap, NotebookPen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -257,7 +258,7 @@ export default function Dashboard() {
           requester_email: email,
           requester_user_id: user.id,
           requester_profile_image_url: creator.profile_image_url,
-          requester_substack_url: creator.substack_url,
+          requester_substack_url: normalizeSubstackUrl(creator.substack_url || '').normalized,
           status: "approved",
           approved_at: new Date().toISOString(),
           message: projectTitle.trim(),
