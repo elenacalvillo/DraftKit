@@ -1,80 +1,74 @@
 
 
-# "Start Writing" — Solo-to-Collab Workspaces
+# Harden Solo Workspace for Production
 
-## The Idea
+You've identified exactly the right failure points. Here's the concrete fix for each:
 
-You're right — this is a pivotal shift. Right now DraftKit forces a linear flow: someone sends a proposal → you accept → date is set → workspace opens. But real collaboration often starts with "let me draft something first." The "Start Writing" feature lets you create a workspace immediately, write solo, and invite collaborators whenever you're ready.
+## 1. Database Trigger — Skip Email for Solo Drafts
 
-## How It Works (User Perspective)
+The `notify_new_collab_request` trigger fires on every INSERT and calls `send-collab-email` when `status = 'pending'`. Solo workspaces insert with `status = 'approved'`, so **this trigger already skips them** — the `IF NEW.status = 'pending'` guard handles it. No change needed here.
 
-1. **Dashboard**: A prominent "Start Writing" button appears at the top, with helper text: *"Start your draft now. Invite collaborators whenever you're ready."*
-2. **Click it**: A lightweight modal asks for a **Project Title** only (e.g., "AI Everywhere Interview with Farida")
-3. **Workspace opens**: You land in the same Zen editor you already know — solo. The Writer's Room sidebar shows just you.
-4. **Invite when ready**: The existing "Invite" button in the sidebar lets you search for DraftKit users or invite by email. The workspace transitions from solo to collaborative seamlessly.
+## 2. Database Trigger — Skip URL Validation for Solo Drafts
 
-## Architecture Approach
+The `validate_requester_substack_url` trigger rejects any URL containing `substack.com/@`. This is the **confirmed production blocker** (the P0001 error).
 
-This reuses the existing `collab_requests` table with minimal changes:
-
-**New column**: `is_solo` (boolean, default `false`) — marks self-initiated workspaces so we can distinguish them from incoming proposals. No schema break.
-
-**Creation logic**: When "Start Writing" is clicked, insert a `collab_request` where:
-- `creator_id` = your creator ID
-- `requester_name` = your own name (you're both host and initial writer)
-- `requester_email` = your email
-- `requester_user_id` = your user ID
-- `status` = `'approved'` (skip pending — it's your own workspace)
-- `requested_date` = `null` (no date needed)
-- `is_solo` = `true`
-- `message` = the project title
-
-**Workspace.tsx**: Already handles all the cases — `isCreator` will be true, the invite flow works, the editor works. We just need to adjust a few UI labels for solo workspaces (e.g., hide "Requester" section when it's yourself, show "Project Title" instead of requester name in the sidebar header).
-
-**Credits**: Deduct 1 collaboration slot on creation, same as a standard approval. Pro users are unlimited.
-
-## Database Migration
+**Migration**: Replace the trigger function to bail out early when `is_solo = true`:
 
 ```sql
-ALTER TABLE public.collab_requests
-ADD COLUMN is_solo boolean NOT NULL DEFAULT false;
+CREATE OR REPLACE FUNCTION public.validate_requester_substack_url()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.is_solo IS TRUE THEN
+    RETURN NEW;
+  END IF;
+  IF NEW.requester_substack_url LIKE '%substack.com/@%' THEN
+    RAISE EXCEPTION '...';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SET search_path = public;
 ```
 
-No new RLS policies needed — the existing "creators can insert/update/view own requests" policies cover this since you're the creator.
+## 3. RLS INSERT Policy — Allow Solo Self-Inserts
 
-## Files to Change
+The current "Anyone can create requests" policy enforces `status = 'pending'`. Solo workspaces insert with `status = 'approved'`, which **violates this policy**. There's also a "Universal Insert Policy" with `WITH CHECK (true)` — this is an overly permissive fallback that should be tightened, but it currently allows the insert to pass. 
+
+However, for correctness and security, the right fix is to **add a dedicated solo INSERT policy** and **drop the universal one**:
+
+```sql
+CREATE POLICY "Creators can create solo workspaces"
+ON public.collab_requests FOR INSERT TO authenticated
+WITH CHECK (
+  is_solo = true
+  AND status = 'approved'
+  AND auth.uid() = requester_user_id
+  AND creator_id IN (SELECT id FROM creators WHERE user_id = auth.uid())
+);
+```
+
+Then drop the dangerous universal policy:
+```sql
+DROP POLICY "Universal Insert Policy" ON public.collab_requests;
+```
+
+## 4. Frontend — Normalize URL Before Insert
+
+In `Dashboard.tsx`, run the creator's `substack_url` through `normalizeSubstackUrl()` before passing it as `requester_substack_url`. This converts `substack.com/@elena` → `elena.substack.com` as defense-in-depth.
+
+## 5. UI Filtering — Hide Solo Drafts from "Pending" Management
+
+The Requests page currently shows solo drafts in the Approved tab. The pending tab won't show them (solo status is `approved`). No additional filtering needed — solo drafts naturally appear where they should.
+
+## Files
 
 | File | Change |
 |------|--------|
-| SQL migration | Add `is_solo` boolean column to `collab_requests` |
-| `src/pages/Dashboard.tsx` | Add "Start Writing" button + simple title modal at the top |
-| `src/pages/Workspace.tsx` | Adjust sidebar labels for solo workspaces (hide requester info when `is_solo` and requester is self, show project title) |
-| `src/pages/Requests.tsx` | Show solo workspaces in the "Approved" tab with a distinguishing label like "Solo Draft" |
-| `src/pages/MyRequests.tsx` | Filter out solo workspaces from "My Proposals" (they're not proposals — they show under Collabs) |
+| SQL Migration | Update `validate_requester_substack_url` to skip solo; add solo INSERT policy; drop universal INSERT policy |
+| `src/pages/Dashboard.tsx` | Import and use `normalizeSubstackUrl()` on line 260 |
 
-## What We Don't Change
+## What We Confirmed Is Already Safe
 
-- No new tables or schemas
-- No changes to `has_workspace_access()` or RLS policies
-- No changes to the invite flow — it already works from inside any workspace
-- No changes to the credit system logic — same deduction path
-- The editor, presence system, and Writer's Room sidebar all work as-is
-
-## Dashboard Button Placement
-
-```text
-┌─────────────────────────────────────────────┐
-│ Welcome back, Elena                          │
-│ Here's what's happening with your collabs    │
-│                                              │
-│  ┌──────────────────────────────────────┐   │
-│  │  ✏️  Start Writing                    │   │
-│  │  Start your draft now. Invite         │   │
-│  │  collaborators whenever you're ready. │   │
-│  └──────────────────────────────────────┘   │
-│                                              │
-│  [Your Public Booking Link card]             │
-│  ...                                         │
-└─────────────────────────────────────────────┘
-```
+- `notify_new_collab_request` trigger — already guarded by `status = 'pending'` check
+- `requester_name` / `requester_email` NOT NULL — already satisfied (passing creator.name and user email)
+- MyRequests page — already filters `.eq('is_solo', false)`
 
