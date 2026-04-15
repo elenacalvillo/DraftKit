@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { parseDateString, sanitizeSubstackImageUrl } from "@/lib/utils";
+import { normalizeSubstackUrl } from "@/lib/substack-url";
 import { Copy, ExternalLink, Globe, MessageSquare, PenLine, TrendingUp, Zap, NotebookPen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
