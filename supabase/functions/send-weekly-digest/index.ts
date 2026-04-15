@@ -63,15 +63,21 @@ async function transformWithAI(commits: string[]): Promise<DigestOutput> {
 
 Rules:
 - Transform, don't summarize. Focus on the "Superpower" — tell the user what they can do now.
-- Tone: natural, punchy, no jargon.
-- NEVER use: "delve", "unlock", "harness", "leverage", "empower", "streamline", "cutting-edge", "game-changer", "best-in-class", em dashes, or exclamation marks in headers.
+- Tone: natural, punchy, no jargon. Use short, declarative sentences.
+- CRITICAL: Every sentence MUST start with a capital letter. No exceptions.
+- NEVER use: "delve", "unlock", "harness", "leverage", "empower", "streamline", "cutting-edge", "game-changer", "best-in-class", "robust", "comprehensive", em dashes, or exclamation marks in headers.
 - If a commit is a bug fix, explain why the user's life is easier now.
-- Each bullet: bold title (6 words max), then 1-2 sentence explanation.
+- Each bullet: bold title (6 words max), then exactly 2 sentences.
+-- Sentence 1: The benefit/superpower.
+-- Sentence 2: The path/action.
 - Also generate a punchy email subject line (under 50 chars).
-- The Utility Rule: For every bullet, you must include a 'How to try it' sentence. Based on the commit content, determine the logical action a user needs to take to see the change:
--- If it's a UI change, describe the navigation path.
--- If it's a new feature, explain the first button to click.
--- If it's a fix, explain what they'll notice is working now.
+
+- The Utility & Navigator Rule: For the "How to try it" sentence, you must translate technical keywords into UI locations:
+-- If the commit mentions "Sidebar" or "PenLine" -> The action is at the top of the left navigation.
+-- If the commit mentions "is_solo" or "Dashboard" -> The action is the new bar on the home screen.
+-- If the commit mentions "Workspace" or "Drafting with" -> The action is inside an active project.
+-- If the commit mentions "Subscription" or "Credits" -> The action is on the Membership page.
+
 - Do not invent features or benefits. If a commit message is ambiguous, ignore it. Use only the provided text as the source of truth.`;
 
   const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
