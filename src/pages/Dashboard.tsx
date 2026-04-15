@@ -258,7 +258,7 @@ export default function Dashboard() {
           requester_email: email,
           requester_user_id: user.id,
           requester_profile_image_url: creator.profile_image_url,
-          requester_substack_url: creator.substack_url,
+          requester_substack_url: normalizeSubstackUrl(creator.substack_url || '').normalized,
           status: "approved",
           approved_at: new Date().toISOString(),
           message: projectTitle.trim(),
