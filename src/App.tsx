@@ -30,6 +30,7 @@ import Discovery from "./pages/Discovery";
 import AgentInfo from "./pages/AgentInfo";
 import TermsOfService from "./pages/TermsOfService";
 import RefundPolicy from "./pages/RefundPolicy";
+import PublicWorkspaceView from "./pages/PublicWorkspaceView";
 
 const queryClient = new QueryClient();
 
@@ -64,6 +65,7 @@ const App = () => (
             <Route path="/dashboard/workspace/:requestId" element={<ProtectedRoute requireCreator={false}><Workspace /></ProtectedRoute>} />
             <Route path="/admin/analytics" element={<ProtectedRoute requireCreator={false}><AdminAnalytics /></ProtectedRoute>} />
             <Route path="/retro/:collabId" element={<ProtectedRoute requireCreator={false}><Retrospective /></ProtectedRoute>} />
+            <Route path="/view/:token" element={<PublicWorkspaceView />} />
             <Route path="/:username" element={<PublicBooking />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

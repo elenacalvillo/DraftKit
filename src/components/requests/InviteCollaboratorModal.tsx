@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { UserPlus, Search, Mail, ArrowLeft } from "lucide-react";
+import { UserPlus, Search, Mail, ArrowLeft, Eye, Copy, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -41,6 +41,10 @@ export function InviteCollaboratorModal({
   const [email, setEmail] = useState("");
   const [isSending, setIsSending] = useState(false);
 
+  // Public view link state
+  const [viewToken, setViewToken] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
   // Reset on close
   useEffect(() => {
     if (!open) {
@@ -49,8 +53,40 @@ export function InviteCollaboratorModal({
       setResults([]);
       setEmail("");
       setInvitingId(null);
+      setCopied(false);
     }
   }, [open]);
+
+  // Fetch view_token when modal opens
+  useEffect(() => {
+    if (!open || !requestId) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("collab_requests")
+        .select("view_token")
+        .eq("id", requestId)
+        .maybeSingle();
+      if (!cancelled && data?.view_token) {
+        setViewToken(data.view_token as string);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [open, requestId]);
+
+  const viewUrl = viewToken ? `${window.location.origin}/view/${viewToken}` : "";
+
+  const handleCopyViewLink = async () => {
+    if (!viewUrl) return;
+    try {
+      await navigator.clipboard.writeText(viewUrl);
+      setCopied(true);
+      toast.success("Link copied");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Couldn't copy link");
+    }
+  };
 
   // Debounced search
   useEffect(() => {
@@ -204,6 +240,37 @@ export function InviteCollaboratorModal({
         </DialogHeader>
 
         <div className="space-y-3 pt-2">
+          {/* Public view link — visible in both modes */}
+          {viewToken && (
+            <div className="rounded-lg border border-border bg-muted/30 px-3 py-2.5 space-y-1.5">
+              <div className="flex items-center gap-2 text-xs font-medium text-foreground">
+                <Eye className="w-3.5 h-3.5 text-primary" />
+                Public view link
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0 text-xs font-mono text-muted-foreground truncate">
+                  {viewUrl}
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 shrink-0"
+                  onClick={handleCopyViewLink}
+                >
+                  {copied ? (
+                    <Check className="w-3.5 h-3.5 text-primary" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5" />
+                  )}
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-snug">
+                Anyone with this link can view the draft. Only invited writers can edit.
+              </p>
+            </div>
+          )}
+
           {mode === "search" ? (
             <>
               {/* Search input */}
