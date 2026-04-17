@@ -251,10 +251,10 @@ export function InviteCollaboratorModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3 pt-2">
+        <div className="space-y-3 pt-2 min-w-0">
           {/* Public view link — visible in both modes */}
           {viewToken && (
-            <div className="rounded-lg border border-border bg-muted/30 px-3 py-2.5 space-y-1.5 min-w-0">
+            <div className="rounded-lg border border-border bg-muted/30 px-3 py-2.5 space-y-1.5 flex-1 min-w-0">
               <div className="flex items-center gap-2 text-xs font-medium text-foreground">
                 <Eye className="w-3.5 h-3.5 text-primary" />
                 Public view link
