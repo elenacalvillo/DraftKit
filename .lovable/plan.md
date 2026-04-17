@@ -1,36 +1,38 @@
 
 
-## Plan: Surface the Share / Invite Entry Points
+## Fix: Public view link overflows the modal
 
-The public view link feature shipped, but the modal is unreachable from solo drafts because there's no visible trigger. Fix the UI so hosts can always grab the link.
+**Root cause:** The link row sits inside `DialogContent` which has `sm:max-w-[460px]`, but the URL row uses `flex items-center gap-2` where the truncate child cannot shrink because its parent flex container itself doesn't constrain width properly when the URL is one unbroken string. The current code uses `truncate overflow-x-auto` on the same element — these conflict (`truncate` sets `overflow:hidden` + `white-space:nowrap`, killing the scroll). Also missing `min-w-0` on the flex parent chain, which is what actually allows truncation/scroll inside flex.
 
-### Investigation needed first
+In production, tokens are full UUIDs (~36 chars) plus the custom domain `draftkit.app/view/<uuid>` ≈ 55 chars — short enough. But on `lovableproject.com` previews the host is ~50+ chars, pushing total length past 100 chars and breaking the layout.
 
-Let me verify where exactly the invite trigger lives today and what's missing on solo drafts. I'll inspect `Workspace.tsx` and the sidebar render path before finalizing.
+### Fix in `src/components/requests/InviteCollaboratorModal.tsx` (lines ~234-252)
 
-### Changes
+Replace the link row so it scrolls horizontally instead of truncating:
 
-**1. `src/pages/Workspace.tsx` (header)**
-- Add a `Share2` icon button labeled "Share" in the top-right header, next to "Start Writing".
-- onClick → opens the existing `InviteCollaboratorModal` (reuse current state).
-- Visible for the host on every workspace (solo + collab).
+1. Wrap the URL in a single-line, horizontally scrollable container.
+2. Remove `truncate` (it conflicts with `overflow-x-auto`).
+3. Add `min-w-0` to the flex parent so the child can actually shrink.
+4. Keep the copy button outside the scroll area as a fixed-width sibling.
 
-**2. Writer's Room sidebar card (likely in `Workspace.tsx` or a `SharedWorkspace` subcomponent)**
-- Restore the "Invite" / "Add collaborator" button inside the WRITER'S ROOM card for solo drafts.
-- Currently it appears to render only when collaborators exist or only in non-solo mode — make it always visible to the host.
+**New structure:**
+```tsx
+<div className="flex items-center gap-2 min-w-0">
+  <div className="flex-1 min-w-0 overflow-x-auto whitespace-nowrap text-xs font-mono text-muted-foreground rounded border border-border/50 bg-background/50 px-2 py-1.5 scrollbar-thin">
+    {viewUrl}
+  </div>
+  <Button ... className="h-8 w-8 p-0 shrink-0">...</Button>
+</div>
+```
 
-**3. `src/components/requests/InviteCollaboratorModal.tsx`**
-- Already shows the "Public view link" row at the top — confirm it stays as the first visible section on open (no reorder needed if already correct).
-- Minor: ensure the link row is visible even before the user types anything in search.
+Also add `min-w-0` to the outer card `<div className="rounded-lg border ...">` if needed.
 
 ### Files
-
 | File | Change |
 |---|---|
-| `src/pages/Workspace.tsx` | Add Share button in header; ensure sidebar Invite button always renders for host |
-| `src/components/requests/InviteCollaboratorModal.tsx` | Verify public link row renders first (already implemented, confirm only) |
+| `src/components/requests/InviteCollaboratorModal.tsx` | Replace `truncate overflow-x-auto` row with proper `min-w-0` + `overflow-x-auto whitespace-nowrap` scrollable container |
 
 ### Out of scope
-- Mobile-specific share sheet
-- Share button on `RequestCard` (hosts already have it inside the workspace)
+- Shortening tokens (UUIDs are required for entropy)
+- URL shortener service
 
