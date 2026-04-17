@@ -1,14 +1,38 @@
- import { useEffect, useState, useRef, useMemo, useCallback } from "react";
+import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Calendar, Check, ChevronRight, ExternalLink, Sparkles, Mail, User, MessageSquare, Lightbulb, Loader2, AlertCircle, RefreshCw, Info } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Calendar,
+  Check,
+  ChevronRight,
+  ExternalLink,
+  Sparkles,
+  Mail,
+  User,
+  MessageSquare,
+  Lightbulb,
+  Loader2,
+  AlertCircle,
+  RefreshCw,
+  Info,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { CollabCalendar } from "@/components/calendar/CollabCalendar";
 import { supabase } from "@/integrations/supabase/client";
-import { bookingFormSchema, COLLAB_TYPE_METADATA, COLLAB_MODE_METADATA, newsletterPublicationUrlSchema, type CollabStyle, type DateMeaning, type CollabMode } from "@/lib/validations";
+import {
+  bookingFormSchema,
+  COLLAB_TYPE_METADATA,
+  COLLAB_MODE_METADATA,
+  newsletterPublicationUrlSchema,
+  type CollabStyle,
+  type DateMeaning,
+  type CollabMode,
+} from "@/lib/validations";
 import { normalizeSubstackUrl, isValidNewsletterPublicationUrl } from "@/lib/substack-url";
 import { toast } from "sonner";
 import { analyzeCollabMatch, type CollabSuggestion, type CollabMatchResult } from "@/lib/api/collab-match";
@@ -54,36 +78,39 @@ const parseCollabStyles = (value: string | null): string[] => {
 };
 
 // Get date clarification text based on collab type and host's date meaning setting
-const getDateClarification = (collabType: string | null, dateMeaning: DateMeaning | null): { icon: string; text: string } => {
+const getDateClarification = (
+  collabType: string | null,
+  dateMeaning: DateMeaning | null,
+): { icon: string; text: string } => {
   // If host has a specific date meaning set (not flexible), use that
-  if (dateMeaning && dateMeaning !== 'flexible') {
-    if (dateMeaning === 'kickoff') {
-      return { icon: '🚀', text: 'This date is when we start working together' };
-    } else if (dateMeaning === 'publish') {
-      return { icon: '📅', text: 'This is the target publication date' };
-    } else if (dateMeaning === 'live') {
-      return { icon: '📞', text: 'This is the date of the call or event' };
+  if (dateMeaning && dateMeaning !== "flexible") {
+    if (dateMeaning === "kickoff") {
+      return { icon: "🚀", text: "This date is when we start working together" };
+    } else if (dateMeaning === "publish") {
+      return { icon: "📅", text: "This is the target publication date" };
+    } else if (dateMeaning === "live") {
+      return { icon: "📞", text: "This is the date of the call or event" };
     }
   }
-  
+
   // Otherwise, use collab-type-specific text
   if (!collabType) return { icon: "📅", text: "Select a date for your collaboration" };
-  
+
   const metadata = COLLAB_TYPE_METADATA[collabType as CollabStyle];
   if (metadata) {
     return { icon: metadata.icon, text: metadata.dateMeans };
   }
-  
+
   return { icon: "📅", text: "This is your target collaboration date" };
 };
 
 // Get the calendar legend text based on date meaning
 const getCalendarLegendText = (dateMeaning: DateMeaning | null): string => {
-  if (!dateMeaning || dateMeaning === 'flexible') return 'Available';
-  if (dateMeaning === 'kickoff') return 'Available to kick off';
-  if (dateMeaning === 'publish') return 'Available to publish';
-  if (dateMeaning === 'live') return 'Available for call/event';
-  return 'Available';
+  if (!dateMeaning || dateMeaning === "flexible") return "Available";
+  if (dateMeaning === "kickoff") return "Available to kick off";
+  if (dateMeaning === "publish") return "Available to publish";
+  if (dateMeaning === "live") return "Available for call/event";
+  return "Available";
 };
 
 export default function PublicBooking() {
@@ -92,7 +119,7 @@ export default function PublicBooking() {
   const { trackEvent } = useAnalytics();
   const { user } = useAuth();
   const hasTrackedPageView = useRef(false);
-  
+
   const [creator, setCreator] = useState<Creator | null>(null);
   const [availability, setAvailability] = useState<Availability | null>(null);
   const [bookedDates, setBookedDates] = useState<string[]>([]);
@@ -133,14 +160,15 @@ export default function PublicBooking() {
     turnstileTokenRef.current = null;
     setTurnstileToken(null);
   }, []);
- 
-   // Immediate error when widget fails to load
-   const handleTurnstileError = useCallback(() => {
-     turnstileTokenRef.current = null;
-     setTurnstileToken(null);
-     const errorMsg = "Security check couldn't load. If you use an ad blocker or strict privacy mode, try disabling it or use another browser.";
-     setSecurityError(errorMsg);
-   }, []);
+
+  // Immediate error when widget fails to load
+  const handleTurnstileError = useCallback(() => {
+    turnstileTokenRef.current = null;
+    setTurnstileToken(null);
+    const errorMsg =
+      "Security check couldn't load. If you use an ad blocker or strict privacy mode, try disabling it or use another browser.";
+    setSecurityError(errorMsg);
+  }, []);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -159,10 +187,10 @@ export default function PublicBooking() {
   useEffect(() => {
     if (!username || hasTrackedPageView.current) return;
     hasTrackedPageView.current = true;
-    
+
     // Store session start time for duration tracking
     sessionStorage.setItem("booking_session_start", Date.now().toString());
-    
+
     trackEvent("booking_link_clicked", { creator_username: username });
   }, [username, trackEvent]);
 
@@ -175,19 +203,20 @@ export default function PublicBooking() {
   // Note: We use the creator from useAuth() which queries the creators table with proper RLS
   // (auth.uid() = user_id), but for public data we use public_creator_profiles view
   const { creator: authCreator } = useAuth();
-  
+
   useEffect(() => {
     if (!user || !authCreator) return;
-    
+
     // Use the authenticated user's creator profile from auth context
     // Prefer newsletter_url for substackUrl (it's a publication URL, not profile)
     // Only use substack_url as fallback if it looks like a publication URL
-    const preferredNewsletterUrl = authCreator.newsletter_url || 
-      (authCreator.substack_url && isValidNewsletterPublicationUrl(authCreator.substack_url) 
-        ? authCreator.substack_url 
-        : '');
-    
-    setFormData(prev => ({
+    const preferredNewsletterUrl =
+      authCreator.newsletter_url ||
+      (authCreator.substack_url && isValidNewsletterPublicationUrl(authCreator.substack_url)
+        ? authCreator.substack_url
+        : "");
+
+    setFormData((prev) => ({
       ...prev,
       name: authCreator.name || prev.name,
       email: user.email || prev.email,
@@ -202,9 +231,11 @@ export default function PublicBooking() {
 
     // Fetch creator from public view (excludes sensitive data like email)
     const { data: creatorData, error } = await supabase
-      .from('public_creator_profiles')
-      .select('id, username, name, substack_url, newsletter_url, welcome_message, profile_image_url, collab_style, collab_guidelines, date_meaning, collab_mode, profile_theme')
-      .eq('username', username)
+      .from("public_creator_profiles")
+      .select(
+        "id, username, name, substack_url, newsletter_url, welcome_message, profile_image_url, collab_style, collab_guidelines, date_meaning, collab_mode, profile_theme",
+      )
+      .eq("username", username)
       .maybeSingle();
 
     if (error || !creatorData) {
@@ -216,7 +247,7 @@ export default function PublicBooking() {
     const creatorObj: Creator = {
       ...creatorData,
       date_meaning: creatorData.date_meaning as DateMeaning | null,
-      collab_mode: (creatorData.collab_mode || 'async') as CollabMode,
+      collab_mode: (creatorData.collab_mode || "async") as CollabMode,
       profile_theme: creatorData.profile_theme as Record<string, unknown> | null,
     };
     setCreator(creatorObj);
@@ -225,19 +256,19 @@ export default function PublicBooking() {
     const jsonLd = {
       "@context": "https://schema.org",
       "@type": "Service",
-      "name": `${creatorObj.name} — DraftKit`,
-      "serviceType": "Newsletter Collaboration and Drafting",
-      "description": "Infrastructure for Substack writers to cross the Coordination Chasm.",
-      "provider": {
+      name: `${creatorObj.name} — DraftKit`,
+      serviceType: "Newsletter Collaboration and Drafting",
+      description: "Infrastructure for Substack writers to cross the Coordination Chasm.",
+      provider: {
         "@type": "Person",
-        "name": creatorObj.name,
-        "url": `https://draftkit.app/${creatorObj.username}`
+        name: creatorObj.name,
+        url: `https://draftkit.app/${creatorObj.username}`,
       },
-      "additionalProperty": [
-        { "@type": "PropertyValue", "name": "collaborationStatus", "value": "open" },
-        { "@type": "PropertyValue", "name": "expertise", "value": "AI Product Management" },
-        { "@type": "PropertyValue", "name": "shipRate", "value": "86%" }
-      ]
+      additionalProperty: [
+        { "@type": "PropertyValue", name: "collaborationStatus", value: "open" },
+        { "@type": "PropertyValue", name: "expertise", value: "AI Product Management" },
+        { "@type": "PropertyValue", name: "shipRate", value: "86%" },
+      ],
     };
     const scriptTag = document.createElement("script");
     scriptTag.type = "application/ld+json";
@@ -246,7 +277,7 @@ export default function PublicBooking() {
     // Remove any previous injection
     document.getElementById("draftkit-jsonld")?.remove();
     document.head.appendChild(scriptTag);
-    
+
     // Parse collab styles
     const styles = parseCollabStyles(creatorData.collab_style);
     setAvailableCollabTypes(styles);
@@ -255,9 +286,9 @@ export default function PublicBooking() {
       setSelectedCollabType(styles[0]);
     }
     const { data: availData } = await supabase
-      .from('availability')
-      .select('available_dates, blocked_dates')
-      .eq('creator_id', creatorData.id)
+      .from("availability")
+      .select("available_dates, blocked_dates")
+      .eq("creator_id", creatorData.id)
       .maybeSingle();
 
     if (availData) {
@@ -290,19 +321,19 @@ export default function PublicBooking() {
 
     // Subscribe to real-time updates for collab_requests
     const channel = supabase
-      .channel('public-booked-dates')
+      .channel("public-booked-dates")
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: '*',
-          schema: 'public',
-          table: 'collab_requests',
+          event: "*",
+          schema: "public",
+          table: "collab_requests",
           filter: `creator_id=eq.${creatorData.id}`,
         },
         () => {
           // Refetch booked dates when requests change
           fetchBookedDates(creatorData.id);
-        }
+        },
       )
       .subscribe();
 
@@ -314,9 +345,9 @@ export default function PublicBooking() {
 
   const fetchBookedDates = async (creatorId: string) => {
     const { data: reqData } = await supabase
-      .from('public_booked_dates')
-      .select('requested_date')
-      .eq('creator_id', creatorId);
+      .from("public_booked_dates")
+      .select("requested_date")
+      .eq("creator_id", creatorId);
 
     if (reqData) {
       setBookedDates(reqData.map((r) => r.requested_date).filter(Boolean) as string[]);
@@ -330,11 +361,11 @@ export default function PublicBooking() {
   const handleAnalyzeMatch = async () => {
     // Clear previous error state
     setAnalysisError(null);
-    
+
     // Use newsletter_url for AI analysis (falls back to substack_url if not set)
     const creatorNewsletterUrl = creator?.newsletter_url || creator?.substack_url;
     if (!formData.substackUrl || !creatorNewsletterUrl) {
-      const errorMsg = !formData.substackUrl 
+      const errorMsg = !formData.substackUrl
         ? "Please enter your newsletter URL first"
         : "This creator hasn't linked their newsletter yet";
       setAnalysisError(errorMsg);
@@ -344,7 +375,7 @@ export default function PublicBooking() {
 
     // Validate with stricter schema that rejects profile URLs
     const validationResult = newsletterPublicationUrlSchema.safeParse(formData.substackUrl);
-    
+
     if (!validationResult.success) {
       const errorMsg = validationResult.error.errors[0]?.message || "Please enter a valid newsletter URL";
       setAnalysisError(errorMsg);
@@ -354,7 +385,7 @@ export default function PublicBooking() {
 
     // Normalize the Substack URL (handles mobile share links, etc.)
     const normalizedResult = normalizeSubstackUrl(formData.substackUrl);
-    
+
     if (!normalizedResult.isValid || !normalizedResult.normalized) {
       setAnalysisError(normalizedResult.error || "Please enter a valid Substack URL (e.g., yourname.substack.com)");
       toast.error(normalizedResult.error || "Please enter a valid Substack URL");
@@ -374,31 +405,34 @@ export default function PublicBooking() {
 
     try {
       const result = await analyzeCollabMatch(creatorNewsletterUrl!, normalizedResult.normalized);
-      
+
       // Handle empty suggestions case
       if (!result.suggestions || result.suggestions.length === 0) {
-        setAnalysisError("No collaboration ideas found yet. This can happen if there's not enough content overlap between your newsletters. Try again later or proceed with your own idea!");
+        setAnalysisError(
+          "No collaboration ideas found yet. This can happen if there's not enough content overlap between your newsletters. Try again later or proceed with your own idea!",
+        );
         setHasAnalyzed(true);
         return;
       }
-      
+
       setMatchResult(result);
       setHasAnalyzed(true);
       toast.success("Found collaboration ideas!");
     } catch (error) {
       console.error("Analysis error:", error);
       const errorMessage = error instanceof Error ? error.message : "Failed to analyze match";
-      
+
       // Provide more helpful error messages
       let userFriendlyError = errorMessage;
       if (errorMessage.includes("rate limit") || errorMessage.includes("Rate limit")) {
         userFriendlyError = "Too many requests. Please wait a moment and try again.";
       } else if (errorMessage.includes("RSS") || errorMessage.includes("feed")) {
-        userFriendlyError = "Couldn't access your newsletter feed. Make sure your Substack URL is correct and your newsletter is public.";
+        userFriendlyError =
+          "Couldn't access your newsletter feed. Make sure your Substack URL is correct and your newsletter is public.";
       } else if (errorMessage.includes("No posts") || errorMessage.includes("no posts")) {
         userFriendlyError = "Your newsletter doesn't have enough published posts yet for content analysis.";
       }
-      
+
       setAnalysisError(userFriendlyError);
       toast.error(userFriendlyError);
     } finally {
@@ -413,10 +447,10 @@ export default function PublicBooking() {
       format: suggestion.format,
       creator_username: username,
     });
-    
+
     // Store the selected suggestion so it can be included in the request
     setSelectedAiSuggestion(suggestion);
-    
+
     const newMessage = `I'd love to collaborate on: "${suggestion.topic}"\n\n${suggestion.description}\n\nFormat: ${suggestion.format}`;
     setFormData({ ...formData, message: newMessage });
     toast.success("Suggestion added to your message!");
@@ -425,13 +459,13 @@ export default function PublicBooking() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if ((!selectedDate && !isFlexibleDate) || !username || !creator) return;
-    
+
     // Clear security error on new attempt
     setSecurityError(null);
-    
+
     // Require collab type selection if multiple available
     if (availableCollabTypes.length > 1 && !selectedCollabType) {
-      setErrors(prev => ({ ...prev, collabType: "Please select a collaboration type" }));
+      setErrors((prev) => ({ ...prev, collabType: "Please select a collaboration type" }));
       return;
     }
 
@@ -459,14 +493,15 @@ export default function PublicBooking() {
       const interval = 100;
       let waited = 0;
       while (!turnstileTokenRef.current && waited < maxWait) {
-        await new Promise(r => setTimeout(r, interval));
+        await new Promise((r) => setTimeout(r, interval));
         waited += interval;
       }
       token = turnstileTokenRef.current;
       setIsVerifying(false);
-      
+
       if (!token) {
-        const errorMsg = "Security check took too long. If you're using a VPN or ad blocker, try disabling it temporarily.";
+        const errorMsg =
+          "Security check took too long. If you're using a VPN or ad blocker, try disabling it temporarily.";
         setSecurityError(errorMsg);
         toast.error(errorMsg);
         setIsSubmitting(false);
@@ -476,13 +511,13 @@ export default function PublicBooking() {
 
     const verifyResult = await verifyTurnstileToken(token);
     if (!verifyResult.success) {
-       // Check for configuration issues vs user issues
-       const isConfigError = verifyResult.codes?.some(c => 
-         ['invalid-input-secret', 'invalid-input-response', 'bad-request'].includes(c)
-       );
-       const errorMsg = isConfigError
-         ? "Security verification error. Please try again in a moment."
-         : "Security check failed. Please refresh the page and try again. If the issue persists, try a different browser.";
+      // Check for configuration issues vs user issues
+      const isConfigError = verifyResult.codes?.some((c) =>
+        ["invalid-input-secret", "invalid-input-response", "bad-request"].includes(c),
+      );
+      const errorMsg = isConfigError
+        ? "Security verification error. Please try again in a moment."
+        : "Security check failed. Please refresh the page and try again. If the issue persists, try a different browser.";
       setSecurityError(errorMsg);
       toast.error(errorMsg);
       handleTurnstileExpireOrError();
@@ -497,10 +532,10 @@ export default function PublicBooking() {
     // Check if date is still available using public view (only if specific date selected)
     if (selectedDate && !isFlexibleDate) {
       const { data: existingRequest } = await supabase
-        .from('public_booked_dates')
-        .select('requested_date')
-        .eq('creator_id', creator.id)
-        .eq('requested_date', selectedDate)
+        .from("public_booked_dates")
+        .select("requested_date")
+        .eq("creator_id", creator.id)
+        .eq("requested_date", selectedDate)
         .maybeSingle();
 
       if (existingRequest) {
@@ -514,11 +549,10 @@ export default function PublicBooking() {
     // Fetch requester's Substack profile image
     let requesterProfileImageUrl: string | null = null;
     try {
-      const { data: profileData, error: profileError } = await supabase.functions.invoke(
-        "fetch-substack-profile",
-        { body: { substackUrl: formData.substackUrl.trim() } }
-      );
-      
+      const { data: profileData, error: profileError } = await supabase.functions.invoke("fetch-substack-profile", {
+        body: { substackUrl: formData.substackUrl.trim() },
+      });
+
       if (!profileError && profileData?.imageUrl) {
         requesterProfileImageUrl = sanitizeSubstackImageUrl(profileData.imageUrl);
       }
@@ -530,48 +564,51 @@ export default function PublicBooking() {
     // Account Blind: always submit as guest. Reconciliation happens via email matching
     // when the user eventually signs up (link_requests_to_new_user trigger).
     // Insert without returning row data to avoid SELECT RLS conflicts (Account Blindness hotfix)
-    const { error } = await supabase
-      .from('collab_requests')
-      .insert({
-        creator_id: creator.id,
-        requester_name: formData.name.trim(),
-        requester_email: formData.email.trim(),
-        requester_substack_url: normalizedSubstackUrl,
-        requester_profile_image_url: requesterProfileImageUrl,
-        message: formData.message.trim() || null,
-        requested_date: isFlexibleDate ? null : selectedDate,
-        status: 'pending' as const,
-        requester_user_id: user?.id ?? null,
-        selected_collab_type: selectedCollabType,
-        ai_suggestion_used: selectedAiSuggestion ? {
-          topic: selectedAiSuggestion.topic,
-          format: selectedAiSuggestion.format,
-          description: selectedAiSuggestion.description,
-        } : null,
-      });
+    const { error } = await supabase.from("collab_requests").insert({
+      creator_id: creator.id,
+      requester_name: formData.name.trim(),
+      requester_email: formData.email.trim(),
+      requester_substack_url: normalizedSubstackUrl,
+      requester_profile_image_url: requesterProfileImageUrl,
+      message: formData.message.trim() || null,
+      requested_date: isFlexibleDate ? null : selectedDate,
+      status: "pending" as const,
+      requester_user_id: user?.id ?? null,
+      selected_collab_type: selectedCollabType,
+      ai_suggestion_used: selectedAiSuggestion
+        ? {
+            topic: selectedAiSuggestion.topic,
+            format: selectedAiSuggestion.format,
+            description: selectedAiSuggestion.description,
+          }
+        : null,
+    });
 
     if (error) {
       const { data: sessionData } = await supabase.auth.getSession();
-      console.error("Collab request insert error:", JSON.stringify({
-        step: 'insert_without_returning',
-        code: error.code,
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        auth_state_summary: {
-          hasSession: !!sessionData?.session,
-          authUserId: sessionData?.session?.user?.id ?? null,
-        },
-        payload: {
-          creator_id: creator.id,
-          requester_email: formData.email.trim(),
-          requester_user_id: user?.id ?? null,
-          selected_collab_type: selectedCollabType,
-          requested_date: isFlexibleDate ? null : selectedDate,
-        },
-      }));
+      console.error(
+        "Collab request insert error:",
+        JSON.stringify({
+          step: "insert_without_returning",
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          auth_state_summary: {
+            hasSession: !!sessionData?.session,
+            authUserId: sessionData?.session?.user?.id ?? null,
+          },
+          payload: {
+            creator_id: creator.id,
+            requester_email: formData.email.trim(),
+            requester_user_id: user?.id ?? null,
+            selected_collab_type: selectedCollabType,
+            requested_date: isFlexibleDate ? null : selectedDate,
+          },
+        }),
+      );
       // Handle unique constraint violation (race condition - date was just booked)
-      if (error.code === '23505') {
+      if (error.code === "23505") {
         toast.error("This date has just been booked. Please select another date.");
         setSelectedDate(null);
       } else {
@@ -587,16 +624,16 @@ export default function PublicBooking() {
     setIsSubmitting(false);
     setIsSuccess(true);
     toast.success("Request sent successfully!");
-    
+
     // Calculate session duration
     const sessionStart = sessionStorage.getItem("booking_session_start");
     const sessionDurationMs = sessionStart ? Date.now() - parseInt(sessionStart) : null;
-    
+
     // Detect if user used an AI suggestion (message contains the AI-generated format)
     const usedAiSuggestion = hasAnalyzed && formData.message.includes("I'd love to collaborate on:");
-    
+
     // Track booking submitted with enhanced data
-    trackEvent("booking_submitted", { 
+    trackEvent("booking_submitted", {
       creator_username: username,
       has_date: !isFlexibleDate && !!selectedDate,
       used_ai_suggestion: usedAiSuggestion,
@@ -667,7 +704,8 @@ export default function PublicBooking() {
           </div>
           <h1 className="text-2xl font-bold mb-2">At Capacity</h1>
           <p className="text-muted-foreground mb-4">
-            {creator.name} has reached the limit for incoming requests right now. Please check back later or reach out on Substack to coordinate.
+            {creator.name} has reached the limit for incoming requests right now. Please check back later or reach out
+            on Substack to coordinate.
           </p>
           {creator.substack_url && (
             <Button variant="outline" asChild className="mb-3">
@@ -678,10 +716,7 @@ export default function PublicBooking() {
             </Button>
           )}
           <div>
-            <Link
-              to="/"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
+            <Link to="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
               ← Back to DraftKit
             </Link>
           </div>
@@ -691,7 +726,7 @@ export default function PublicBooking() {
   }
 
   return (
-    <div 
+    <div
       className="min-h-screen"
       style={{
         ...themeStyles,
@@ -730,11 +765,7 @@ export default function PublicBooking() {
 
       <div className="relative z-10 max-w-4xl mx-auto px-6 py-12">
         {/* Back button */}
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="mb-8"
-        >
+        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="mb-8">
           <Link
             to="/"
             className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
@@ -745,35 +776,29 @@ export default function PublicBooking() {
         </motion.div>
 
         {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-12"
-        >
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-12">
           {creator.profile_image_url ? (
-            <img 
-              src={creator.profile_image_url} 
+            <img
+              src={creator.profile_image_url}
               alt={creator.name}
               className="w-20 h-20 rounded-full mx-auto mb-4 object-cover ring-4 ring-white/20"
-              style={{ 
+              style={{
                 boxShadow: `0 0 30px hsla(var(--theme-glow, 12 76% 61%) / 0.4)`,
               }}
             />
           ) : (
-            <div 
+            <div
               className="w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center"
-              style={{ 
+              style={{
                 background: `var(--theme-gradient)`,
                 boxShadow: `0 0 30px hsla(var(--theme-glow, 12 76% 61%) / 0.4)`,
               }}
             >
-              <span className="text-3xl font-bold text-white">
-                {creator.name.charAt(0).toUpperCase()}
-              </span>
+              <span className="text-3xl font-bold text-white">{creator.name.charAt(0).toUpperCase()}</span>
             </div>
           )}
           <h1 className="text-4xl font-bold mb-3">{creator.name}</h1>
-          
+
           {/* Badge + Substack Link Row */}
           <div className="flex items-center justify-center gap-4 mb-4">
             {/* Mode Badge */}
@@ -783,7 +808,9 @@ export default function PublicBooking() {
                   <TooltipTrigger asChild>
                     <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/20 rounded-full cursor-help">
                       <span className="text-lg">{COLLAB_MODE_METADATA[creator.collab_mode].icon}</span>
-                      <span className="font-medium text-primary">{COLLAB_MODE_METADATA[creator.collab_mode].badge}</span>
+                      <span className="font-medium text-primary">
+                        {COLLAB_MODE_METADATA[creator.collab_mode].badge}
+                      </span>
                     </div>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -794,9 +821,7 @@ export default function PublicBooking() {
             )}
 
             {/* Separator dot (only if both badge and link exist) */}
-            {creator.collab_mode && creator.substack_url && (
-              <span className="text-muted-foreground/50">•</span>
-            )}
+            {creator.collab_mode && creator.substack_url && <span className="text-muted-foreground/50">•</span>}
 
             {creator.substack_url && (
               <a
@@ -811,9 +836,7 @@ export default function PublicBooking() {
             )}
           </div>
           {creator.welcome_message && (
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-6">
-              {creator.welcome_message}
-            </p>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-6">{creator.welcome_message}</p>
           )}
 
           {/* Process Steps - only show when not in success state and not filling form */}
@@ -825,9 +848,7 @@ export default function PublicBooking() {
               className="max-w-md mx-auto mb-8"
             >
               {/* Personal headline for process */}
-              <h4 className="text-sm font-semibold text-foreground text-center mb-4">
-                My collaboration process
-              </h4>
+              <h4 className="text-sm font-semibold text-foreground text-center mb-4">My collaboration process</h4>
               <div className="flex items-center justify-center gap-4">
                 {COLLAB_MODE_METADATA[creator.collab_mode].processSteps.map((step, index) => (
                   <div key={step.step} className="flex items-center">
@@ -850,11 +871,13 @@ export default function PublicBooking() {
           {availableCollabTypes.length === 1 && (
             <div className="max-w-md mx-auto p-4 bg-accent/20 border border-accent/30 rounded-xl text-left">
               <div className="flex items-center gap-3 mb-2">
-                <span className="text-2xl">{COLLAB_TYPE_METADATA[availableCollabTypes[0] as CollabStyle]?.icon || '📝'}</span>
+                <span className="text-2xl">
+                  {COLLAB_TYPE_METADATA[availableCollabTypes[0] as CollabStyle]?.icon || "📝"}
+                </span>
                 <div>
                   <p className="font-semibold text-primary">{availableCollabTypes[0]}</p>
                   <p className="text-sm text-muted-foreground">
-                    {COLLAB_TYPE_METADATA[availableCollabTypes[0] as CollabStyle]?.outcome || 'Collaboration'}
+                    {COLLAB_TYPE_METADATA[availableCollabTypes[0] as CollabStyle]?.outcome || "Collaboration"}
                   </p>
                 </div>
               </div>
@@ -865,11 +888,11 @@ export default function PublicBooking() {
               <p className="text-sm text-muted-foreground mb-3">Open to collaborating on:</p>
               <div className="flex flex-wrap gap-2 justify-center">
                 {availableCollabTypes.map((style) => (
-                  <span 
+                  <span
                     key={style}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 rounded-full text-sm"
                   >
-                    <span>{COLLAB_TYPE_METADATA[style as CollabStyle]?.icon || '📝'}</span>
+                    <span>{COLLAB_TYPE_METADATA[style as CollabStyle]?.icon || "📝"}</span>
                     <span className="text-primary font-medium">{style}</span>
                   </span>
                 ))}
@@ -904,7 +927,7 @@ export default function PublicBooking() {
                 </motion.div>
                 <h2 className="text-2xl font-bold mb-2">Request Sent!</h2>
                 <p className="text-sm text-muted-foreground mb-4">Sent to {creator.name}</p>
-                
+
                 {/* Date with meaning */}
                 {selectedDate && !isFlexibleDate ? (
                   <div className="mb-4 p-4 bg-primary/5 border border-primary/20 rounded-xl max-w-md mx-auto">
@@ -913,21 +936,23 @@ export default function PublicBooking() {
                       <span className="font-medium">{formatSelectedDate(selectedDate)}</span>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      {creator.collab_mode === 'discovery' 
-                        ? 'Requested intro call time' 
-                        : creator.date_meaning === 'publish' 
-                          ? 'Target publication date'
-                          : creator.date_meaning === 'kickoff'
-                            ? 'Kickoff date'
-                            : 'Requested collaboration date'}
+                      {creator.collab_mode === "discovery"
+                        ? "Requested intro call time"
+                        : creator.date_meaning === "publish"
+                          ? "Target publication date"
+                          : creator.date_meaning === "kickoff"
+                            ? "Kickoff date"
+                            : "Requested collaboration date"}
                     </p>
                   </div>
                 ) : (
                   <div className="mb-4 p-4 bg-muted/50 rounded-xl max-w-md mx-auto">
-                    <p className="text-sm text-muted-foreground">Timing: Flexible — {creator.name} will suggest dates</p>
+                    <p className="text-sm text-muted-foreground">
+                      Timing: Flexible — {creator.name} will suggest dates
+                    </p>
                   </div>
                 )}
-                
+
                 {/* What happens next */}
                 <div className="mb-6 max-w-md mx-auto text-left">
                   <h3 className="text-sm font-semibold text-center mb-3">What happens next</h3>
@@ -939,9 +964,9 @@ export default function PublicBooking() {
                     <div className="flex items-start gap-2">
                       <ArrowRight className="w-4 h-4 mt-0.5 text-primary shrink-0" />
                       <span>
-                        {creator.collab_mode === 'discovery' 
-                          ? 'If accepted, you\'ll receive a calendar invite for your intro call'
-                          : 'If accepted, you\'ll receive an email with next steps for drafting'}
+                        {creator.collab_mode === "discovery"
+                          ? "If accepted, you'll receive a calendar invite for your intro call"
+                          : "If accepted, you'll receive an email with next steps for drafting"}
                       </span>
                     </div>
                   </div>
@@ -959,8 +984,8 @@ export default function PublicBooking() {
                     <h3 className="font-semibold">Want to track this collaboration?</h3>
                   </div>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Create your free DraftKit account to track all your requests, 
-                    get notified of responses, and receive collaborations from other creators.
+                    Create your free DraftKit account to track all your requests, get notified of responses, and receive
+                    collaborations from other creators.
                   </p>
                   <div className="flex flex-col sm:flex-row gap-3 justify-center">
                     <Button
@@ -968,7 +993,7 @@ export default function PublicBooking() {
                         const params = new URLSearchParams({
                           email: formData.email,
                           name: formData.name,
-                          substack: formData.substackUrl || '',
+                          substack: formData.substackUrl || "",
                         });
                         navigate(`/signup?${params.toString()}`);
                       }}
@@ -1029,38 +1054,45 @@ export default function PublicBooking() {
                         </p>
                         {!isFlexibleDate && (
                           <p className="text-sm text-muted-foreground">
-                            {selectedCollabType 
+                            {selectedCollabType
                               ? getDateClarification(selectedCollabType, creator.date_meaning).text
-                              : creator.date_meaning === 'publish' ? 'Target publication date'
-                              : creator.date_meaning === 'live' ? 'Date for your call/event'
-                              : creator.date_meaning === 'kickoff' ? 'Day to start working together'
-                              : 'Your collaboration date'}
+                              : creator.date_meaning === "publish"
+                                ? "Target publication date"
+                                : creator.date_meaning === "live"
+                                  ? "Date for your call/event"
+                                  : creator.date_meaning === "kickoff"
+                                    ? "Day to start working together"
+                                    : "Your collaboration date"}
                           </p>
                         )}
                       </div>
                     </div>
-                    
+
                     {/* Collab Type (if single) */}
                     {availableCollabTypes.length === 1 && (
                       <div className="flex items-start gap-3">
-                        <span className="text-xl mt-0.5">{COLLAB_TYPE_METADATA[availableCollabTypes[0] as CollabStyle]?.icon || '📝'}</span>
+                        <span className="text-xl mt-0.5">
+                          {COLLAB_TYPE_METADATA[availableCollabTypes[0] as CollabStyle]?.icon || "📝"}
+                        </span>
                         <div>
                           <p className="font-medium">{availableCollabTypes[0]}</p>
                           <p className="text-sm text-muted-foreground">
-                            → {COLLAB_TYPE_METADATA[availableCollabTypes[0] as CollabStyle]?.outcome || 'Collaboration'}
+                            → {COLLAB_TYPE_METADATA[availableCollabTypes[0] as CollabStyle]?.outcome || "Collaboration"}
                           </p>
                         </div>
                       </div>
                     )}
-                    
+
                     {/* Selected Collab Type (if multiple and selected) */}
                     {availableCollabTypes.length > 1 && selectedCollabType && (
                       <div className="flex items-start gap-3">
-                        <span className="text-xl mt-0.5">{COLLAB_TYPE_METADATA[selectedCollabType as CollabStyle]?.icon || '📝'}</span>
+                        <span className="text-xl mt-0.5">
+                          {COLLAB_TYPE_METADATA[selectedCollabType as CollabStyle]?.icon || "📝"}
+                        </span>
                         <div>
                           <p className="font-medium">{selectedCollabType}</p>
                           <p className="text-sm text-muted-foreground">
-                            → {COLLAB_TYPE_METADATA[selectedCollabType as CollabStyle]?.outcome || 'Collaboration'}
+                            → {COLLAB_TYPE_METADATA[selectedCollabType as CollabStyle]?.outcome || "Collaboration"}
                           </p>
                         </div>
                       </div>
@@ -1088,31 +1120,29 @@ export default function PublicBooking() {
                             }`}
                             onClick={() => {
                               setSelectedCollabType(style);
-                              setErrors(prev => ({ ...prev, collabType: "" }));
+                              setErrors((prev) => ({ ...prev, collabType: "" }));
                             }}
                           >
-                            <div 
+                            <div
                               className={`w-5 h-5 mt-0.5 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
-                                selectedCollabType === style 
-                                  ? "border-primary bg-primary" 
+                                selectedCollabType === style
+                                  ? "border-primary bg-primary"
                                   : "border-muted-foreground/40"
                               }`}
                             >
-                              {selectedCollabType === style && (
-                                <Check className="w-3 h-3 text-primary-foreground" />
-                              )}
+                              {selectedCollabType === style && <Check className="w-3 h-3 text-primary-foreground" />}
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1">
-                                <span className="text-lg">{metadata?.icon || '📝'}</span>
+                                <span className="text-lg">{metadata?.icon || "📝"}</span>
                                 <p className="font-medium">{style}</p>
                               </div>
                               <p className="text-sm text-muted-foreground mb-2">
-                                → {metadata?.outcome || 'See guidelines'}
+                                → {metadata?.outcome || "See guidelines"}
                               </p>
                               {!isFlexibleDate && (
                                 <p className="text-xs text-muted-foreground/80 bg-muted/50 px-2 py-1 rounded inline-block">
-                                  📅 {metadata?.dateMeans || 'Collaboration date'}
+                                  📅 {metadata?.dateMeans || "Collaboration date"}
                                 </p>
                               )}
                             </div>
@@ -1120,9 +1150,7 @@ export default function PublicBooking() {
                         );
                       })}
                     </div>
-                    {errors.collabType && (
-                      <p className="text-sm text-destructive">{errors.collabType}</p>
-                    )}
+                    {errors.collabType && <p className="text-sm text-destructive">{errors.collabType}</p>}
                   </div>
                 )}
 
@@ -1137,15 +1165,11 @@ export default function PublicBooking() {
                         id="name"
                         required
                         value={formData.name}
-                        onChange={(e) =>
-                          setFormData({ ...formData, name: e.target.value })
-                        }
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         placeholder="John Doe"
                         className="h-12"
                       />
-                      {errors.name && (
-                        <p className="text-sm text-destructive">{errors.name}</p>
-                      )}
+                      {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
                     </div>
 
                     <div className="space-y-2">
@@ -1158,15 +1182,11 @@ export default function PublicBooking() {
                         type="email"
                         required
                         value={formData.email}
-                        onChange={(e) =>
-                          setFormData({ ...formData, email: e.target.value })
-                        }
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                         placeholder="john@example.com"
                         className="h-12"
                       />
-                      {errors.email && (
-                        <p className="text-sm text-destructive">{errors.email}</p>
-                      )}
+                      {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
                     </div>
                   </div>
 
@@ -1181,7 +1201,7 @@ export default function PublicBooking() {
                         type="text"
                         required
                         value={formData.substackUrl}
-                      onChange={(e) => {
+                        onChange={(e) => {
                           setFormData({ ...formData, substackUrl: e.target.value });
                           // Reset analysis when URL changes
                           if (hasAnalyzed || analysisError) {
@@ -1221,13 +1241,11 @@ export default function PublicBooking() {
                         </div>
                       )}
                     </div>
-                    {errors.substackUrl && (
-                      <p className="text-sm text-destructive">{errors.substackUrl}</p>
-                    )}
+                    {errors.substackUrl && <p className="text-sm text-destructive">{errors.substackUrl}</p>}
                     <p className="text-xs text-muted-foreground">
                       Your newsletter URL for SMART-powered collaboration ideas (e.g., yourname.substack.com)
                     </p>
-                    
+
                     {/* Show message when creator hasn't linked newsletter */}
                     {!creator.newsletter_url && !creator.substack_url && (
                       <p className="text-xs text-muted-foreground/70 flex items-center gap-1.5 mt-1">
@@ -1291,7 +1309,9 @@ export default function PublicBooking() {
                             </motion.div>
                             <div>
                               <p className="font-medium">Analyzing your newsletters...</p>
-                              <p className="text-sm text-muted-foreground">Finding collaboration ideas based on your writing styles</p>
+                              <p className="text-sm text-muted-foreground">
+                                Finding collaboration ideas based on your writing styles
+                              </p>
                             </div>
                           </div>
                         </div>
@@ -1309,7 +1329,7 @@ export default function PublicBooking() {
                           <Lightbulb className="w-4 h-4" />
                           SMART Match Ideas
                         </div>
-                        
+
                         <div className="grid gap-3">
                           {matchResult.suggestions.map((suggestion, index) => (
                             <motion.div
@@ -1322,17 +1342,13 @@ export default function PublicBooking() {
                               <div className="flex items-start justify-between gap-4">
                                 <div className="flex-1 min-w-0">
                                   <h4 className="font-semibold mb-1">"{suggestion.topic}"</h4>
-                                  <p className="text-sm text-muted-foreground mb-2">
-                                    {suggestion.description}
-                                  </p>
+                                  <p className="text-sm text-muted-foreground mb-2">{suggestion.description}</p>
                                   <div className="flex flex-wrap gap-2">
                                     <span className="inline-flex items-center px-2 py-1 rounded-md bg-primary/10 text-xs font-medium text-primary">
                                       {suggestion.format}
                                     </span>
                                   </div>
-                                  <p className="text-xs text-muted-foreground mt-2 italic">
-                                    {suggestion.whyItWorks}
-                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-2 italic">{suggestion.whyItWorks}</p>
                                 </div>
                                 <Button
                                   type="button"
@@ -1359,22 +1375,18 @@ export default function PublicBooking() {
                     <Textarea
                       id="message"
                       value={formData.message}
-                      onChange={(e) =>
-                        setFormData({ ...formData, message: e.target.value })
-                      }
+                      onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                       placeholder="Tell them about the collaboration you have in mind..."
                       rows={4}
                     />
-                    {errors.message && (
-                      <p className="text-sm text-destructive">{errors.message}</p>
-                    )}
+                    {errors.message && <p className="text-sm text-destructive">{errors.message}</p>}
                   </div>
 
                   {/* Turnstile Widget (invisible) */}
                   <TurnstileWidget
                     onVerify={handleTurnstileVerify}
                     onExpire={handleTurnstileExpireOrError}
-                   onError={handleTurnstileError}
+                    onError={handleTurnstileError}
                   />
 
                   {/* Inline Security Error */}
@@ -1411,27 +1423,22 @@ export default function PublicBooking() {
                 </form>
               </motion.div>
             ) : (
-              <motion.div
-                key="calendar"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-              >
+              <motion.div key="calendar" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                 <div className="text-center mb-6">
                   <h2 className="text-xl font-semibold mb-2">
-                    {creator.collab_mode 
+                    {creator.collab_mode
                       ? COLLAB_MODE_METADATA[creator.collab_mode].calendarHeader
-                      : 'Target Publication Date'}
+                      : "Target Publication Date"}
                   </h2>
                   <p className="text-muted-foreground">
-                    {creator.collab_mode === 'discovery'
-                      ? 'When are you available for a quick intro call?'
-                      : 'Select your target publish date'}
+                    {creator.collab_mode === "discovery"
+                      ? "When are you available for a quick intro call?"
+                      : "Select your target publish date"}
                   </p>
                 </div>
 
                 {/* Async Mode Explainer - Prominent */}
-                {creator.collab_mode === 'async' && (
+                {creator.collab_mode === "async" && (
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -1442,9 +1449,15 @@ export default function PublicBooking() {
                       <div>
                         <h4 className="font-semibold text-sm mb-2">How async collaboration works</h4>
                         <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
-                          <li>You pick a <span className="font-medium text-foreground">target publish date</span> (not a meeting)</li>
-                          <li>{creator.name} shares a draft for your review</li>
-                          <li>Refine together asynchronously — no calls needed</li>
+                          <li>
+                            Pick a <span className="font-medium text-foreground">target publish date</span> and pitch
+                            your idea
+                          </li>
+                          <li>
+                            Once <span className="font-medium text-foreground">{creator?.name || "the host"}</span>{" "}
+                            approves, your workspace is ready
+                          </li>
+                          <li>Refine together asynchronously — no calls needed!</li>
                         </ol>
                       </div>
                     </div>
@@ -1457,17 +1470,17 @@ export default function PublicBooking() {
                   blockedDates={availability?.blocked_dates || []}
                   onDateSelect={handleDateSelect}
                   availableLegendText={
-                    creator.collab_mode === 'discovery' 
-                      ? 'Available for call' 
-                      : creator.collab_mode === 'async'
-                        ? 'Open for publishing'
+                    creator.collab_mode === "discovery"
+                      ? "Available for call"
+                      : creator.collab_mode === "async"
+                        ? "Open for publishing"
                         : getCalendarLegendText(creator.date_meaning)
                   }
-                  collabMode={creator.collab_mode as 'async' | 'discovery' | null}
+                  collabMode={creator.collab_mode as "async" | "discovery" | null}
                 />
 
                 {(!availability?.available_dates || availability.available_dates.length === 0) && (
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     className="text-center mt-6 p-8 bg-accent/20 border border-accent/30 rounded-xl"
@@ -1477,11 +1490,7 @@ export default function PublicBooking() {
                     <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
                       {creator.name} hasn't set specific dates yet, but you can still propose a collaboration!
                     </p>
-                    <Button 
-                      variant="gradient" 
-                      size="lg"
-                      onClick={() => setIsFlexibleDate(true)}
-                    >
+                    <Button variant="gradient" size="lg" onClick={() => setIsFlexibleDate(true)}>
                       <Sparkles className="w-4 h-4 mr-2" />
                       Propose with Flexible Date
                     </Button>
