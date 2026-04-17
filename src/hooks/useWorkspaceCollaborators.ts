@@ -14,6 +14,28 @@ export interface Collaborator {
   profile_image_url: string | null;
   // Stable guest number for email-only invites
   guest_number: number | null;
+  // Best display name: creator name → capitalized email local-part → "Guest #N"
+  display_name: string;
+}
+
+function deriveDisplayName(
+  name: string | null,
+  email: string | null,
+  guestNumber: number | null,
+): string {
+  if (name && name.trim()) return name;
+  if (email) {
+    const local = email.split("@")[0];
+    if (local) {
+      // "farida.smith" → "Farida Smith", "john_doe" → "John Doe"
+      return local
+        .split(/[._-]+/)
+        .filter(Boolean)
+        .map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase())
+        .join(" ");
+    }
+  }
+  return guestNumber != null ? `Guest ${guestNumber}` : "Guest";
 }
 
 export function useWorkspaceCollaborators(requestId: string) {
@@ -63,12 +85,16 @@ export function useWorkspaceCollaborators(requestId: string) {
       const isGuest = !c.user_id;
       if (isGuest) guestCounter++;
 
+      const name = profile?.name || null;
+      const guest_number = isGuest ? guestCounter : null;
+
       return {
         ...c,
-        name: profile?.name || null,
+        name,
         username: profile?.username || null,
         profile_image_url: profile?.profile_image_url || null,
-        guest_number: isGuest ? guestCounter : null,
+        guest_number,
+        display_name: deriveDisplayName(name, c.email, guest_number),
       };
     });
 
@@ -79,6 +105,30 @@ export function useWorkspaceCollaborators(requestId: string) {
   useEffect(() => {
     fetchCollaborators();
   }, [fetchCollaborators]);
+
+  // Realtime: refetch when a collaborator row changes (e.g., user_id linked on signup)
+  useEffect(() => {
+    if (!requestId) return;
+    const channel = supabase
+      .channel(`workspace-collabs-${requestId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "workspace_collaborators",
+          filter: `request_id=eq.${requestId}`,
+        },
+        () => {
+          fetchCollaborators();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [requestId, fetchCollaborators]);
 
   return { collaborators, loading, refetch: fetchCollaborators };
 }
