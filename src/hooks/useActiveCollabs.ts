@@ -24,6 +24,7 @@ export function useActiveCollabs() {
       return { count: count || 0 };
     },
     enabled: !!creator?.id,
+    staleTime: 30_000,
   });
 
   const activeCount = data?.count ?? 0;
