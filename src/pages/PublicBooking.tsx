@@ -1442,7 +1442,7 @@ export default function PublicBooking() {
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="mb-6 p-4 bg-accent/30 border border-accent/50 rounded-xl"
+                    className="mb-6 p-4 bg-accent/10 border border-accent/20 rounded-xl"
                   >
                     <div className="flex items-start gap-3">
                       <span className="text-xl">✍️</span>
