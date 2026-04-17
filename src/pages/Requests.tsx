@@ -409,7 +409,22 @@ export default function Requests() {
     { value: "cancelled", label: "Cancelled", count: requests.filter((r) => r.status === "cancelled").length },
   ];
 
-  if (!creator) return null;
+  if (!creator) {
+    return (
+      <DashboardLayout>
+        <div className="max-w-4xl mx-auto space-y-6 animate-pulse">
+          <div className="h-4 w-40 bg-muted rounded-md" />
+          <div className="h-9 w-64 bg-muted rounded-md" />
+          <div className="h-10 w-full bg-muted rounded-md" />
+          <div className="grid gap-4 mt-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-40 bg-muted rounded-xl" />
+            ))}
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   // Map requests to the format expected by RequestCard
   const mappedRequests = filteredRequests.map((r) => ({
