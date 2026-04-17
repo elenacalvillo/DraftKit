@@ -240,6 +240,37 @@ export function InviteCollaboratorModal({
         </DialogHeader>
 
         <div className="space-y-3 pt-2">
+          {/* Public view link — visible in both modes */}
+          {viewToken && (
+            <div className="rounded-lg border border-border bg-muted/30 px-3 py-2.5 space-y-1.5">
+              <div className="flex items-center gap-2 text-xs font-medium text-foreground">
+                <Eye className="w-3.5 h-3.5 text-primary" />
+                Public view link
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0 text-xs font-mono text-muted-foreground truncate">
+                  {viewUrl}
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 shrink-0"
+                  onClick={handleCopyViewLink}
+                >
+                  {copied ? (
+                    <Check className="w-3.5 h-3.5 text-primary" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5" />
+                  )}
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-snug">
+                Anyone with this link can view the draft. Only invited writers can edit.
+              </p>
+            </div>
+          )}
+
           {mode === "search" ? (
             <>
               {/* Search input */}
