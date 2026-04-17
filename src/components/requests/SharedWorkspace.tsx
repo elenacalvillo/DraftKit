@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useWorkspacePresence } from "@/hooks/useWorkspacePresence";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { FileText, Save, X, AlertCircle, PenLine, Lock, Download } from "lucide-react";
+import { FileText, Save, X, AlertCircle, PenLine, Lock, Download, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -39,6 +39,7 @@ interface SharedWorkspaceProps {
   partnerName?: string;
   isCreator?: boolean;
   editingSessions?: EditingSession[];
+  onShareClick?: () => void;
 }
 
 export function SharedWorkspace({
@@ -52,6 +53,7 @@ export function SharedWorkspace({
   partnerName,
   isCreator,
   editingSessions = [],
+  onShareClick,
 }: SharedWorkspaceProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(sharedContent || "");
@@ -200,6 +202,18 @@ export function SharedWorkspace({
             >
               <Download className="w-3.5 h-3.5 mr-1.5" />
               Download
+            </Button>
+          )}
+          {isCreator && onShareClick && !isEditing && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onShareClick}
+              className="h-8"
+              title="Share or invite collaborators"
+            >
+              <Share2 className="w-3.5 h-3.5 mr-1.5" />
+              Share
             </Button>
           )}
           {canEdit && !isEditing && (
