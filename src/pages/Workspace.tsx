@@ -968,36 +968,17 @@ export default function Workspace() {
                     <Users className="w-3.5 h-3.5" />
                     Writer's Room
                   </h4>
-                  {isCreator &&
-                    request.status === "approved" &&
-                    (() => {
-                      const maxCollabs = isPro ? Infinity : 5;
-                      const atLimit = collaborators.length >= maxCollabs;
-                      if (atLimit) {
-                        return (
-                          <span className="text-[10px] text-muted-foreground">
-                            <a href="/subscription" className="underline hover:text-primary">
-                              Go Unlimited
-                            </a>{" "}
-                            for more
-                          </span>
-                        );
-                      }
-                      if (isPro || credits > 0) {
-                        return (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 text-xs"
-                            onClick={() => setShowInviteModal(true)}
-                          >
-                            <UserPlus className="w-3.5 h-3.5 mr-1" />
-                            Invite
-                          </Button>
-                        );
-                      }
-                      return null;
-                    })()}
+                  {isCreator && request.status === "approved" && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => setShowInviteModal(true)}
+                    >
+                      <UserPlus className="w-3.5 h-3.5 mr-1" />
+                      Invite
+                    </Button>
+                  )}
                 </div>
 
                 {/* Participants list */}
@@ -1188,6 +1169,7 @@ export default function Workspace() {
               partnerName={partnerName || undefined}
               isCreator={isCreator}
               editingSessions={(request as any).editing_sessions || []}
+              onShareClick={isCreator ? () => setShowInviteModal(true) : undefined}
               onContentSaved={(content, editedBy, editedAt) => {
                 setRequest((prev) =>
                   prev
