@@ -78,7 +78,13 @@ export function TestimonialsSection() {
               <div className="flex items-center gap-3 mb-4">
                 <Avatar className="w-12 h-12 border-2 border-primary/20">
                   {testimonial.image ? (
-                    <AvatarImage src={testimonial.image} alt={testimonial.name} className="object-cover" />
+                    <AvatarImage
+                      src={testimonial.image}
+                      alt={testimonial.name}
+                      className="object-cover"
+                      loading="lazy"
+                      decoding="async"
+                    />
                   ) : null}
                   <AvatarFallback className="text-sm font-medium bg-muted">
                     {testimonial.initials}

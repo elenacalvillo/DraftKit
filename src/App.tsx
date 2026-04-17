@@ -7,6 +7,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { FeedbackWidget } from "@/components/feedback/FeedbackWidget";
 import { TrackingNotice } from "@/components/privacy/TrackingNotice";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { ScrollToTop } from "@/components/ScrollToTop";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -39,6 +40,7 @@ const App = () => (
     <BrowserRouter>
       <TooltipProvider>
         <AuthProvider>
+          <ScrollToTop />
           <TrackingNotice />
           <Toaster />
           <Sonner />
