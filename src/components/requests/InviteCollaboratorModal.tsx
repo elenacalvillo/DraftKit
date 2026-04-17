@@ -62,16 +62,14 @@ export function InviteCollaboratorModal({
     if (!open || !requestId) return;
     let cancelled = false;
     (async () => {
-      const { data } = await supabase
-        .from("collab_requests")
-        .select("view_token")
-        .eq("id", requestId)
-        .maybeSingle();
+      const { data } = await supabase.from("collab_requests").select("view_token").eq("id", requestId).maybeSingle();
       if (!cancelled && data?.view_token) {
         setViewToken(data.view_token as string);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [open, requestId]);
 
   const viewUrl = viewToken ? `${window.location.origin}/view/${viewToken}` : "";
@@ -115,43 +113,48 @@ export function InviteCollaboratorModal({
     return () => clearTimeout(timeout);
   }, [query, mode]);
 
-  const handleProfileInvite = useCallback(async (creator: CreatorProfile) => {
-    if (!isPro && credits < 1) {
-      toast.error("You need at least 1 credit to invite a collaborator", {
-        description: "Top up credits on the Membership page.",
-      });
-      return;
-    }
-
-    setInvitingId(creator.id!);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
-
-      const { data, error } = await supabase.functions.invoke("invite-by-profile", {
-        body: { requestId, creatorId: creator.id },
-      });
-
-      if (error) throw error;
-      if (data?.error) {
-        if (data.error.includes("already been invited")) {
-          toast.error("This person has already been invited");
-        } else {
-          toast.error(data.error);
-        }
+  const handleProfileInvite = useCallback(
+    async (creator: CreatorProfile) => {
+      if (!isPro && credits < 1) {
+        toast.error("You need at least 1 credit to invite a collaborator", {
+          description: "Top up credits on the Membership page.",
+        });
         return;
       }
 
-      toast.success(`Invited ${creator.name || creator.username}`);
-      onInvited();
-      onOpenChange(false);
-    } catch (err: any) {
-      console.error("Failed to invite by profile:", err);
-      toast.error("Failed to send invitation. Please try again.");
-    } finally {
-      setInvitingId(null);
-    }
-  }, [requestId, isPro, credits, onInvited, onOpenChange]);
+      setInvitingId(creator.id!);
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (!session) throw new Error("Not authenticated");
+
+        const { data, error } = await supabase.functions.invoke("invite-by-profile", {
+          body: { requestId, creatorId: creator.id },
+        });
+
+        if (error) throw error;
+        if (data?.error) {
+          if (data.error.includes("already been invited")) {
+            toast.error("This person has already been invited");
+          } else {
+            toast.error(data.error);
+          }
+          return;
+        }
+
+        toast.success(`Invited ${creator.name || creator.username}`);
+        onInvited();
+        onOpenChange(false);
+      } catch (err: any) {
+        console.error("Failed to invite by profile:", err);
+        toast.error("Failed to send invitation. Please try again.");
+      } finally {
+        setInvitingId(null);
+      }
+    },
+    [requestId, isPro, credits, onInvited, onOpenChange],
+  );
 
   const handleEmailInvite = async () => {
     const trimmed = email.trim().toLowerCase();
@@ -169,16 +172,16 @@ export function InviteCollaboratorModal({
 
     setIsSending(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const { error: insertError } = await supabase
-        .from("workspace_collaborators")
-        .insert({
-          request_id: requestId,
-          email: trimmed,
-          invited_by: user.id,
-        } as any);
+      const { error: insertError } = await supabase.from("workspace_collaborators").insert({
+        request_id: requestId,
+        email: trimmed,
+        invited_by: user.id,
+      } as any);
 
       if (insertError) {
         if (insertError.message?.includes("duplicate key") || insertError.code === "23505") {
@@ -196,12 +199,16 @@ export function InviteCollaboratorModal({
           .eq("user_id", user.id);
       }
 
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (session) {
-        supabase.functions.invoke("send-collab-email", {
-          body: { type: "workspace_invite", requestId, inviteeEmail: trimmed },
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        }).catch(() => {});
+        supabase.functions
+          .invoke("send-collab-email", {
+            body: { type: "workspace_invite", requestId, inviteeEmail: trimmed },
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          })
+          .catch(() => {});
       }
 
       toast.success(`Invitation sent to ${trimmed}`);
@@ -218,7 +225,12 @@ export function InviteCollaboratorModal({
 
   const getInitials = (name: string | null) => {
     if (!name) return "?";
-    return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
   };
 
   return (
@@ -248,7 +260,7 @@ export function InviteCollaboratorModal({
                 Public view link
               </div>
               <div className="flex items-center gap-2">
-                <div className="flex-1 min-w-0 text-xs font-mono text-muted-foreground truncate">
+                <div className="flex-1 min-w-0 text-xs font-mono text-muted-foreground truncate overflow-x-auto">
                   {viewUrl}
                 </div>
                 <Button
@@ -258,11 +270,7 @@ export function InviteCollaboratorModal({
                   className="h-7 px-2 shrink-0"
                   onClick={handleCopyViewLink}
                 >
-                  {copied ? (
-                    <Check className="w-3.5 h-3.5 text-primary" />
-                  ) : (
-                    <Copy className="w-3.5 h-3.5" />
-                  )}
+                  {copied ? <Check className="w-3.5 h-3.5 text-primary" /> : <Copy className="w-3.5 h-3.5" />}
                 </Button>
               </div>
               <p className="text-[11px] text-muted-foreground leading-snug">
@@ -287,14 +295,10 @@ export function InviteCollaboratorModal({
 
               {/* Results */}
               <div className="min-h-[120px]">
-                {searching && (
-                  <p className="text-sm text-muted-foreground text-center py-6">Searching…</p>
-                )}
+                {searching && <p className="text-sm text-muted-foreground text-center py-6">Searching…</p>}
 
                 {!searching && query.trim().length >= 2 && results.length === 0 && (
-                  <p className="text-sm text-muted-foreground text-center py-6">
-                    No writers found matching "{query}"
-                  </p>
+                  <p className="text-sm text-muted-foreground text-center py-6">No writers found matching "{query}"</p>
                 )}
 
                 {!searching && query.trim().length < 2 && (
@@ -371,12 +375,7 @@ export function InviteCollaboratorModal({
                 <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
                   Cancel
                 </Button>
-                <Button
-                  variant="gradient"
-                  size="sm"
-                  onClick={handleEmailInvite}
-                  disabled={isSending || !email.trim()}
-                >
+                <Button variant="gradient" size="sm" onClick={handleEmailInvite} disabled={isSending || !email.trim()}>
                   {isSending ? "Sending…" : "Send Email Invite"}
                 </Button>
               </div>
