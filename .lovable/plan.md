@@ -1,88 +1,76 @@
 
 
-## Plan: Auto-link guest invites + display fix (revised)
+## Plan: Performance + landing page polish (mobile-first fixes)
 
-Patches the 3 risks raised: trigger ordering, case-sensitivity, frontend reactivity.
+I'll focus on what's **actually fixable in our code** and skip the noise (chart breakage isn't real per your check; "500+ writers" social proof requires real numbers we don't have yet).
 
-### 1. Migration — case-insensitive trigger + backfill
+### Triage of the report
 
-**Update the function to use `lower()` directly (defense in depth):**
-```sql
-CREATE OR REPLACE FUNCTION public.link_requests_to_new_user()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
-AS $$
-BEGIN
-  UPDATE public.collab_requests
-  SET requester_user_id = NEW.id
-  WHERE lower(requester_email) = lower(NEW.email)
-    AND requester_user_id IS NULL;
+| Suggestion | Action | Why |
+|---|---|---|
+| Lazy-load images below fold | ✅ Implement | Real win |
+| WebP compression | ⚠️ Skip for now | Landing uses ~zero raster images; mostly SVG/Recharts |
+| Page hiccups between routes | ✅ Fix (root cause) | This is the **real** issue you're feeling |
+| Pricing teaser on landing | ✅ Add small section | Quick trust win |
+| SEO meta title/description | ✅ Update `index.html` | 1-line fix |
+| Mobile CTA card / navbar overflow | ✅ Fix per screenshots | Confirmed visible bug |
+| Demo video | ❌ Skip | Already have `/demo` link in hero |
+| Quantitative social proof ("500+") | ❌ Skip | Inventing numbers violates the "Sam Filter" honesty rule |
+| Integration logos (Substack/Ghost/Beehiiv) | ❌ Skip | We only integrate with Substack — claiming Ghost/Beehiiv would be dishonest |
 
-  UPDATE public.workspace_collaborators
-  SET user_id = NEW.id
-  WHERE lower(email) = lower(NEW.email)
-    AND user_id IS NULL;
-  RETURN NEW;
-END;
-$$;
-```
+### The real performance issue: route-change "hiccups"
 
-**Create the missing trigger (schema dump confirms zero triggers exist):**
-```sql
-DROP TRIGGER IF EXISTS zz_link_invites_on_signup ON auth.users;
-CREATE TRIGGER zz_link_invites_on_signup
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.link_requests_to_new_user();
-```
-The `zz_` prefix guarantees alphabetical ordering runs **after** any `handle_new_user` profile-creation trigger, eliminating the race condition.
+You're describing the classic pattern: navigate to `/requests` → blank/jumpy state → data lands → layout shifts. Two compounding causes:
 
-**One-time backfill (case-insensitive):**
-```sql
-UPDATE public.workspace_collaborators wc
-SET user_id = u.id
-FROM auth.users u
-WHERE wc.user_id IS NULL AND lower(wc.email) = lower(u.email);
+1. **No scroll reset on route change** → land at random scroll position, then content loads above/below → perceived "jump."
+2. **Loading states that don't reserve space** → list renders empty (`h-0`), then suddenly fills with 600px of cards → big CLS jump.
+3. **Every page refetches from scratch** on each visit, even if you were just there 2 seconds ago.
 
-UPDATE public.collab_requests cr
-SET requester_user_id = u.id
-FROM auth.users u
-WHERE cr.requester_user_id IS NULL AND lower(cr.requester_email) = lower(u.email);
-```
+### Fixes — grouped
 
-### 2. Display fallback — `useWorkspaceCollaborators.ts`
+**A. Route transitions (the hiccup fix)**
+- Add `<ScrollToTop />` component in `App.tsx` (mounted inside `BrowserRouter`, runs on `pathname` change).
+- Audit the highest-traffic dashboard pages (`Dashboard.tsx`, `Requests.tsx`, `MyRequests.tsx`, `Workspace.tsx`) and ensure their loading states render **skeletons sized like the final content** instead of `null` or a tiny spinner. This eliminates the layout shift.
+- Verify React Query `staleTime` on the main hooks (`useActiveCollabs`, `useWorkspaceCollaborators`, etc.) — if it's the default `0`, set it to `30_000` so back-navigation is instant.
 
-Add a computed `display_name` to each collaborator:
-1. `creators.name` (Google full name once linked)
-2. Capitalized email local-part (`farida@gmail.com` → `Farida`) — covers the brief gap before profile creation, AND users who linked but never set a name
-3. `Guest #N` only if email is somehow missing
+**B. Landing page perf**
+- Add `loading="lazy"` + `decoding="async"` to any `<img>` below the fold (testimonials avatars, roadmap icons if any).
+- Recharts components: dynamic-import the chart sections via `React.lazy` + `Suspense` so the hero paints before the chart bundle arrives.
 
-### 3. Sidebar render — `SharedWorkspace.tsx` (and any other consumer)
+**C. Mobile UI fixes (from your screenshots)**
 
-Replace hard-coded "Guest" labels with `collaborator.display_name`.
+*Screenshot 1 — `BottomCTASection.tsx`:* The orange CTA button bleeds outside the white card on 390px viewport because `size="xl"` has fixed horizontal padding wider than the card's inner width.
+- Make the button `w-full sm:w-auto` and reduce horizontal padding at mobile breakpoint, or add `max-w-full` so it wraps inside the card.
 
-### 4. Realtime reactivity — `useWorkspaceCollaborators.ts`
+*Screenshot 2 — `Navbar.tsx`:* "Get Started" gets clipped by the right edge because the glass pill + Sign In + Get Started exceeds 358px usable width.
+- On mobile (`<sm`): collapse "Sign In" into a smaller ghost link, shrink button paddings, OR hide "Sign In" and keep only "Get Started" (users can still reach login via the auth page).
+- Recommended: reduce both buttons to `size="sm"` on mobile and tighten the pill's `px-6` to `px-3` under `sm`.
 
-Add a Supabase Realtime subscription so the sidebar updates the moment the trigger fires (host has the workspace open while guest signs up):
-```ts
-supabase.channel(`collab-${requestId}`)
-  .on('postgres_changes',
-    { event: 'UPDATE', schema: 'public', table: 'workspace_collaborators', filter: `request_id=eq.${requestId}` },
-    () => refetch())
-  .subscribe();
-```
-Plus enable realtime on the table:
-```sql
-ALTER PUBLICATION supabase_realtime ADD TABLE public.workspace_collaborators;
-```
+**D. Pricing teaser**
+- New small section between `FeatureRoadmapSection` and `BottomCTASection`: two minimal cards (Free / Pro $14.99/mo per existing memory), with a "See full details" link to `/dashboard/subscription`. Keep it understated — matches the "Sam Filter" non-corporate tone.
+
+**E. SEO meta**
+- Update `<title>` and `<meta name="description">` in `index.html` to include "newsletter collaboration" + "Substack" keywords, without keyword-stuffing.
 
 ### Files
 
 | File | Change |
 |---|---|
-| SQL migration | Update `link_requests_to_new_user` with `lower()`, add `zz_link_invites_on_signup` trigger, backfill orphans, enable realtime |
-| `src/hooks/useWorkspaceCollaborators.ts` | Add `display_name` derivation + realtime subscription |
-| `src/components/requests/SharedWorkspace.tsx` | Use `display_name` instead of "Guest" label |
+| `src/components/ScrollToTop.tsx` | New — scroll reset on route change |
+| `src/App.tsx` | Mount `<ScrollToTop />` inside `BrowserRouter` |
+| `src/components/landing/BottomCTASection.tsx` | Mobile: `w-full sm:w-auto` button, padding fix |
+| `src/components/layout/Navbar.tsx` | Mobile: shrink buttons + pill padding so nothing clips |
+| `src/components/landing/TestimonialsSection.tsx` | Add `loading="lazy"` to avatar imgs |
+| `src/components/landing/RealityOfGrowthSection.tsx` | Wrap chart in `React.lazy` + `Suspense` skeleton |
+| `src/components/landing/PricingTeaserSection.tsx` | New — Free vs Pro mini-cards |
+| `src/pages/Landing.tsx` | Insert `<PricingTeaserSection />` |
+| `index.html` | Title + meta description SEO update |
+| `src/hooks/useActiveCollabs.ts` + similar | Add `staleTime: 30_000` to React Query configs |
+| `src/pages/Requests.tsx`, `MyRequests.tsx`, `Dashboard.tsx` | Replace null/spinner loading states with sized skeletons |
 
 ### Out of scope
-- Auto-creating `creators` row from Google metadata
-- Username auto-generation
+- Inventing user-count claims ("500+ writers")
+- Fake integration badges for Ghost/Beehiiv
+- Demo video production
+- WebP conversion (no raster assets to convert)
 
