@@ -1,74 +1,107 @@
 
 
-# Harden Solo Workspace for Production
+## Plan: Public Read-Only Snapshot Links
 
-You've identified exactly the right failure points. Here's the concrete fix for each:
+### Architecture Principle
+**Separate the Product (Writer's Room) from the Artifact (The Sheet).** The `/view/:token` route is a brand-new, isolated page that physically cannot leak workspace internals because it never imports them.
 
-## 1. Database Trigger — Skip Email for Solo Drafts
+---
 
-The `notify_new_collab_request` trigger fires on every INSERT and calls `send-collab-email` when `status = 'pending'`. Solo workspaces insert with `status = 'approved'`, so **this trigger already skips them** — the `IF NEW.status = 'pending'` guard handles it. No change needed here.
+### 1. Database Migration
 
-## 2. Database Trigger — Skip URL Validation for Solo Drafts
+**Add to `collab_requests`:**
+- `view_token uuid NOT NULL UNIQUE DEFAULT gen_random_uuid()`
+- Backfill existing rows happens automatically via the default.
 
-The `validate_requester_substack_url` trigger rejects any URL containing `substack.com/@`. This is the **confirmed production blocker** (the P0001 error).
+**New RPC — `get_public_sheet(_token uuid)`:**
+- `SECURITY DEFINER`, callable by `anon` + `authenticated`.
+- Returns ONLY: `project_title` (derived from `selected_collab_type` or first heading), `shared_content`, `creator_name`, `creator_username`.
+- Returns nothing else: no email, no notes, no AI draft, no chat, no collaborators, no metrics.
+- Returns empty result if token doesn't match (page renders 404 state).
 
-**Migration**: Replace the trigger function to bail out early when `is_solo = true`:
+**No new INSERT/UPDATE policies.** Edit access remains gated solely by `workspace_collaborators` + ownership. The token literally cannot grant write access because no policy references it for writes.
 
-```sql
-CREATE OR REPLACE FUNCTION public.validate_requester_substack_url()
-RETURNS TRIGGER AS $$
-BEGIN
-  IF NEW.is_solo IS TRUE THEN
-    RETURN NEW;
-  END IF;
-  IF NEW.requester_substack_url LIKE '%substack.com/@%' THEN
-    RAISE EXCEPTION '...';
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SET search_path = public;
+---
+
+### 2. New Isolated Page — `src/pages/PublicWorkspaceView.tsx`
+
+Mounted at `/view/:token` (public, outside `ProtectedRoute`, outside `DashboardLayout`).
+
+**Hard rules:**
+- Imports ZERO workspace components (no `WorkspaceConversation`, no `WorkspaceCollaborators`, no `WorkspacePresence`, no toolbar, no sidebar).
+- Tiptap editor with `editable: false` and only the **rendering** extensions (StarterKit, Link, Image, Table read-only). No comment/highlight extensions.
+- Tailwind `prose prose-lg` centered layout — reads like a published article.
+- Sets `<meta name="robots" content="noindex, nofollow">` via a small effect on mount.
+- No OpenGraph tags for this route.
+
+**Contextual sticky banner (uses `useAuth` only — does NOT load workspace data):**
+
+| Viewer | Banner |
+|---|---|
+| Anonymous | "Built in a DraftKit Writer's Room. [Sign up free →]" |
+| Logged in, NOT owner/collaborator | "You're viewing a shared draft. [Go to Dashboard]" |
+| Owner OR invited collaborator | "You have edit access. [Enter Writer's Room →]" (links to `/dashboard/workspace/:id`) |
+
+The owner/collaborator check runs a lightweight `has_workspace_access` lookup using the *real* request id returned by the RPC — only after auth is confirmed, so anon users skip it.
+
+**404 state:** if RPC returns no row, show a clean "This draft is no longer available" page with a link to the landing page.
+
+---
+
+### 3. Routing — `src/App.tsx`
+
+Add ONE line, before the `*` catch-all:
+```tsx
+<Route path="/view/:token" element={<PublicWorkspaceView />} />
+```
+Public, no `ProtectedRoute` wrapper, no layout wrapper.
+
+---
+
+### 4. Share UI — `src/components/requests/InviteCollaboratorModal.tsx`
+
+Add a "Public view link" row at the very top of the modal body (above search/email modes, visible in both):
+
+```text
+┌────────────────────────────────────────┐
+│ 👁  Public view link                    │
+│ ┌────────────────────────────────┐ 📋  │
+│ │ draftkit.app/view/abc-123...   │     │
+│ └────────────────────────────────┘     │
+│ Anyone with this link can view the     │
+│ draft. Only invited writers can edit.  │
+└────────────────────────────────────────┘
 ```
 
-## 3. RLS INSERT Policy — Allow Solo Self-Inserts
+- Fetches `view_token` for the current `requestId` once on modal open (single SELECT).
+- Click → `navigator.clipboard.writeText(...)` → toast "Link copied" + icon flips `Copy` → `Check` for 2s.
 
-The current "Anyone can create requests" policy enforces `status = 'pending'`. Solo workspaces insert with `status = 'approved'`, which **violates this policy**. There's also a "Universal Insert Policy" with `WITH CHECK (true)` — this is an overly permissive fallback that should be tightened, but it currently allows the insert to pass. 
+---
 
-However, for correctness and security, the right fix is to **add a dedicated solo INSERT policy** and **drop the universal one**:
+### 5. Security Coverage Summary
 
-```sql
-CREATE POLICY "Creators can create solo workspaces"
-ON public.collab_requests FOR INSERT TO authenticated
-WITH CHECK (
-  is_solo = true
-  AND status = 'approved'
-  AND auth.uid() = requester_user_id
-  AND creator_id IN (SELECT id FROM creators WHERE user_id = auth.uid())
-);
-```
+| Threat | Mitigation |
+|---|---|
+| Search engines indexing private drafts | `noindex, nofollow` meta tag |
+| URL guessing | UUIDv4 token (122 bits entropy) |
+| Public reader trying to edit | Editor `editable: false` + RLS rejects writes (no token-based write policy exists) |
+| Scraper extracting PII | RPC whitelist returns only title + content + author display name |
+| Workspace component data leak | Page imports zero workspace files — code path doesn't exist |
+| Social preview cards leaking content | No OG tags on `/view` route |
 
-Then drop the dangerous universal policy:
-```sql
-DROP POLICY "Universal Insert Policy" ON public.collab_requests;
-```
+---
 
-## 4. Frontend — Normalize URL Before Insert
-
-In `Dashboard.tsx`, run the creator's `substack_url` through `normalizeSubstackUrl()` before passing it as `requester_substack_url`. This converts `substack.com/@elena` → `elena.substack.com` as defense-in-depth.
-
-## 5. UI Filtering — Hide Solo Drafts from "Pending" Management
-
-The Requests page currently shows solo drafts in the Approved tab. The pending tab won't show them (solo status is `approved`). No additional filtering needed — solo drafts naturally appear where they should.
-
-## Files
+### Files
 
 | File | Change |
-|------|--------|
-| SQL Migration | Update `validate_requester_substack_url` to skip solo; add solo INSERT policy; drop universal INSERT policy |
-| `src/pages/Dashboard.tsx` | Import and use `normalizeSubstackUrl()` on line 260 |
+|---|---|
+| SQL migration | Add `view_token` column + `get_public_sheet` RPC |
+| `src/pages/PublicWorkspaceView.tsx` | NEW — isolated read-only sheet renderer |
+| `src/App.tsx` | Register `/view/:token` route |
+| `src/components/requests/InviteCollaboratorModal.tsx` | Add "Public view link" row + copy button |
 
-## What We Confirmed Is Already Safe
-
-- `notify_new_collab_request` trigger — already guarded by `status = 'pending'` check
-- `requester_name` / `requester_email` NOT NULL — already satisfied (passing creator.name and user email)
-- MyRequests page — already filters `.eq('is_solo', false)`
+### Out of Scope (future)
+- Per-draft toggle to disable public link
+- Token rotation / revocation UI
+- OG preview cards (intentionally omitted)
 
