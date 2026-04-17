@@ -1,38 +1,88 @@
 
 
-## Fix: Public view link overflows the modal
+## Plan: Auto-link guest invites + display fix (revised)
 
-**Root cause:** The link row sits inside `DialogContent` which has `sm:max-w-[460px]`, but the URL row uses `flex items-center gap-2` where the truncate child cannot shrink because its parent flex container itself doesn't constrain width properly when the URL is one unbroken string. The current code uses `truncate overflow-x-auto` on the same element — these conflict (`truncate` sets `overflow:hidden` + `white-space:nowrap`, killing the scroll). Also missing `min-w-0` on the flex parent chain, which is what actually allows truncation/scroll inside flex.
+Patches the 3 risks raised: trigger ordering, case-sensitivity, frontend reactivity.
 
-In production, tokens are full UUIDs (~36 chars) plus the custom domain `draftkit.app/view/<uuid>` ≈ 55 chars — short enough. But on `lovableproject.com` previews the host is ~50+ chars, pushing total length past 100 chars and breaking the layout.
+### 1. Migration — case-insensitive trigger + backfill
 
-### Fix in `src/components/requests/InviteCollaboratorModal.tsx` (lines ~234-252)
+**Update the function to use `lower()` directly (defense in depth):**
+```sql
+CREATE OR REPLACE FUNCTION public.link_requests_to_new_user()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+BEGIN
+  UPDATE public.collab_requests
+  SET requester_user_id = NEW.id
+  WHERE lower(requester_email) = lower(NEW.email)
+    AND requester_user_id IS NULL;
 
-Replace the link row so it scrolls horizontally instead of truncating:
-
-1. Wrap the URL in a single-line, horizontally scrollable container.
-2. Remove `truncate` (it conflicts with `overflow-x-auto`).
-3. Add `min-w-0` to the flex parent so the child can actually shrink.
-4. Keep the copy button outside the scroll area as a fixed-width sibling.
-
-**New structure:**
-```tsx
-<div className="flex items-center gap-2 min-w-0">
-  <div className="flex-1 min-w-0 overflow-x-auto whitespace-nowrap text-xs font-mono text-muted-foreground rounded border border-border/50 bg-background/50 px-2 py-1.5 scrollbar-thin">
-    {viewUrl}
-  </div>
-  <Button ... className="h-8 w-8 p-0 shrink-0">...</Button>
-</div>
+  UPDATE public.workspace_collaborators
+  SET user_id = NEW.id
+  WHERE lower(email) = lower(NEW.email)
+    AND user_id IS NULL;
+  RETURN NEW;
+END;
+$$;
 ```
 
-Also add `min-w-0` to the outer card `<div className="rounded-lg border ...">` if needed.
+**Create the missing trigger (schema dump confirms zero triggers exist):**
+```sql
+DROP TRIGGER IF EXISTS zz_link_invites_on_signup ON auth.users;
+CREATE TRIGGER zz_link_invites_on_signup
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.link_requests_to_new_user();
+```
+The `zz_` prefix guarantees alphabetical ordering runs **after** any `handle_new_user` profile-creation trigger, eliminating the race condition.
+
+**One-time backfill (case-insensitive):**
+```sql
+UPDATE public.workspace_collaborators wc
+SET user_id = u.id
+FROM auth.users u
+WHERE wc.user_id IS NULL AND lower(wc.email) = lower(u.email);
+
+UPDATE public.collab_requests cr
+SET requester_user_id = u.id
+FROM auth.users u
+WHERE cr.requester_user_id IS NULL AND lower(cr.requester_email) = lower(u.email);
+```
+
+### 2. Display fallback — `useWorkspaceCollaborators.ts`
+
+Add a computed `display_name` to each collaborator:
+1. `creators.name` (Google full name once linked)
+2. Capitalized email local-part (`farida@gmail.com` → `Farida`) — covers the brief gap before profile creation, AND users who linked but never set a name
+3. `Guest #N` only if email is somehow missing
+
+### 3. Sidebar render — `SharedWorkspace.tsx` (and any other consumer)
+
+Replace hard-coded "Guest" labels with `collaborator.display_name`.
+
+### 4. Realtime reactivity — `useWorkspaceCollaborators.ts`
+
+Add a Supabase Realtime subscription so the sidebar updates the moment the trigger fires (host has the workspace open while guest signs up):
+```ts
+supabase.channel(`collab-${requestId}`)
+  .on('postgres_changes',
+    { event: 'UPDATE', schema: 'public', table: 'workspace_collaborators', filter: `request_id=eq.${requestId}` },
+    () => refetch())
+  .subscribe();
+```
+Plus enable realtime on the table:
+```sql
+ALTER PUBLICATION supabase_realtime ADD TABLE public.workspace_collaborators;
+```
 
 ### Files
+
 | File | Change |
 |---|---|
-| `src/components/requests/InviteCollaboratorModal.tsx` | Replace `truncate overflow-x-auto` row with proper `min-w-0` + `overflow-x-auto whitespace-nowrap` scrollable container |
+| SQL migration | Update `link_requests_to_new_user` with `lower()`, add `zz_link_invites_on_signup` trigger, backfill orphans, enable realtime |
+| `src/hooks/useWorkspaceCollaborators.ts` | Add `display_name` derivation + realtime subscription |
+| `src/components/requests/SharedWorkspace.tsx` | Use `display_name` instead of "Guest" label |
 
 ### Out of scope
-- Shortening tokens (UUIDs are required for entropy)
-- URL shortener service
+- Auto-creating `creators` row from Google metadata
+- Username auto-generation
 
