@@ -19,7 +19,9 @@ export default function Landing() {
     <div className="min-h-screen">
       <Navbar />
       <HeroSection />
-      <RealityOfGrowthSection />
+      <Suspense fallback={<div className="h-[500px]" aria-hidden />}>
+        <RealityOfGrowthSection />
+      </Suspense>
       <DirectDiscoveryCard />
       <BusyworkComparisonSection />
       <HowItWorksSection />
