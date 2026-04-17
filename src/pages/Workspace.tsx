@@ -1020,7 +1020,7 @@ export default function Workspace() {
                     )}
                     {/* Invited collaborators */}
                     {collaborators.map((c) => {
-                      const displayName = c.name || (c.guest_number != null ? `Guest ${c.guest_number}` : "Guest");
+                      const displayName = c.display_name;
                       const tooltipText = c.user_id
                         ? c.username
                           ? `@${c.username}`
