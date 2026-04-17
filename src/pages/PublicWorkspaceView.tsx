@@ -124,7 +124,7 @@ export default function PublicWorkspaceView() {
       <div className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-md">
         <div className="max-w-3xl mx-auto px-6 py-3 flex items-center justify-between gap-4">
           <Link to="/" className="flex items-center gap-2 shrink-0">
-            <DraftKitLogo className="w-7 h-7" />
+            <DraftKitLogo size={28} />
             <span className="text-sm font-semibold text-foreground hidden sm:inline">
               DraftKit
             </span>
