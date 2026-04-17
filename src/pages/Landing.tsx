@@ -1,6 +1,6 @@
+import { lazy, Suspense } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { HeroSection } from "@/components/landing/HeroSection";
-import { RealityOfGrowthSection } from "@/components/landing/RealityOfGrowthSection";
 import { DirectDiscoveryCard } from "@/components/landing/DirectDiscoveryCard";
 import { BusyworkComparisonSection } from "@/components/landing/BusyworkComparisonSection";
 import { HowItWorksSection } from "@/components/landing/HowItWorksSection";
@@ -9,6 +9,10 @@ import { FeatureRoadmapSection } from "@/components/landing/FeatureRoadmapSectio
 import { PricingTeaserSection } from "@/components/landing/PricingTeaserSection";
 import { BottomCTASection } from "@/components/landing/BottomCTASection";
 import { Footer } from "@/components/layout/Footer";
+
+const RealityOfGrowthSection = lazy(() =>
+  import("@/components/landing/RealityOfGrowthSection").then((m) => ({ default: m.RealityOfGrowthSection }))
+);
 
 export default function Landing() {
   return (
