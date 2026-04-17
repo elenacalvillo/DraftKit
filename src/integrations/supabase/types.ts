@@ -174,6 +174,7 @@ export type Database = {
           selected_collab_type: string | null
           shared_content: string | null
           status: string
+          view_token: string
         }
         Insert: {
           ai_draft?: Json | null
@@ -206,6 +207,7 @@ export type Database = {
           selected_collab_type?: string | null
           shared_content?: string | null
           status?: string
+          view_token?: string
         }
         Update: {
           ai_draft?: Json | null
@@ -238,6 +240,7 @@ export type Database = {
           selected_collab_type?: string | null
           shared_content?: string | null
           status?: string
+          view_token?: string
         }
         Relationships: [
           {
@@ -796,6 +799,16 @@ export type Database = {
     }
     Functions: {
       get_host_capacity: { Args: { _creator_id: string }; Returns: Json }
+      get_public_sheet: {
+        Args: { _token: string }
+        Returns: {
+          creator_name: string
+          creator_username: string
+          project_title: string
+          request_id: string
+          shared_content: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
