@@ -124,9 +124,98 @@ export const ALLOWED_COLLAB_STYLES = [
 ] as const;
 export type CollabStyle = typeof ALLOWED_COLLAB_STYLES[number];
 
-// Collaboration mode options (async-first vs discovery-first)
+// Collaboration mode options (async-first vs discovery-first) — LEGACY, kept for one release
 export const COLLAB_MODE_OPTIONS = ['async', 'discovery'] as const;
 export type CollabMode = typeof COLLAB_MODE_OPTIONS[number];
+
+// === NEW: Two-step Playbook (Vibe → Format) ===
+
+// Step 1 — Vibe (the "How"): single-select
+export const COLLAB_VIBE_OPTIONS = ['async', 'live', 'call'] as const;
+export type CollabVibe = typeof COLLAB_VIBE_OPTIONS[number];
+
+export const COLLAB_VIBE_METADATA: Record<CollabVibe, {
+  label: string;
+  description: string;
+  icon: string;
+  outcome: string;
+  dateMeans: string;
+  recommended?: boolean;
+}> = {
+  async: {
+    label: 'Async Workspace',
+    description: 'Write together inside the engine — no calls required.',
+    icon: '✍️',
+    outcome: 'A finished draft, written together',
+    dateMeans: 'Target publish date',
+    recommended: true,
+  },
+  live: {
+    label: 'Substack Live',
+    description: 'Record a Live conversation directly on Substack.',
+    icon: '📺',
+    outcome: 'A Substack Live recording',
+    dateMeans: 'Live broadcast date',
+  },
+  call: {
+    label: 'Video Call',
+    description: 'A Zoom or Google Meet conversation.',
+    icon: '☕',
+    outcome: 'A live video conversation',
+    dateMeans: 'Call date',
+  },
+};
+
+// Step 2 — Format (the "What"): multi-select, async-only
+export const COLLAB_FORMAT_OPTIONS = ['interview', 'cross-post', 'guest-post'] as const;
+export type CollabFormat = typeof COLLAB_FORMAT_OPTIONS[number];
+
+export const COLLAB_FORMAT_METADATA: Record<CollabFormat, {
+  label: string;
+  description: string;
+  icon: string;
+  outcome: string;
+}> = {
+  'interview': {
+    label: 'Interview',
+    description: 'Q&A style — one asks, one answers.',
+    icon: '🎙️',
+    outcome: 'A Q&A piece',
+  },
+  'cross-post': {
+    label: 'Cross-post',
+    description: 'A collaborative deep-dive on a shared topic.',
+    icon: '🔁',
+    outcome: 'One piece, both perspectives',
+  },
+  'guest-post': {
+    label: 'Guest-post',
+    description: 'One person leads the draft on the other\'s newsletter.',
+    icon: '📝',
+    outcome: 'A guest post',
+  },
+};
+
+// Helper: parse collab_formats from DB (stored as JSON string array)
+export const parseCollabFormats = (value: string | null | undefined): CollabFormat[] => {
+  if (!value) return [];
+  try {
+    const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((f): f is CollabFormat => COLLAB_FORMAT_OPTIONS.includes(f as CollabFormat));
+  } catch {
+    return [];
+  }
+};
+
+// Helper: get vibe from creator with safe fallback
+export const getCreatorVibe = (vibe: string | null | undefined): CollabVibe => {
+  if (vibe && COLLAB_VIBE_OPTIONS.includes(vibe as CollabVibe)) return vibe as CollabVibe;
+  return 'async';
+};
+
+export const collabVibeSchema = z.enum(COLLAB_VIBE_OPTIONS);
+export const collabFormatsSchema = z.array(z.enum(COLLAB_FORMAT_OPTIONS));
 
 // Collaboration mode metadata for UI
 export const COLLAB_MODE_METADATA: Record<CollabMode, {

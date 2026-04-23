@@ -13,7 +13,23 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePro } from "@/hooks/usePro";
 import { supabase } from "@/integrations/supabase/client";
 import { sanitizeSubstackImageUrl } from "@/lib/utils";
-import { settingsSchema, COLLAB_TYPE_METADATA, COLLAB_MODE_METADATA, COLLAB_MODE_OPTIONS, type CollabStyle, type DateMeaning, type CollabMode } from "@/lib/validations";
+import {
+  settingsSchema,
+  COLLAB_TYPE_METADATA,
+  COLLAB_MODE_METADATA,
+  COLLAB_MODE_OPTIONS,
+  COLLAB_VIBE_OPTIONS,
+  COLLAB_VIBE_METADATA,
+  COLLAB_FORMAT_OPTIONS,
+  COLLAB_FORMAT_METADATA,
+  parseCollabFormats,
+  getCreatorVibe,
+  type CollabStyle,
+  type DateMeaning,
+  type CollabMode,
+  type CollabVibe,
+  type CollabFormat,
+} from "@/lib/validations";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -61,6 +77,8 @@ export default function Settings() {
     reminderDaysBefore: 3,
     dateMeaning: "flexible" as DateMeaning,
     collabMode: "async" as CollabMode,
+    collabVibe: "async" as CollabVibe,
+    collabFormats: ["cross-post"] as CollabFormat[],
   });
 
   // Parse collab_style from DB (could be single value or JSON array)
@@ -124,6 +142,8 @@ export default function Settings() {
   useEffect(() => {
     if (!creator) return;
 
+    const vibe = getCreatorVibe((creator as any).collab_vibe);
+    const formats = parseCollabFormats((creator as any).collab_formats);
     setFormData({
       name: creator.name,
       bio: creator.bio || "",
@@ -135,6 +155,8 @@ export default function Settings() {
       reminderDaysBefore: (creator as any).reminder_days_before ?? 3,
       dateMeaning: ((creator as any).date_meaning || "flexible") as DateMeaning,
       collabMode: ((creator as any).collab_mode || "async") as CollabMode,
+      collabVibe: vibe,
+      collabFormats: vibe === "async" && formats.length > 0 ? formats : (vibe === "async" ? ["cross-post"] : []),
     });
     setPreviewImageUrl((creator as any).profile_image_url || null);
     
@@ -182,6 +204,18 @@ export default function Settings() {
       }
     }
 
+    // Derive legacy collab_style from new vibe/formats for backwards compatibility
+    const legacyStyles: string[] =
+      formData.collabVibe === "call"
+        ? ["Virtual Coffee"]
+        : formData.collabVibe === "live"
+        ? ["Live Event / Webinar"]
+        : formData.collabFormats.map((f) => {
+            if (f === "interview") return "Interview Style";
+            if (f === "guest-post") return "Guest Post Exchange";
+            return "Async Drafting";
+          });
+
     const { error } = await supabase
       .from('creators')
       .update({
@@ -191,12 +225,14 @@ export default function Settings() {
         newsletter_url: formData.newsletterUrl,
         welcome_message: formData.welcomeMessage || null,
         profile_image_url: profileImageUrl,
-        collab_style: JSON.stringify(formData.collabStyles),
+        collab_style: JSON.stringify(legacyStyles.length > 0 ? legacyStyles : ["Async Drafting"]),
         collab_guidelines: formData.collabGuidelines || null,
         reminder_days_before: formData.reminderDaysBefore,
         date_meaning: formData.dateMeaning,
-        collab_mode: formData.collabMode,
-      })
+        collab_mode: formData.collabVibe === "async" ? "async" : "discovery",
+        collab_vibe: formData.collabVibe,
+        collab_formats: JSON.stringify(formData.collabVibe === "async" ? formData.collabFormats : []),
+      } as any)
       .eq('id', creator.id);
 
     if (error) {
@@ -474,118 +510,87 @@ export default function Settings() {
           </p>
           
           <div className="space-y-6">
+            {/* Step 1 — Vibe (the "How") */}
             <div className="space-y-3">
-              <Label>Preferred Collaboration Styles (select all that apply)</Label>
+              <Label className="text-base">How do you like to collaborate?</Label>
+              <p className="text-xs text-muted-foreground -mt-1">Pick one. This is the default vibe shown to guests.</p>
               <div className="grid gap-3">
-                {COLLAB_STYLE_OPTIONS.map((option) => (
-                  <div
-                    key={option.value}
-                    className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-colors ${
-                      formData.collabStyles.includes(option.value)
-                        ? "bg-primary/10 border-primary/30"
-                        : "bg-muted/50 border-transparent hover:border-muted-foreground/20"
-                    }`}
-                    onClick={() => toggleCollabStyle(option.value)}
-                  >
-                    <Checkbox
-                      id={`collab-${option.value}`}
-                      checked={formData.collabStyles.includes(option.value)}
-                      onCheckedChange={() => toggleCollabStyle(option.value)}
-                    />
-                    <div className="flex-1">
-                      <label 
-                        htmlFor={`collab-${option.value}`}
-                        className="font-medium cursor-pointer"
-                      >
-                        {option.label}
-                      </label>
-                      <p className="text-sm text-muted-foreground">{option.description}</p>
+                {COLLAB_VIBE_OPTIONS.map((vibe) => {
+                  const meta = COLLAB_VIBE_METADATA[vibe];
+                  const isSelected = formData.collabVibe === vibe;
+                  return (
+                    <div
+                      key={vibe}
+                      className={`p-5 rounded-xl border-2 cursor-pointer transition-all ${
+                        isSelected
+                          ? "bg-primary/10 border-primary shadow-sm"
+                          : "bg-muted/50 border-transparent hover:border-muted-foreground/20"
+                      }`}
+                      onClick={() => setFormData({ ...formData, collabVibe: vibe })}
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="text-2xl">{meta.icon}</span>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-semibold">{meta.label}</span>
+                            {meta.recommended && (
+                              <Badge variant="secondary" className="text-xs">Recommended</Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground">{meta.description}</p>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
-              <p className="text-xs text-muted-foreground">
-                Collaborators will choose one of your selected styles when booking
-              </p>
             </div>
 
-            {/* Collaboration Mode Selector */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Label>How do you prefer to collaborate?</Label>
-                {!isPro && (
-                  <Badge variant="outline" className="text-xs border-primary/50 text-primary">
-                    <Crown className="w-3 h-3 mr-1" />
-                    Pro
-                  </Badge>
-                )}
-              </div>
-              {isPro ? (
+            {/* Step 2 — Format (the "What") — only when vibe = async */}
+            {formData.collabVibe === 'async' && (
+              <div className="space-y-3">
+                <Label className="text-base">What formats are you open to?</Label>
+                <p className="text-xs text-muted-foreground -mt-1">Pick one or more. Guests will choose from these when booking.</p>
                 <div className="grid gap-3">
-                  {COLLAB_MODE_OPTIONS.map((mode) => {
-                    const metadata = COLLAB_MODE_METADATA[mode];
-                    const isSelected = formData.collabMode === mode;
+                  {COLLAB_FORMAT_OPTIONS.map((fmt) => {
+                    const meta = COLLAB_FORMAT_METADATA[fmt];
+                    const isSelected = formData.collabFormats.includes(fmt);
                     return (
                       <div
-                        key={mode}
-                        className={`p-5 rounded-xl border-2 cursor-pointer transition-all ${
+                        key={fmt}
+                        className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors ${
                           isSelected
-                            ? "bg-primary/10 border-primary shadow-sm"
+                            ? "bg-primary/10 border-primary/30"
                             : "bg-muted/50 border-transparent hover:border-muted-foreground/20"
                         }`}
-                        onClick={() => setFormData({ ...formData, collabMode: mode })}
+                        onClick={() => {
+                          const current = formData.collabFormats;
+                          if (current.includes(fmt)) {
+                            if (current.length === 1) {
+                              toast.error("Pick at least one format");
+                              return;
+                            }
+                            setFormData({ ...formData, collabFormats: current.filter(f => f !== fmt) });
+                          } else {
+                            setFormData({ ...formData, collabFormats: [...current, fmt] });
+                          }
+                        }}
                       >
-                        <div className="flex items-start gap-3">
-                          <span className="text-2xl">{metadata.icon}</span>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="font-semibold">{metadata.label}</span>
-                              {mode === 'async' && (
-                                <Badge variant="secondary" className="text-xs">Recommended</Badge>
-                              )}
-                            </div>
-                            <p className="text-sm text-muted-foreground mb-2">{metadata.description}</p>
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Badge 
-                                    variant="outline" 
-                                    className={`text-xs ${isSelected ? 'border-primary/50 text-primary' : ''}`}
-                                  >
-                                    {metadata.badge}
-                                  </Badge>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p className="text-xs max-w-[200px]">{metadata.badgeTooltip}</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          </div>
+                        <Checkbox checked={isSelected} onCheckedChange={() => {}} />
+                        <span className="text-xl leading-none">{meta.icon}</span>
+                        <div className="flex-1">
+                          <p className="font-medium">{meta.label}</p>
+                          <p className="text-sm text-muted-foreground">{meta.description}</p>
                         </div>
                       </div>
                     );
                   })}
                 </div>
-              ) : (
-                <div className="p-4 bg-muted/50 rounded-xl border border-dashed">
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Free accounts use <span className="font-medium text-foreground">"100% Async"</span> mode with Target Publication Dates.
-                  </p>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => navigate("/dashboard/settings?upgrade=true")}
-                    className="border-primary/30 text-primary hover:bg-primary/10"
-                  >
-                    <Crown className="w-3.5 h-3.5 mr-2" />
-                    Upgrade to customize your collaboration style
-                  </Button>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
 
-            {/* Date Meaning Selector - Only show for async mode */}
-            {formData.collabMode === 'async' && (
+            {/* Date Meaning Selector - Only for async vibe */}
+            {formData.collabVibe === 'async' && (
               <div className="space-y-3">
                 <Label>What do your available dates represent?</Label>
                 <RadioGroup
@@ -609,22 +614,18 @@ export default function Settings() {
                           {option.label}
                         </label>
                         <p className="text-sm text-muted-foreground">{option.description}</p>
-            </div>
+                      </div>
                     </div>
                   ))}
                 </RadioGroup>
-                {/* Preview of guest experience */}
                 <div className="p-3 bg-muted/50 rounded-lg border border-border/50 mt-3">
                   <p className="text-xs text-muted-foreground">
                     <span className="font-medium text-foreground">Guest will see:</span>{" "}
-                    "{formData.dateMeaning === 'kickoff' 
-                      ? 'This is the day we start working together' 
+                    "{formData.dateMeaning === 'kickoff'
+                      ? 'This is the day we start working together'
                       : 'This is our target publish date'}"
                   </p>
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  This context is shown to collaborators on your booking page
-                </p>
               </div>
             )}
 

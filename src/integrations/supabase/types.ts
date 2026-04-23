@@ -415,9 +415,11 @@ export type Database = {
       creators: {
         Row: {
           bio: string | null
+          collab_formats: string | null
           collab_guidelines: string | null
           collab_mode: string | null
           collab_style: string | null
+          collab_vibe: string | null
           created_at: string
           credits: number
           date_meaning: string | null
@@ -441,9 +443,11 @@ export type Database = {
         }
         Insert: {
           bio?: string | null
+          collab_formats?: string | null
           collab_guidelines?: string | null
           collab_mode?: string | null
           collab_style?: string | null
+          collab_vibe?: string | null
           created_at?: string
           credits?: number
           date_meaning?: string | null
@@ -467,9 +471,11 @@ export type Database = {
         }
         Update: {
           bio?: string | null
+          collab_formats?: string | null
           collab_guidelines?: string | null
           collab_mode?: string | null
           collab_style?: string | null
+          collab_vibe?: string | null
           created_at?: string
           credits?: number
           date_meaning?: string | null
@@ -748,9 +754,11 @@ export type Database = {
       public_creator_profiles: {
         Row: {
           bio: string | null
+          collab_formats: string | null
           collab_guidelines: string | null
           collab_mode: string | null
           collab_style: string | null
+          collab_vibe: string | null
           created_at: string | null
           date_meaning: string | null
           id: string | null
@@ -764,9 +772,11 @@ export type Database = {
         }
         Insert: {
           bio?: string | null
+          collab_formats?: string | null
           collab_guidelines?: string | null
           collab_mode?: string | null
           collab_style?: string | null
+          collab_vibe?: string | null
           created_at?: string | null
           date_meaning?: string | null
           id?: string | null
@@ -780,9 +790,11 @@ export type Database = {
         }
         Update: {
           bio?: string | null
+          collab_formats?: string | null
           collab_guidelines?: string | null
           collab_mode?: string | null
           collab_style?: string | null
+          collab_vibe?: string | null
           created_at?: string | null
           date_meaning?: string | null
           id?: string | null
