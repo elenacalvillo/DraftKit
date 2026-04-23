@@ -13,7 +13,23 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePro } from "@/hooks/usePro";
 import { supabase } from "@/integrations/supabase/client";
 import { sanitizeSubstackImageUrl } from "@/lib/utils";
-import { settingsSchema, COLLAB_TYPE_METADATA, COLLAB_MODE_METADATA, COLLAB_MODE_OPTIONS, type CollabStyle, type DateMeaning, type CollabMode } from "@/lib/validations";
+import {
+  settingsSchema,
+  COLLAB_TYPE_METADATA,
+  COLLAB_MODE_METADATA,
+  COLLAB_MODE_OPTIONS,
+  COLLAB_VIBE_OPTIONS,
+  COLLAB_VIBE_METADATA,
+  COLLAB_FORMAT_OPTIONS,
+  COLLAB_FORMAT_METADATA,
+  parseCollabFormats,
+  getCreatorVibe,
+  type CollabStyle,
+  type DateMeaning,
+  type CollabMode,
+  type CollabVibe,
+  type CollabFormat,
+} from "@/lib/validations";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
