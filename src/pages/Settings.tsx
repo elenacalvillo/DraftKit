@@ -204,6 +204,18 @@ export default function Settings() {
       }
     }
 
+    // Derive legacy collab_style from new vibe/formats for backwards compatibility
+    const legacyStyles: string[] =
+      formData.collabVibe === "call"
+        ? ["Virtual Coffee"]
+        : formData.collabVibe === "live"
+        ? ["Live Event / Webinar"]
+        : formData.collabFormats.map((f) => {
+            if (f === "interview") return "Interview Style";
+            if (f === "guest-post") return "Guest Post Exchange";
+            return "Async Drafting";
+          });
+
     const { error } = await supabase
       .from('creators')
       .update({
@@ -213,12 +225,14 @@ export default function Settings() {
         newsletter_url: formData.newsletterUrl,
         welcome_message: formData.welcomeMessage || null,
         profile_image_url: profileImageUrl,
-        collab_style: JSON.stringify(formData.collabStyles),
+        collab_style: JSON.stringify(legacyStyles.length > 0 ? legacyStyles : ["Async Drafting"]),
         collab_guidelines: formData.collabGuidelines || null,
         reminder_days_before: formData.reminderDaysBefore,
         date_meaning: formData.dateMeaning,
-        collab_mode: formData.collabMode,
-      })
+        collab_mode: formData.collabVibe === "async" ? "async" : "discovery",
+        collab_vibe: formData.collabVibe,
+        collab_formats: JSON.stringify(formData.collabVibe === "async" ? formData.collabFormats : []),
+      } as any)
       .eq('id', creator.id);
 
     if (error) {
