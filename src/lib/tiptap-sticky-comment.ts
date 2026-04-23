@@ -4,7 +4,7 @@ export interface StickyCommentOptions {
   HTMLAttributes: Record<string, any>;
 }
 
-declare module "@tiptap/core" {
+declare module "@tiptap/react" {
   interface Commands<ReturnType> {
     stickyComment: {
       setStickyComment: (attrs: { comment: string; author: string }) => ReturnType;
