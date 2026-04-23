@@ -28,10 +28,16 @@ import {
   bookingFormSchema,
   COLLAB_TYPE_METADATA,
   COLLAB_MODE_METADATA,
+  COLLAB_VIBE_METADATA,
+  COLLAB_FORMAT_METADATA,
+  parseCollabFormats,
+  getCreatorVibe,
   newsletterPublicationUrlSchema,
   type CollabStyle,
   type DateMeaning,
   type CollabMode,
+  type CollabVibe,
+  type CollabFormat,
 } from "@/lib/validations";
 import { normalizeSubstackUrl, isValidNewsletterPublicationUrl } from "@/lib/substack-url";
 import { toast } from "sonner";
@@ -58,6 +64,8 @@ interface Creator {
   collab_guidelines: string | null;
   date_meaning: DateMeaning | null;
   collab_mode: CollabMode | null;
+  collab_vibe: CollabVibe | null;
+  collab_formats: string | null;
   profile_theme: Record<string, unknown> | null;
 }
 
@@ -233,7 +241,7 @@ export default function PublicBooking() {
     const { data: creatorData, error } = await supabase
       .from("public_creator_profiles")
       .select(
-        "id, username, name, substack_url, newsletter_url, welcome_message, profile_image_url, collab_style, collab_guidelines, date_meaning, collab_mode, profile_theme",
+        "id, username, name, substack_url, newsletter_url, welcome_message, profile_image_url, collab_style, collab_guidelines, date_meaning, collab_mode, collab_vibe, collab_formats, profile_theme",
       )
       .eq("username", username)
       .maybeSingle();
@@ -248,6 +256,8 @@ export default function PublicBooking() {
       ...creatorData,
       date_meaning: creatorData.date_meaning as DateMeaning | null,
       collab_mode: (creatorData.collab_mode || "async") as CollabMode,
+      collab_vibe: getCreatorVibe((creatorData as any).collab_vibe),
+      collab_formats: (creatorData as any).collab_formats ?? null,
       profile_theme: creatorData.profile_theme as Record<string, unknown> | null,
     };
     setCreator(creatorObj);
@@ -278,10 +288,25 @@ export default function PublicBooking() {
     document.getElementById("draftkit-jsonld")?.remove();
     document.head.appendChild(scriptTag);
 
-    // Parse collab styles
-    const styles = parseCollabStyles(creatorData.collab_style);
+    // Determine available collab types from new vibe/formats model.
+    // - vibe = async: use formats (mapped to legacy labels for compatibility)
+    // - vibe = live: single "Substack Live" option
+    // - vibe = call: single "Video Call" option
+    const vibe = getCreatorVibe((creatorData as any).collab_vibe);
+    const formats = parseCollabFormats((creatorData as any).collab_formats);
+    let styles: string[];
+    if (vibe === 'live') {
+      styles = ['Substack Live'];
+    } else if (vibe === 'call') {
+      styles = ['Video Call'];
+    } else if (formats.length > 0) {
+      styles = formats.map((f) => COLLAB_FORMAT_METADATA[f].label);
+    } else {
+      // Fallback to legacy collab_style if no formats yet (pre-migration data)
+      styles = parseCollabStyles(creatorData.collab_style);
+    }
     setAvailableCollabTypes(styles);
-    // Auto-select if only one style available
+    // Auto-select if only one style available (live, call, or single async format)
     if (styles.length === 1) {
       setSelectedCollabType(styles[0]);
     }
