@@ -1142,7 +1142,10 @@ export default function PublicBooking() {
                     </Label>
                     <div className="grid gap-3">
                       {availableCollabTypes.map((style) => {
-                        const metadata = COLLAB_TYPE_METADATA[style as CollabStyle];
+                        const formatMeta = Object.values(COLLAB_FORMAT_METADATA).find((m) => m.label === style);
+                        const metadata = formatMeta
+                          ? { icon: formatMeta.icon, outcome: formatMeta.outcome, dateMeans: 'Target publish date' }
+                          : COLLAB_TYPE_METADATA[style as CollabStyle];
                         return (
                           <div
                             key={style}
