@@ -77,6 +77,8 @@ export default function Settings() {
     reminderDaysBefore: 3,
     dateMeaning: "flexible" as DateMeaning,
     collabMode: "async" as CollabMode,
+    collabVibe: "async" as CollabVibe,
+    collabFormats: ["cross-post"] as CollabFormat[],
   });
 
   // Parse collab_style from DB (could be single value or JSON array)
@@ -140,6 +142,8 @@ export default function Settings() {
   useEffect(() => {
     if (!creator) return;
 
+    const vibe = getCreatorVibe((creator as any).collab_vibe);
+    const formats = parseCollabFormats((creator as any).collab_formats);
     setFormData({
       name: creator.name,
       bio: creator.bio || "",
@@ -151,6 +155,8 @@ export default function Settings() {
       reminderDaysBefore: (creator as any).reminder_days_before ?? 3,
       dateMeaning: ((creator as any).date_meaning || "flexible") as DateMeaning,
       collabMode: ((creator as any).collab_mode || "async") as CollabMode,
+      collabVibe: vibe,
+      collabFormats: vibe === "async" && formats.length > 0 ? formats : (vibe === "async" ? ["cross-post"] : []),
     });
     setPreviewImageUrl((creator as any).profile_image_url || null);
     
