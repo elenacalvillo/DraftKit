@@ -1,76 +1,89 @@
 
 
-## Plan: Performance + landing page polish (mobile-first fixes)
+## Plan: Two-step Collaboration Playbook (Vibe → Format)
 
-I'll focus on what's **actually fixable in our code** and skip the noise (chart breakage isn't real per your check; "500+ writers" social proof requires real numbers we don't have yet).
+**Problem:** The current Playbook flattens 8 unrelated checkboxes ("How we work" mixed with "What we make") into one list. Decision fatigue → guests message hosts asking "what do you actually want?"
 
-### Triage of the report
+**Fix:** Split the choice into two clear steps that mirror how creators actually think.
 
-| Suggestion | Action | Why |
+---
+
+### The new mental model
+
+**Step 1 — Vibe (the "How"):** single-select, always shown
+- ✍️ **Async Workspace** — Write together inside the engine
+- 📺 **Substack Live** — Record a Live conversation on Substack
+- ☕ **Video Call** — A Zoom/Meet conversation
+
+**Step 2 — Format (the "What"):** multi-select, **only shown when Vibe = Async**
+- 🎙️ **Interview** — Q&A style
+- 🔁 **Cross-post** — Collaborative deep-dive on a shared topic
+- 📝 **Guest-post** — One person takes the lead on the other's newsletter
+
+If Vibe = Substack Live or Video Call, no Step 2 — the format is implicit.
+
+---
+
+### Data model — backwards compatible
+
+We already store `collab_style` as a JSON string of an array. We add two new fields without breaking existing data:
+
+| New field on `creators` | Type | Purpose |
 |---|---|---|
-| Lazy-load images below fold | ✅ Implement | Real win |
-| WebP compression | ⚠️ Skip for now | Landing uses ~zero raster images; mostly SVG/Recharts |
-| Page hiccups between routes | ✅ Fix (root cause) | This is the **real** issue you're feeling |
-| Pricing teaser on landing | ✅ Add small section | Quick trust win |
-| SEO meta title/description | ✅ Update `index.html` | 1-line fix |
-| Mobile CTA card / navbar overflow | ✅ Fix per screenshots | Confirmed visible bug |
-| Demo video | ❌ Skip | Already have `/demo` link in hero |
-| Quantitative social proof ("500+") | ❌ Skip | Inventing numbers violates the "Sam Filter" honesty rule |
-| Integration logos (Substack/Ghost/Beehiiv) | ❌ Skip | We only integrate with Substack — claiming Ghost/Beehiiv would be dishonest |
+| `collab_vibe` | `text` (`'async' \| 'live' \| 'call'`) | Step 1 selection. Default `'async'`. |
+| `collab_formats` | `text` (JSON array) | Step 2 selections (only for async). |
 
-### The real performance issue: route-change "hiccups"
+**Migration:** for each existing creator, derive `collab_vibe` + `collab_formats` from current `collab_style`:
+- Contains `Virtual Coffee` → vibe `call`
+- Contains `Live Event / Webinar` → vibe `live`
+- Anything else → vibe `async`, and map old types to new formats:
+  - `Async Drafting`, `Co-written Article` → `cross-post`
+  - `Interview Style` → `interview`
+  - `Guest Post Exchange` → `guest-post`
+  - `Newsletter Shoutout`, `Custom` → dropped (folded into Guidelines text)
 
-You're describing the classic pattern: navigate to `/requests` → blank/jumpy state → data lands → layout shifts. Two compounding causes:
+`collab_style` stays in place as a derived/legacy column for one release so nothing breaks; we'll remove read paths in the same PR but keep writes synced.
 
-1. **No scroll reset on route change** → land at random scroll position, then content loads above/below → perceived "jump."
-2. **Loading states that don't reserve space** → list renders empty (`h-0`), then suddenly fills with 600px of cards → big CLS jump.
-3. **Every page refetches from scratch** on each visit, even if you were just there 2 seconds ago.
+---
 
-### Fixes — grouped
+### UI changes
 
-**A. Route transitions (the hiccup fix)**
-- Add `<ScrollToTop />` component in `App.tsx` (mounted inside `BrowserRouter`, runs on `pathname` change).
-- Audit the highest-traffic dashboard pages (`Dashboard.tsx`, `Requests.tsx`, `MyRequests.tsx`, `Workspace.tsx`) and ensure their loading states render **skeletons sized like the final content** instead of `null` or a tiny spinner. This eliminates the layout shift.
-- Verify React Query `staleTime` on the main hooks (`useActiveCollabs`, `useWorkspaceCollaborators`, etc.) — if it's the default `0`, set it to `30_000` so back-navigation is instant.
+**`src/pages/Settings.tsx` — Collaboration Playbook section (lines 461–510)**
+- Replace the flat 8-checkbox grid with two sequential blocks:
+  1. "How do you like to collaborate?" → 3 single-select cards (Async / Substack Live / Video Call). Recommended badge stays on Async.
+  2. "What formats are you open to?" → 3 multi-select chips (Interview / Cross-post / Guest-post). Renders only when vibe = `async`.
+- Remove the duplicative "How do you prefer to collaborate?" block below (lines 512–585) — it's now merged into Step 1, so Pro gating moves with it (Substack Live + Video Call become free; **vibe = async** stays default for everyone, no Pro gate needed).
 
-**B. Landing page perf**
-- Add `loading="lazy"` + `decoding="async"` to any `<img>` below the fold (testimonials avatars, roadmap icons if any).
-- Recharts components: dynamic-import the chart sections via `React.lazy` + `Suspense` so the hero paints before the chart bundle arrives.
+**`src/pages/PublicBooking.tsx` (lines 281–287, 869–905)**
+- Read the new fields. Header chips become: shows the vibe as a primary line ("Async drafting via DraftKit") and formats as small chips underneath. If vibe = Live/Call, just show the vibe.
+- Booking step where guest "selects collab type" only fires for async + multiple formats. Calls/Live skip straight to date pick.
 
-**C. Mobile UI fixes (from your screenshots)**
+**`src/lib/validations.ts`**
+- Add `COLLAB_VIBE_OPTIONS` (`'async' | 'live' | 'call'`) + `COLLAB_FORMAT_OPTIONS` (`'interview' | 'cross-post' | 'guest-post'`) with metadata (label, icon, description, outcome).
+- Keep `COLLAB_TYPE_METADATA` for one release (read-only) so emails / RequestCard select work without same-PR refactors.
 
-*Screenshot 1 — `BottomCTASection.tsx`:* The orange CTA button bleeds outside the white card on 390px viewport because `size="xl"` has fixed horizontal padding wider than the card's inner width.
-- Make the button `w-full sm:w-auto` and reduce horizontal padding at mobile breakpoint, or add `max-w-full` so it wraps inside the card.
+**`src/components/requests/RequestCard.tsx` (line 39, 420)**
+- The collab-type override dropdown becomes the format list when vibe = async, otherwise hidden (no override needed for live/call).
 
-*Screenshot 2 — `Navbar.tsx`:* "Get Started" gets clipped by the right edge because the glass pill + Sign In + Get Started exceeds 358px usable width.
-- On mobile (`<sm`): collapse "Sign In" into a smaller ghost link, shrink button paddings, OR hide "Sign In" and keep only "Get Started" (users can still reach login via the auth page).
-- Recommended: reduce both buttons to `size="sm"` on mobile and tighten the pill's `px-6` to `px-3` under `sm`.
+**`supabase/functions/send-collab-email/index.ts` + `generate-collab-draft/index.ts`**
+- Read `collab_vibe` to pick email copy. Read `collab_formats[0]` (or the guest's `selected_collab_type`) to pick draft template. Existing case-statement keys still work because we'll keep the legacy strings in the `selected_collab_type` field on requests until next cleanup pass.
 
-**D. Pricing teaser**
-- New small section between `FeatureRoadmapSection` and `BottomCTASection`: two minimal cards (Free / Pro $14.99/mo per existing memory), with a "See full details" link to `/dashboard/subscription`. Keep it understated — matches the "Sam Filter" non-corporate tone.
-
-**E. SEO meta**
-- Update `<title>` and `<meta name="description">` in `index.html` to include "newsletter collaboration" + "Substack" keywords, without keyword-stuffing.
+---
 
 ### Files
 
 | File | Change |
 |---|---|
-| `src/components/ScrollToTop.tsx` | New — scroll reset on route change |
-| `src/App.tsx` | Mount `<ScrollToTop />` inside `BrowserRouter` |
-| `src/components/landing/BottomCTASection.tsx` | Mobile: `w-full sm:w-auto` button, padding fix |
-| `src/components/layout/Navbar.tsx` | Mobile: shrink buttons + pill padding so nothing clips |
-| `src/components/landing/TestimonialsSection.tsx` | Add `loading="lazy"` to avatar imgs |
-| `src/components/landing/RealityOfGrowthSection.tsx` | Wrap chart in `React.lazy` + `Suspense` skeleton |
-| `src/components/landing/PricingTeaserSection.tsx` | New — Free vs Pro mini-cards |
-| `src/pages/Landing.tsx` | Insert `<PricingTeaserSection />` |
-| `index.html` | Title + meta description SEO update |
-| `src/hooks/useActiveCollabs.ts` + similar | Add `staleTime: 30_000` to React Query configs |
-| `src/pages/Requests.tsx`, `MyRequests.tsx`, `Dashboard.tsx` | Replace null/spinner loading states with sized skeletons |
+| SQL migration | Add `collab_vibe`, `collab_formats` columns + backfill from `collab_style` |
+| `src/lib/validations.ts` | Add vibe/format options + metadata; keep legacy types |
+| `src/pages/Settings.tsx` | Replace flat list with Vibe (Step 1) + Format (Step 2, async-only). Merge duplicate "How do you prefer to collaborate?" block into Step 1. |
+| `src/pages/PublicBooking.tsx` | Render vibe/formats; skip format-pick when vibe ≠ async |
+| `src/components/requests/RequestCard.tsx` | Hide format dropdown when vibe ≠ async |
+| `src/hooks/useAuth.tsx` | Add `collab_vibe`, `collab_formats` to Creator type |
+| `supabase/functions/send-collab-email/index.ts` | Branch email copy on `collab_vibe` |
 
 ### Out of scope
-- Inventing user-count claims ("500+ writers")
-- Fake integration badges for Ghost/Beehiiv
-- Demo video production
-- WebP conversion (no raster assets to convert)
+- Removing `collab_style` column (next release, after one stable cycle)
+- Folding Newsletter Shoutout / Custom into the new model — Guidelines field already covers these as freeform notes
+- Renaming `selected_collab_type` on requests (still works as-is)
 
