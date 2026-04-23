@@ -892,38 +892,46 @@ export default function PublicBooking() {
             </motion.div>
           )}
 
-          {/* Collaboration Types with Outcomes */}
-          {availableCollabTypes.length === 1 && (
-            <div className="max-w-md mx-auto p-4 bg-accent/20 border border-accent/30 rounded-xl text-left">
-              <div className="flex items-center gap-3 mb-2">
-                <span className="text-2xl">
-                  {COLLAB_TYPE_METADATA[availableCollabTypes[0] as CollabStyle]?.icon || "📝"}
-                </span>
-                <div>
-                  <p className="font-semibold text-primary">{availableCollabTypes[0]}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {COLLAB_TYPE_METADATA[availableCollabTypes[0] as CollabStyle]?.outcome || "Collaboration"}
-                  </p>
+          {/* Vibe + Format header */}
+          {(() => {
+            const vibe = (creator.collab_vibe || 'async') as CollabVibe;
+            const vibeMeta = COLLAB_VIBE_METADATA[vibe];
+            const formats = parseCollabFormats(creator.collab_formats);
+            return (
+              <div className="max-w-lg mx-auto space-y-3">
+                {/* Vibe pill — always visible */}
+                <div className="p-4 bg-accent/20 border border-accent/30 rounded-xl text-left">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{vibeMeta.icon}</span>
+                    <div>
+                      <p className="font-semibold text-primary">{vibeMeta.label}</p>
+                      <p className="text-sm text-muted-foreground">{vibeMeta.outcome}</p>
+                    </div>
+                  </div>
                 </div>
+                {/* Format chips — only for async with 2+ formats */}
+                {vibe === 'async' && formats.length > 1 && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-2 text-center">Open to:</p>
+                    <div className="flex flex-wrap gap-2 justify-center">
+                      {formats.map((f) => {
+                        const meta = COLLAB_FORMAT_METADATA[f];
+                        return (
+                          <span
+                            key={f}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 rounded-full text-sm"
+                          >
+                            <span>{meta.icon}</span>
+                            <span className="text-primary font-medium">{meta.label}</span>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          )}
-          {availableCollabTypes.length > 1 && (
-            <div className="max-w-lg mx-auto">
-              <p className="text-sm text-muted-foreground mb-3">Open to collaborating on:</p>
-              <div className="flex flex-wrap gap-2 justify-center">
-                {availableCollabTypes.map((style) => (
-                  <span
-                    key={style}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 rounded-full text-sm"
-                  >
-                    <span>{COLLAB_TYPE_METADATA[style as CollabStyle]?.icon || "📝"}</span>
-                    <span className="text-primary font-medium">{style}</span>
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
+            );
+          })()}
         </motion.div>
 
         {/* Main card */}
