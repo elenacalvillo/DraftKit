@@ -657,26 +657,14 @@ Generate a collaboration draft that:
 
     const draft: CollabDraft = JSON.parse(toolCall.function.arguments);
 
-    // Convert draft to HTML for the shared workspace
-    const sharedContentHtml = draftToHtml(draft, creatorName, requesterName);
-
-    // Safety lock: check if a human has already edited shared_content
-    const hasHumanContent = request.shared_content &&
-      request.shared_content.trim().length > 0 &&
-      request.content_last_edited_by &&
-      request.content_last_edited_by !== "AI Draft";
-
-    // Build the update payload — only overwrite shared_content if no human edits exist
+    // NOTE: We intentionally DO NOT write `shared_content` here.
+    // The "Apply to Workspace" button in CollabDraftModal is the single,
+    // user-controlled gate that moves draft content into the workspace.
+    // This prevents auto-overwriting any in-progress human work.
     const updatePayload: Record<string, unknown> = {
       ai_draft: draft,
       approved_at: new Date().toISOString(),
     };
-
-    if (!hasHumanContent) {
-      updatePayload.shared_content = sharedContentHtml;
-      updatePayload.content_last_edited_by = "AI Draft";
-      updatePayload.content_last_edited_at = new Date().toISOString();
-    }
 
     const { error: updateError } = await supabase
       .from("collab_requests")
@@ -690,8 +678,6 @@ Generate a collaboration draft that:
     return new Response(
       JSON.stringify({
         draft,
-        shared_content: hasHumanContent ? null : sharedContentHtml,
-        human_content_preserved: !!hasHumanContent,
         success: true,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
