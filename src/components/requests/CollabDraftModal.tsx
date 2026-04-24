@@ -45,6 +45,7 @@ export function CollabDraftModal({
   isLoading,
   onRegenerate,
   onDelete,
+  onApplied,
 }: CollabDraftModalProps) {
   const [copied, setCopied] = useState(false);
   const [isApplying, setIsApplying] = useState(false);
