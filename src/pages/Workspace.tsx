@@ -262,19 +262,6 @@ export default function Workspace() {
       if (error) throw error;
       if (data?.draft) {
         setLocalDraft(data.draft);
-        // Only update shared_content if no human content was preserved
-        if (data.shared_content && !data.human_content_preserved) {
-          setRequest((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  shared_content: data.shared_content,
-                  content_last_edited_by: "SMART Draft",
-                  content_last_edited_at: new Date().toISOString(),
-                }
-              : prev,
-          );
-        }
         // Set first_draft_generated_at if not already set
         if (!(request as any).first_draft_generated_at) {
           await supabase
@@ -285,10 +272,7 @@ export default function Workspace() {
             prev ? ({ ...prev, first_draft_generated_at: new Date().toISOString() } as any) : prev,
           );
         }
-        const msg = data.human_content_preserved
-          ? "SMART draft saved! Your manual work is untouched — view it in the SMART Draft panel."
-          : "Collaboration draft generated!";
-        toast.success(msg);
+        toast.success("SMART draft ready — review and click Apply to Workspace.");
         trackEvent("draft_generated", { request_id: request!.id });
       }
     } catch (error) {
