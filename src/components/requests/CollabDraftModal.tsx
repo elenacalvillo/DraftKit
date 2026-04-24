@@ -105,28 +105,34 @@ Estimated Read Time: ${draft.estimatedReadTime}`;
         .eq("id", requestId)
         .maybeSingle();
 
-      if (!current?.shared_content) {
-        const updatePayload: any = {
-          shared_content: draftHtml,
-          content_last_edited_by: "SMART Draft",
-          content_last_edited_at: new Date().toISOString(),
-        };
-        // Set first_draft_generated_at if not already set
-        const { data: currentFull } = await supabase
-          .from("collab_requests")
-          .select("first_draft_generated_at")
-          .eq("id", requestId)
-          .maybeSingle();
-        if (!(currentFull as any)?.first_draft_generated_at) {
-          updatePayload.first_draft_generated_at = new Date().toISOString();
-        }
-        await supabase
-          .from("collab_requests")
-          .update(updatePayload)
-          .eq("id", requestId);
+      if (current?.shared_content && current.shared_content.trim() !== "") {
+        toast.error("Workspace already has content. Clear it first to apply this draft.");
+        setIsApplying(false);
+        return;
       }
 
+      const updatePayload: any = {
+        shared_content: draftHtml,
+        content_last_edited_by: "SMART Draft",
+        content_last_edited_at: new Date().toISOString(),
+      };
+      // Set first_draft_generated_at if not already set
+      const { data: currentFull } = await supabase
+        .from("collab_requests")
+        .select("first_draft_generated_at")
+        .eq("id", requestId)
+        .maybeSingle();
+      if (!(currentFull as any)?.first_draft_generated_at) {
+        updatePayload.first_draft_generated_at = new Date().toISOString();
+      }
+      await supabase
+        .from("collab_requests")
+        .update(updatePayload)
+        .eq("id", requestId);
+
       trackEvent("draft_applied_to_workspace", { draft_title: draft.title, request_id: requestId });
+      toast.success("Draft applied to workspace");
+      onApplied?.(draftHtml);
       onOpenChange(false);
       navigate(`/dashboard/workspace/${requestId}`);
     } catch (error) {
