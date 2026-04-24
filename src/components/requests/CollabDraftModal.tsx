@@ -33,6 +33,7 @@ interface CollabDraftModalProps {
   isLoading?: boolean;
   onRegenerate?: () => void;
   onDelete?: () => void;
+  onApplied?: (html: string) => void;
 }
 
 export function CollabDraftModal({
