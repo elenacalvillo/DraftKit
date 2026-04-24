@@ -1195,6 +1195,18 @@ export default function Workspace() {
             isLoading={isGeneratingDraft}
             onRegenerate={generateDraft}
             onDelete={handleDeleteDraft}
+            onApplied={(html) =>
+              setRequest((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      shared_content: html,
+                      content_last_edited_by: "SMART Draft",
+                      content_last_edited_at: new Date().toISOString(),
+                    }
+                  : prev
+              )
+            }
           />
           <SendMessageModal
             open={showMessageModal}
