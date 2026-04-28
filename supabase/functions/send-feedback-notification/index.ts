@@ -17,8 +17,6 @@ interface FeedbackNotificationRequest {
   pageUrl: string | null;
 }
 
-const feedbackTypeConfig: Record<string, { emoji: string; color: string; label: string }> = {
-
 const escapeHtml = (str: string): string =>
   String(str)
     .replace(/&/g, "&amp;")
@@ -27,6 +25,7 @@ const escapeHtml = (str: string): string =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 
+const feedbackTypeConfig: Record<string, { emoji: string; color: string; label: string }> = {
   bug: { emoji: "🐛", color: "#dc2626", label: "Bug Report" },
   feature: { emoji: "✨", color: "#7c3aed", label: "Feature Request" },
   general: { emoji: "💬", color: "#2563eb", label: "General Feedback" },
