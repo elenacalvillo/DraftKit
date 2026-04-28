@@ -565,6 +565,27 @@ export type Database = {
         }
         Relationships: []
       }
+      fulfilled_stripe_sessions: {
+        Row: {
+          credits_added: number
+          fulfilled_at: string
+          stripe_session_id: string
+          user_id: string
+        }
+        Insert: {
+          credits_added: number
+          fulfilled_at?: string
+          stripe_session_id: string
+          user_id: string
+        }
+        Update: {
+          credits_added?: number
+          fulfilled_at?: string
+          stripe_session_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       referral_credits: {
         Row: {
           created_at: string
