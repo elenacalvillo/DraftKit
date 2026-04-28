@@ -54,6 +54,36 @@ serve(async (req) => {
       throw new Error("Credits mismatch");
     }
 
+    // Idempotency: claim this Stripe session before granting credits.
+    // The PRIMARY KEY on stripe_session_id makes the insert atomic — replays fail here.
+    const { error: claimErr } = await supabaseAdmin
+      .from("fulfilled_stripe_sessions")
+      .insert({
+        stripe_session_id: sessionId,
+        user_id: user.id,
+        credits_added: creditsNum,
+      });
+
+    if (claimErr) {
+      // Unique violation = already fulfilled. Return current balance, do NOT add credits.
+      const { data: existing } = await supabaseAdmin
+        .from("creators")
+        .select("credits")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      return new Response(
+        JSON.stringify({
+          credits: existing?.credits ?? 0,
+          alreadyFulfilled: true,
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        }
+      );
+    }
+
     // Increment credits using service role
     const { data: creator, error: fetchErr } = await supabaseAdmin
       .from("creators")
