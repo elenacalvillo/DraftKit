@@ -276,6 +276,17 @@ serve(async (req: Request) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Auth: require shared secret to prevent unauthenticated mass-email abuse
+  const providedSecret = req.headers.get("x-internal-secret");
+  const expectedSecret = Deno.env.get("CRON_SECRET");
+  if (!expectedSecret || providedSecret !== expectedSecret) {
+    console.warn("send-weekly-digest: unauthorized invocation blocked");
+    return new Response(
+      JSON.stringify({ error: "Unauthorized" }),
+      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
   try {
     console.log("Starting weekly digest...");
 

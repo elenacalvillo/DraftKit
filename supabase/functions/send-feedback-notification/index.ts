@@ -17,6 +17,14 @@ interface FeedbackNotificationRequest {
   pageUrl: string | null;
 }
 
+const escapeHtml = (str: string): string =>
+  String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
 const feedbackTypeConfig: Record<string, { emoji: string; color: string; label: string }> = {
   bug: { emoji: "🐛", color: "#dc2626", label: "Bug Report" },
   feature: { emoji: "✨", color: "#7c3aed", label: "Feature Request" },
@@ -45,8 +53,8 @@ const generateEmailHtml = (feedback: FeedbackNotificationRequest): string => {
     ? `
       <tr>
         <td style="padding-top: 24px;">
-          <a href="mailto:${feedback.email}" style="display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #d9826b 0%, #c9946d 100%); color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600;">
-            Reply to ${feedback.email}
+          <a href="mailto:${encodeURIComponent(feedback.email)}" style="display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #d9826b 0%, #c9946d 100%); color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600;">
+            Reply to ${escapeHtml(feedback.email)}
           </a>
         </td>
       </tr>
@@ -90,7 +98,7 @@ const generateEmailHtml = (feedback: FeedbackNotificationRequest): string => {
                     <tr>
                       <td style="padding: 16px 0; border-bottom: 1px solid #e5e7eb;">
                         <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Message</div>
-                        <div style="font-size: 16px; color: #1f2937; line-height: 1.6; white-space: pre-wrap;">${feedback.message}</div>
+                        <div style="font-size: 16px; color: #1f2937; line-height: 1.6; white-space: pre-wrap;">${escapeHtml(feedback.message)}</div>
                       </td>
                     </tr>
                     
@@ -99,7 +107,7 @@ const generateEmailHtml = (feedback: FeedbackNotificationRequest): string => {
                     <tr>
                       <td style="padding: 16px 0; border-bottom: 1px solid #e5e7eb;">
                         <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Submitted From</div>
-                        <div style="font-size: 14px; color: #6b7280;">${feedback.pageUrl}</div>
+                        <div style="font-size: 14px; color: #6b7280;">${escapeHtml(feedback.pageUrl ?? "")}</div>
                       </td>
                     </tr>
                     ` : ""}
@@ -109,7 +117,7 @@ const generateEmailHtml = (feedback: FeedbackNotificationRequest): string => {
                     <tr>
                       <td style="padding: 16px 0;">
                         <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">User Email</div>
-                        <div style="font-size: 14px; color: #1f2937;">${feedback.email}</div>
+                        <div style="font-size: 14px; color: #1f2937;">${escapeHtml(feedback.email ?? "")}</div>
                       </td>
                     </tr>
                     ` : `
