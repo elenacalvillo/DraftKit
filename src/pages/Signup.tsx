@@ -240,9 +240,9 @@ export default function Signup() {
       return;
     }
 
-    // Check if username is taken
+    // Check if username is taken (use public view — no sensitive cols)
     const { data: existingUser } = await supabase
-      .from('creators')
+      .from('public_creator_profiles')
       .select('username')
       .eq('username', formData.username)
       .maybeSingle();
