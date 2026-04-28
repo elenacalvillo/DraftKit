@@ -53,8 +53,8 @@ const generateEmailHtml = (feedback: FeedbackNotificationRequest): string => {
     ? `
       <tr>
         <td style="padding-top: 24px;">
-          <a href="mailto:${feedback.email}" style="display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #d9826b 0%, #c9946d 100%); color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600;">
-            Reply to ${feedback.email}
+          <a href="mailto:${encodeURIComponent(feedback.email)}" style="display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #d9826b 0%, #c9946d 100%); color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600;">
+            Reply to ${escapeHtml(feedback.email)}
           </a>
         </td>
       </tr>
