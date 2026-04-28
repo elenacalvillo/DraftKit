@@ -18,6 +18,15 @@ interface FeedbackNotificationRequest {
 }
 
 const feedbackTypeConfig: Record<string, { emoji: string; color: string; label: string }> = {
+
+const escapeHtml = (str: string): string =>
+  String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
   bug: { emoji: "🐛", color: "#dc2626", label: "Bug Report" },
   feature: { emoji: "✨", color: "#7c3aed", label: "Feature Request" },
   general: { emoji: "💬", color: "#2563eb", label: "General Feedback" },
