@@ -240,9 +240,9 @@ export default function Signup() {
       return;
     }
 
-    // Check if username is taken
+    // Check if username is taken (use public view — no sensitive cols)
     const { data: existingUser } = await supabase
-      .from('creators')
+      .from('public_creator_profiles')
       .select('username')
       .eq('username', formData.username)
       .maybeSingle();
@@ -274,13 +274,11 @@ export default function Signup() {
     const refUsername = searchParams.get('ref');
     let referredByUserId: string | null = null;
     if (refUsername) {
-      const { data: referrer } = await supabase
-        .from('creators')
-        .select('user_id')
-        .eq('username', refUsername)
-        .maybeSingle();
-      if (referrer) {
-        referredByUserId = referrer.user_id;
+      const { data: refUserId } = await supabase.rpc('get_user_id_by_username', {
+        _username: refUsername,
+      });
+      if (refUserId) {
+        referredByUserId = refUserId as string;
       }
     }
 
