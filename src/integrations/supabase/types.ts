@@ -821,6 +821,7 @@ export type Database = {
           shared_content: string
         }[]
       }
+      get_user_id_by_username: { Args: { _username: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -832,6 +833,7 @@ export type Database = {
         Args: { _request_id: string; _user_id: string }
         Returns: boolean
       }
+      is_collab_participant: { Args: { _user_id: string }; Returns: boolean }
       is_pro_user: { Args: { _user_id: string }; Returns: boolean }
       is_request_owner: {
         Args: { _request_id: string; _user_id: string }
