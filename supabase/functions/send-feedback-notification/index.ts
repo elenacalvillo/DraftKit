@@ -107,7 +107,7 @@ const generateEmailHtml = (feedback: FeedbackNotificationRequest): string => {
                     <tr>
                       <td style="padding: 16px 0; border-bottom: 1px solid #e5e7eb;">
                         <div style="font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Submitted From</div>
-                        <div style="font-size: 14px; color: #6b7280;">${feedback.pageUrl}</div>
+                        <div style="font-size: 14px; color: #6b7280;">${escapeHtml(feedback.pageUrl ?? "")}</div>
                       </td>
                     </tr>
                     ` : ""}
