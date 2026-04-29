@@ -68,8 +68,8 @@ import { useWorkspaceCollaborators } from "@/hooks/useWorkspaceCollaborators";
 interface WorkspaceRequest {
   id: string;
   creator_id: string;
-  requester_name: string;
-  requester_email: string;
+  requester_name: string | null;
+  requester_email: string | null;
   requester_substack_url: string | null;
   requester_profile_image_url: string | null;
   requester_user_id: string | null;
@@ -202,7 +202,13 @@ export default function Workspace() {
 
   const fetchRequest = async () => {
     try {
-      const { data, error } = await supabase.from("collab_requests").select("*").eq("id", requestId!).maybeSingle();
+      // Use SECURITY DEFINER RPC so collaborator viewers don't see requester PII.
+      // Owners and the original requester get the full row; collaborators get
+      // PII fields (email, name, profile image, substack url, retro notes) as null.
+      const { data: rows, error } = await supabase.rpc("get_workspace_request", {
+        _request_id: requestId!,
+      });
+      const data = Array.isArray(rows) ? (rows[0] as any) : (rows as any);
 
       if (error || !data) {
         setNotFound(true);
@@ -211,7 +217,7 @@ export default function Workspace() {
       }
 
       // Resolve missing requester profile image from their creator profile
-      let resolvedData = data;
+      let resolvedData: any = data;
       if (!data.requester_profile_image_url && data.requester_user_id) {
         const { data: reqCreator } = await supabase
           .from("creators")
@@ -827,8 +833,8 @@ export default function Workspace() {
                 </DialogContent>
               </Dialog>
 
-              {/* Email — hide for solo workspaces (it's your own email) */}
-              {!isSolo && (
+              {/* Email — hide for solo workspaces and for collaborators (RPC returns null email for them) */}
+              {!isSolo && request.requester_email && (
                 <div className="flex items-center gap-1">
                   <a
                     href={`mailto:${request.requester_email}`}
@@ -839,7 +845,7 @@ export default function Workspace() {
                   </a>
                   <button
                     onClick={() => {
-                      navigator.clipboard.writeText(request.requester_email);
+                      navigator.clipboard.writeText(request.requester_email!);
                       toast.success("Email copied!");
                     }}
                     title="Copy email address"

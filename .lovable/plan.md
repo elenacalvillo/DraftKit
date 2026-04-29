@@ -1,62 +1,98 @@
+## Plan
 
+I found two important facts in the current backend state:
 
-## Plan: Restore missing SELECT policy on `availability` table (P0 prod)
+1. The `creators` table currently has only one live `SELECT` policy: `Creators can view own profile` with `auth.uid() = user_id`.
+2. The remaining real issue is `collab_requests`: collaborators still have full-row `SELECT` access through `Collaborators can view invited requests`, which exposes `requester_email`, `requester_name`, and `requester_profile_image_url`.
 
-### Root cause
+So the scanner is not entirely wrong, but it is mixing one verified-safe area with one still-open exposure.
 
-The `availability` table has RLS enabled but **zero SELECT policies** — meaning every read returns 0 rows for everyone (owner, public, anonymous). Your data is **safe in the database** (I confirmed your 15 publishing dates for `elenacalvillo` and the rows for all 30+ other creators are intact), but no client can read them.
+## What I will change
 
-A migration on Feb 4 (`20260204232240`) created `Public can view availability for public creators` to replace an older `Public can view availability` policy. That SELECT policy was dropped at some later point and never replaced — leaving the table read-blocked.
+### 1. Re-verify and harden creator billing privacy
+- Add one cleanup migration that explicitly drops any legacy public-read creator policies if they still exist:
+  - `Public can read public creator columns`
+  - `Public profile columns readable`
+  - any other known legacy broad public creator read policy found in prior migrations
+- Leave `creators` with owner-only row access for `SELECT`.
+- Preserve public profile browsing through `public_creator_profiles` only.
+- Re-run the security scan and mark `creators_stripe_ids_public` fixed if the backend confirms there is no public `SELECT` path on `creators`.
 
-### Symptoms (all caused by the same single bug)
+### 2. Remove collaborator access to private requester fields
+- Create a safe collaborator-facing projection for workspace request data, either as:
+  - a dedicated view for collaborator reads, or
+  - a split-fetch pattern using existing safe sources plus a new view/RPC if needed.
+- Recommended implementation:
+  - keep `collab_requests` row `SELECT` limited to creator/requester only
+  - remove `Collaborators can view invited requests`
+  - add a collaborator-safe view exposing only workspace-safe columns such as:
+    - `id`
+    - `creator_id`
+    - `status`
+    - `shared_content`
+    - `content_last_edited_by`
+    - `content_last_edited_at`
+    - `selected_collab_type`
+    - `is_solo`
+    - `message` only if it is intentionally considered workspace-visible
+    - `requested_date` only if collaborators are meant to see scheduling
+  - exclude PII and sensitive fields:
+    - `requester_email`
+    - `requester_name`
+    - `requester_profile_image_url`
+    - `requester_substack_url`
+    - `requester_collab_link`
+    - `creator_notes`
+    - `view_token`
+    - retrospective fields
+- If the workspace UI still needs a display name/avatar for collaborators, source those from non-sensitive public profile data or show neutral guest labels instead of raw requester identity.
 
-- `/dashboard/availability` shows blank → user thinks dates were erased
-- Public booking page shows zero open dates → guests can't book
-- `Requests.tsx` approve/decline can't read current `available_dates` → date manipulation logic silently no-ops
-- `Workspace.tsx` and `Dashboard.tsx` availability widgets show empty
+### 3. Keep collaborator edit access narrow and explicit
+- Keep the existing trigger-based protection, but tighten it further so collaborator writes are aligned with the intended safe set.
+- Update the trigger so collaborators can only change:
+  - `shared_content`
+  - `content_last_edited_at`
+  - `content_last_edited_by`
+  - `editing_sessions` if the editor needs it
+- Explicitly block changes to all other fields, including `first_draft_generated_at` unless collaborators truly need to set it.
+- This removes ambiguity between the broad RLS update policy and the actual allowed write surface.
 
-### The fix — one migration, two policies
+### 4. Update the frontend to use the safe read path
+- Refactor `src/pages/Workspace.tsx` so collaborator users do not fetch `select('*')` from `collab_requests`.
+- Refactor `src/hooks/useWorkspaceCollaborators.ts` so it does not rely on direct reads from private creator data unless the current user is allowed to do so.
+- Remove collaborator-visible email actions from the workspace UI when the viewer is neither the creator nor the requester.
+- Ensure creator and requester experiences remain unchanged.
 
-Recreate the two SELECT policies that the schema needs:
+## Technical details
 
-```sql
--- 1. Owner can read their own availability (for /dashboard/availability)
-CREATE POLICY "Creators can view own availability"
-ON public.availability FOR SELECT
-USING (
-  creator_id IN (
-    SELECT id FROM public.creators WHERE user_id = auth.uid()
-  )
-);
+### Current state confirmed
+- `creators` policies in the live database:
+  - `Creators can view own profile` only for `SELECT`
+- `collab_requests` still has:
+  - `Collaborators can view invited requests` for full-row `SELECT`
+- `public_creator_profiles` currently exposes only safe profile fields and does not include Stripe IDs.
 
--- 2. Anyone can read availability for public creator profiles (for /:username booking page)
-CREATE POLICY "Public can view availability for public creators"
-ON public.availability FOR SELECT
-USING (
-  creator_id IN (
-    SELECT id FROM public.public_creator_profiles WHERE username IS NOT NULL
-  )
-);
+### Migration shape
+```text
+1. DROP legacy creator public SELECT policies if present
+2. DROP collaborator full-row SELECT policy on collab_requests
+3. CREATE collaborator-safe request view or equivalent safe read layer
+4. GRANT access to that safe layer
+5. Tighten collaborator update trigger to exact allowed columns
 ```
 
-Both policies are `permissive` so they OR together. Owners get their own row even if they later make their profile private; the public policy keeps the booking page working for guests.
+### Files likely to change
+- `supabase/migrations/<new_security_fix>.sql`
+- `src/pages/Workspace.tsx`
+- `src/hooks/useWorkspaceCollaborators.ts`
+- possibly `src/components/requests/InviteCollaboratorModal.tsx` if any collaborator identity assumptions need cleanup
 
-### Why no data restore is needed
+## Expected outcome
+- The `creators_stripe_ids_public` warning should be resolved by explicit policy cleanup plus re-verification.
+- The `collab_requests_requester_email_exposure` warning should be resolved by removing collaborator full-row reads and replacing them with a safe projection.
+- Workspace editing should continue working for collaborators without exposing requester email or other private identity fields.
 
-I queried the DB directly and confirmed:
-- Your row (`elenacalvillo`) still has all 15 publishing dates, last updated `2026-04-23 04:50`
-- 30+ other creators still have their full date arrays
-- No DELETE happened — only the SELECT policy went missing
-
-Once the migration runs, the existing data will become visible again **immediately**, no client code change required.
-
-### Files
-
-| File | Change |
-|---|---|
-| New SQL migration | Recreate both SELECT policies on `public.availability` |
-
-### Out of scope (separate follow-ups, not blocking)
-- Adding a unique constraint on `availability.creator_id` to prevent duplicate-row creation in the buggy "else" branch of `Availability.tsx` (low risk now that SELECT works)
-- Audit other tables for the same "RLS enabled, no SELECT policy" footgun
-
+## Validation after implementation
+- Re-check live policies on `creators` and `collab_requests`
+- Re-run the security scan
+- Mark fixed findings only after the scan confirms the issues are gone
