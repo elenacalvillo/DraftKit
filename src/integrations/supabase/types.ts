@@ -843,6 +843,38 @@ export type Database = {
         }[]
       }
       get_user_id_by_username: { Args: { _username: string }; Returns: string }
+      get_workspace_request: {
+        Args: { _request_id: string }
+        Returns: {
+          ai_draft: Json
+          approved_at: string
+          collab_link: string
+          content_last_edited_at: string
+          content_last_edited_by: string
+          created_at: string
+          creator_id: string
+          creator_notes: string
+          editing_sessions: Json
+          first_draft_generated_at: string
+          id: string
+          is_solo: boolean
+          message: string
+          requested_date: string
+          requester_collab_link: string
+          requester_email: string
+          requester_name: string
+          requester_profile_image_url: string
+          requester_substack_url: string
+          requester_user_id: string
+          retro_completed_at: string
+          retro_notes: string
+          retro_rating: number
+          selected_collab_type: string
+          shared_content: string
+          status: string
+          view_token: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
