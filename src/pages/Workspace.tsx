@@ -202,7 +202,13 @@ export default function Workspace() {
 
   const fetchRequest = async () => {
     try {
-      const { data, error } = await supabase.from("collab_requests").select("*").eq("id", requestId!).maybeSingle();
+      // Use SECURITY DEFINER RPC so collaborator viewers don't see requester PII.
+      // Owners and the original requester get the full row; collaborators get
+      // PII fields (email, name, profile image, substack url, retro notes) as null.
+      const { data: rows, error } = await supabase.rpc("get_workspace_request", {
+        _request_id: requestId!,
+      });
+      const data = Array.isArray(rows) ? (rows[0] as any) : (rows as any);
 
       if (error || !data) {
         setNotFound(true);
@@ -211,7 +217,7 @@ export default function Workspace() {
       }
 
       // Resolve missing requester profile image from their creator profile
-      let resolvedData = data;
+      let resolvedData: any = data;
       if (!data.requester_profile_image_url && data.requester_user_id) {
         const { data: reqCreator } = await supabase
           .from("creators")
