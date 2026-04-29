@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useWorkspacePresence } from "@/hooks/useWorkspacePresence";
 import { createPortal } from "react-dom";
@@ -42,7 +42,7 @@ interface SharedWorkspaceProps {
   onShareClick?: () => void;
 }
 
-export function SharedWorkspace({
+function SharedWorkspaceInner({
   requestId,
   sharedContent,
   lastEditedBy,
@@ -350,3 +350,8 @@ export function SharedWorkspace({
     </div>
   );
 }
+
+// Memoized export — prevents re-render on every Tiptap onChange / parent state
+// tick. Without this, every keystroke in the editor was bubbling up and
+// re-rendering the whole workspace shell, triggering refetches downstream.
+export const SharedWorkspace = memo(SharedWorkspaceInner);

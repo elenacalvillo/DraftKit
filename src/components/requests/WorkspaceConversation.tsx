@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, memo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { MessageSquare } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,7 +20,7 @@ interface Message {
   created_at: string | null;
 }
 
-export function WorkspaceConversation({
+function WorkspaceConversationInner({
   requestId,
   currentUserIsCreator,
   refreshKey = 0,
@@ -110,3 +110,10 @@ export function WorkspaceConversation({
     </div>
   );
 }
+
+// Memoized export — keeps the conversation panel from re-rendering on every
+// editor keystroke / parent state change. The query inside is already gated by
+// `enabled: !!user` so it won't fire as anon, but memo eliminates the wasted
+// React render cycles that were amplifying the storm.
+export const WorkspaceConversation = memo(WorkspaceConversationInner);
+
