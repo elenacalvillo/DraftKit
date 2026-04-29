@@ -33,7 +33,20 @@ import TermsOfService from "./pages/TermsOfService";
 import RefundPolicy from "./pages/RefundPolicy";
 import PublicWorkspaceView from "./pages/PublicWorkspaceView";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // "Quiet mode" — prevents the network storm caused by browser extensions
+      // (Grammarly/LanguageTool) triggering window-focus refetches and by
+      // RLS-gated queries firing as anon → 403 → retry loops.
+      staleTime: 5 * 60 * 1000, // 5 min — data considered fresh
+      gcTime: 10 * 60 * 1000, // 10 min — keep cache around
+      refetchOnWindowFocus: false, // kills the Grammarly trigger
+      refetchOnReconnect: false, // kills WebSocket reconnect storms
+      retry: 1, // stop hammering on RLS 403s
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
