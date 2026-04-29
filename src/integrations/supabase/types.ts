@@ -831,6 +831,10 @@ export type Database = {
       }
     }
     Functions: {
+      creator_has_public_profile: {
+        Args: { _creator_id: string }
+        Returns: boolean
+      }
       get_host_capacity: { Args: { _creator_id: string }; Returns: Json }
       get_public_sheet: {
         Args: { _token: string }

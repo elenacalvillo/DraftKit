@@ -1,55 +1,80 @@
-## What's happening
+# Fix: Public Booking Pages Broken for Anonymous Visitors
 
-Dinah's 3 messages on workspace `50a88ca4...` exist in the database and are correctly accessible under RLS — I verified the rows are there and the policies on `collaboration_messages` resolve correctly for the workspace creator. The bug is **on the client**, not in the recent security migrations.
+## The Problem (confirmed by stress test)
 
-## Root cause
+The recent security hardening set `public_creator_profiles` to `security_invoker=on`. Because `creators` only has an owner-scoped SELECT policy, anon visitors (`auth.uid() IS NULL`) get zero rows from the view. This cascades into `availability`, whose public-read policy joins through that view.
 
-`src/components/requests/WorkspaceConversation.tsx` runs its `useQuery` for messages with no auth gate:
+**User-visible impact:** Every `/{username}` and `/u/{username}` booking page on draftkit.app is blank for logged-out visitors right now. The booking calendar is also dead.
 
-```ts
-const { data: messages = [] } = useQuery({
-  queryKey: ["workspace-messages", requestId, refreshKey],
-  queryFn: async () => { /* supabase.from("collaboration_messages")... */ },
-});
+**Verified safe:** All 12 other probes (creators direct access, Stripe IDs, collab_requests PII, storage, cron-protected functions, presence, messages, roles) remain locked down.
+
+## The Fix
+
+One migration. No code changes — `PublicBooking.tsx` and `Availability.tsx` already query the right view/table; they just need it to return rows for anon.
+
+### Migration: `supabase/migrations/<ts>_fix_public_profile_anon_read.sql`
+
+```sql
+-- 1. Switch the public view to security_invoker=off.
+-- Safe: the SELECT list excludes every sensitive column
+-- (stripe_*, credits, subscription_tier, referred_by, trial_ends_at,
+-- user_id, reminder_days_before). The view IS the privacy boundary.
+DROP VIEW IF EXISTS public.public_creator_profiles;
+CREATE VIEW public.public_creator_profiles
+WITH (security_invoker = off) AS
+SELECT id, username, name, bio, substack_url, newsletter_url,
+       welcome_message, profile_image_url, collab_style, collab_guidelines,
+       date_meaning, collab_mode, collab_vibe, collab_formats,
+       created_at, profile_theme
+FROM public.creators
+WHERE username IS NOT NULL;
+GRANT SELECT ON public.public_creator_profiles TO anon, authenticated;
+
+-- 2. Repair availability's public-read policy via a SECURITY DEFINER helper
+-- so policy evaluation doesn't depend on view RLS semantics.
+CREATE OR REPLACE FUNCTION public.creator_has_public_profile(_creator_id uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.creators
+    WHERE id = _creator_id AND username IS NOT NULL
+  );
+$$;
+
+DROP POLICY IF EXISTS "Public can view availability for public creators"
+  ON public.availability;
+CREATE POLICY "Public can view availability for public creators"
+ON public.availability
+FOR SELECT
+TO anon, authenticated
+USING (public.creator_has_public_profile(creator_id));
 ```
 
-Two problems combine:
+## Post-Migration Verification (I will run)
 
-1. **No `enabled` guard on `user`.** When the workspace page mounts, this query can fire before Supabase has attached the JWT to outgoing requests. The query goes out as `anon`, RLS evaluates `auth.uid() = NULL`, the subquery returns no request IDs, and the result is `[]`.
-2. **Stale empty result is cached.** `queryKey` doesn't include `user?.id`, so when auth finishes initializing the query is never invalidated. React Query keeps serving the cached empty array, which is why the conversation "loads forever then says no conversations."
+Re-run the same anon probes against the live REST API:
 
-This explains all three symptoms Dinah reported:
-- Messages exist but show as missing
-- The conversation widget hangs (initial loading skeleton) then flips to "No messages yet"
-- Restricted-workspace blocking still works (that uses the SECURITY DEFINER RPC, which is unaffected)
+1. `GET /rest/v1/public_creator_profiles?username=eq.elenacalvillo` → expect row returned
+2. `GET /rest/v1/availability?creator_id=eq.<elena_id>` → expect rows returned
+3. `GET /rest/v1/creators?select=stripe_customer_id` → still 403 ✅
+4. `GET /rest/v1/public_creator_profiles?select=stripe_customer_id` → still 42703 ✅
+5. `GET /rest/v1/collab_requests` → still `[]` ✅
+6. `POST /functions/v1/send-weekly-digest` (no secret) → still 401 ✅
 
-The recent security hardening did not delete or break the message data — the RLS policies on `collaboration_messages` are still correct.
+## What Does NOT Change
 
-## The fix
+- `creators` base-table SELECT policy (owner-only) — unchanged
+- All RLS on `collab_requests`, `collaboration_messages`, `workspace_presence`, `user_roles`, `email_events`, `fulfilled_stripe_sessions` — unchanged
+- Storage bucket policies — unchanged
+- Cron-secret edge function gates — unchanged
+- The `get_workspace_request` PII shielding for collaborators — unchanged
 
-Update `src/components/requests/WorkspaceConversation.tsx`:
+## Files Touched
 
-1. Pull `user` from `useAuth()`.
-2. Add `user?.id` to the `queryKey` so the query refetches when auth resolves.
-3. Add `enabled: !!user && !!requestId` so it only runs once we have an authenticated session.
+- **NEW** `supabase/migrations/<timestamp>_fix_public_profile_anon_read.sql`
 
-That's the entire change — one file, ~5 lines. No database migration, no policy changes.
+No frontend changes. No edge function changes.
 
-```text
-WorkspaceConversation
-├─ const { user } = useAuth()
-├─ queryKey: ["workspace-messages", requestId, user?.id, refreshKey]
-└─ enabled: !!user && !!requestId
-```
-
-## Why this is the right fix (not a database change)
-
-- Verified in DB: 3 messages present for request `50a88ca4...`, creator/requester IDs match the participants.
-- Verified RLS: `Creators can view messages for their requests` policy resolves `request_id` → `creators.user_id = auth.uid()` correctly for Dinah.
-- The Workspace page's main `fetchRequest` works because it calls a `SECURITY DEFINER` RPC that doesn't need RLS-time `auth.uid()` to be set in the same window — but it still gates on `user` in its `useEffect`. The conversation widget is the only fetch path that lacks that guard.
-
-## Files changed
-
-- `src/components/requests/WorkspaceConversation.tsx` — add auth gate + include `user?.id` in queryKey.
-
-No migrations, no security findings touched.
+Approve to switch to default mode and ship.
