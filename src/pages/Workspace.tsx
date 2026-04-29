@@ -833,8 +833,8 @@ export default function Workspace() {
                 </DialogContent>
               </Dialog>
 
-              {/* Email — hide for solo workspaces (it's your own email) */}
-              {!isSolo && (
+              {/* Email — hide for solo workspaces and for collaborators (RPC returns null email for them) */}
+              {!isSolo && request.requester_email && (
                 <div className="flex items-center gap-1">
                   <a
                     href={`mailto:${request.requester_email}`}
@@ -845,7 +845,7 @@ export default function Workspace() {
                   </a>
                   <button
                     onClick={() => {
-                      navigator.clipboard.writeText(request.requester_email);
+                      navigator.clipboard.writeText(request.requester_email!);
                       toast.success("Email copied!");
                     }}
                     title="Copy email address"
