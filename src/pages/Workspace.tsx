@@ -68,8 +68,8 @@ import { useWorkspaceCollaborators } from "@/hooks/useWorkspaceCollaborators";
 interface WorkspaceRequest {
   id: string;
   creator_id: string;
-  requester_name: string;
-  requester_email: string;
+  requester_name: string | null;
+  requester_email: string | null;
   requester_substack_url: string | null;
   requester_profile_image_url: string | null;
   requester_user_id: string | null;
