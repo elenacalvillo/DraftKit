@@ -4,6 +4,7 @@ import { MessageSquare } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
+import { useAuth } from "@/hooks/useAuth";
 
 interface WorkspaceConversationProps {
   requestId: string;
@@ -25,9 +26,12 @@ export function WorkspaceConversation({
   refreshKey = 0,
 }: WorkspaceConversationProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const { user, loading: authLoading } = useAuth();
 
   const { data: messages = [], isLoading } = useQuery({
-    queryKey: ["workspace-messages", requestId, refreshKey],
+    // Include user.id in the key so the query refetches once auth resolves —
+    // prevents serving a stale empty array fetched before the JWT was attached.
+    queryKey: ["workspace-messages", requestId, user?.id, refreshKey],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("collaboration_messages")
@@ -38,6 +42,9 @@ export function WorkspaceConversation({
       if (error) throw error;
       return (data || []) as Message[];
     },
+    // Only run once we have an authenticated session. Without this gate the
+    // query can fire as `anon`, RLS evaluates auth.uid()=NULL, and returns [].
+    enabled: !!user && !!requestId && !authLoading,
   });
 
   useEffect(() => {
