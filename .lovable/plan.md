@@ -1,80 +1,94 @@
-# Fix: Public Booking Pages Broken for Anonymous Visitors
+## What I found (and what I did NOT find)
 
-## The Problem (confirmed by stress test)
+I did NOT touch any code. I read the database, recent migrations, and the message-send code paths. Here is the honest picture:
 
-The recent security hardening set `public_creator_profiles` to `security_invoker=on`. Because `creators` only has an owner-scoped SELECT policy, anon visitors (`auth.uid() IS NULL`) get zero rows from the view. This cascades into `availability`, whose public-read policy joins through that view.
+### 1. Messages ARE flowing on the server
 
-**User-visible impact:** Every `/{username}` and `/u/{username}` booking page on draftkit.app is blank for logged-out visitors right now. The booking calendar is also dead.
+The `collaboration_messages` table has Dinah's most recent message timestamped **April 27 13:16 UTC** (2 days ago). 17 total messages from her account. So the table itself is healthy and her account has historically been able to insert.
 
-**Verified safe:** All 12 other probes (creators direct access, Stripe IDs, collab_requests PII, storage, cron-protected functions, presence, messages, roles) remain locked down.
+### 2. No DB errors, no edge function errors
 
-## The Fix
+- Postgres logs: zero `ERROR`/`FATAL` entries mentioning `collaboration_messages` or `RLS`/`denied` in the last 48 hours.
+- Edge function logs: empty for `send-collab-email` (it is fire-and-forget anyway, so a failure there would not block the modal).
 
-One migration. No code changes — `PublicBooking.tsx` and `Availability.tsx` already query the right view/table; they just need it to return rows for anon.
+### 3. The real risk: the security migrations stripped grants on `creators`
 
-### Migration: `supabase/migrations/<ts>_fix_public_profile_anon_read.sql`
+Between April 28 and 29, six migrations rewrote policies/grants on `public.creators` to fix the "Stripe columns publicly readable" finding. The current state:
 
-```sql
--- 1. Switch the public view to security_invoker=off.
--- Safe: the SELECT list excludes every sensitive column
--- (stripe_*, credits, subscription_tier, referred_by, trial_ends_at,
--- user_id, reminder_days_before). The view IS the privacy boundary.
-DROP VIEW IF EXISTS public.public_creator_profiles;
-CREATE VIEW public.public_creator_profiles
-WITH (security_invoker = off) AS
-SELECT id, username, name, bio, substack_url, newsletter_url,
-       welcome_message, profile_image_url, collab_style, collab_guidelines,
-       date_meaning, collab_mode, collab_vibe, collab_formats,
-       created_at, profile_theme
-FROM public.creators
-WHERE username IS NOT NULL;
-GRANT SELECT ON public.public_creator_profiles TO anon, authenticated;
-
--- 2. Repair availability's public-read policy via a SECURITY DEFINER helper
--- so policy evaluation doesn't depend on view RLS semantics.
-CREATE OR REPLACE FUNCTION public.creator_has_public_profile(_creator_id uuid)
-RETURNS boolean
-LANGUAGE sql STABLE SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.creators
-    WHERE id = _creator_id AND username IS NOT NULL
-  );
-$$;
-
-DROP POLICY IF EXISTS "Public can view availability for public creators"
-  ON public.availability;
-CREATE POLICY "Public can view availability for public creators"
-ON public.availability
-FOR SELECT
-TO anon, authenticated
-USING (public.creator_has_public_profile(creator_id));
+```
+authenticated  →  has_table_privilege(creators, SELECT) = false
+anon           →  has_table_privilege(creators, SELECT) = false
 ```
 
-## Post-Migration Verification (I will run)
+Column-level grants exist for safe columns (`id`, `user_id`, `name`, `username`, etc.), so the JOIN inside `collaboration_messages`' INSERT policy:
 
-Re-run the same anon probes against the live REST API:
+```
+WITH CHECK (request_id IN (
+  SELECT cr.id FROM collab_requests cr
+  JOIN creators c ON cr.creator_id = c.id
+  WHERE c.user_id = auth.uid()
+))
+```
 
-1. `GET /rest/v1/public_creator_profiles?username=eq.elenacalvillo` → expect row returned
-2. `GET /rest/v1/availability?creator_id=eq.<elena_id>` → expect rows returned
-3. `GET /rest/v1/creators?select=stripe_customer_id` → still 403 ✅
-4. `GET /rest/v1/public_creator_profiles?select=stripe_customer_id` → still 42703 ✅
-5. `GET /rest/v1/collab_requests` → still `[]` ✅
-6. `POST /functions/v1/send-weekly-digest` (no secret) → still 401 ✅
+…technically still works because `id` and `user_id` are column-granted. **But this is fragile.** Any future migration that omits a column from the grant list silently breaks message sending for creators. This is the exact "zombie policy" pattern that has bitten us twice already.
 
-## What Does NOT Change
+### 4. What I cannot tell from here
 
-- `creators` base-table SELECT policy (owner-only) — unchanged
-- All RLS on `collab_requests`, `collaboration_messages`, `workspace_presence`, `user_roles`, `email_events`, `fulfilled_stripe_sessions` — unchanged
-- Storage bucket policies — unchanged
-- Cron-secret edge function gates — unchanged
-- The `get_workspace_request` PII shielding for collaborators — unchanged
+I do not have a captured browser console error or network trace from Dinah's session showing the actual failure mode. Without that I am guessing whether:
+- (a) the Send button hangs (insert silently fails), or
+- (b) the modal does not open (UI state issue), or
+- (c) the message sends but the conversation panel does not refresh (React Query cache issue from yesterday's fix).
 
-## Files Touched
+## The plan: one small, targeted change + a verification step
 
-- **NEW** `supabase/migrations/<timestamp>_fix_public_profile_anon_read.sql`
+### Step 1 — Make `collaboration_messages` policies independent of `creators` grants
 
-No frontend changes. No edge function changes.
+Replace the two creator-side policies that JOIN to `creators` with policies that use the existing `is_request_owner(auth.uid(), request_id)` SECURITY DEFINER helper. That helper already exists, is already used by `workspace_collaborators` policies, and bypasses the column-grant fragility.
 
-Approve to switch to default mode and ship.
+```sql
+DROP POLICY "Creators can insert messages for their requests" ON collaboration_messages;
+DROP POLICY "Creators can view messages for their requests"   ON collaboration_messages;
+
+CREATE POLICY "Creators can insert messages for their requests"
+  ON collaboration_messages FOR INSERT TO authenticated
+  WITH CHECK (is_request_owner(auth.uid(), request_id));
+
+CREATE POLICY "Creators can view messages for their requests"
+  ON collaboration_messages FOR SELECT TO authenticated
+  USING (is_request_owner(auth.uid(), request_id));
+```
+
+Same change for the equivalent policies on `collab_requests` if they show the same fragile JOIN pattern (I will verify per-policy in the migration, not blindly).
+
+This removes the dependency on `creators` table grants entirely. Whatever future security pass we run, message sending stays intact.
+
+### Step 2 — Verify before declaring victory
+
+After the migration runs, I will:
+
+1. Re-run the `has_table_privilege` check to confirm policies no longer require it.
+2. Query `collaboration_messages` to confirm no rows were lost.
+3. Ask you to have Dinah send one test message and report the outcome (or paste her browser console + network tab if it still fails).
+
+### Step 3 — If Dinah's issue is NOT this
+
+Then I need her browser console error or a network 4xx/5xx response. I will not blindly add more code. The exact next debug step depends on which of (a)/(b)/(c) above is happening.
+
+## What I will NOT do in this pass
+
+- I will NOT touch React Query caching (yesterday's change is not implicated by any data I can see).
+- I will NOT touch the email edge function (it is fire-and-forget and not blocking the insert).
+- I will NOT add new policies, new tables, or new RPCs.
+- I will NOT re-run the security scanner or "fix" any other findings.
+
+One file changed (one migration). Roll-back is one DROP POLICY + recreate.
+
+## Honest cost estimate
+
+- 1 short migration (~15 lines).
+- 1 verification query.
+- Zero frontend changes.
+
+If after the migration Dinah still cannot send, the next step is **read her console log** — not write more code.
+
+Approve and I will execute exactly this and nothing more.
