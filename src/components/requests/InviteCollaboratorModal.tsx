@@ -215,6 +215,7 @@ export function InviteCollaboratorModal({
       }
 
       toast.success(`Invitation sent to ${trimmed}`);
+      trackEvent("collaborator_invited", { request_id: requestId, method: "email" });
       setEmail("");
       onInvited();
       onOpenChange(false);
