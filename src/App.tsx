@@ -57,6 +57,7 @@ const App = () => (
         <AuthProvider>
           <ScrollToTop />
           <PostAuthRedirect />
+          <PageViewTracker />
           <TrackingNotice />
           <Toaster />
           <Sonner />
