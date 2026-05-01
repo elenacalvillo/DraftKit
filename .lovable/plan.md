@@ -1,94 +1,80 @@
-## What I found (and what I did NOT find)
+## Fix the collaboration access breakage
 
-I did NOT touch any code. I read the database, recent migrations, and the message-send code paths. Here is the honest picture:
+### What I’m going to fix
 
-### 1. Messages ARE flowing on the server
+1. **Repair the backend linking logic for existing users**
+   - Add a secure insert-time reconciliation for `workspace_collaborators` so that when someone is invited by email **after they already have an account**, their `user_id` is filled immediately.
+   - Replace the current no-op `link_request_to_existing_user()` behavior for `collab_requests` so requests created for an email that already belongs to an existing account can link to that account safely.
+   - Run a one-time backfill for already-broken rows where the email matches an existing account but `user_id` / `requester_user_id` is still `NULL`.
 
-The `collaboration_messages` table has Dinah's most recent message timestamped **April 27 13:16 UTC** (2 days ago). 17 total messages from her account. So the table itself is healthy and her account has historically been able to insert.
+2. **Fix login/signup return-to-workspace flow**
+   - Preserve the intended workspace URL through:
+     - `/login`
+     - `/signup`
+     - Google sign-in
+   - Update post-auth redirect logic so **non-creators** (requesters and invited collaborators) are sent back to their workspace too, instead of only creators being auto-routed correctly.
 
-### 2. No DB errors, no edge function errors
+3. **Keep access secure without loosening RLS**
+   - Do **not** weaken workspace security.
+   - Keep the current participant-based access model.
+   - Only fix the identity-linking and redirect path so legitimate participants can reach their collaboration again.
 
-- Postgres logs: zero `ERROR`/`FATAL` entries mentioning `collaboration_messages` or `RLS`/`denied` in the last 48 hours.
-- Edge function logs: empty for `send-collab-email` (it is fire-and-forget anyway, so a failure there would not block the modal).
+4. **Verify against the actual broken cases**
+   - Re-check the currently orphaned invite rows.
+   - Re-check direct workspace access for a requester-owned collaboration.
+   - Re-check direct workspace access for an invited collaborator.
+   - Confirm the app redirects back to the exact workspace after auth.
 
-### 3. The real risk: the security migrations stripped grants on `creators`
+---
 
-Between April 28 and 29, six migrations rewrote policies/grants on `public.creators` to fix the "Stripe columns publicly readable" finding. The current state:
+## What I found
 
-```
-authenticated  →  has_table_privilege(creators, SELECT) = false
-anon           →  has_table_privilege(creators, SELECT) = false
-```
+There are **two separate failures** causing the mess:
 
-Column-level grants exist for safe columns (`id`, `user_id`, `name`, `username`, etc.), so the JOIN inside `collaboration_messages`' INSERT policy:
+### A. Existing-account collaborators are not being linked
+Your database currently has at least one collaborator invite where:
+- the invite email matches a real account,
+- but `workspace_collaborators.user_id` is still `NULL`.
 
-```
-WITH CHECK (request_id IN (
-  SELECT cr.id FROM collab_requests cr
-  JOIN creators c ON cr.creator_id = c.id
-  WHERE c.user_id = auth.uid()
-))
-```
+That means the row exists, but RLS still denies access because policies check `user_id = auth.uid()`.
 
-…technically still works because `id` and `user_id` are column-granted. **But this is fragile.** Any future migration that omits a column from the grant list silently breaks message sending for creators. This is the exact "zombie policy" pattern that has bitten us twice already.
+In plain English: the invitation exists, but the app never “attaches” it to the actual signed-in user.
 
-### 4. What I cannot tell from here
+### B. Direct workspace links are not surviving auth properly
+The frontend preserves `state.from` for email/password login, but the Google auth flow does **not** preserve the original workspace destination. On top of that, the login page only auto-redirects when a `creator` profile exists.
 
-I do not have a captured browser console error or network trace from Dinah's session showing the actual failure mode. Without that I am guessing whether:
-- (a) the Send button hangs (insert silently fails), or
-- (b) the modal does not open (UI state issue), or
-- (c) the message sends but the conversation panel does not refresh (React Query cache issue from yesterday's fix).
+That is wrong for guests and invited collaborators.
 
-## The plan: one small, targeted change + a verification step
+In plain English: even when someone is a valid participant, the auth flow can dump them in the wrong place.
 
-### Step 1 — Make `collaboration_messages` policies independent of `creators` grants
+---
 
-Replace the two creator-side policies that JOIN to `creators` with policies that use the existing `is_request_owner(auth.uid(), request_id)` SECURITY DEFINER helper. That helper already exists, is already used by `workspace_collaborators` policies, and bypasses the column-grant fragility.
+## Technical details
 
-```sql
-DROP POLICY "Creators can insert messages for their requests" ON collaboration_messages;
-DROP POLICY "Creators can view messages for their requests"   ON collaboration_messages;
+### Files to update
+- `supabase/migrations/...sql`
+- `src/pages/Login.tsx`
+- `src/pages/Signup.tsx`
+- likely `src/hooks/useAuth.tsx` or auth redirect handling if needed for OAuth restore
 
-CREATE POLICY "Creators can insert messages for their requests"
-  ON collaboration_messages FOR INSERT TO authenticated
-  WITH CHECK (is_request_owner(auth.uid(), request_id));
+### Database changes
+- Add or replace a trigger/function so `public.workspace_collaborators` sets `user_id` from `auth.users` by normalized email on insert.
+- Replace the current no-op `public.link_request_to_existing_user()` with a safe normalized-email matcher for `collab_requests` inserts.
+- Backfill existing broken rows where matching auth users already exist.
+- Keep RLS unchanged unless a very small policy adjustment is strictly required for the repaired path.
 
-CREATE POLICY "Creators can view messages for their requests"
-  ON collaboration_messages FOR SELECT TO authenticated
-  USING (is_request_owner(auth.uid(), request_id));
-```
+### Frontend changes
+- Preserve the target workspace path through login/signup and Google auth.
+- Redirect authenticated non-creator users back to the original workspace instead of stalling on generic auth pages.
 
-Same change for the equivalent policies on `collab_requests` if they show the same fragile JOIN pattern (I will verify per-policy in the migration, not blindly).
+---
 
-This removes the dependency on `creators` table grants entirely. Whatever future security pass we run, message sending stays intact.
+## Success criteria
 
-### Step 2 — Verify before declaring victory
+- Invited collaborators can open their collaboration after logging in.
+- Requesters can open their collaboration after logging in/signing up.
+- Google sign-in returns users to the collaboration they started from.
+- No RLS rollback, no public exposure, no “open access” shortcut.
+- Known orphaned access rows are repaired.
 
-After the migration runs, I will:
-
-1. Re-run the `has_table_privilege` check to confirm policies no longer require it.
-2. Query `collaboration_messages` to confirm no rows were lost.
-3. Ask you to have Dinah send one test message and report the outcome (or paste her browser console + network tab if it still fails).
-
-### Step 3 — If Dinah's issue is NOT this
-
-Then I need her browser console error or a network 4xx/5xx response. I will not blindly add more code. The exact next debug step depends on which of (a)/(b)/(c) above is happening.
-
-## What I will NOT do in this pass
-
-- I will NOT touch React Query caching (yesterday's change is not implicated by any data I can see).
-- I will NOT touch the email edge function (it is fire-and-forget and not blocking the insert).
-- I will NOT add new policies, new tables, or new RPCs.
-- I will NOT re-run the security scanner or "fix" any other findings.
-
-One file changed (one migration). Roll-back is one DROP POLICY + recreate.
-
-## Honest cost estimate
-
-- 1 short migration (~15 lines).
-- 1 verification query.
-- Zero frontend changes.
-
-If after the migration Dinah still cannot send, the next step is **read her console log** — not write more code.
-
-Approve and I will execute exactly this and nothing more.
+If you approve this, I’ll implement it as one backend migration plus the auth redirect fixes, then verify the known broken collaboration paths.
