@@ -146,6 +146,7 @@ export function InviteCollaboratorModal({
         }
 
         toast.success(`Invited ${creator.name || creator.username}`);
+        trackEvent("collaborator_invited", { request_id: requestId, method: "profile" });
         onInvited();
         onOpenChange(false);
       } catch (err: any) {
