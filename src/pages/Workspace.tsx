@@ -211,6 +211,10 @@ export default function Workspace() {
       const data = Array.isArray(rows) ? (rows[0] as any) : (rows as any);
 
       if (error || !data) {
+        trackEvent("workspace_access_denied", {
+          request_id: requestId,
+          reason: error?.message || "no_row",
+        });
         setNotFound(true);
         setLoading(false);
         return;
@@ -240,8 +244,23 @@ export default function Workspace() {
         .maybeSingle();
 
       setCreatorInfo(cInfo as CreatorInfo | null);
+
+      // Stamp joined_at for invited collaborators the first time they
+      // open the workspace — keeps the Writer's Room "Joined" badge truthful.
+      // No-op for owner/requester; safe for already-stamped rows.
+      supabase.rpc("stamp_collaborator_joined", { _request_id: requestId! }).then(() => {});
+
+      trackEvent("workspace_opened", {
+        request_id: requestId,
+        status: data.status,
+        is_solo: !!data.is_solo,
+      });
     } catch (err) {
       console.error("Error fetching workspace request:", err);
+      trackEvent("workspace_access_denied", {
+        request_id: requestId,
+        reason: "exception",
+      });
       setNotFound(true);
     } finally {
       setLoading(false);
@@ -1097,6 +1116,7 @@ export default function Workspace() {
                                 toast.error("Failed to remove collaborator");
                               } else {
                                 toast.success(`Access revoked for ${name}`);
+                                trackEvent("collaborator_removed", { request_id: requestId });
                                 refetchCollaborators();
                               }
                             }}

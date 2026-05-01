@@ -23,11 +23,21 @@ export type AnalyticsEventType =
   | "collab_declined"
   | "collab_cancelled"
   | "collab_type_changed"
-  // New events for funnel analytics
+  // Funnel analytics
   | "analyze_collab_match_invoked"
   | "ai_match_suggestion_selected"
   | "draft_regeneration_requested"
-  | "collab_rescheduled";
+  | "collab_rescheduled"
+  // Workspace observability — added so we can detect access regressions
+  // (e.g. broken collaborator visibility) without users having to report.
+  | "workspace_opened"
+  | "workspace_access_denied"
+  | "workspace_message_sent"
+  | "collaborator_invited"
+  | "collaborator_removed"
+  | "profile_theme_changed"
+  | "profile_theme_upgrade_prompt_shown"
+  | "directory_waitlist_signup";
 
 function getOrCreateSessionId(): string {
   let sessionId = sessionStorage.getItem("draftkit_session_id");

@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 interface GuestMessageModalProps {
   open: boolean;
@@ -32,6 +33,7 @@ export function GuestMessageModal({
 }: GuestMessageModalProps) {
   const [message, setMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const { trackEvent } = useAnalytics();
 
   const handleSend = async () => {
     if (!message.trim()) {
@@ -51,6 +53,8 @@ export function GuestMessageModal({
       });
 
       if (error) throw error;
+
+      trackEvent("workspace_message_sent", { request_id: requestId, sender_type: "requester" });
 
       // Send email notification to the creator
       supabase.functions.invoke('send-collab-email', {

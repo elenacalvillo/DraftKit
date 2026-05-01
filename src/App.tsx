@@ -8,6 +8,7 @@ import { FeedbackWidget } from "@/components/feedback/FeedbackWidget";
 import { TrackingNotice } from "@/components/privacy/TrackingNotice";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { PostAuthRedirect } from "@/components/auth/PostAuthRedirect";
+import { PageViewTracker } from "@/components/analytics/PageViewTracker";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
@@ -56,6 +57,7 @@ const App = () => (
         <AuthProvider>
           <ScrollToTop />
           <PostAuthRedirect />
+          <PageViewTracker />
           <TrackingNotice />
           <Toaster />
           <Sonner />

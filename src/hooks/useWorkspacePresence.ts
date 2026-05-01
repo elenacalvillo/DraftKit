@@ -41,16 +41,15 @@ export function useWorkspacePresence({
       );
   }, [requestId, userId, userName]);
 
-  // Clear presence on stop editing
+  // Clear presence on stop editing — DELETE the row instead of poisoning
+  // the timestamp with a 1970 sentinel. The polling cutoff already filters
+  // out rows older than 60s, but deleting keeps the table truthful and
+  // prevents misleading "1970-01-01" reads in admin/db tools.
   const clearPresence = useCallback(async () => {
     if (!userId) return;
-    // Set last_active_at far in the past to signal "not editing"
     await supabase
       .from("workspace_presence")
-      .update({
-        last_active_at: new Date(0).toISOString(),
-        has_unsaved: false,
-      } as any)
+      .delete()
       .eq("request_id", requestId)
       .eq("user_id", userId);
   }, [requestId, userId]);

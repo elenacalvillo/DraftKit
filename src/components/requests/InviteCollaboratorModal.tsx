@@ -6,6 +6,7 @@ import { UserPlus, Search, Mail, ArrowLeft, Eye, Copy, Check } from "lucide-reac
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 interface InviteCollaboratorModalProps {
   open: boolean;
@@ -36,6 +37,7 @@ export function InviteCollaboratorModal({
   const [results, setResults] = useState<CreatorProfile[]>([]);
   const [searching, setSearching] = useState(false);
   const [invitingId, setInvitingId] = useState<string | null>(null);
+  const { trackEvent } = useAnalytics();
 
   // Email fallback state
   const [email, setEmail] = useState("");
@@ -144,6 +146,7 @@ export function InviteCollaboratorModal({
         }
 
         toast.success(`Invited ${creator.name || creator.username}`);
+        trackEvent("collaborator_invited", { request_id: requestId, method: "profile" });
         onInvited();
         onOpenChange(false);
       } catch (err: any) {
@@ -212,6 +215,7 @@ export function InviteCollaboratorModal({
       }
 
       toast.success(`Invitation sent to ${trimmed}`);
+      trackEvent("collaborator_invited", { request_id: requestId, method: "email" });
       setEmail("");
       onInvited();
       onOpenChange(false);
