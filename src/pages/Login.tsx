@@ -60,9 +60,25 @@ export default function Login() {
    }, []);
 
   useEffect(() => {
-    if (!loading && user && creator) {
-      const from = (location.state as any)?.from?.pathname || "/dashboard";
-      navigate(from, { replace: true });
+    if (loading) return;
+    if (!user) return;
+    const from = (location.state as any)?.from?.pathname || null;
+    // If the user came from a non-creator-only deep link (e.g. a workspace
+    // or sent-requests page), send them there immediately — invited
+    // collaborators may not have a creator profile and shouldn't be
+    // stuck on the login screen waiting for one.
+    const isWorkspaceOrGuestPath =
+      !!from &&
+      (from.startsWith("/dashboard/workspace/") ||
+        from.startsWith("/dashboard/my-requests") ||
+        from.startsWith("/retro/") ||
+        from.startsWith("/view/"));
+    if (isWorkspaceOrGuestPath) {
+      navigate(from!, { replace: true });
+      return;
+    }
+    if (creator) {
+      navigate(from || "/dashboard", { replace: true });
     }
   }, [user, creator, loading, navigate, location.state]);
 
@@ -149,8 +165,13 @@ export default function Login() {
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
+    // Persist the intended return path through the Google redirect round-trip.
+    const from = (location.state as any)?.from?.pathname || null;
+    if (from) {
+      try { sessionStorage.setItem("postAuthRedirect", from); } catch {}
+    }
     const { error } = await signInWithGoogle();
-    
+
     if (error) {
       toast.error(error.message || "Failed to sign in with Google");
       setIsGoogleLoading(false);

@@ -197,8 +197,13 @@ export default function Signup() {
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
+    // Preserve any intended return path (e.g. ?next=/dashboard/workspace/...)
+    const next = searchParams.get("next");
+    if (next && next.startsWith("/")) {
+      try { sessionStorage.setItem("postAuthRedirect", next); } catch {}
+    }
     const { error } = await signInWithGoogle();
-    
+
     if (error) {
       toast.error(error.message || "Failed to sign in with Google");
       setIsGoogleLoading(false);
