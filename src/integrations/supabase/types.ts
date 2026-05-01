@@ -896,6 +896,11 @@ export type Database = {
         Args: { _request_id: string; _user_id: string }
         Returns: boolean
       }
+      normalize_email: { Args: { _email: string }; Returns: string }
+      stamp_collaborator_joined: {
+        Args: { _request_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "user" | "pro"
