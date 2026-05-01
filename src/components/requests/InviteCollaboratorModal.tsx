@@ -37,6 +37,7 @@ export function InviteCollaboratorModal({
   const [results, setResults] = useState<CreatorProfile[]>([]);
   const [searching, setSearching] = useState(false);
   const [invitingId, setInvitingId] = useState<string | null>(null);
+  const { trackEvent } = useAnalytics();
 
   // Email fallback state
   const [email, setEmail] = useState("");
