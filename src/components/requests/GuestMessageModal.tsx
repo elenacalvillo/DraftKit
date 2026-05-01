@@ -54,6 +54,8 @@ export function GuestMessageModal({
 
       if (error) throw error;
 
+      trackEvent("workspace_message_sent", { request_id: requestId, sender_type: "requester" });
+
       // Send email notification to the creator
       supabase.functions.invoke('send-collab-email', {
         body: { 
