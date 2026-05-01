@@ -35,6 +35,7 @@ export function SendMessageModal({
 }: SendMessageModalProps) {
   const [message, setMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const { trackEvent } = useAnalytics();
 
   const handleSend = async () => {
     if (!message.trim()) {
