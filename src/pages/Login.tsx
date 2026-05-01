@@ -165,8 +165,13 @@ export default function Login() {
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
+    // Persist the intended return path through the Google redirect round-trip.
+    const from = (location.state as any)?.from?.pathname || null;
+    if (from) {
+      try { sessionStorage.setItem("postAuthRedirect", from); } catch {}
+    }
     const { error } = await signInWithGoogle();
-    
+
     if (error) {
       toast.error(error.message || "Failed to sign in with Google");
       setIsGoogleLoading(false);
