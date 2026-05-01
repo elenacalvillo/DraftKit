@@ -1116,6 +1116,7 @@ export default function Workspace() {
                                 toast.error("Failed to remove collaborator");
                               } else {
                                 toast.success(`Access revoked for ${name}`);
+                                trackEvent("collaborator_removed", { request_id: requestId });
                                 refetchCollaborators();
                               }
                             }}
