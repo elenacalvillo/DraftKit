@@ -1,65 +1,37 @@
-## Fix: "priceId is required" + missing Project tier schema
+# Restore broken table grants (data is safe)
 
-### Root cause
-1. The "Upgrade to Project tier" button calls `create-checkout` with `{ plan: "project" }`. The function reads `Deno.env.get("PROJECT_TIER_PRICE_ID")` to resolve the Stripe price — that secret is not set, so it returns `priceId is required`.
-2. The Project tier code (`useProjects`, `useProjectMembers`, `useProjectChapters`, `useProjectBroadcasts`, `project-broadcast` edge function, `ProjectDetail.tsx`, `Projects.tsx`) references tables (`projects`, `project_members`, `project_broadcasts`), columns on `collab_requests` (`project_id`, `is_project_workspace`, `chapter_order`), and an RPC (`is_project_owner`) that **do not exist in the database**. The generated `src/integrations/supabase/types.ts` has zero references to them, which is the build-error source.
+## Diagnosis
 
-I already created the Stripe product/price via the Stripe API:
-- Product: `prod_URe679o408Efnc` — "DraftKit Project Tier"
-- Price: `price_1TSknqAgAh00fVW1Opx4dfq7` — $49.00 USD / month
+Your account `e12cb16e…` still has its full creator profile (`elenacalvillo`, "Elena Calvillo", created Jan 9). The other test account is also intact. **No data was lost.**
 
-### What I'll do once approved
+The recent security migration that tried to switch `creators` to column-level GRANTs ended up revoking all privileges from `anon` and `authenticated`. Current state:
 
-**1. Add the `PROJECT_TIER_PRICE_ID` secret**
-Prompt for it via `add_secret` and have you paste `price_1TSknqAgAh00fVW1Opx4dfq7`. The `create-checkout` function already reads this env var — no code change needed.
-
-**2. Migration: create the Project tier schema**
-
-```text
-projects
-  id uuid PK, creator_id uuid -> creators.id, title text NOT NULL,
-  description text, is_archived bool DEFAULT false,
-  created_at, updated_at timestamptz
-
-project_members
-  id uuid PK, project_id uuid -> projects.id ON DELETE CASCADE,
-  email text NOT NULL, user_id uuid (auto-linked via existing
-  normalize_email pattern), role text CHECK IN
-  ('admin','chapter_writer','peer_reviewer','cross_chapter_reviewer'),
-  invited_by uuid, invited_at timestamptz DEFAULT now(),
-  joined_at timestamptz, UNIQUE(project_id, lower(email))
-
-project_broadcasts
-  id uuid PK, project_id uuid -> projects.id ON DELETE CASCADE,
-  sender_id uuid, sender_name text, message text,
-  recipient_count int, created_at timestamptz
-
-collab_requests (new columns, all nullable / safe defaults)
-  project_id uuid REFERENCES projects(id),
-  is_project_workspace bool DEFAULT false,
-  chapter_order int
+```
+public.creators grants → only sandbox_exec has SELECT/INSERT
+authenticated → (nothing)
+anon          → (nothing)
 ```
 
-**3. RLS policies (least privilege, mirroring existing patterns)**
-- `projects`: owner (creator) full RW; members SELECT only.
-- `project_members`: project owner full RW; member can SELECT own row.
-- `project_broadcasts`: project owner INSERT/SELECT; members SELECT only. Direct INSERT denied for non-owners (the edge function uses service role).
-- `collab_requests` policies are unchanged — new columns are covered by the existing policies.
+In Postgres, RLS runs *after* table grants. No grant = no rows returned, even when RLS would allow it. That's why `fetchCreator()` in `useAuth.tsx` returns `null` and `ProtectedRoute` bounces you into `/signup` onboarding.
 
-**4. Helper RPC** `is_project_owner(_user_id uuid, _project_id uuid)` — `SECURITY DEFINER`, returns boolean. Used by `project-broadcast` and policies. Mirrors `is_request_owner`.
+The same migration likely also stripped grants on other tables touched by the security pass (`collab_requests`, workspace tables, etc.), which would explain the earlier "can't see Dinah's collabs" report.
 
-**5. Auto-link `project_members` triggers**
-Reuse the same `normalize_email` pattern already in place: BEFORE INSERT trigger to set `user_id` if a matching `auth.users` row exists; ON auth.users INSERT, also link orphaned member rows. Sets `joined_at = now()` when linked.
+## Fix
 
-**6. Code follow-ups (small)**
-- After the migration runs, `src/integrations/supabase/types.ts` is regenerated automatically by the Supabase integration — that resolves the TS build errors in the four hooks and the `project-broadcast` function.
-- No changes to `create-checkout/index.ts` — it already supports `plan: "project"` via the env var.
+A single migration that restores standard table-level grants while keeping RLS as the actual access gate.
 
-### Verification
-1. `Subscription` page → "Upgrade to Project tier" → opens a Stripe checkout for $49/mo.
-2. `useProjects`, `useProjectMembers`, `useProjectBroadcasts`, `useProjectChapters` compile cleanly.
-3. `project-broadcast` edge function returns 200 for an owner with members; 403 for a non-owner.
-4. Existing collaboration flows (RLS on `collab_requests`, `workspace_collaborators`, presence) are untouched.
+1. **`creators`** — grant `SELECT, INSERT, UPDATE, DELETE` to `authenticated`. RLS already restricts to `auth.uid() = user_id` for read/update/delete. No grant to `anon` (public profile data is now served via the `creators_public` view per the earlier security work).
+2. **Audit & restore grants** on every table the security migrations touched. I'll enumerate `information_schema.role_table_grants` for `public.*` and re-grant the standard CRUD set to `authenticated` wherever it was wiped, leaving `anon` only where a public-facing view/policy exists.
+3. **Verify the `creators_public` view** still has `SELECT` granted to `anon, authenticated` so public booking pages keep working.
+4. **Smoke test** after deploy: confirm `select * from creators where user_id = auth.uid()` returns the row when impersonating an authenticated user, and confirm `/dashboard` no longer redirects to `/signup`.
 
-### Out of scope
-No security policy rewrites, no changes to existing collab tables, no Pro logic changes — this plan only adds the missing Project tier wiring.
+## Why this is safe
+
+- Grants only re-enable the *ability* to query; RLS policies (already in place: `Creators can view own profile`, etc.) continue to enforce row-level access.
+- No schema changes, no data writes, no policy edits — purely restoring privileges that should never have been removed.
+- The "zombie policy" cleanup from the security memory is preserved; we are not re-introducing the old `Public profile columns readable` policy.
+
+## Out of scope (separate follow-ups)
+
+- The `1970-01-01` timestamps you saw — likely a `to_timestamp(0)` default or null-coalesce somewhere; I'll investigate after your account is unblocked.
+- Analytics event coverage audit — track separately once you're back in.
