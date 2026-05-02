@@ -1,37 +1,57 @@
-# Restore broken table grants (data is safe)
+## The situation
 
-## Diagnosis
+Today, access to Book Projects is controlled by `hasProjectAccess()` in `src/lib/access.ts`, which returns `true` only when `creators.subscription_tier === 'project'`. That's the right architecture — but two things are wrong in practice:
 
-Your account `e12cb16e…` still has its full creator profile (`elenacalvillo`, "Elena Calvillo", created Jan 9). The other test account is also intact. **No data was lost.**
+1. **Founding Members are *not* automatically getting Projects.** Their tier is `pro` (or granted via the `pro` role), not `project`. So you, as a Founding Member, do **not** currently have access. Good — that matches what you want.
+2. **But the Membership page (`/dashboard/subscription`) hides the Project tier upgrade card from anyone who is already Pro/Founder.** `Subscription.tsx` early-returns View A for `isPro && !isInTrial`, which is why you can't see any "Upgrade to Project tier" button. That's the screenshot you're looking at.
 
-The recent security migration that tried to switch `creators` to column-level GRANTs ended up revoking all privileges from `anon` and `authenticated`. Current state:
+So the policy you want is already enforceable; the UI just doesn't expose the upsell to existing Pro members.
 
-```
-public.creators grants → only sandbox_exec has SELECT/INSERT
-authenticated → (nothing)
-anon          → (nothing)
-```
+## What this plan does
 
-In Postgres, RLS runs *after* table grants. No grant = no rows returned, even when RLS would allow it. That's why `fetchCreator()` in `useAuth.tsx` returns `null` and `ProtectedRoute` bounces you into `/signup` onboarding.
+### 1. Confirm the access policy (no code change, just documentation)
 
-The same migration likely also stripped grants on other tables touched by the security pass (`collab_requests`, workspace tables, etc.), which would explain the earlier "can't see Dinah's collabs" report.
+- Free → no Pro, no Projects
+- Pro (paid or Founding Member) → Pro features only, **no** Book Projects
+- Project ($49/mo) → superset of Pro, **plus** Book Projects (chapters, members, broadcasts, 1 GB image storage)
 
-## Fix
+This is already what `hasProjectAccess()` enforces. No DB or gate changes needed.
 
-A single migration that restores standard table-level grants while keeping RLS as the actual access gate.
+### 2. Surface the Project upgrade card to Pro & Founding Members
 
-1. **`creators`** — grant `SELECT, INSERT, UPDATE, DELETE` to `authenticated`. RLS already restricts to `auth.uid() = user_id` for read/update/delete. No grant to `anon` (public profile data is now served via the `creators_public` view per the earlier security work).
-2. **Audit & restore grants** on every table the security migrations touched. I'll enumerate `information_schema.role_table_grants` for `public.*` and re-grant the standard CRUD set to `authenticated` wherever it was wiped, leaving `anon` only where a public-facing view/policy exists.
-3. **Verify the `creators_public` view** still has `SELECT` granted to `anon, authenticated` so public booking pages keep working.
-4. **Smoke test** after deploy: confirm `select * from creators where user_id = auth.uid()` returns the row when impersonating an authenticated user, and confirm `/dashboard` no longer redirects to `/signup`.
+In `src/pages/Subscription.tsx`, the "View A" branch (Founders / paid Pro) currently shows: status card, features list, credits, Creator Discovery teaser, Manage Billing. Add a **"Add Book Projects — $49/mo"** card to View A, between the features list and the credits section, that:
 
-## Why this is safe
+- Explains Book Projects are an add-on tier (chapters, roles, broadcasts, 1 GB images).
+- Notes clearly: "Founding Member benefits don't include Book Projects — this is a separate tier."
+- Has an "Upgrade to Project tier" button that calls the existing `handleProjectCheckout()` (already wired to Stripe + `PROJECT_TIER_PRICE_ID`).
+- Is only shown when the user is **not** already on the `project` tier (use `tier !== 'project'` from `usePro()`).
 
-- Grants only re-enable the *ability* to query; RLS policies (already in place: `Creators can view own profile`, etc.) continue to enforce row-level access.
-- No schema changes, no data writes, no policy edits — purely restoring privileges that should never have been removed.
-- The "zombie policy" cleanup from the security memory is preserved; we are not re-introducing the old `Public profile columns readable` policy.
+For users already on `project`, replace the card with a small confirmation badge ("Book Projects active").
 
-## Out of scope (separate follow-ups)
+### 3. Make the gate visible everywhere else
 
-- The `1970-01-01` timestamps you saw — likely a `to_timestamp(0)` default or null-coalesce somewhere; I'll investigate after your account is unblocked.
-- Analytics event coverage audit — track separately once you're back in.
+- `ProjectUpgradePrompt.tsx` is already shown on `/dashboard/projects` and `ProjectDetail.tsx` for non-project tiers, including Founders. Verify the copy reflects that this is a paid add-on (not "upgrade to Pro"). Tweak the heading to "Book Projects are a paid add-on" and keep the CTA pointing at `/dashboard/subscription?plan=project`.
+- Sidebar/nav: if a "Projects" entry is shown to Pro/Free users, leave it visible (it routes to the upsell screen). No change needed unless you'd prefer to hide it entirely — let me know.
+
+### 4. Clarify Founding Member copy
+
+Update the Founding Member status card copy from:
+
+> "You helped build DraftKit from day one. All Pro features are yours, forever."
+
+to keep the same warmth but set the expectation:
+
+> "You helped build DraftKit from day one. All Pro features are yours, forever. Book Projects are a separate add-on tier."
+
+## Files touched
+
+- `src/pages/Subscription.tsx` — add Project upgrade card to View A; tweak Founding Member copy.
+- `src/components/projects/ProjectUpgradePrompt.tsx` — sharpen heading/subhead so it reads as a paid add-on, not a Pro upsell.
+
+No DB migrations, no edge function changes, no Stripe changes — the `PROJECT_TIER_PRICE_ID` and `create-checkout` flow are already in place from the previous round.
+
+## Out of scope (flag if you want them)
+
+- Granting any specific Founding Members complimentary Project access (would need a per-user override; not done by default).
+- Hiding the Projects nav entry entirely for non-project users.
+- Building a downgrade/cancel flow specific to the Project tier (today it routes through the standard Stripe customer portal).
