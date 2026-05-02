@@ -21,6 +21,8 @@ interface Creator {
   collab_formats: string | null;
   reminder_days_before: number | null;
   profile_theme: Record<string, unknown> | null;
+  subscription_tier: string | null;
+  trial_ends_at: string | null;
   created_at: string;
   updated_at: string;
 }
