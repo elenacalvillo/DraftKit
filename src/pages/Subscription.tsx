@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Crown, Sparkles, Users, MessageSquare, PenLine, Palette, Rocket, Check, Heart, Coins, UserPlus } from "lucide-react";
+import { Crown, Sparkles, Users, MessageSquare, PenLine, Palette, Rocket, Check, Heart, Coins, UserPlus, BookMarked } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
