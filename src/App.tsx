@@ -34,6 +34,8 @@ import AgentInfo from "./pages/AgentInfo";
 import TermsOfService from "./pages/TermsOfService";
 import RefundPolicy from "./pages/RefundPolicy";
 import PublicWorkspaceView from "./pages/PublicWorkspaceView";
+import Projects from "./pages/Projects";
+import ProjectDetail from "./pages/ProjectDetail";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -81,6 +83,8 @@ const App = () => (
             <Route path="/dashboard/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="/dashboard/subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
             <Route path="/dashboard/discovery" element={<ProtectedRoute><Discovery /></ProtectedRoute>} />
+            <Route path="/dashboard/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
+            <Route path="/dashboard/projects/:projectId" element={<ProtectedRoute><ProjectDetail /></ProtectedRoute>} />
             <Route path="/dashboard/workspace/:requestId" element={<ProtectedRoute requireCreator={false}><Workspace /></ProtectedRoute>} />
             <Route path="/admin/analytics" element={<ProtectedRoute requireCreator={false}><AdminAnalytics /></ProtectedRoute>} />
             <Route path="/retro/:collabId" element={<ProtectedRoute requireCreator={false}><Retrospective /></ProtectedRoute>} />

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { hasProAccess } from "@/lib/access";
 
 interface CreatorProStatus {
   isPro: boolean;
@@ -8,10 +9,13 @@ interface CreatorProStatus {
 
 /**
  * Checks whether the HOST creator has Pro access.
- * 
+ *
  * IMPORTANT: This hook is now ONLY used to determine if the host is a paying/founder member
  * for features like AI draft generation. It does NOT gate workspace access.
  * Workspace access is always open for approved/published collabs regardless of tier.
+ *
+ * The 'project' tier is treated as a SUPERSET of 'pro' — Project tier
+ * users pass any existing Pro feature gate.
  */
 export function useCreatorPro(creatorId: string | undefined): CreatorProStatus {
   const { data, isLoading } = useQuery({
@@ -34,9 +38,11 @@ export function useCreatorPro(creatorId: string | undefined): CreatorProStatus {
       };
 
       const isInTrial = trial_ends_at ? new Date(trial_ends_at) > new Date() : false;
-      const isSubPro = subscription_tier === "pro";
-
-      if (isSubPro || isInTrial) return true;
+      // hasProAccess covers BOTH 'pro' and 'project' tiers (project
+      // is a superset). Trial users also pass.
+      if (hasProAccess({ subscription_tier, trial_ends_at }) || isInTrial) {
+        return true;
+      }
 
       // Also check user_roles table for 'pro' role (early adopters / VIP grants)
       const { data: roleData } = await supabase.rpc("has_role", {
