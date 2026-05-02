@@ -255,6 +255,13 @@ export default function Subscription() {
     return (
       <DashboardLayout>
         <div className="max-w-xl mx-auto">
+          {syncing && (
+            <Card className="mb-4 border-primary/30 bg-primary/5">
+              <CardContent className="p-4 text-sm text-center text-muted-foreground">
+                Activating your subscription… this can take a few seconds.
+              </CardContent>
+            </Card>
+          )}
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-2 mb-3">
               <Crown className="w-6 h-6 text-primary" />
