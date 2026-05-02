@@ -447,6 +447,7 @@ export type Database = {
           profile_theme: Json | null
           referred_by: string | null
           reminder_days_before: number | null
+          storage_used_bytes: number
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
           subscription_tier: string | null
@@ -475,6 +476,7 @@ export type Database = {
           profile_theme?: Json | null
           referred_by?: string | null
           reminder_days_before?: number | null
+          storage_used_bytes?: number
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           subscription_tier?: string | null
@@ -503,6 +505,7 @@ export type Database = {
           profile_theme?: Json | null
           referred_by?: string | null
           reminder_days_before?: number | null
+          storage_used_bytes?: number
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           subscription_tier?: string | null
@@ -1029,6 +1032,10 @@ export type Database = {
       has_workspace_access: {
         Args: { _request_id: string; _user_id: string }
         Returns: boolean
+      }
+      increment_storage_used: {
+        Args: { _creator_id: string; _delta_bytes: number }
+        Returns: undefined
       }
       is_collab_participant: { Args: { _user_id: string }; Returns: boolean }
       is_pro_user: { Args: { _user_id: string }; Returns: boolean }
