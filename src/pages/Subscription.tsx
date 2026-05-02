@@ -48,17 +48,54 @@ export default function Subscription() {
   const isPaidPro = isPro && !isInTrial && !!creatorBilling?.stripe_customer_id;
   const creditBalance = creatorBilling?.credits ?? 3;
 
-  // Handle success params
+  const [syncing, setSyncing] = useState(false);
+
+  // Handle success params — poll check-subscription until the DB
+  // reflects the paid tier (covers webhook delays / missing webhook).
   useEffect(() => {
-    if (searchParams.get("success") === "true") {
-      toast({
-        title: "Welcome to the Engine 🎉",
-        description: "Your workspace is now unlocked. All Pro features are active.",
-      });
-      searchParams.delete("success");
-      setSearchParams(searchParams, { replace: true });
-    }
-  }, []);
+    const isSuccess =
+      searchParams.get("success") === "true" ||
+      searchParams.get("pro_activated") === "true";
+    if (!isSuccess || !user) return;
+
+    let cancelled = false;
+    setSyncing(true);
+
+    (async () => {
+      const MAX = 10;
+      for (let i = 0; i < MAX && !cancelled; i++) {
+        try {
+          const { data } = await supabase.functions.invoke("check-subscription");
+          const t = (data as { tier?: string } | null)?.tier;
+          if (t && t !== "free") {
+            await queryClient.invalidateQueries({ queryKey: ["isPro"] });
+            await queryClient.invalidateQueries({ queryKey: ["creator-billing", user.id] });
+            if (!cancelled) {
+              toast({
+                title: t === "project" ? "Book Projects unlocked 🎉" : "Welcome to Pro 🎉",
+                description: "Your subscription is active.",
+              });
+            }
+            break;
+          }
+        } catch {
+          // keep polling
+        }
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+      if (!cancelled) {
+        setSyncing(false);
+        searchParams.delete("success");
+        searchParams.delete("pro_activated");
+        setSearchParams(searchParams, { replace: true });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   // Handle credit fulfillment
   useEffect(() => {
@@ -101,7 +138,7 @@ export default function Subscription() {
         body: { priceId, returnTo },
       });
       if (error) throw error;
-      if (data?.url) window.open(data.url, "_blank");
+      if (data?.url) window.location.href = data.url;
     } catch (err: any) {
       toast({ title: "Checkout failed", description: err.message, variant: "destructive" });
     } finally {
@@ -123,7 +160,7 @@ export default function Subscription() {
         body: { plan: "project", returnTo },
       });
       if (error) throw error;
-      if (data?.url) window.open(data.url, "_blank");
+      if (data?.url) window.location.href = data.url;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Checkout failed";
       toast({ title: "Checkout failed", description: msg, variant: "destructive" });
@@ -137,7 +174,7 @@ export default function Subscription() {
     try {
       const { data, error } = await supabase.functions.invoke("customer-portal");
       if (error) throw error;
-      if (data?.url) window.open(data.url, "_blank");
+      if (data?.url) window.location.href = data.url;
     } catch (err: any) {
       toast({ title: "Could not open portal", description: err.message, variant: "destructive" });
     } finally {
@@ -156,7 +193,7 @@ export default function Subscription() {
         body: { packId },
       });
       if (error) throw error;
-      if (data?.url) window.open(data.url, "_blank");
+      if (data?.url) window.location.href = data.url;
     } catch (err: any) {
       toast({ title: "Purchase failed", description: err.message, variant: "destructive" });
     } finally {
@@ -218,6 +255,13 @@ export default function Subscription() {
     return (
       <DashboardLayout>
         <div className="max-w-xl mx-auto">
+          {syncing && (
+            <Card className="mb-4 border-primary/30 bg-primary/5">
+              <CardContent className="p-4 text-sm text-center text-muted-foreground">
+                Activating your subscription… this can take a few seconds.
+              </CardContent>
+            </Card>
+          )}
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-2 mb-3">
               <Crown className="w-6 h-6 text-primary" />
