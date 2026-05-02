@@ -147,6 +147,7 @@ export type Database = {
           ai_draft: Json | null
           ai_suggestion_used: Json | null
           approved_at: string | null
+          chapter_order: number | null
           collab_link: string | null
           content_last_edited_at: string | null
           content_last_edited_by: string | null
@@ -158,8 +159,10 @@ export type Database = {
           hidden_by_creator: boolean
           hidden_by_requester: boolean
           id: string
+          is_project_workspace: boolean
           is_solo: boolean
           message: string | null
+          project_id: string | null
           reminder_sent_at: string | null
           requested_date: string | null
           requester_collab_link: string | null
@@ -180,6 +183,7 @@ export type Database = {
           ai_draft?: Json | null
           ai_suggestion_used?: Json | null
           approved_at?: string | null
+          chapter_order?: number | null
           collab_link?: string | null
           content_last_edited_at?: string | null
           content_last_edited_by?: string | null
@@ -191,8 +195,10 @@ export type Database = {
           hidden_by_creator?: boolean
           hidden_by_requester?: boolean
           id?: string
+          is_project_workspace?: boolean
           is_solo?: boolean
           message?: string | null
+          project_id?: string | null
           reminder_sent_at?: string | null
           requested_date?: string | null
           requester_collab_link?: string | null
@@ -213,6 +219,7 @@ export type Database = {
           ai_draft?: Json | null
           ai_suggestion_used?: Json | null
           approved_at?: string | null
+          chapter_order?: number | null
           collab_link?: string | null
           content_last_edited_at?: string | null
           content_last_edited_by?: string | null
@@ -224,8 +231,10 @@ export type Database = {
           hidden_by_creator?: boolean
           hidden_by_requester?: boolean
           id?: string
+          is_project_workspace?: boolean
           is_solo?: boolean
           message?: string | null
+          project_id?: string | null
           reminder_sent_at?: string | null
           requested_date?: string | null
           requester_collab_link?: string | null
@@ -255,6 +264,13 @@ export type Database = {
             columns: ["creator_id"]
             isOneToOne: false
             referencedRelation: "public_creator_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collab_requests_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
@@ -586,6 +602,130 @@ export type Database = {
         }
         Relationships: []
       }
+      project_broadcasts: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          project_id: string
+          recipient_count: number
+          sender_id: string | null
+          sender_name: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          project_id: string
+          recipient_count?: number
+          sender_id?: string | null
+          sender_name?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          project_id?: string
+          recipient_count?: number
+          sender_id?: string | null
+          sender_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_broadcasts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_members: {
+        Row: {
+          email: string
+          id: string
+          invited_at: string
+          invited_by: string | null
+          joined_at: string | null
+          project_id: string
+          role: string
+          user_id: string | null
+        }
+        Insert: {
+          email: string
+          id?: string
+          invited_at?: string
+          invited_by?: string | null
+          joined_at?: string | null
+          project_id: string
+          role: string
+          user_id?: string | null
+        }
+        Update: {
+          email?: string
+          id?: string
+          invited_at?: string
+          invited_by?: string | null
+          joined_at?: string | null
+          project_id?: string
+          role?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_members_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          created_at: string
+          creator_id: string
+          description: string | null
+          id: string
+          is_archived: boolean
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          creator_id: string
+          description?: string | null
+          id?: string
+          is_archived?: boolean
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          creator_id?: string
+          description?: string | null
+          id?: string
+          is_archived?: boolean
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projects_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "public_creator_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       referral_credits: {
         Row: {
           created_at: string
@@ -892,6 +1032,14 @@ export type Database = {
       }
       is_collab_participant: { Args: { _user_id: string }; Returns: boolean }
       is_pro_user: { Args: { _user_id: string }; Returns: boolean }
+      is_project_member: {
+        Args: { _project_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_project_owner: {
+        Args: { _project_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_request_owner: {
         Args: { _request_id: string; _user_id: string }
         Returns: boolean
