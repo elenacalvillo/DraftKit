@@ -109,6 +109,29 @@ export default function Subscription() {
     }
   };
 
+  const handleProjectCheckout = async () => {
+    if (!user) {
+      toast({ title: "Please sign in first", variant: "destructive" });
+      return;
+    }
+    setLoading(true);
+    try {
+      const returnTo = searchParams.get("returnTo") || undefined;
+      // Project tier price ID is configured server-side via the
+      // PROJECT_TIER_PRICE_ID env var — see create-checkout.
+      const { data, error } = await supabase.functions.invoke("create-checkout", {
+        body: { plan: "project", returnTo },
+      });
+      if (error) throw error;
+      if (data?.url) window.open(data.url, "_blank");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Checkout failed";
+      toast({ title: "Checkout failed", description: msg, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleManageBilling = async () => {
     setLoading(true);
     try {
@@ -352,6 +375,36 @@ export default function Subscription() {
                 </Button>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Project tier upgrade card */}
+        <Card className="mb-6 border-primary/30 bg-gradient-to-br from-primary/5 to-accent/10">
+          <CardContent className="p-5">
+            <div className="flex items-start gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <Crown className="w-5 h-5 text-primary" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-base">
+                  Writing a book? Try the Project tier
+                </h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Includes everything in Pro, plus Book Projects: chapters,
+                  team roles, broadcasts, and 1GB of image storage.
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full border-primary/30 hover:bg-primary/5"
+              onClick={handleProjectCheckout}
+              disabled={loading}
+            >
+              <Crown className="w-3.5 h-3.5 mr-1.5" />
+              Upgrade to Project tier
+            </Button>
           </CardContent>
         </Card>
 

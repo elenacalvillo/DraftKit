@@ -24,8 +24,16 @@ serve(async (req) => {
     const user = data.user;
     if (!user?.email) throw new Error("User not authenticated");
 
-    const { priceId, returnTo } = await req.json();
-    if (!priceId) throw new Error("priceId is required");
+    const { priceId, returnTo, plan } = await req.json();
+
+    // The "project" plan resolves to the PROJECT_TIER_PRICE_ID env var
+    // so it can be swapped without a code change. If neither a priceId
+    // nor a recognized plan is provided we 400 out.
+    let resolvedPriceId: string | undefined = priceId;
+    if (!resolvedPriceId && plan === "project") {
+      resolvedPriceId = Deno.env.get("PROJECT_TIER_PRICE_ID") ?? undefined;
+    }
+    if (!resolvedPriceId) throw new Error("priceId is required");
 
     // Validate returnTo is a safe relative path (no open redirect)
     function isValidReturnPath(path: unknown): path is string {
@@ -54,15 +62,15 @@ serve(async (req) => {
       ? `${origin}${returnTo}?pro_activated=true`
       : `${origin}/dashboard/subscription?success=true`;
 
-    const sessionParams: any = {
-      line_items: [{ price: priceId, quantity: 1 }],
+    const sessionParams: Stripe.Checkout.SessionCreateParams = {
+      line_items: [{ price: resolvedPriceId, quantity: 1 }],
       mode: "subscription",
       automatic_tax: { enabled: true },
       tax_id_collection: { enabled: true },
       allow_promotion_codes: true,
       success_url: successUrl,
       cancel_url: `${origin}/dashboard/subscription?canceled=true`,
-      metadata: { user_id: user.id },
+      metadata: { user_id: user.id, plan: plan ?? "pro" },
     };
 
     let session;
@@ -73,9 +81,10 @@ serve(async (req) => {
         customer: customerId,
         customer_email: customerId ? undefined : user.email,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
       // If currency conflict, retry without attaching to existing customer
-      if (err?.message?.includes("cannot combine currencies")) {
+      if (msg.includes("cannot combine currencies")) {
         session = await stripe.checkout.sessions.create({
           ...sessionParams,
           customer_email: user.email,

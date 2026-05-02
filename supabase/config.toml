@@ -57,3 +57,12 @@ verify_jwt = false
 [functions.send-weekly-digest]
 verify_jwt = false
 
+# project-broadcast: VERIFIES JWT — only authenticated project owners
+# may invoke, and the function additionally checks is_project_owner().
+[functions.project-broadcast]
+verify_jwt = true
+
+# stripe-webhook: receives signed events from Stripe; signature is
+# verified by stripe.webhooks.constructEvent() inside the function.
+[functions.stripe-webhook]
+verify_jwt = false

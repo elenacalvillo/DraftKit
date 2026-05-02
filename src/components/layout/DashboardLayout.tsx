@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
+  BookMarked,
   Calendar,
   Crown,
   LayoutDashboard,
@@ -29,7 +30,7 @@ const useIsDesktop = () => {
   useEffect(() => {
     const mediaQuery = window.matchMedia("(min-width: 1280px)");
     const handleChange = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
-    
+
     setIsDesktop(mediaQuery.matches);
     mediaQuery.addEventListener("change", handleChange);
     return () => mediaQuery.removeEventListener("change", handleChange);
@@ -38,7 +39,7 @@ const useIsDesktop = () => {
   return isDesktop;
 };
 
-const navItems = [
+const baseNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
   { icon: Calendar, label: "Availability", path: "/dashboard/availability" },
   { icon: MessageSquare, label: "Collabs", path: "/dashboard/requests" },
@@ -60,8 +61,18 @@ export function DashboardLayout({ children, zenMode, zenTitle, zenBackPath }: Da
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { creator, signOut } = useAuth();
-  const { isPro } = usePro();
+  const { isPro, isProject } = usePro();
   const isDesktop = useIsDesktop();
+
+  // Project tier users see a separate "Projects" entry above
+  // Settings — kept visually distinct from the newsletter Collabs.
+  const navItems = isProject
+    ? [
+        ...baseNavItems.slice(0, 5),
+        { icon: BookMarked, label: "Projects", path: "/dashboard/projects" },
+        ...baseNavItems.slice(5),
+      ]
+    : baseNavItems;
 
   useEffect(() => {
     if (!isDesktop) {

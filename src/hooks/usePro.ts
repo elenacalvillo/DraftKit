@@ -1,6 +1,12 @@
 import { useAuth } from "./useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import {
+  hasProAccess,
+  hasProjectAccess,
+  normalizeTier,
+  type SubscriptionTier,
+} from "@/lib/access";
 
 interface HostCapacity {
   limit: number;
@@ -12,7 +18,9 @@ interface HostCapacity {
 interface ProStatus {
   /** True only for paid subscribers, founders, or legacy trial users */
   isPro: boolean;
-  tier: 'free' | 'pro';
+  /** True only for Project tier subscribers (superset of Pro) */
+  isProject: boolean;
+  tier: SubscriptionTier;
   trialEndsAt: string | null;
   isInTrial: boolean;
   /** Host capacity: base 3 + referral bonuses - used */
@@ -30,14 +38,25 @@ export function usePro() {
     queryKey: ["isPro", user?.id, creator?.id],
     queryFn: async (): Promise<ProStatus> => {
       if (!user?.id) {
-        return { isPro: false, tier: 'free', trialEndsAt: null, isInTrial: false, hostCapacity: defaultCapacity, canHostMore: true };
+        return {
+          isPro: false,
+          isProject: false,
+          tier: 'free',
+          trialEndsAt: null,
+          isInTrial: false,
+          hostCapacity: defaultCapacity,
+          canHostMore: true,
+        };
       }
 
       // Read subscription_tier / trial_ends_at from the creator object already
       // loaded by useAuth — eliminates a redundant `creators?select=...` call.
-      const subscriptionTier = (creator as any)?.subscription_tier || 'free';
-      const trialEndsAt = (creator as any)?.trial_ends_at || null;
-      const isInTrial = trialEndsAt && new Date(trialEndsAt) > new Date();
+      const subscriptionTier = normalizeTier(
+        (creator as { subscription_tier?: string | null } | null)?.subscription_tier,
+      );
+      const trialEndsAt =
+        (creator as { trial_ends_at?: string | null } | null)?.trial_ends_at || null;
+      const isInTrial = !!(trialEndsAt && new Date(trialEndsAt) > new Date());
 
       // has_role still needs a server check — it's the source of truth for
       // founders / VIP grants. Cached for 5 min via staleTime below.
@@ -48,15 +67,17 @@ export function usePro() {
       if (roleError) console.error("Error checking pro role:", roleError);
       const hasRole = roleData === true;
 
-      const isPaidOrFounder = hasRole || subscriptionTier === 'pro';
-      const isPro = isPaidOrFounder || Boolean(isInTrial);
+      // 'pro' OR 'project' tier both pass the pro feature gate.
+      const isPaidOrFounder = hasRole || hasProAccess(creator);
+      const isPro = isPaidOrFounder || isInTrial;
+      const isProject = hasProjectAccess(creator);
 
       // Fetch host capacity (cheap: single RPC, results cached 5 min)
       let hostCapacity = defaultCapacity;
       if (creator?.id) {
         const { data: capData, error: capError } = await supabase.rpc("get_host_capacity", { _creator_id: creator.id });
         if (!capError && capData) {
-          const cap = capData as any;
+          const cap = capData as { base_limit?: number; referral_bonus?: number; used?: number };
           const limit = (cap.base_limit || 3) + (cap.referral_bonus || 0);
           const used = cap.used || 0;
           hostCapacity = { limit, used, remaining: Math.max(0, limit - used), referralBonus: cap.referral_bonus || 0 };
@@ -67,9 +88,10 @@ export function usePro() {
 
       return {
         isPro,
-        tier: subscriptionTier as 'free' | 'pro',
+        isProject,
+        tier: subscriptionTier,
         trialEndsAt,
-        isInTrial: Boolean(isInTrial),
+        isInTrial,
         hostCapacity,
         canHostMore,
       };
@@ -82,6 +104,7 @@ export function usePro() {
 
   return {
     isPro: data?.isPro ?? false,
+    isProject: data?.isProject ?? false,
     tier: data?.tier ?? 'free',
     trialEndsAt: data?.trialEndsAt ?? null,
     isInTrial: data?.isInTrial ?? false,
