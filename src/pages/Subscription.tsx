@@ -48,17 +48,54 @@ export default function Subscription() {
   const isPaidPro = isPro && !isInTrial && !!creatorBilling?.stripe_customer_id;
   const creditBalance = creatorBilling?.credits ?? 3;
 
-  // Handle success params
+  const [syncing, setSyncing] = useState(false);
+
+  // Handle success params — poll check-subscription until the DB
+  // reflects the paid tier (covers webhook delays / missing webhook).
   useEffect(() => {
-    if (searchParams.get("success") === "true") {
-      toast({
-        title: "Welcome to the Engine 🎉",
-        description: "Your workspace is now unlocked. All Pro features are active.",
-      });
-      searchParams.delete("success");
-      setSearchParams(searchParams, { replace: true });
-    }
-  }, []);
+    const isSuccess =
+      searchParams.get("success") === "true" ||
+      searchParams.get("pro_activated") === "true";
+    if (!isSuccess || !user) return;
+
+    let cancelled = false;
+    setSyncing(true);
+
+    (async () => {
+      const MAX = 10;
+      for (let i = 0; i < MAX && !cancelled; i++) {
+        try {
+          const { data } = await supabase.functions.invoke("check-subscription");
+          const t = (data as { tier?: string } | null)?.tier;
+          if (t && t !== "free") {
+            await queryClient.invalidateQueries({ queryKey: ["isPro"] });
+            await queryClient.invalidateQueries({ queryKey: ["creator-billing", user.id] });
+            if (!cancelled) {
+              toast({
+                title: t === "project" ? "Book Projects unlocked 🎉" : "Welcome to Pro 🎉",
+                description: "Your subscription is active.",
+              });
+            }
+            break;
+          }
+        } catch {
+          // keep polling
+        }
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+      if (!cancelled) {
+        setSyncing(false);
+        searchParams.delete("success");
+        searchParams.delete("pro_activated");
+        setSearchParams(searchParams, { replace: true });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   // Handle credit fulfillment
   useEffect(() => {
