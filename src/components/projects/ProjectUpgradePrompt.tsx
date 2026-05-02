@@ -24,12 +24,12 @@ export function ProjectUpgradePrompt() {
         <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
           <BookMarked className="w-7 h-7 text-primary" />
         </div>
-        <h2 className="text-2xl font-bold mb-2">Book Projects are a Project tier feature</h2>
+        <h2 className="text-2xl font-bold mb-2">Book Projects are a paid add-on tier</h2>
         <p className="text-muted-foreground mb-6">
-          Organize an entire book in DraftKit: create chapters, invite
-          your team with role-based access, broadcast updates to
-          everyone at once, and embed images in your manuscript — all
-          in one workspace.
+          Book Projects ($49/mo) is a separate tier on top of Pro. Organize
+          an entire book in DraftKit: create chapters, invite your team
+          with role-based access, broadcast updates to everyone at once,
+          and embed images in your manuscript — all in one workspace.
         </p>
         <Button onClick={handleUpgrade} size="lg">
           <Crown className="w-4 h-4 mr-2" />
