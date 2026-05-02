@@ -26,7 +26,7 @@ const features = [
 export default function Subscription() {
   const [billing, setBilling] = useState<"monthly" | "yearly">("yearly");
   const [loading, setLoading] = useState(false);
-  const { isPro, isInTrial, trialEndsAt, hostCapacity, canHostMore } = usePro();
+  const { isPro, isProject, tier, isInTrial, trialEndsAt, hostCapacity, canHostMore } = usePro();
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
