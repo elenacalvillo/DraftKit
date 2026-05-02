@@ -7,6 +7,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const PLAN_PRICE_IDS = {
+  pro_monthly: "price_1Szs8CAgAh00fVW11BjTnSrF",
+  pro_yearly: "price_1TJRLwAgAh00fVW16vp9a32v",
+} as const;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -26,13 +31,17 @@ serve(async (req) => {
 
     const { priceId, returnTo, plan } = await req.json();
 
-    // The "project" plan resolves to the PROJECT_TIER_PRICE_ID env var
-    // so it can be swapped without a code change. If neither a priceId
-    // nor a recognized plan is provided we 400 out.
-    let resolvedPriceId: string | undefined = priceId;
-    if (!resolvedPriceId && plan === "project") {
+    let resolvedPriceId: string | undefined;
+    if (plan === "project") {
       resolvedPriceId = Deno.env.get("PROJECT_TIER_PRICE_ID") ?? undefined;
+    } else if (plan === "pro_monthly") {
+      resolvedPriceId = PLAN_PRICE_IDS.pro_monthly;
+    } else if (plan === "pro_yearly") {
+      resolvedPriceId = PLAN_PRICE_IDS.pro_yearly;
+    } else if (typeof priceId === "string" && priceId.trim()) {
+      resolvedPriceId = priceId.trim();
     }
+
     if (!resolvedPriceId) throw new Error("priceId is required");
 
     // Validate returnTo is a safe relative path (no open redirect)
