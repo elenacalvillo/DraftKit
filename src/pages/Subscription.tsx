@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Crown, Sparkles, Users, MessageSquare, PenLine, Palette, Rocket, Check, Heart, Coins, UserPlus } from "lucide-react";
+import { Crown, Sparkles, Users, MessageSquare, PenLine, Palette, Rocket, Check, Heart, Coins, UserPlus, BookMarked } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -26,7 +26,7 @@ const features = [
 export default function Subscription() {
   const [billing, setBilling] = useState<"monthly" | "yearly">("yearly");
   const [loading, setLoading] = useState(false);
-  const { isPro, isInTrial, trialEndsAt, hostCapacity, canHostMore } = usePro();
+  const { isPro, isProject, tier, isInTrial, trialEndsAt, hostCapacity, canHostMore } = usePro();
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
@@ -240,8 +240,8 @@ export default function Subscription() {
               </div>
               <p className="text-muted-foreground text-sm mt-2 max-w-sm mx-auto">
                 {isFounder
-                  ? "You helped build DraftKit from day one. All Pro features are yours, forever."
-                  : "All features unlocked. Thank you for being part of the engine."}
+                  ? "You helped build DraftKit from day one. All Pro features are yours, forever. Book Projects are a separate add-on tier."
+                  : "All Pro features unlocked. Thank you for being part of the engine."}
               </p>
             </CardContent>
           </Card>
@@ -264,6 +264,57 @@ export default function Subscription() {
               </ul>
             </CardContent>
           </Card>
+
+          {/* Book Projects add-on (separate paid tier) */}
+          {tier === "project" ? (
+            <Card className="mb-6 border-primary/30 bg-primary/5">
+              <CardContent className="p-5 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <BookMarked className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-semibold text-sm">Book Projects active</p>
+                  <p className="text-xs text-muted-foreground">
+                    Chapters, team roles, broadcasts and 1 GB image storage are unlocked.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="mb-6 border-primary/30 bg-gradient-to-br from-primary/5 to-accent/10">
+              <CardContent className="p-5">
+                <div className="flex items-start gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <BookMarked className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-base">
+                      Add Book Projects — $49/mo
+                    </h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      A separate tier for book authors: chapters, team roles
+                      (admin / writer / reviewer), broadcasts to all
+                      collaborators, and 1 GB of image storage.
+                    </p>
+                    {isFounder && (
+                      <p className="text-xs text-muted-foreground mt-2 italic">
+                        Founding Member benefits don't include Book Projects — this is a separate add-on tier.
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  className="w-full gradient-primary text-primary-foreground"
+                  onClick={handleProjectCheckout}
+                  disabled={loading}
+                >
+                  <Crown className="w-3.5 h-3.5 mr-1.5" />
+                  Upgrade to Project tier
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Credit balance (no top-up for Pro) */}
           <CreditSection showTopUp={false} />
