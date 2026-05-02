@@ -240,8 +240,8 @@ export default function Subscription() {
               </div>
               <p className="text-muted-foreground text-sm mt-2 max-w-sm mx-auto">
                 {isFounder
-                  ? "You helped build DraftKit from day one. All Pro features are yours, forever."
-                  : "All features unlocked. Thank you for being part of the engine."}
+                  ? "You helped build DraftKit from day one. All Pro features are yours, forever. Book Projects are a separate add-on tier."
+                  : "All Pro features unlocked. Thank you for being part of the engine."}
               </p>
             </CardContent>
           </Card>
