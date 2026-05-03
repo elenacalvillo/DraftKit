@@ -28,11 +28,13 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const stripeSecret = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
-  const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET") ?? "";
-  const projectPriceId = Deno.env.get("PROJECT_TIER_PRICE_ID") ?? "";
+  const liveKey = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
+  const testKey = Deno.env.get("STRIPE_TEST_SECRET_KEY") ?? "";
+  const liveWebhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET") ?? "";
+  const testWebhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET_TEST") ?? "";
+  const projectPriceLive = Deno.env.get("PROJECT_TIER_PRICE_ID") ?? "price_1TSknqAgAh00fVW1Opx4dfq7";
+  const projectPriceTest = "price_1TSnOsAgAh00fVW1HkJerNQo";
 
-  const stripe = new Stripe(stripeSecret, { apiVersion: "2025-08-27.basil" });
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
@@ -42,18 +44,34 @@ serve(async (req) => {
     const sig = req.headers.get("stripe-signature") ?? "";
     const payload = await req.text();
 
-    let event: Stripe.Event;
-    if (webhookSecret) {
-      event = await stripe.webhooks.constructEventAsync(
-        payload,
-        sig,
-        webhookSecret,
-      );
-    } else {
-      // Test environments without a webhook secret — we still want
-      // the function to be invokable from local fixtures.
-      event = JSON.parse(payload) as Stripe.Event;
+    // Try live secret first, then test. Whichever verifies wins.
+    let event: Stripe.Event | null = null;
+    let isTestEvent = false;
+    if (liveWebhookSecret) {
+      try {
+        const tmp = new Stripe(liveKey, { apiVersion: "2025-08-27.basil" });
+        event = await tmp.webhooks.constructEventAsync(payload, sig, liveWebhookSecret);
+      } catch { /* try test */ }
     }
+    if (!event && testWebhookSecret) {
+      try {
+        const tmp = new Stripe(testKey || liveKey, { apiVersion: "2025-08-27.basil" });
+        event = await tmp.webhooks.constructEventAsync(payload, sig, testWebhookSecret);
+        isTestEvent = true;
+      } catch { /* fall through */ }
+    }
+    if (!event) {
+      // Dev fallback when no secret is configured at all.
+      if (!liveWebhookSecret && !testWebhookSecret) {
+        event = JSON.parse(payload) as Stripe.Event;
+        isTestEvent = event.livemode === false;
+      } else {
+        throw new Error("Invalid webhook signature");
+      }
+    }
+    if (event.livemode === false) isTestEvent = true;
+
+    const projectPriceId = isTestEvent ? projectPriceTest : projectPriceLive;
 
     // Only handle the subscription lifecycle here. Everything else
     // (one-time purchases, etc.) goes through fulfill-credits or
