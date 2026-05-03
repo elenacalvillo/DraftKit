@@ -1,14 +1,8 @@
 // Edge function: check-subscription
 //
 // Reconciles the authenticated user's `creators.subscription_tier` from
-// the live Stripe API. Acts as a safety net when the Stripe webhook is
-// delayed, missing, or hasn't been wired yet — the success page polls
-// this until tier flips off 'free'.
-//
-// Returns:
-//   { tier: 'free' | 'pro' | 'project',
-//     subscriptionId: string | null,
-//     customerId: string | null }
+// the Stripe API. Checks BOTH live and test mode (when test key is set)
+// so preview-mode test purchases also activate the user's tier.
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
@@ -19,10 +13,39 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const PRO_PRICE_IDS = new Set([
-  "price_1Szs8CAgAh00fVW11BjTnSrF", // pro monthly
-  "price_1TJRLwAgAh00fVW16vp9a32v", // pro yearly
+const LIVE_PROJECT_PRICE = "price_1TSknqAgAh00fVW1Opx4dfq7";
+const LIVE_PRO_PRICES = new Set([
+  "price_1Szs8CAgAh00fVW11BjTnSrF",
+  "price_1TJRLwAgAh00fVW16vp9a32v",
+  "price_1TJRKBAgAh00fVW1XxMeveNB",
 ]);
+
+const TEST_PROJECT_PRICE = "price_1TSnOsAgAh00fVW1HkJerNQo";
+const TEST_PRO_PRICES = new Set([
+  "price_1TSnOtAgAh00fVW1ONn6cIFj",
+  "price_1TSnOvAgAh00fVW1QUnVDv8i",
+]);
+
+type Tier = "free" | "pro" | "project";
+
+async function lookupTier(
+  stripe: Stripe,
+  email: string,
+  projectPrice: string,
+  proPrices: Set<string>,
+): Promise<{ tier: Tier; customerId: string | null; subscriptionId: string | null }> {
+  const customers = await stripe.customers.list({ email, limit: 1 });
+  if (customers.data.length === 0) return { tier: "free", customerId: null, subscriptionId: null };
+  const customerId = customers.data[0].id;
+  const subs = await stripe.subscriptions.list({ customer: customerId, status: "active", limit: 1 });
+  if (subs.data.length === 0) return { tier: "free", customerId, subscriptionId: null };
+  const sub = subs.data[0];
+  const priceId = sub.items.data[0]?.price?.id ?? null;
+  let tier: Tier = "pro";
+  if (priceId && priceId === projectPrice) tier = "project";
+  else if (priceId && proPrices.has(priceId)) tier = "pro";
+  return { tier, customerId, subscriptionId: sub.id };
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -43,78 +66,52 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No authorization header");
     const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: userErr } = await supabaseAuth.auth.getUser(
-      token,
-    );
+    const { data: userData, error: userErr } = await supabaseAuth.auth.getUser(token);
     if (userErr) throw userErr;
     const user = userData.user;
     if (!user?.email) throw new Error("User not authenticated");
 
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") ?? "", {
-      apiVersion: "2025-08-27.basil",
-    });
-    const projectPriceId = Deno.env.get("PROJECT_TIER_PRICE_ID") ?? "";
+    const liveKey = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
+    const testKey = Deno.env.get("STRIPE_TEST_SECRET_KEY") ?? "";
+    const projectPriceLive = Deno.env.get("PROJECT_TIER_PRICE_ID") || LIVE_PROJECT_PRICE;
 
-    // Resolve the Stripe customer by email (mirrors create-checkout).
-    const customers = await stripe.customers.list({
-      email: user.email,
-      limit: 1,
-    });
-    if (customers.data.length === 0) {
-      return new Response(
-        JSON.stringify({ tier: "free", subscriptionId: null, customerId: null }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+    const results: { mode: "live" | "test"; tier: Tier; customerId: string | null; subscriptionId: string | null }[] = [];
+
+    if (liveKey) {
+      const stripe = new Stripe(liveKey, { apiVersion: "2025-08-27.basil" });
+      const r = await lookupTier(stripe, user.email, projectPriceLive, LIVE_PRO_PRICES);
+      results.push({ mode: "live", ...r });
     }
-    const customerId = customers.data[0].id;
-
-    // Find an active subscription
-    const subs = await stripe.subscriptions.list({
-      customer: customerId,
-      status: "active",
-      limit: 1,
-    });
-
-    if (subs.data.length === 0) {
-      // Downgrade locally too
-      await admin
-        .from("creators")
-        .update({
-          subscription_tier: "free",
-          stripe_customer_id: customerId,
-          stripe_subscription_id: null,
-        })
-        .eq("user_id", user.id);
-      return new Response(
-        JSON.stringify({
-          tier: "free",
-          subscriptionId: null,
-          customerId,
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+    if (testKey) {
+      const stripe = new Stripe(testKey, { apiVersion: "2025-08-27.basil" });
+      const r = await lookupTier(stripe, user.email, TEST_PROJECT_PRICE, TEST_PRO_PRICES);
+      results.push({ mode: "test", ...r });
     }
 
-    const sub = subs.data[0];
-    const priceId = sub.items.data[0]?.price?.id ?? null;
-    let tier: "pro" | "project" = "pro";
-    if (projectPriceId && priceId === projectPriceId) tier = "project";
-    else if (priceId && PRO_PRICE_IDS.has(priceId)) tier = "pro";
+    // Prefer live > test, and project > pro > free.
+    const tierRank = (t: Tier) => (t === "project" ? 2 : t === "pro" ? 1 : 0);
+    results.sort((a, b) => {
+      const d = tierRank(b.tier) - tierRank(a.tier);
+      if (d !== 0) return d;
+      return a.mode === "live" ? -1 : 1;
+    });
+    const best = results[0] ?? { tier: "free" as Tier, customerId: null, subscriptionId: null, mode: "live" as const };
 
     await admin
       .from("creators")
       .update({
-        subscription_tier: tier,
-        stripe_customer_id: customerId,
-        stripe_subscription_id: sub.id,
+        subscription_tier: best.tier,
+        stripe_customer_id: best.customerId,
+        stripe_subscription_id: best.subscriptionId,
       })
       .eq("user_id", user.id);
 
     return new Response(
       JSON.stringify({
-        tier,
-        subscriptionId: sub.id,
-        customerId,
+        tier: best.tier,
+        subscriptionId: best.subscriptionId,
+        customerId: best.customerId,
+        mode: best.mode,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
