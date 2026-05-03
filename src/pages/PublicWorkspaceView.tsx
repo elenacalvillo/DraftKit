@@ -186,7 +186,7 @@ export default function PublicWorkspaceView() {
 
         {cleanContent ? (
           <div
-            className="prose prose-lg dark:prose-invert max-w-none prose-headings:text-foreground prose-p:text-foreground prose-p:leading-relaxed prose-a:text-primary prose-strong:text-foreground prose-code:text-foreground prose-blockquote:text-muted-foreground prose-blockquote:border-l-primary"
+            className="workspace-prose workspace-prose-public"
             dangerouslySetInnerHTML={{ __html: cleanContent }}
           />
         ) : (
