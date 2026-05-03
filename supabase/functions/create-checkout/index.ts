@@ -7,9 +7,28 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const PLAN_PRICE_IDS = {
+// Production hosts that should hit LIVE Stripe.
+const LIVE_HOSTS = new Set(["draftkit.app", "www.draftkit.app", "collabstack.lovable.app"]);
+
+function isTestModeFromOrigin(origin: string | null): boolean {
+  if (!origin) return false;
+  try {
+    const host = new URL(origin).hostname;
+    return !LIVE_HOSTS.has(host);
+  } catch {
+    return false;
+  }
+}
+
+const LIVE_PRICES = {
   pro_monthly: "price_1Szs8CAgAh00fVW11BjTnSrF",
   pro_yearly: "price_1TJRLwAgAh00fVW16vp9a32v",
+} as const;
+
+const TEST_PRICES = {
+  project: "price_1TSnOsAgAh00fVW1HkJerNQo",
+  pro_monthly: "price_1TSnOtAgAh00fVW1ONn6cIFj",
+  pro_yearly: "price_1TSnOvAgAh00fVW1QUnVDv8i",
 } as const;
 
 serve(async (req) => {
@@ -31,20 +50,28 @@ serve(async (req) => {
 
     const { priceId, returnTo, plan } = await req.json();
 
+    const origin = req.headers.get("origin") || "https://collabstack.lovable.app";
+    const testMode = isTestModeFromOrigin(origin);
+
+    const stripeKey = testMode
+      ? (Deno.env.get("STRIPE_TEST_SECRET_KEY") ?? Deno.env.get("STRIPE_SECRET_KEY") ?? "")
+      : (Deno.env.get("STRIPE_SECRET_KEY") ?? "");
+
     let resolvedPriceId: string | undefined;
     if (plan === "project") {
-      resolvedPriceId = Deno.env.get("PROJECT_TIER_PRICE_ID") ?? undefined;
+      resolvedPriceId = testMode
+        ? TEST_PRICES.project
+        : (Deno.env.get("PROJECT_TIER_PRICE_ID") ?? undefined);
     } else if (plan === "pro_monthly") {
-      resolvedPriceId = PLAN_PRICE_IDS.pro_monthly;
+      resolvedPriceId = testMode ? TEST_PRICES.pro_monthly : LIVE_PRICES.pro_monthly;
     } else if (plan === "pro_yearly") {
-      resolvedPriceId = PLAN_PRICE_IDS.pro_yearly;
+      resolvedPriceId = testMode ? TEST_PRICES.pro_yearly : LIVE_PRICES.pro_yearly;
     } else if (typeof priceId === "string" && priceId.trim()) {
       resolvedPriceId = priceId.trim();
     }
 
     if (!resolvedPriceId) throw new Error("priceId is required");
 
-    // Validate returnTo is a safe relative path (no open redirect)
     function isValidReturnPath(path: unknown): path is string {
       if (typeof path !== "string" || !path) return false;
       if (!path.startsWith("/")) return false;
@@ -54,18 +81,11 @@ serve(async (req) => {
       return true;
     }
 
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-      apiVersion: "2025-08-27.basil",
-    });
+    const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
 
-    // Find existing Stripe customer
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
     let customerId: string | undefined;
-    if (customers.data.length > 0) {
-      customerId = customers.data[0].id;
-    }
-
-    const origin = req.headers.get("origin") || "https://collabstack.lovable.app";
+    if (customers.data.length > 0) customerId = customers.data[0].id;
 
     const successUrl = isValidReturnPath(returnTo)
       ? `${origin}${returnTo}?pro_activated=true`
@@ -79,12 +99,11 @@ serve(async (req) => {
       allow_promotion_codes: true,
       success_url: successUrl,
       cancel_url: `${origin}/dashboard/subscription?canceled=true`,
-      metadata: { user_id: user.id, plan: plan ?? "pro" },
+      metadata: { user_id: user.id, plan: plan ?? "pro", mode: testMode ? "test" : "live" },
     };
 
     let session;
     try {
-      // Try with existing customer first
       session = await stripe.checkout.sessions.create({
         ...sessionParams,
         customer: customerId,
@@ -92,7 +111,6 @@ serve(async (req) => {
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      // If currency conflict, retry without attaching to existing customer
       if (msg.includes("cannot combine currencies")) {
         session = await stripe.checkout.sessions.create({
           ...sessionParams,
@@ -103,7 +121,7 @@ serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ url: session.url }), {
+    return new Response(JSON.stringify({ url: session.url, mode: testMode ? "test" : "live" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
