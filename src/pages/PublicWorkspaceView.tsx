@@ -23,11 +23,9 @@ function sanitize(html: string): string {
 
 interface PublicSheet {
   request_id: string;
-  project_title: string;
   shared_content: string | null;
   creator_name: string;
   creator_username: string | null;
-  // Added in DRAFT-002 — both nullable for back-compat with older rows.
   creator_profile_image_url?: string | null;
   invite_message?: string | null;
 }
@@ -66,7 +64,7 @@ export default function PublicWorkspaceView() {
       } else {
         const row = data[0] as PublicSheet;
         setSheet(row);
-        document.title = `${row.project_title} · DraftKit`;
+        document.title = `${row.creator_name}'s draft · DraftKit`;
       }
       setLoading(false);
     })();
@@ -238,15 +236,7 @@ export default function PublicWorkspaceView() {
       </section>
 
       {/* Draft content — below-the-fold context */}
-      <article className="max-w-3xl mx-auto px-6 pb-12 sm:pb-16">
-        <header className="mb-8 pb-6 border-b border-border">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
-            The draft
-          </p>
-          <h2 className="text-2xl sm:text-3xl font-bold text-foreground leading-tight">
-            {sheet.project_title}
-          </h2>
-        </header>
+      <article className="max-w-3xl mx-auto px-6 pt-4 pb-12 sm:pb-16">
 
         {cleanContent ? (
           <div

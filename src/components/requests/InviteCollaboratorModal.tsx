@@ -75,16 +75,12 @@ export function InviteCollaboratorModal({
     (async () => {
       const { data } = await supabase
         .from("collab_requests")
-        .select("view_token, invite_message")
+        .select("view_token")
         .eq("id", requestId)
         .maybeSingle();
       if (cancelled) return;
       if (data?.view_token) {
         setViewToken(data.view_token as string);
-      }
-      // Pre-populate textarea so editing an existing invite is non-destructive
-      if (typeof data?.invite_message === "string") {
-        setInviteMessage(data.invite_message);
       }
     })();
     return () => {
