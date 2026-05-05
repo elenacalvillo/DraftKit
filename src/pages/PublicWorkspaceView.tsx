@@ -23,11 +23,9 @@ function sanitize(html: string): string {
 
 interface PublicSheet {
   request_id: string;
-  project_title: string;
   shared_content: string | null;
   creator_name: string;
   creator_username: string | null;
-  // Added in DRAFT-002 — both nullable for back-compat with older rows.
   creator_profile_image_url?: string | null;
   invite_message?: string | null;
 }
