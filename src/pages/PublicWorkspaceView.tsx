@@ -236,15 +236,7 @@ export default function PublicWorkspaceView() {
       </section>
 
       {/* Draft content — below-the-fold context */}
-      <article className="max-w-3xl mx-auto px-6 pb-12 sm:pb-16">
-        <header className="mb-8 pb-6 border-b border-border">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
-            The draft
-          </p>
-          <h2 className="text-2xl sm:text-3xl font-bold text-foreground leading-tight">
-            {sheet.project_title}
-          </h2>
-        </header>
+      <article className="max-w-3xl mx-auto px-6 pt-4 pb-12 sm:pb-16">
 
         {cleanContent ? (
           <div
