@@ -64,7 +64,7 @@ export default function PublicWorkspaceView() {
       } else {
         const row = data[0] as PublicSheet;
         setSheet(row);
-        document.title = `${row.project_title} · DraftKit`;
+        document.title = `${row.creator_name}'s draft · DraftKit`;
       }
       setLoading(false);
     })();
