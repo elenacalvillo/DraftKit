@@ -983,8 +983,9 @@ export type Database = {
         Args: { _token: string }
         Returns: {
           creator_name: string
+          creator_profile_image_url: string
           creator_username: string
-          project_title: string
+          invite_message: string
           request_id: string
           shared_content: string
         }[]
