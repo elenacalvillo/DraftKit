@@ -64,6 +64,10 @@ import { extractSubstackUsername, normalizeSubstackUrl } from "@/lib/substack-ur
 import { toast } from "sonner";
 import { useWorkspacePresence } from "@/hooks/useWorkspacePresence";
 import { useWorkspaceCollaborators } from "@/hooks/useWorkspaceCollaborators";
+import {
+  isInvitedCollaborator as deriveIsInvitedCollaborator,
+  getMessagePartnerLabel,
+} from "@/lib/workspace-roles";
 
 interface WorkspaceRequest {
   id: string;
@@ -110,7 +114,8 @@ export default function Workspace() {
   const isCreator = !!creator && creator.id === request?.creator_id;
   const isGuest = !!user && user.id === request?.requester_user_id;
 
-  const { isAdmin } = useAdmin();
+  // useAdmin retained for downstream hooks even though isAdmin is unused here.
+  useAdmin();
 
   // Modals
   const [showDraftModal, setShowDraftModal] = useState(false);
@@ -382,6 +387,16 @@ export default function Workspace() {
 
   // Solo workspace detection
   const isSolo = !!(request as any)?.is_solo;
+
+  // Third user type: invited collaborators (from workspace_collaborators)
+  // are neither the creator nor the original requester. They get the same
+  // restricted UI as guests — owner-only controls stay hidden.
+  const isInvitedCollaborator = deriveIsInvitedCollaborator(
+    user?.id,
+    collaborators,
+  );
+  const isOwnerView = isCreator;
+  const isGuestView = isGuest || isInvitedCollaborator;
 
   // The partner — the "other person" in the collab
   const partnerName = isSolo ? null : isCreator ? request?.requester_name : creatorInfo?.name || "Creator";
@@ -902,7 +917,7 @@ export default function Workspace() {
 
               <Button variant="outline" size="sm" onClick={() => setShowMessageModal(true)} className="w-full">
                 <MessageSquare className="w-4 h-4 mr-2" />
-                Message {partnerName?.split(" ")[0] || "Partner"}
+                {getMessagePartnerLabel(partnerName)}
               </Button>
 
               {request.collab_link && (
@@ -917,7 +932,7 @@ export default function Workspace() {
                 </Button>
               )}
 
-              {request.status === "approved" && (
+              {isOwnerView && request.status === "approved" && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button
@@ -1246,7 +1261,7 @@ export default function Workspace() {
         </>
       )}
 
-      {isGuest && (
+      {isGuestView && (
         <GuestMessageModal
           open={showMessageModal}
           onOpenChange={setShowMessageModal}

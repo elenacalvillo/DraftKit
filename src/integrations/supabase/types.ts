@@ -159,6 +159,7 @@ export type Database = {
           hidden_by_creator: boolean
           hidden_by_requester: boolean
           id: string
+          invite_message: string | null
           is_project_workspace: boolean
           is_solo: boolean
           message: string | null
@@ -195,6 +196,7 @@ export type Database = {
           hidden_by_creator?: boolean
           hidden_by_requester?: boolean
           id?: string
+          invite_message?: string | null
           is_project_workspace?: boolean
           is_solo?: boolean
           message?: string | null
@@ -231,6 +233,7 @@ export type Database = {
           hidden_by_creator?: boolean
           hidden_by_requester?: boolean
           id?: string
+          invite_message?: string | null
           is_project_workspace?: boolean
           is_solo?: boolean
           message?: string | null
@@ -983,7 +986,9 @@ export type Database = {
         Args: { _token: string }
         Returns: {
           creator_name: string
+          creator_profile_image_url: string | null
           creator_username: string
+          invite_message: string | null
           project_title: string
           request_id: string
           shared_content: string

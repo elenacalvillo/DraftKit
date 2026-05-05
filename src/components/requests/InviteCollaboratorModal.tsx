@@ -2,11 +2,13 @@ import { useState, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { UserPlus, Search, Mail, ArrowLeft, Eye, Copy, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAnalytics } from "@/hooks/useAnalytics";
+import { INVITE_MESSAGE_SOFT_LIMIT } from "@/lib/public-workspace";
 
 interface InviteCollaboratorModalProps {
   open: boolean;
@@ -23,6 +25,9 @@ interface CreatorProfile {
   username: string | null;
   profile_image_url: string | null;
 }
+
+const INVITE_MESSAGE_PLACEHOLDER =
+  "I'd love your feedback on structure and whether the questions feel sharp";
 
 export function InviteCollaboratorModal({
   open,
@@ -47,6 +52,9 @@ export function InviteCollaboratorModal({
   const [viewToken, setViewToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  // Invite message — surfaced on the public workspace view (DRAFT-003)
+  const [inviteMessage, setInviteMessage] = useState("");
+
   // Reset on close
   useEffect(() => {
     if (!open) {
@@ -56,17 +64,27 @@ export function InviteCollaboratorModal({
       setEmail("");
       setInvitingId(null);
       setCopied(false);
+      setInviteMessage("");
     }
   }, [open]);
 
-  // Fetch view_token when modal opens
+  // Fetch view_token + existing invite_message when modal opens
   useEffect(() => {
     if (!open || !requestId) return;
     let cancelled = false;
     (async () => {
-      const { data } = await supabase.from("collab_requests").select("view_token").eq("id", requestId).maybeSingle();
-      if (!cancelled && data?.view_token) {
+      const { data } = await supabase
+        .from("collab_requests")
+        .select("view_token, invite_message")
+        .eq("id", requestId)
+        .maybeSingle();
+      if (cancelled) return;
+      if (data?.view_token) {
         setViewToken(data.view_token as string);
+      }
+      // Pre-populate textarea so editing an existing invite is non-destructive
+      if (typeof data?.invite_message === "string") {
+        setInviteMessage(data.invite_message);
       }
     })();
     return () => {
@@ -87,6 +105,21 @@ export function InviteCollaboratorModal({
       toast.error("Couldn't copy link");
     }
   };
+
+  // Persist invite_message to collab_requests after a successful invite.
+  // Both invite paths (profile + email) call this. We log but don't surface
+  // failures — the invite itself succeeded.
+  const persistInviteMessage = useCallback(async () => {
+    const trimmed = inviteMessage.trim();
+    const payload = trimmed.length > 0 ? trimmed : null;
+    const { error } = await supabase
+      .from("collab_requests")
+      .update({ invite_message: payload } as never)
+      .eq("id", requestId);
+    if (error) {
+      console.error("Failed to save invite_message (non-fatal):", error);
+    }
+  }, [inviteMessage, requestId]);
 
   // Debounced search
   useEffect(() => {
@@ -145,18 +178,22 @@ export function InviteCollaboratorModal({
           return;
         }
 
+        // Save the per-collab invite_message (DRAFT-004) — separate from the
+        // workspace_collaborators insert so this works for both invite paths.
+        await persistInviteMessage();
+
         toast.success(`Invited ${creator.name || creator.username}`);
         trackEvent("collaborator_invited", { request_id: requestId, method: "profile" });
         onInvited();
         onOpenChange(false);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Failed to invite by profile:", err);
         toast.error("Failed to send invitation. Please try again.");
       } finally {
         setInvitingId(null);
       }
     },
-    [requestId, isPro, credits, onInvited, onOpenChange],
+    [requestId, isPro, credits, onInvited, onOpenChange, persistInviteMessage, trackEvent],
   );
 
   const handleEmailInvite = async () => {
@@ -184,7 +221,7 @@ export function InviteCollaboratorModal({
         request_id: requestId,
         email: trimmed,
         invited_by: user.id,
-      } as any);
+      } as never);
 
       if (insertError) {
         if (insertError.message?.includes("duplicate key") || insertError.code === "23505") {
@@ -194,6 +231,10 @@ export function InviteCollaboratorModal({
         }
         return;
       }
+
+      // Save the per-collab invite_message (DRAFT-004) — same UPDATE as the
+      // profile-search path; collab_requests is the single source of truth.
+      await persistInviteMessage();
 
       if (!isPro) {
         await supabase
@@ -236,6 +277,9 @@ export function InviteCollaboratorModal({
       .toUpperCase()
       .slice(0, 2);
   };
+
+  const inviteMessageLength = inviteMessage.length;
+  const overSoftLimit = inviteMessageLength > INVITE_MESSAGE_SOFT_LIMIT;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -282,6 +326,31 @@ export function InviteCollaboratorModal({
               </p>
             </div>
           )}
+
+          {/* Invite message — shown on the public view; optional */}
+          <div className="space-y-1.5">
+            <label htmlFor="invite-message" className="text-xs font-medium text-foreground">
+              What do you need from this person?{" "}
+              <span className="text-muted-foreground font-normal">(optional)</span>
+            </label>
+            <Textarea
+              id="invite-message"
+              placeholder={INVITE_MESSAGE_PLACEHOLDER}
+              value={inviteMessage}
+              onChange={(e) => setInviteMessage(e.target.value)}
+              className="min-h-[72px] resize-none text-sm"
+              rows={3}
+            />
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+              <span>Shown on the share link page so they know what to do.</span>
+              <span
+                className={overSoftLimit ? "text-warning font-medium" : undefined}
+                aria-live="polite"
+              >
+                {inviteMessageLength}/{INVITE_MESSAGE_SOFT_LIMIT}
+              </span>
+            </div>
+          </div>
 
           {mode === "search" ? (
             <>

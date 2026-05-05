@@ -3,9 +3,12 @@ import { useParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DraftKitLogo } from "@/components/icons/DraftKitLogo";
 import { ArrowRight, FileText, Loader2 } from "lucide-react";
 import DOMPurify from "dompurify";
+import { sanitizeSubstackImageUrl } from "@/lib/utils";
+import { getInviterInitials, getInviteMessage, getInviteCtaLabel } from "@/lib/public-workspace";
 
 const ALLOWED_TAGS = [
   "p", "h1", "h2", "h3", "h4", "strong", "em", "s", "u", "code", "pre",
@@ -24,6 +27,9 @@ interface PublicSheet {
   shared_content: string | null;
   creator_name: string;
   creator_username: string | null;
+  // Added in DRAFT-002 — both nullable for back-compat with older rows.
+  creator_profile_image_url?: string | null;
+  invite_message?: string | null;
 }
 
 export default function PublicWorkspaceView() {
@@ -117,6 +123,12 @@ export default function PublicWorkspaceView() {
   }
 
   const cleanContent = sheet.shared_content ? sanitize(sheet.shared_content) : "";
+  const inviterInitials = getInviterInitials(sheet.creator_name);
+  const inviteMessage = getInviteMessage(sheet.invite_message);
+  const ctaLabel = getInviteCtaLabel(sheet.creator_name);
+  const profileImage = sheet.creator_profile_image_url
+    ? sanitizeSubstackImageUrl(sheet.creator_profile_image_url)
+    : null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -133,7 +145,7 @@ export default function PublicWorkspaceView() {
           {hasEditAccess ? (
             <Button asChild variant="gradient" size="sm">
               <Link to={`/dashboard/workspace/${sheet.request_id}`}>
-                Enter Writer's Room
+                {ctaLabel}
                 <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
               </Link>
             </Button>
@@ -162,26 +174,78 @@ export default function PublicWorkspaceView() {
         </div>
       </div>
 
-      {/* The Sheet */}
-      <article className="max-w-3xl mx-auto px-6 py-12 sm:py-16">
-        <header className="mb-10 pb-8 border-b border-border">
-          <h1 className="text-3xl sm:text-4xl font-bold text-foreground mb-3 leading-tight">
-            {sheet.project_title}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            By <span className="text-foreground font-medium">{sheet.creator_name}</span>
-            {sheet.creator_username && (
-              <>
-                {" · "}
-                <Link
-                  to={`/${sheet.creator_username}`}
-                  className="text-primary hover:underline"
-                >
-                  @{sheet.creator_username}
-                </Link>
-              </>
+      {/* Invitation hero — visually dominant; the draft sits below for context */}
+      <section
+        aria-label="Invitation"
+        className="max-w-3xl mx-auto px-6 pt-12 sm:pt-16 pb-8"
+      >
+        <div className="flex flex-col items-center text-center">
+          <Avatar className="h-20 w-20 sm:h-24 sm:w-24 ring-2 ring-primary/20 shadow-sm">
+            {profileImage && (
+              <AvatarImage src={profileImage} alt={sheet.creator_name} />
             )}
+            <AvatarFallback className="text-xl sm:text-2xl font-semibold bg-primary/10 text-primary">
+              {inviterInitials}
+            </AvatarFallback>
+          </Avatar>
+
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground mt-5 leading-tight">
+            {sheet.creator_name}
+          </h1>
+          {sheet.creator_username && (
+            <Link
+              to={`/${sheet.creator_username}`}
+              className="text-sm text-primary hover:underline mt-1"
+            >
+              @{sheet.creator_username}
+            </Link>
+          )}
+
+          <p className="text-base sm:text-lg text-foreground mt-5">
+            <span className="font-medium">{sheet.creator_name}</span> invited
+            you to collaborate on this draft
           </p>
+
+          <blockquote className="mt-4 max-w-xl rounded-2xl border border-border bg-muted/40 px-5 py-4 text-sm sm:text-base text-foreground/90 leading-relaxed">
+            <span className="block text-xs uppercase tracking-wider text-muted-foreground mb-1">
+              A note from {sheet.creator_name.split(" ")[0] || sheet.creator_name}
+            </span>
+            <span
+              className={
+                sheet.invite_message ? "italic" : "italic text-muted-foreground"
+              }
+            >
+              "{inviteMessage}"
+            </span>
+          </blockquote>
+
+          {hasEditAccess ? (
+            <Button asChild variant="gradient" size="lg" className="mt-6">
+              <Link to={`/dashboard/workspace/${sheet.request_id}`}>
+                {ctaLabel}
+                <ArrowRight className="w-4 h-4 ml-1.5" />
+              </Link>
+            </Button>
+          ) : !user ? (
+            <Button asChild variant="gradient" size="lg" className="mt-6">
+              <Link to="/signup">
+                Sign up to collaborate
+                <ArrowRight className="w-4 h-4 ml-1.5" />
+              </Link>
+            </Button>
+          ) : null}
+        </div>
+      </section>
+
+      {/* Draft content — below-the-fold context */}
+      <article className="max-w-3xl mx-auto px-6 pb-12 sm:pb-16">
+        <header className="mb-8 pb-6 border-b border-border">
+          <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
+            The draft
+          </p>
+          <h2 className="text-2xl sm:text-3xl font-bold text-foreground leading-tight">
+            {sheet.project_title}
+          </h2>
         </header>
 
         {cleanContent ? (
@@ -198,7 +262,7 @@ export default function PublicWorkspaceView() {
 
       {/* Footer CTA for anonymous viewers */}
       {!user && (
-        <footer className="border-t border-border mt-16">
+        <footer className="border-t border-border mt-8">
           <div className="max-w-3xl mx-auto px-6 py-10 text-center">
             <p className="text-sm text-muted-foreground mb-4">
               This draft was built collaboratively in a DraftKit Writer's Room.
