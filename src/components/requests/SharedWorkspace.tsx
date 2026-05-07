@@ -63,6 +63,7 @@ function SharedWorkspaceInner({
   const [headerPortal, setHeaderPortal] = useState<HTMLElement | null>(null);
   const [editStartTime, setEditStartTime] = useState<number | null>(null);
   const { user } = useAuth();
+  const { trackEvent } = useAnalytics();
 
   // Presence heartbeat: active while editing
   const { activeEditors } = useWorkspacePresence({
