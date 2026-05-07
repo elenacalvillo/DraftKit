@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useWorkspacePresence } from "@/hooks/useWorkspacePresence";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { FileText, Save, X, AlertCircle, PenLine, Lock, Download, Share2 } from "lucide-react";
+import { FileText, Save, X, AlertCircle, PenLine, Lock, Download, Share2, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,6 +14,7 @@ import DOMPurify from "dompurify";
 import { WorkspaceEditor } from "./WorkspaceEditor";
 import { cn } from "@/lib/utils";
 import { exportWorkspaceHtmlToDocx } from "@/lib/export-draft";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 const ALLOWED_TAGS = ["p", "h1", "h2", "h3", "strong", "em", "s", "code", "pre", "a", "ul", "ol", "li", "br", "hr", "table", "thead", "tbody", "tr", "th", "td", "span"];
 const ALLOWED_ATTR = ["href", "target", "rel", "colspan", "rowspan", "colwidth", "class", "data-comment", "data-author"];
@@ -62,6 +63,7 @@ function SharedWorkspaceInner({
   const [headerPortal, setHeaderPortal] = useState<HTMLElement | null>(null);
   const [editStartTime, setEditStartTime] = useState<number | null>(null);
   const { user } = useAuth();
+  const { trackEvent } = useAnalytics();
 
   // Presence heartbeat: active while editing
   const { activeEditors } = useWorkspacePresence({
@@ -186,6 +188,41 @@ function SharedWorkspaceInner({
           <span className="text-sm font-medium">Shared Workspace</span>
         </div>
         <div className="flex items-center gap-2">
+          {hasContent && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8"
+              onClick={async () => {
+                try {
+                  const html = sharedContent || "";
+                  const tmp = document.createElement("div");
+                  tmp.innerHTML = html;
+                  const plain = tmp.textContent || tmp.innerText || "";
+                  const wordCount = plain.split(/\s+/).filter(Boolean).length;
+
+                  if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
+                    const item = new ClipboardItem({
+                      "text/html": new Blob([html], { type: "text/html" }),
+                      "text/plain": new Blob([plain], { type: "text/plain" }),
+                    });
+                    await navigator.clipboard.write([item]);
+                  } else {
+                    await navigator.clipboard.writeText(plain);
+                  }
+
+                  toast.success("Draft copied — paste it into Substack. You just saved ~30 minutes.");
+                  trackEvent("draft_copied", { request_id: requestId, surface: "workspace_copy", word_count: wordCount });
+                  trackEvent("draft_accepted", { request_id: requestId, surface: "workspace_copy", word_count: wordCount });
+                } catch {
+                  toast.error("Couldn't copy. Try selecting and copying manually.");
+                }
+              }}
+            >
+              <Copy className="w-3.5 h-3.5 mr-1.5" />
+              Copy
+            </Button>
+          )}
           {hasContent && canEdit && (
             <Button
               variant="ghost"
@@ -194,7 +231,8 @@ function SharedWorkspaceInner({
               onClick={async () => {
                 try {
                   await exportWorkspaceHtmlToDocx(sharedContent!, partnerName ? `Drafting with ${partnerName}` : "Workspace Draft");
-                  toast.success("Draft downloaded");
+                  toast.success("Draft downloaded — ready for Substack.");
+                  trackEvent("draft_accepted", { request_id: requestId, surface: "workspace_download" });
                 } catch {
                   toast.error("Failed to download draft");
                 }

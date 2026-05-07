@@ -76,8 +76,9 @@ Estimated Read Time: ${draft.estimatedReadTime}`;
 
     navigator.clipboard.writeText(text);
     setCopied(true);
-    toast.success("Draft copied to clipboard!");
-    trackEvent("draft_copied", { draft_title: draft.title });
+    toast.success("Outline copied. Drop it into your editor to start drafting.");
+    trackEvent("draft_copied", { draft_title: draft.title, surface: "smart_draft_copy" });
+    trackEvent("draft_accepted", { draft_title: draft.title, surface: "smart_draft_copy" });
     setTimeout(() => setCopied(false), 2000);
   };
 

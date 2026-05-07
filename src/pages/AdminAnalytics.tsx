@@ -173,8 +173,17 @@ export default function AdminAnalytics() {
   }).length;
   const aiAttachmentRate = bookingSubmits > 0 ? ((bookingsWithAiSuggestion / bookingSubmits) * 100) : 0;
 
-  // Calculate Draft Acceptance Rate (DAR): draft_copied / draft_generated
-  const draftAcceptanceRate = draftGenerated > 0 ? ((draftCopied / draftGenerated) * 100) : 0;
+  // Calculate Draft Acceptance Rate (DAR): unique requests with draft_accepted / draft_generated
+  const acceptedRequestIds = new Set(
+    events
+      .filter((e) => e.event_type === "draft_accepted")
+      .map((e) => {
+        const data = getEventData(e);
+        return (data.request_id as string | undefined) ?? `__no_req_${e.id}`;
+      })
+  );
+  const draftAccepted = acceptedRequestIds.size;
+  const draftAcceptanceRate = draftGenerated > 0 ? ((draftAccepted / draftGenerated) * 100) : 0;
   const darNeedsAction = draftAcceptanceRate < 30 && draftGenerated > 0;
 
   // Calculate Regeneration Rate
@@ -333,7 +342,7 @@ export default function AdminAnalytics() {
                   {draftAcceptanceRate.toFixed(1)}%
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {draftCopied} of {draftGenerated} drafts copied
+                  {draftAccepted} of {draftGenerated} drafts accepted ({draftCopied} legacy copies)
                 </p>
                 {darNeedsAction && (
                   <p className="text-xs text-destructive mt-2">

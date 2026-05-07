@@ -11,6 +11,7 @@ export type AnalyticsEventType =
   | "booking_submitted"
   | "draft_generated"
   | "draft_copied"
+  | "draft_accepted"
   | "draft_deleted"
   | "draft_exported_docx"
   | "draft_exported_google_docs"
