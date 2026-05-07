@@ -1,61 +1,59 @@
-# Fix public draft view: hide private title, load creator avatar
+## Goal
 
-## What's wrong
+Fix the 0.0% Draft Acceptance Rate. Today the only path that fires `draft_copied` is the legacy `CollabDraftModal` (the SMART pre-draft outline). The actual product surface — the Shared Workspace where users finalize the post — has **no Copy button and no acceptance tracking at all**. The only acceptance-shaped action is "Download" (.docx), and it isn't tracked either. So the metric reads 0% even when users are publishing.
 
-Looking at the live data and the `get_public_sheet` RPC:
+This plan is scoped to the **tactical retention ask**: real acceptance tracking + value-realization moment. The email migration / nudge work is a separate thread and not bundled here.
 
-```sql
-RETURNS TABLE(request_id, project_title, shared_content, creator_name, creator_username)
--- project_title := COALESCE(selected_collab_type, 'Untitled draft')
+## Changes
+
+### 1. Add a Copy button to the Shared Workspace header
+
+`src/components/requests/SharedWorkspace.tsx` — alongside Download, add a Copy button (visible whenever `hasContent`, for both creator and guest, regardless of `canEdit`):
+
+- Strips HTML to plain text + a rich HTML clipboard payload (using `ClipboardItem` with `text/plain` and `text/html`) so paste into Substack / Beehiiv keeps headings, lists, bold.
+- On success: `toast.success("Draft copied — paste it into Substack. You just saved ~30 minutes.")`
+- Fires two analytics events:
+  - `draft_copied` (keeps existing DAR numerator working)
+  - `draft_accepted` (new canonical acceptance event with `{ request_id, surface: "workspace_copy", word_count }`)
+
+### 2. Track Download as acceptance too
+
+Same file, existing Download handler — on success fire `draft_accepted` with `surface: "workspace_download"` and update its toast copy to: `"Draft downloaded — ready for Substack."`
+
+### 3. Track Copy from the SMART draft modal
+
+`src/components/requests/CollabDraftModal.tsx` — the existing `copyToClipboard` already fires `draft_copied`. Add `draft_accepted` with `surface: "smart_draft_copy"` and tighten the toast: `"Outline copied. Drop it into your editor to start drafting."`
+
+### 4. Wire the new event into analytics types
+
+`src/hooks/useAnalytics.ts` — add `"draft_accepted"` to `AnalyticsEventType`.
+
+### 5. Update the Admin dashboard metric
+
+`src/pages/AdminAnalytics.tsx` — switch DAR numerator from `draft_copied` to `draft_accepted` (deduplicated by `request_id` so a user copying twice doesn't double-count). Keep `draft_copied` as a secondary tile for backwards comparison so historical numbers don't go blank. Threshold for `darNeedsAction` stays at 30%.
+
+```text
+DAR = unique(request_id where draft_accepted) / draft_generated
 ```
 
-1. **"Untitled draft" title block** — `project_title` comes from `selected_collab_type` (an internal field like "Cross-promotion" / often empty). It's owner-side metadata, not a public draft headline. The actual article H1 already lives in `shared_content`. Showing "THE DRAFT / Untitled draft" above the content adds noise and leaks an internal label.
-2. **Missing avatar (showing "EC" fallback)** — The RPC never returns `creator_profile_image_url` or `invite_message`, even though `PublicWorkspaceView.tsx` reads `sheet.creator_profile_image_url`. So the avatar always falls back to initials and the invite-note always shows the default copy.
+No DB migration needed — `analytics_events` already accepts arbitrary `event_type`.
 
-## Plan
+## Out of scope (call out, don't build now)
 
-### 1. Migration: extend `get_public_sheet`
+- Resend → Supabase SMTP migration for nudge emails
+- "Did you publish?" 48h check-in email
+- 6-day re-engagement prompt
+- Audit of `project-broadcast` / `send-collab-email` for duplicates
 
-Drop & recreate the function to also return `creator_profile_image_url` and `invite_message`:
-
-```sql
-CREATE OR REPLACE FUNCTION public.get_public_sheet(_token uuid)
-RETURNS TABLE(
-  request_id uuid,
-  shared_content text,
-  creator_name text,
-  creator_username text,
-  creator_profile_image_url text,
-  invite_message text
-)
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public'
-AS $$
-  SELECT
-    cr.id,
-    cr.shared_content,
-    c.name,
-    c.username,
-    c.profile_image_url,
-    NULL::text  -- invite_message column doesn't exist yet; keep placeholder for forward-compat
-  FROM public.collab_requests cr
-  JOIN public.creators c ON c.id = cr.creator_id
-  WHERE cr.view_token = _token
-  LIMIT 1;
-$$;
-```
-
-Note: `invite_message` column doesn't exist on `collab_requests` today — the frontend already falls back to default copy. Keep the field in the RPC signature so the existing client code keeps working; we can wire a real column later without another RPC change.
-
-`project_title` is dropped from the return shape — it was internal-only.
-
-### 2. `src/pages/PublicWorkspaceView.tsx`
-
-- Remove the `<header>` block that renders "THE DRAFT / {project_title}" above the content. The article body's own headings are the public title.
-- Remove `project_title` from the `PublicSheet` interface and from `document.title` (use `${creator_name}'s draft · DraftKit` instead, so the browser tab doesn't leak the internal label either).
-- No other changes — `creator_profile_image_url` is already read & passed through `sanitizeSubstackImageUrl`; once the RPC returns it, the avatar will render.
+These are real and worth doing, but they're a separate plan (email infra + cron + templates) and would dilute this fix. Once acceptance is being tracked truthfully for ~48h we'll have a real baseline to measure those nudges against.
 
 ## Files touched
-- New migration (recreate `get_public_sheet`)
-- `src/pages/PublicWorkspaceView.tsx`
+
+- `src/components/requests/SharedWorkspace.tsx`
+- `src/components/requests/CollabDraftModal.tsx`
+- `src/hooks/useAnalytics.ts`
+- `src/pages/AdminAnalytics.tsx`
 
 Approve and I'll ship it.
+
+Don't forget to update the specs md in the files.
