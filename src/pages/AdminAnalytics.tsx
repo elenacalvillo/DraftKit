@@ -342,7 +342,7 @@ export default function AdminAnalytics() {
                   {draftAcceptanceRate.toFixed(1)}%
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {draftCopied} of {draftGenerated} drafts copied
+                  {draftAccepted} of {draftGenerated} drafts accepted ({draftCopied} legacy copies)
                 </p>
                 {darNeedsAction && (
                   <p className="text-xs text-destructive mt-2">
