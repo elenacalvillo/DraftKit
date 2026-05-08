@@ -246,8 +246,9 @@ function RecommendationCard({
 }: {
   pub: DiscoveredPublication;
   index: number;
-  onCopyInvite: (name: string) => void;
+  onCopyInvite: (name: string, subdomain: string) => void;
 }) {
+  const { trackEvent } = useAnalytics();
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -299,7 +300,18 @@ function RecommendationCard({
           )}
           <div className="mt-auto">
             {pub.isOnDraftKit && pub.draftKitUsername ? (
-              <Button variant="default" size="sm" className="w-full" asChild>
+              <Button
+                variant="default"
+                size="sm"
+                className="w-full"
+                asChild
+                onClick={() =>
+                  trackEvent("discovery_profile_viewed", {
+                    target_username: pub.draftKitUsername,
+                    source: "substack_recommendations",
+                  })
+                }
+              >
                 <a href={`/${pub.draftKitUsername}`}>
                   <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
                   View Profile
@@ -310,7 +322,7 @@ function RecommendationCard({
                 variant="outline"
                 size="sm"
                 className="w-full"
-                onClick={() => onCopyInvite(pub.name)}
+                onClick={() => onCopyInvite(pub.name, pub.subdomain)}
               >
                 <Link2 className="w-3.5 h-3.5 mr-1.5" />
                 Copy Invite Link
