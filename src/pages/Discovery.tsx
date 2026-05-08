@@ -129,7 +129,17 @@ function CreatorSearchSection({ currentUsername }: { currentUsername?: string })
                     <p className="font-semibold text-sm truncate">{c.name}</p>
                     <p className="text-xs text-muted-foreground truncate">@{c.username}</p>
                   </div>
-                  <Button variant="default" size="sm" asChild>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    asChild
+                    onClick={() =>
+                      trackEvent("discovery_profile_viewed", {
+                        target_username: c.username,
+                        source: "search",
+                      })
+                    }
+                  >
                     <a href={`/${c.username}`}>
                       <ExternalLink className="w-3.5 h-3.5 mr-1" />
                       View
@@ -151,6 +161,7 @@ function CreatorSearchSection({ currentUsername }: { currentUsername?: string })
 }
 
 function NewOnDraftKitSection({ currentUsername }: { currentUsername?: string }) {
+  const { trackEvent } = useAnalytics();
   const { data: creators, isLoading } = useQuery({
     queryKey: ["new-on-draftkit"],
     queryFn: async () => {
@@ -204,7 +215,17 @@ function NewOnDraftKitSection({ currentUsername }: { currentUsername?: string })
                 <p className="font-semibold text-sm truncate">{c.name}</p>
                 <p className="text-xs text-muted-foreground truncate">@{c.username}</p>
               </div>
-              <Button variant="default" size="sm" asChild>
+              <Button
+                variant="default"
+                size="sm"
+                asChild
+                onClick={() =>
+                  trackEvent("discovery_profile_viewed", {
+                    target_username: c.username,
+                    source: "new_on_draftkit",
+                  })
+                }
+              >
                 <a href={`/${c.username}`}>
                   <ExternalLink className="w-3.5 h-3.5 mr-1" />
                   View
