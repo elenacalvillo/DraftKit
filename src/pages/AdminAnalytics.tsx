@@ -161,7 +161,37 @@ export default function AdminAnalytics() {
       setFeedback(feedbackRes.data);
     }
 
+    await fetchInactiveUsers();
+
     setIsLoading(false);
+  };
+
+  const fetchInactiveUsers = async () => {
+    const { data, error } = await (supabase as any).rpc("get_inactive_credit_users");
+    if (error) {
+      console.error("Failed to fetch inactive users:", error);
+      return;
+    }
+    setInactiveUsers((data as InactiveUser[]) || []);
+  };
+
+  const handleSendNudge = async (u: InactiveUser, strike: NudgeStrike) => {
+    setNudgingId(u.creator_id);
+    try {
+      const tpl = buildNudge(strike, u.name, u.credits);
+      const clipboardText = `To: ${u.email ?? ""}\nSubject: ${tpl.subject}\n\n${tpl.body}`;
+      await navigator.clipboard.writeText(clipboardText);
+
+      const { error } = await (supabase as any).rpc("bump_nudge_count", { _creator_id: u.creator_id });
+      if (error) throw error;
+
+      toast.success(`Strike ${strike} copied — paste into your email client`);
+      await fetchInactiveUsers();
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to record nudge");
+    } finally {
+      setNudgingId(null);
+    }
   };
 
   // Helper to safely extract event_data properties
