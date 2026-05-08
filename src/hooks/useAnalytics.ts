@@ -38,7 +38,32 @@ export type AnalyticsEventType =
   | "collaborator_removed"
   | "profile_theme_changed"
   | "profile_theme_upgrade_prompt_shown"
-  | "directory_waitlist_signup";
+  | "directory_waitlist_signup"
+  // ---- Attribution & growth loops ----
+  // Fired once on signup with { source, invite_request_id?, referrer_user_id?, ref_username? }
+  | "signup_attribution"
+  | "referral_link_copied"
+  | "referral_visit"
+  | "referral_credit_earned"
+  | "invite_email_clicked"
+  // ---- Discovery surface ----
+  | "discovery_opened"
+  | "discovery_filter_applied"
+  | "discovery_profile_viewed"
+  | "discovery_substack_opened"
+  | "discovery_invite_clicked"
+  // ---- Monetization funnel ----
+  | "upgrade_prompt_shown"
+  | "upgrade_prompt_clicked"
+  | "checkout_started"
+  | "checkout_completed"
+  | "credits_purchase_started"
+  | "credits_purchase_completed"
+  // ---- Dashboard / nav ----
+  | "dashboard_tile_clicked"
+  | "nav_link_clicked"
+  // ---- Email loop ----
+  | "email_link_clicked";
 
 function getOrCreateSessionId(): string {
   let sessionId = sessionStorage.getItem("draftkit_session_id");

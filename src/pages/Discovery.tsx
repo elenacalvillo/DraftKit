@@ -21,6 +21,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { sanitizeSubstackImageUrl } from "@/lib/utils";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 interface DiscoveredPublication {
   id: string;
@@ -51,6 +52,7 @@ function CreatorSearchSection({ currentUsername }: { currentUsername?: string })
   const [results, setResults] = useState<SearchedCreator[]>([]);
   const [searching, setSearching] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const { trackEvent } = useAnalytics();
 
   useEffect(() => {
     if (query.trim().length < 2) {
@@ -67,9 +69,13 @@ function CreatorSearchSection({ currentUsername }: { currentUsername?: string })
           .or(`name.ilike.%${query}%,username.ilike.%${query}%`)
           .not("username", "is", null)
           .limit(12);
-        setResults(
-          (data || []).filter((c) => c.username !== currentUsername)
-        );
+        const filtered = (data || []).filter((c) => c.username !== currentUsername);
+        setResults(filtered);
+        trackEvent("discovery_filter_applied", {
+          filter: "search",
+          query_length: query.trim().length,
+          result_count: filtered.length,
+        });
       } catch {
         setResults([]);
       } finally {
@@ -77,7 +83,7 @@ function CreatorSearchSection({ currentUsername }: { currentUsername?: string })
       }
     }, 300);
     return () => clearTimeout(debounceRef.current);
-  }, [query, currentUsername]);
+  }, [query, currentUsername, trackEvent]);
 
   return (
     <div className="mb-8">
@@ -123,7 +129,17 @@ function CreatorSearchSection({ currentUsername }: { currentUsername?: string })
                     <p className="font-semibold text-sm truncate">{c.name}</p>
                     <p className="text-xs text-muted-foreground truncate">@{c.username}</p>
                   </div>
-                  <Button variant="default" size="sm" asChild>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    asChild
+                    onClick={() =>
+                      trackEvent("discovery_profile_viewed", {
+                        target_username: c.username,
+                        source: "search",
+                      })
+                    }
+                  >
                     <a href={`/${c.username}`}>
                       <ExternalLink className="w-3.5 h-3.5 mr-1" />
                       View
@@ -145,6 +161,7 @@ function CreatorSearchSection({ currentUsername }: { currentUsername?: string })
 }
 
 function NewOnDraftKitSection({ currentUsername }: { currentUsername?: string }) {
+  const { trackEvent } = useAnalytics();
   const { data: creators, isLoading } = useQuery({
     queryKey: ["new-on-draftkit"],
     queryFn: async () => {
@@ -198,7 +215,17 @@ function NewOnDraftKitSection({ currentUsername }: { currentUsername?: string })
                 <p className="font-semibold text-sm truncate">{c.name}</p>
                 <p className="text-xs text-muted-foreground truncate">@{c.username}</p>
               </div>
-              <Button variant="default" size="sm" asChild>
+              <Button
+                variant="default"
+                size="sm"
+                asChild
+                onClick={() =>
+                  trackEvent("discovery_profile_viewed", {
+                    target_username: c.username,
+                    source: "new_on_draftkit",
+                  })
+                }
+              >
                 <a href={`/${c.username}`}>
                   <ExternalLink className="w-3.5 h-3.5 mr-1" />
                   View
@@ -219,8 +246,9 @@ function RecommendationCard({
 }: {
   pub: DiscoveredPublication;
   index: number;
-  onCopyInvite: (name: string) => void;
+  onCopyInvite: (name: string, subdomain: string) => void;
 }) {
+  const { trackEvent } = useAnalytics();
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -272,7 +300,18 @@ function RecommendationCard({
           )}
           <div className="mt-auto">
             {pub.isOnDraftKit && pub.draftKitUsername ? (
-              <Button variant="default" size="sm" className="w-full" asChild>
+              <Button
+                variant="default"
+                size="sm"
+                className="w-full"
+                asChild
+                onClick={() =>
+                  trackEvent("discovery_profile_viewed", {
+                    target_username: pub.draftKitUsername,
+                    source: "substack_recommendations",
+                  })
+                }
+              >
                 <a href={`/${pub.draftKitUsername}`}>
                   <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
                   View Profile
@@ -283,7 +322,7 @@ function RecommendationCard({
                 variant="outline"
                 size="sm"
                 className="w-full"
-                onClick={() => onCopyInvite(pub.name)}
+                onClick={() => onCopyInvite(pub.name, pub.subdomain)}
               >
                 <Link2 className="w-3.5 h-3.5 mr-1.5" />
                 Copy Invite Link
@@ -299,6 +338,17 @@ function RecommendationCard({
 export default function Discovery() {
   const { creator } = useAuth();
   const [lastFetchedAt, setLastFetchedAt] = useState<number>(0);
+  const { trackEvent } = useAnalytics();
+
+  // Fire once per visit
+  const trackedOpenRef = useRef(false);
+  useEffect(() => {
+    if (trackedOpenRef.current) return;
+    trackedOpenRef.current = true;
+    trackEvent("discovery_opened", {
+      has_substack: !!(creator?.newsletter_url || creator?.substack_url),
+    });
+  }, [trackEvent, creator?.newsletter_url, creator?.substack_url]);
 
   const fetchRecommendations = useCallback(async () => {
     const { data, error } = await supabase.functions.invoke(
@@ -338,10 +388,18 @@ export default function Discovery() {
     refetch();
   };
 
-  const handleCopyInviteLink = (pubName: string) => {
+  const handleCopyInviteLink = (pubName: string, subdomain: string) => {
     if (!creator?.username) return;
     const link = `${window.location.origin}/${creator.username}?ref=${creator.username}`;
     navigator.clipboard.writeText(link);
+    trackEvent("discovery_invite_clicked", {
+      target_publication: pubName,
+      target_subdomain: subdomain,
+    });
+    trackEvent("referral_link_copied", {
+      surface: "discovery",
+      ref_username: creator.username,
+    });
     toast({
       title: "Invite link copied!",
       description: `Share your booking page with ${pubName} to start collaborating.`,

@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 const MONTHLY_PRICE_ID = "price_1Szs8CAgAh00fVW11BjTnSrF";
 const YEARLY_PRICE_ID = "price_1TJRLwAgAh00fVW16vp9a32v";
@@ -30,6 +31,7 @@ export default function Subscription() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
+  const { trackEvent } = useAnalytics();
 
   const { data: creatorBilling } = useQuery({
     queryKey: ["creator-billing", user?.id],
@@ -71,6 +73,7 @@ export default function Subscription() {
             await queryClient.invalidateQueries({ queryKey: ["isPro"] });
             await queryClient.invalidateQueries({ queryKey: ["creator-billing", user.id] });
             if (!cancelled) {
+              trackEvent("checkout_completed", { plan: t });
               toast({
                 title: t === "project" ? "Book Projects unlocked 🎉" : "Welcome to Pro 🎉",
                 description: "Your subscription is active.",
@@ -109,6 +112,10 @@ export default function Subscription() {
           body: { sessionId, credits: parseInt(creditsAmount, 10) },
         });
         if (error) throw error;
+        trackEvent("credits_purchase_completed", {
+          credits: parseInt(creditsAmount, 10),
+          new_balance: data?.credits,
+        });
         toast({
           title: `${creditsAmount} credits added! 🎉`,
           description: `Your new balance is ${data.credits} credits.`,
@@ -134,6 +141,7 @@ export default function Subscription() {
     try {
       const priceId = billing === "monthly" ? MONTHLY_PRICE_ID : YEARLY_PRICE_ID;
       const returnTo = searchParams.get("returnTo") || undefined;
+      trackEvent("checkout_started", { plan: "pro", billing, returnTo });
       const { data, error } = await supabase.functions.invoke("create-checkout", {
         body: { priceId, returnTo },
       });
@@ -154,6 +162,7 @@ export default function Subscription() {
     setLoading(true);
     try {
       const returnTo = searchParams.get("returnTo") || undefined;
+      trackEvent("checkout_started", { plan: "project", returnTo });
       // Project tier price ID is configured server-side via the
       // PROJECT_TIER_PRICE_ID env var — see create-checkout.
       const { data, error } = await supabase.functions.invoke("create-checkout", {
@@ -189,6 +198,7 @@ export default function Subscription() {
     }
     setLoading(true);
     try {
+      trackEvent("credits_purchase_started", { pack_id: packId });
       const { data, error } = await supabase.functions.invoke("purchase-credits", {
         body: { packId },
       });

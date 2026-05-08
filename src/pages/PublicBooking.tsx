@@ -191,7 +191,9 @@ export default function PublicBooking() {
     return getThemeStyles(theme);
   }, [creator?.profile_theme]);
 
-  // Track booking link clicked and store session start time
+  // Track booking link clicked and store session start time, and capture
+  // attribution params (?ref=, ?invited_by=, ?utm_*) so the resulting
+  // signup can be attributed to the correct growth loop.
   useEffect(() => {
     if (!username || hasTrackedPageView.current) return;
     hasTrackedPageView.current = true;
@@ -200,6 +202,26 @@ export default function PublicBooking() {
     sessionStorage.setItem("booking_session_start", Date.now().toString());
 
     trackEvent("booking_link_clicked", { creator_username: username });
+
+    // Capture attribution from current URL
+    import("@/lib/attribution").then(({ captureAttributionFromUrl }) => {
+      const search = new URLSearchParams(window.location.search);
+      const captured = captureAttributionFromUrl(search, "landing");
+      if (!captured) return;
+      if (captured.source === "referral") {
+        trackEvent("referral_visit", {
+          ref_username: captured.ref_username,
+          creator_username: username,
+        });
+      }
+      if (captured.source === "email" || captured.utm_source === "email") {
+        trackEvent("email_link_clicked", {
+          utm_campaign: captured.utm_campaign,
+          utm_medium: captured.utm_medium,
+          path: window.location.pathname,
+        });
+      }
+    });
   }, [username, trackEvent]);
 
   useEffect(() => {

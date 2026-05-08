@@ -338,6 +338,27 @@ export default function Signup() {
     
     // Track signup
     trackEvent("user_signup", { username: newCreator.username });
+
+    // Attribution — emit signup_attribution exactly once per session.
+    try {
+      const { readAttribution, markAttributionEmitted, wasAttributionEmitted } =
+        await import("@/lib/attribution");
+      if (!wasAttributionEmitted()) {
+        const attr = readAttribution();
+        trackEvent("signup_attribution", {
+          source: attr?.source ?? (refUsername ? "referral" : "direct"),
+          ref_username: attr?.ref_username ?? refUsername ?? undefined,
+          referrer_user_id: referredByUserId ?? undefined,
+          invite_request_id: attr?.invite_request_id,
+          utm_source: attr?.utm_source,
+          utm_medium: attr?.utm_medium,
+          utm_campaign: attr?.utm_campaign,
+        });
+        markAttributionEmitted();
+      }
+    } catch {
+      /* non-blocking */
+    }
   };
 
   const handleToggleAvailable = (date: string) => {
