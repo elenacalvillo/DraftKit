@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Copy, ExternalLink, Check, AlertTriangle, ArrowLeft, User, BookOpen, Crown } from "lucide-react";
+import { Copy, ExternalLink, Check, AlertTriangle, ArrowLeft, User, BookOpen, Crown, Plus, Trash2, Link as LinkIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
@@ -15,21 +15,26 @@ import { supabase } from "@/integrations/supabase/client";
 import { sanitizeSubstackImageUrl } from "@/lib/utils";
 import {
   settingsSchema,
+  externalLinkUrlSchema,
   COLLAB_TYPE_METADATA,
-  COLLAB_MODE_METADATA,
-  COLLAB_MODE_OPTIONS,
   COLLAB_VIBE_OPTIONS,
   COLLAB_VIBE_METADATA,
   COLLAB_FORMAT_OPTIONS,
   COLLAB_FORMAT_METADATA,
   parseCollabFormats,
   getCreatorVibe,
+  MAX_EXTERNAL_LINKS,
   type CollabStyle,
   type DateMeaning,
-  type CollabMode,
   type CollabVibe,
   type CollabFormat,
 } from "@/lib/validations";
+import {
+  detectLabelFromUrl,
+  parseExternalLinks,
+  serializeExternalLinks,
+  type ExternalLink as ExternalLinkType,
+} from "@/lib/external-links";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -76,9 +81,9 @@ export default function Settings() {
     collabGuidelines: "",
     reminderDaysBefore: 3,
     dateMeaning: "flexible" as DateMeaning,
-    collabMode: "async" as CollabMode,
     collabVibe: "async" as CollabVibe,
     collabFormats: ["cross-post"] as CollabFormat[],
+    externalLinks: [] as ExternalLinkType[],
   });
 
   // Parse collab_style from DB (could be single value or JSON array)
@@ -107,6 +112,84 @@ export default function Settings() {
       }
     });
   };
+
+  // ============================================================
+  // DRAFT-002: External link helpers
+  // ============================================================
+  const addExternalLink = () => {
+    setFormData((prev) => {
+      if (prev.externalLinks.length >= MAX_EXTERNAL_LINKS) {
+        toast.error(`You can add at most ${MAX_EXTERNAL_LINKS} links`);
+        return prev;
+      }
+      return {
+        ...prev,
+        externalLinks: [...prev.externalLinks, { url: "", label: "" }],
+      };
+    });
+    // Clear any prior link errors so the new row is fresh.
+    setErrors((prev) => {
+      const next: Record<string, string> = {};
+      for (const [k, v] of Object.entries(prev)) {
+        if (!k.startsWith("externalLinks.")) next[k] = v;
+      }
+      return next;
+    });
+  };
+
+  const removeExternalLink = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      externalLinks: prev.externalLinks.filter((_, i) => i !== index),
+    }));
+    setErrors((prev) => {
+      const next: Record<string, string> = {};
+      for (const [k, v] of Object.entries(prev)) {
+        if (!k.startsWith(`externalLinks.${index}.`)) next[k] = v;
+      }
+      return next;
+    });
+  };
+
+  const updateExternalLink = (
+    index: number,
+    field: "url" | "label",
+    value: string,
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      externalLinks: prev.externalLinks.map((link, i) =>
+        i === index ? { ...link, [field]: value } : link,
+      ),
+    }));
+
+    if (field === "url") {
+      const trimmed = value.trim();
+      const errKey = `externalLinks.${index}.url`;
+      if (!trimmed) {
+        // Clear the inline error when the field is empty — we only flag
+        // bad URLs the moment the creator tries to save.
+        setErrors((prev) => {
+          if (!prev[errKey]) return prev;
+          const next = { ...prev };
+          delete next[errKey];
+          return next;
+        });
+        return;
+      }
+      const result = externalLinkUrlSchema.safeParse(trimmed);
+      setErrors((prev) => {
+        const next = { ...prev };
+        if (result.success) {
+          delete next[errKey];
+        } else {
+          next[errKey] = result.error.errors[0]?.message ?? "Invalid URL";
+        }
+        return next;
+      });
+    }
+  };
+
 
   // Auto-fetch profile image if missing
   const autoFetchProfileImage = async (substackUrl: string) => {
@@ -154,9 +237,9 @@ export default function Settings() {
       collabGuidelines: (creator as any).collab_guidelines || "",
       reminderDaysBefore: (creator as any).reminder_days_before ?? 3,
       dateMeaning: ((creator as any).date_meaning || "flexible") as DateMeaning,
-      collabMode: ((creator as any).collab_mode || "async") as CollabMode,
       collabVibe: vibe,
       collabFormats: vibe === "async" && formats.length > 0 ? formats : (vibe === "async" ? ["cross-post"] : []),
+      externalLinks: parseExternalLinks((creator as any).external_links),
     });
     setPreviewImageUrl((creator as any).profile_image_url || null);
     
@@ -229,9 +312,11 @@ export default function Settings() {
         collab_guidelines: formData.collabGuidelines || null,
         reminder_days_before: formData.reminderDaysBefore,
         date_meaning: formData.dateMeaning,
-        collab_mode: formData.collabVibe === "async" ? "async" : "discovery",
+        // DRAFT-003: collab_mode is no longer written from the UI. The DB
+        // column persists for back-compat; existing rows are left as-is.
         collab_vibe: formData.collabVibe,
         collab_formats: JSON.stringify(formData.collabVibe === "async" ? formData.collabFormats : []),
+        external_links: JSON.parse(serializeExternalLinks(formData.externalLinks)),
       } as any)
       .eq('id', creator.id);
 
@@ -494,6 +579,105 @@ export default function Settings() {
         {/* Profile Style */}
         <ProfileStyleSection />
 
+        {/* External Links (DRAFT-002) */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+          className="glass-card p-6 mb-6"
+          data-testid="external-links-card"
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <LinkIcon className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-semibold">External Links</h2>
+          </div>
+          <p className="text-sm text-muted-foreground mb-6">
+            Add links to your social profiles, personal website, or external
+            scheduling tool (e.g. Calendly). They show on your public booking
+            page. Only <code className="bg-muted px-1 rounded">https://</code>
+            URLs are accepted, up to {MAX_EXTERNAL_LINKS} links.
+          </p>
+
+          <div className="space-y-4">
+            {formData.externalLinks.length === 0 && (
+              <p className="text-sm text-muted-foreground italic">
+                No links yet. Add one to help visitors find you elsewhere.
+              </p>
+            )}
+
+            {formData.externalLinks.map((link, index) => {
+              const urlError = errors[`externalLinks.${index}.url`];
+              const detected = link.url ? detectLabelFromUrl(link.url) : "";
+              return (
+                <div
+                  key={index}
+                  className="grid sm:grid-cols-[2fr_1fr_auto] gap-3 items-start p-3 rounded-xl border border-border bg-muted/30"
+                  data-testid={`external-link-row-${index}`}
+                >
+                  <div>
+                    <Label htmlFor={`external-link-url-${index}`} className="sr-only">
+                      URL
+                    </Label>
+                    <Input
+                      id={`external-link-url-${index}`}
+                      type="url"
+                      placeholder="https://example.com"
+                      value={link.url}
+                      onChange={(e) => updateExternalLink(index, "url", e.target.value)}
+                      maxLength={2048}
+                    />
+                    {urlError && (
+                      <p className="text-xs text-destructive mt-1">{urlError}</p>
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor={`external-link-label-${index}`} className="sr-only">
+                      Label
+                    </Label>
+                    <Input
+                      id={`external-link-label-${index}`}
+                      type="text"
+                      placeholder={detected || "Label (optional)"}
+                      value={link.label ?? ""}
+                      onChange={(e) => updateExternalLink(index, "label", e.target.value)}
+                      maxLength={60}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeExternalLink(index)}
+                    aria-label={`Remove link ${index + 1}`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              );
+            })}
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={addExternalLink}
+              disabled={formData.externalLinks.length >= MAX_EXTERNAL_LINKS}
+              className="w-full"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add link
+            </Button>
+
+            <Button
+              variant="gradient"
+              onClick={handleSave}
+              className="w-full"
+              disabled={isSaving}
+            >
+              {isSaving ? "Saving..." : "Save Links"}
+            </Button>
+          </div>
+        </motion.div>
+
         {/* Collaboration Playbook */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -629,15 +813,7 @@ export default function Settings() {
               </div>
             )}
 
-            {/* Discovery mode info */}
-            {formData.collabMode === 'discovery' && (
-              <div className="p-4 bg-accent/20 border border-accent/30 rounded-xl">
-                <p className="text-sm text-muted-foreground">
-                  <span className="font-medium text-foreground">📅 Dates = Call slots</span><br />
-                  Your available dates will be shown as times for intro calls. Visitors will receive a calendar invite after booking.
-                </p>
-              </div>
-            )}
+            {/* DRAFT-003: discovery-mode info block removed. */}
 
             <div className="space-y-2">
               <Label htmlFor="collabGuidelines">Collaboration Guidelines</Label>

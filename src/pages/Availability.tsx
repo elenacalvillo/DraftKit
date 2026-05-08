@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Check, Info } from "lucide-react";
+import { ArrowLeft, Check, Info, Clock } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { CollabCalendar, BookingInfo } from "@/components/calendar/CollabCalendar";
 import { useAuth } from "@/hooks/useAuth";
@@ -8,6 +8,30 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  MIN_NOTICE_WEEKS_DEFAULT,
+  MIN_NOTICE_WEEKS_MAX,
+  MIN_NOTICE_WEEKS_MIN,
+  clampMinimumNoticeWeeks,
+} from "@/lib/minimum-notice";
+
+const NOTICE_WEEK_OPTIONS = Array.from(
+  { length: MIN_NOTICE_WEEKS_MAX - MIN_NOTICE_WEEKS_MIN + 1 },
+  (_, i) => MIN_NOTICE_WEEKS_MIN + i,
+);
+
+const noticeOptionLabel = (weeks: number) => {
+  if (weeks === 0) return "No buffer (guests can book any open date)";
+  if (weeks === 1) return "1 week";
+  return `${weeks} weeks`;
+};
 
 export default function Availability() {
   const navigate = useNavigate();
@@ -19,6 +43,8 @@ export default function Availability() {
   const [publishedDates, setPublishedDates] = useState<string[]>([]);
   const [publishedBookingDetails, setPublishedBookingDetails] = useState<BookingInfo[]>([]);
   const [availabilityId, setAvailabilityId] = useState<string | null>(null);
+  const [minimumNoticeWeeks, setMinimumNoticeWeeks] = useState<number>(MIN_NOTICE_WEEKS_DEFAULT);
+  const [isSavingNotice, setIsSavingNotice] = useState(false);
 
   useEffect(() => {
     if (!creator) return;
@@ -62,6 +88,9 @@ export default function Availability() {
       setAvailabilityId(availData.id);
       setAvailableDates(availData.available_dates || []);
       setBlockedDates(availData.blocked_dates || []);
+      setMinimumNoticeWeeks(
+        clampMinimumNoticeWeeks((availData as { minimum_notice_weeks?: number }).minimum_notice_weeks ?? 0),
+      );
     }
 
     await fetchBookedDates();
@@ -69,7 +98,7 @@ export default function Availability() {
 
   const fetchBookedDates = async () => {
     if (!creator) return;
-    
+
     const { data: reqData } = await supabase
       .from('collab_requests')
       .select('id, requested_date, requester_name, requester_profile_image_url, status')
@@ -102,26 +131,29 @@ export default function Availability() {
     }
   };
 
-  const saveAvailability = async (newAvailable: string[], newBlocked: string[]) => {
+  const persistAvailability = async (
+    fields: {
+      available_dates?: string[];
+      blocked_dates?: string[];
+      minimum_notice_weeks?: number;
+    },
+    successMessage: string,
+  ) => {
     if (!creator) return;
 
     if (availabilityId) {
-      // Update existing
       await supabase
         .from('availability')
-        .update({
-          available_dates: newAvailable,
-          blocked_dates: newBlocked,
-        })
+        .update(fields)
         .eq('id', availabilityId);
     } else {
-      // Create new
       const { data } = await supabase
         .from('availability')
         .insert({
           creator_id: creator.id,
-          available_dates: newAvailable,
-          blocked_dates: newBlocked,
+          available_dates: fields.available_dates ?? [],
+          blocked_dates: fields.blocked_dates ?? [],
+          minimum_notice_weeks: fields.minimum_notice_weeks ?? MIN_NOTICE_WEEKS_DEFAULT,
           recurring_days: [],
         })
         .select()
@@ -132,11 +164,30 @@ export default function Availability() {
       }
     }
 
-    toast.success(
-      creator.collab_mode === 'discovery' 
-        ? "Availability updated" 
-        : "Publishing dates updated"
+    toast.success(successMessage);
+  };
+
+  const saveDates = async (newAvailable: string[], newBlocked: string[]) => {
+    await persistAvailability(
+      { available_dates: newAvailable, blocked_dates: newBlocked },
+      "Publishing dates updated",
     );
+  };
+
+  const handleNoticeChange = async (raw: string) => {
+    const weeks = clampMinimumNoticeWeeks(Number(raw));
+    setMinimumNoticeWeeks(weeks);
+    setIsSavingNotice(true);
+    try {
+      await persistAvailability(
+        { minimum_notice_weeks: weeks },
+        weeks === 0
+          ? "Buffer cleared — guests can book any open date"
+          : `Buffer set to ${weeks} ${weeks === 1 ? "week" : "weeks"}`,
+      );
+    } finally {
+      setIsSavingNotice(false);
+    }
   };
 
   const handleToggleAvailable = (date: string) => {
@@ -154,7 +205,7 @@ export default function Availability() {
 
     setAvailableDates(newAvailable);
     setBlockedDates(newBlocked);
-    saveAvailability(newAvailable, newBlocked);
+    saveDates(newAvailable, newBlocked);
   };
 
   const handleToggleBlocked = (date: string) => {
@@ -172,7 +223,7 @@ export default function Availability() {
 
     setBlockedDates(newBlocked);
     setAvailableDates(newAvailable);
-    saveAvailability(newAvailable, newBlocked);
+    saveDates(newAvailable, newBlocked);
   };
 
   if (!creator) return null;
@@ -202,14 +253,10 @@ export default function Availability() {
             </Button>
           </div>
           <h1 className="text-3xl font-bold mb-2">
-            <span className="gradient-text">
-              {creator.collab_mode === 'discovery' ? 'Availability' : 'Publishing Windows'}
-            </span>
+            <span className="gradient-text">Publishing Windows</span>
           </h1>
           <p className="text-muted-foreground">
-            {creator.collab_mode === 'discovery' 
-              ? "Set the dates when you're available for intro calls"
-              : 'Set the dates when collaborations can target going live'}
+            Set the dates when collaborations can target going live
           </p>
         </motion.div>
 
@@ -224,9 +271,22 @@ export default function Availability() {
           <div className="text-sm text-muted-foreground">
             <p className="font-medium text-foreground mb-1">How to use:</p>
             <ul className="list-disc list-inside space-y-1">
-              <li>Click on a date to mark it as <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-available inline-block" />{creator.collab_mode === 'discovery' ? 'available for calls' : 'open for publishing'}</span></li>
-              <li>Click again to remove {creator.collab_mode === 'discovery' ? 'availability' : 'the date'}</li>
-              <li>Dates with a <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded bg-booked inline-block" />coral</span> background are already booked</li>
+              <li>
+                Click on a date to mark it as{" "}
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded bg-available inline-block" />
+                  open for publishing
+                </span>
+              </li>
+              <li>Click again to remove the date</li>
+              <li>
+                Dates with a{" "}
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded bg-booked inline-block" />
+                  coral
+                </span>{" "}
+                background are already booked
+              </li>
             </ul>
           </div>
         </motion.div>
@@ -241,11 +301,62 @@ export default function Availability() {
           <span className="text-lg">👁️</span>
           <div className="text-sm text-muted-foreground">
             <p className="font-medium text-foreground mb-1">What guests will see</p>
-            {creator.collab_mode === 'discovery' ? (
-              <p>Guests will pick from your <span className="inline-flex items-center gap-1.5 align-baseline"><span className="w-2.5 h-2.5 rounded bg-available inline-block" /><span className="font-medium">highlighted dates</span></span> to schedule an intro call. They'll receive a calendar invite after booking.</p>
-            ) : (
-              <p>Guests will pick from your <span className="inline-flex items-center gap-1.5 align-baseline"><span className="w-2.5 h-2.5 rounded bg-available inline-block" /><span className="font-medium">highlighted dates</span></span> as a target publish date. They'll understand this is when you aim to ship — not a meeting.</p>
-            )}
+            <p>
+              Guests will pick from your{" "}
+              <span className="inline-flex items-center gap-1.5 align-baseline">
+                <span className="w-2.5 h-2.5 rounded bg-available inline-block" />
+                <span className="font-medium">highlighted dates</span>
+              </span>{" "}
+              as a target publish date. They'll understand this is when you aim to ship — not a meeting.
+            </p>
+          </div>
+        </motion.div>
+
+        {/* DRAFT-001: Minimum notice period — sits ABOVE the calendar */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.18 }}
+          className="glass-card p-5 mb-6"
+          data-testid="minimum-notice-control"
+        >
+          <div className="flex items-start gap-3">
+            <Clock className="w-5 h-5 text-primary mt-1 shrink-0" />
+            <div className="flex-1">
+              <label
+                htmlFor="minimum-notice-weeks"
+                className="font-medium text-foreground block mb-1"
+              >
+                Guests can&apos;t book within{" "}
+                <span className="text-primary font-semibold" data-testid="minimum-notice-value">{minimumNoticeWeeks}</span>{" "}
+                {minimumNoticeWeeks === 1 ? "week" : "weeks"} of today
+              </label>
+              <p className="text-sm text-muted-foreground mb-3">
+                Use this to give yourself enough lead time between when a guest books and when content goes live. Already-booked dates inside the window stay visible — only future open dates are blocked.
+              </p>
+              <Select
+                value={String(minimumNoticeWeeks)}
+                onValueChange={handleNoticeChange}
+                disabled={isSavingNotice}
+              >
+                <SelectTrigger
+                  id="minimum-notice-weeks"
+                  className="w-full sm:w-[320px]"
+                >
+                  <SelectValue placeholder="No buffer" />
+                </SelectTrigger>
+                <SelectContent>
+                  {NOTICE_WEEK_OPTIONS.map((weeks) => (
+                    <SelectItem key={weeks} value={String(weeks)}>
+                      {noticeOptionLabel(weeks)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-2">
+                Default is no buffer (0 weeks). You can change this at any time — the public booking page updates immediately.
+              </p>
+            </div>
           </div>
         </motion.div>
 
@@ -266,12 +377,7 @@ export default function Availability() {
             onToggleAvailable={handleToggleAvailable}
             onToggleBlocked={handleToggleBlocked}
             onBookedDateClick={(requestId) => navigate(`/dashboard/workspace/${requestId}`)}
-            availableLegendText={
-              creator.collab_mode === 'discovery' 
-                ? 'Available for calls' 
-                : 'Open for publishing'
-            }
-            collabMode={creator.collab_mode as 'async' | 'discovery' | null}
+            availableLegendText="Open for publishing"
           />
         </motion.div>
 
@@ -284,9 +390,7 @@ export default function Availability() {
         >
           <div className="glass-card p-4 text-center">
             <p className="text-2xl font-bold text-available">{availableDates.length}</p>
-            <p className="text-sm text-muted-foreground">
-              {creator.collab_mode === 'discovery' ? 'Available dates' : 'Publishing dates'}
-            </p>
+            <p className="text-sm text-muted-foreground">Publishing dates</p>
           </div>
           <div className="glass-card p-4 text-center">
             <p className="text-2xl font-bold text-booked">{bookedDates.length}</p>

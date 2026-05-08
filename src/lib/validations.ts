@@ -1,5 +1,16 @@
 import { z } from 'zod';
 import { isValidSubstackUrl, isValidNewsletterPublicationUrl } from './substack-url';
+import {
+  MIN_NOTICE_WEEKS_MIN,
+  MIN_NOTICE_WEEKS_MAX,
+  MIN_NOTICE_WEEKS_DEFAULT,
+} from './minimum-notice';
+import {
+  MAX_EXTERNAL_LINKS,
+  MAX_LABEL_LENGTH,
+  MAX_URL_LENGTH,
+  isValidExternalUrl,
+} from './external-links';
 
 export const emailSchema = z.string()
   .trim()
@@ -114,7 +125,7 @@ export const bookingFormSchema = z.object({
 // Allowed collaboration styles (expanded with outcome-focused types)
 export const ALLOWED_COLLAB_STYLES = [
   'Virtual Coffee',
-  'Async Drafting', 
+  'Async Drafting',
   'Interview Style',
   'Guest Post Exchange',
   'Live Event / Webinar',
@@ -124,7 +135,9 @@ export const ALLOWED_COLLAB_STYLES = [
 ] as const;
 export type CollabStyle = typeof ALLOWED_COLLAB_STYLES[number];
 
-// Collaboration mode options (async-first vs discovery-first) — LEGACY, kept for one release
+// Collaboration mode options — DRAFT-003 deprecates the discovery branch in
+// the UI. The legacy values are kept here so any existing data parses without
+// crashing, but the toggle no longer appears in the creator's settings.
 export const COLLAB_MODE_OPTIONS = ['async', 'discovery'] as const;
 export type CollabMode = typeof COLLAB_MODE_OPTIONS[number];
 
@@ -217,7 +230,9 @@ export const getCreatorVibe = (vibe: string | null | undefined): CollabVibe => {
 export const collabVibeSchema = z.enum(COLLAB_VIBE_OPTIONS);
 export const collabFormatsSchema = z.array(z.enum(COLLAB_FORMAT_OPTIONS));
 
-// Collaboration mode metadata for UI
+// Collaboration mode metadata for UI — DRAFT-003: only the async branch is
+// referenced from the UI now. The discovery entry stays so any legacy code
+// path still type-checks until the field is fully removed.
 export const COLLAB_MODE_METADATA: Record<CollabMode, {
   label: string;
   description: string;
@@ -281,7 +296,58 @@ export const reminderDaysSchema = z.number()
 
 export const collabModeSchema = z.enum(COLLAB_MODE_OPTIONS);
 
-// Settings form schema
+// =============================================================
+// DRAFT-001: Minimum Notice Period
+// =============================================================
+export const minimumNoticeWeeksSchema = z
+  .number({ invalid_type_error: 'Minimum notice must be a number' })
+  .int({ message: 'Minimum notice must be a whole number of weeks' })
+  .min(MIN_NOTICE_WEEKS_MIN, {
+    message: `Minimum notice cannot be less than ${MIN_NOTICE_WEEKS_MIN} weeks`,
+  })
+  .max(MIN_NOTICE_WEEKS_MAX, {
+    message: `Minimum notice cannot be more than ${MIN_NOTICE_WEEKS_MAX} weeks`,
+  });
+
+// =============================================================
+// DRAFT-002: External Links
+// =============================================================
+export const externalLinkUrlSchema = z
+  .string()
+  .trim()
+  .min(1, { message: 'URL is required' })
+  .max(MAX_URL_LENGTH, { message: `URL must be at most ${MAX_URL_LENGTH} characters` })
+  .refine(isValidExternalUrl, {
+    message: 'Only https:// links are accepted (e.g., https://example.com)',
+  });
+
+export const externalLinkLabelSchema = z
+  .string()
+  .trim()
+  .max(MAX_LABEL_LENGTH, { message: `Label must be at most ${MAX_LABEL_LENGTH} characters` })
+  .optional()
+  .or(z.literal(''));
+
+export const externalLinkSchema = z.object({
+  url: externalLinkUrlSchema,
+  label: externalLinkLabelSchema,
+});
+
+export const externalLinksSchema = z
+  .array(externalLinkSchema)
+  .max(MAX_EXTERNAL_LINKS, { message: `You can add at most ${MAX_EXTERNAL_LINKS} links` });
+
+export {
+  MIN_NOTICE_WEEKS_MIN,
+  MIN_NOTICE_WEEKS_MAX,
+  MIN_NOTICE_WEEKS_DEFAULT,
+  MAX_EXTERNAL_LINKS,
+  MAX_URL_LENGTH,
+  MAX_LABEL_LENGTH,
+};
+
+// Settings form schema — DRAFT-003 drops `collabMode` from the form (the
+// toggle is gone; the column persists for back-compat but is no longer read).
 export const settingsSchema = z.object({
   name: nameSchema,
   bio: bioSchema,
@@ -292,7 +358,7 @@ export const settingsSchema = z.object({
   collabGuidelines: collabGuidelinesSchema,
   reminderDaysBefore: reminderDaysSchema,
   dateMeaning: dateMeaningSchema.optional(),
-  collabMode: collabModeSchema.optional(),
+  externalLinks: externalLinksSchema.optional(),
 });
 
 // Collab type metadata for UI display

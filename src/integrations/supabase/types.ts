@@ -50,6 +50,7 @@ export type Database = {
           blocked_dates: string[] | null
           creator_id: string
           id: string
+          minimum_notice_weeks: number
           recurring_days: number[] | null
           updated_at: string
         }
@@ -58,6 +59,7 @@ export type Database = {
           blocked_dates?: string[] | null
           creator_id: string
           id?: string
+          minimum_notice_weeks?: number
           recurring_days?: number[] | null
           updated_at?: string
         }
@@ -66,6 +68,7 @@ export type Database = {
           blocked_dates?: string[] | null
           creator_id?: string
           id?: string
+          minimum_notice_weeks?: number
           recurring_days?: number[] | null
           updated_at?: string
         }
@@ -439,6 +442,7 @@ export type Database = {
           created_at: string
           credits: number
           date_meaning: string | null
+          external_links: Json
           id: string
           join_directory_waitlist: boolean | null
           name: string
@@ -468,6 +472,7 @@ export type Database = {
           created_at?: string
           credits?: number
           date_meaning?: string | null
+          external_links?: Json
           id?: string
           join_directory_waitlist?: boolean | null
           name: string
@@ -497,6 +502,7 @@ export type Database = {
           created_at?: string
           credits?: number
           date_meaning?: string | null
+          external_links?: Json
           id?: string
           join_directory_waitlist?: boolean | null
           name?: string
@@ -925,6 +931,7 @@ export type Database = {
           collab_vibe: string | null
           created_at: string | null
           date_meaning: string | null
+          external_links: Json | null
           id: string | null
           name: string | null
           newsletter_url: string | null
@@ -943,6 +950,7 @@ export type Database = {
           collab_vibe?: string | null
           created_at?: string | null
           date_meaning?: string | null
+          external_links?: Json | null
           id?: string | null
           name?: string | null
           newsletter_url?: string | null
@@ -961,6 +969,7 @@ export type Database = {
           collab_vibe?: string | null
           created_at?: string | null
           date_meaning?: string | null
+          external_links?: Json | null
           id?: string | null
           name?: string | null
           newsletter_url?: string | null
