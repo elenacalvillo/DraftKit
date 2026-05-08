@@ -24,7 +24,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { buildNudge, strikeForCount, type NudgeStrike } from "@/lib/nudge-templates";
-import { formatDistanceToNow } from "date-fns";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
