@@ -165,6 +165,44 @@ export default function AdminAnalytics() {
   const collabApproved = events.filter((e) => e.event_type === "collab_approved").length;
   const collabDeclined = events.filter((e) => e.event_type === "collab_declined").length;
 
+  // ---- Feature Usage Matrix (last 7d / 30d) ----
+  const now = Date.now();
+  const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+  type Row = { event: string; d7: number; d30: number; users7: number };
+  const usageMap = new Map<string, { d7: number; d30: number; users: Set<string> }>();
+  for (const e of events) {
+    const ts = new Date(e.created_at).getTime();
+    const row = usageMap.get(e.event_type) ?? { d7: 0, d30: 0, users: new Set<string>() };
+    row.d30 += 1;
+    if (ts >= sevenDaysAgo) {
+      row.d7 += 1;
+      const uid = (e as unknown as { user_id?: string }).user_id;
+      if (uid) row.users.add(uid);
+    }
+    usageMap.set(e.event_type, row);
+  }
+  const usageRows: Row[] = Array.from(usageMap.entries())
+    .map(([event, v]) => ({ event, d7: v.d7, d30: v.d30, users7: v.users.size }))
+    .sort((a, b) => b.d7 - a.d7 || b.d30 - a.d30);
+
+  // ---- Signup Attribution breakdown ----
+  const attributionCounts: Record<string, number> = {};
+  for (const e of events) {
+    if (e.event_type !== "signup_attribution") continue;
+    const data = getEventData(e);
+    const src = (data.source as string | undefined) ?? "unknown";
+    attributionCounts[src] = (attributionCounts[src] || 0) + 1;
+  }
+  const attributionTotal = Object.values(attributionCounts).reduce((a, b) => a + b, 0);
+  const attributionRows = Object.entries(attributionCounts)
+    .map(([source, count]) => ({
+      source,
+      count,
+      pct: attributionTotal > 0 ? (count / attributionTotal) * 100 : 0,
+    }))
+    .sort((a, b) => b.count - a.count);
+
+
   // Calculate SMART Attachment Rate: % of bookings that used SMART-suggested topics
   const bookingsWithAiSuggestion = events.filter((e) => {
     if (e.event_type !== "booking_submitted") return false;
