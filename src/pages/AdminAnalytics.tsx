@@ -79,7 +79,16 @@ interface FunnelStep {
   color: string;
 }
 
-export default function AdminAnalytics() {
+interface InactiveUser {
+  user_id: string;
+  creator_id: string;
+  name: string | null;
+  email: string | null;
+  credits: number;
+  nudge_count: number;
+  last_nudge_sent_at: string | null;
+  last_sign_in_at: string | null;
+}
   const navigate = useNavigate();
   const { isAdmin, loading } = useAdmin();
   
