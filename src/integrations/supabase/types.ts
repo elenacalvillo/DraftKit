@@ -445,8 +445,10 @@ export type Database = {
           external_links: Json
           id: string
           join_directory_waitlist: boolean | null
+          last_nudge_sent_at: string | null
           name: string
           newsletter_url: string | null
+          nudge_count: number
           profile_image_url: string | null
           profile_theme: Json | null
           referred_by: string | null
@@ -475,8 +477,10 @@ export type Database = {
           external_links?: Json
           id?: string
           join_directory_waitlist?: boolean | null
+          last_nudge_sent_at?: string | null
           name: string
           newsletter_url?: string | null
+          nudge_count?: number
           profile_image_url?: string | null
           profile_theme?: Json | null
           referred_by?: string | null
@@ -505,8 +509,10 @@ export type Database = {
           external_links?: Json
           id?: string
           join_directory_waitlist?: boolean | null
+          last_nudge_sent_at?: string | null
           name?: string
           newsletter_url?: string | null
+          nudge_count?: number
           profile_image_url?: string | null
           profile_theme?: Json | null
           referred_by?: string | null
@@ -983,11 +989,31 @@ export type Database = {
       }
     }
     Functions: {
+      bump_nudge_count: {
+        Args: { _creator_id: string }
+        Returns: {
+          last_nudge_sent_at: string
+          nudge_count: number
+        }[]
+      }
       creator_has_public_profile: {
         Args: { _creator_id: string }
         Returns: boolean
       }
       get_host_capacity: { Args: { _creator_id: string }; Returns: Json }
+      get_inactive_credit_users: {
+        Args: never
+        Returns: {
+          creator_id: string
+          credits: number
+          email: string
+          last_nudge_sent_at: string
+          last_sign_in_at: string
+          name: string
+          nudge_count: number
+          user_id: string
+        }[]
+      }
       get_public_sheet: {
         Args: { _token: string }
         Returns: {

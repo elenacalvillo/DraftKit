@@ -211,7 +211,7 @@ function SharedWorkspaceInner({
                     await navigator.clipboard.writeText(plain);
                   }
 
-                  toast.success("Draft copied — paste it into Substack. You just saved ~30 minutes.");
+                  toast.success("Draft copied — you just saved ~30 minutes.");
                   trackEvent("draft_copied", { request_id: requestId, surface: "workspace_copy", word_count: wordCount });
                   trackEvent("draft_accepted", { request_id: requestId, surface: "workspace_copy", word_count: wordCount });
                 } catch {
@@ -231,7 +231,7 @@ function SharedWorkspaceInner({
               onClick={async () => {
                 try {
                   await exportWorkspaceHtmlToDocx(sharedContent!, partnerName ? `Drafting with ${partnerName}` : "Workspace Draft");
-                  toast.success("Draft downloaded — ready for Substack.");
+                  toast.success("Draft downloaded — you just saved ~30 minutes.");
                   trackEvent("draft_accepted", { request_id: requestId, surface: "workspace_download" });
                 } catch {
                   toast.error("Failed to download draft");

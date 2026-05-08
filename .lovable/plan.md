@@ -1,78 +1,88 @@
-# Close the analytics blind spots
+## 3-Stage Retention Campaign + DAR Fix
 
-## Problem
+### 1. Database changes (migration)
 
-You're right — we have growth loops shipped (referrals, invite-to-signup, Discovery, credit grants) but the dashboard can't tell us which loop is firing. Today we only track ~30 events and most of them are clustered around one surface (the Workspace + draft flow). Whole product surfaces have **zero clicks tracked**:
+Add to `creators`:
 
-- **Discovery page** — we show "X writers registered" but don't know if anyone clicks profiles, opens a Substack, or sends an invite from there.
-- **Invite-driven signups** — `user_signup` fires, but we don't capture *how* the user arrived (invited collaborator? referral link? cold landing?), so attribution is impossible.
-- **Referral / credit loop** — no event when a user copies their referral link, lands via `?ref=`, or earns a credit.
-- **Membership / upgrade funnel** — upgrade prompts shown vs. clicked vs. checkout started vs. completed are not stitched.
-- **Dashboard navigation** — we can't see which dashboard tiles/CTAs people actually use.
-- **Email → app** — broadcast and reminder emails don't tag inbound clicks, so we can't measure re-engagement.
+- `last_nudge_sent_at timestamptz null`
+- `nudge_count integer not null default 0`
 
-The Admin dashboard then can't slice "which features are used" because the events don't exist.
+To detect "inactive" users we need `last_sign_in_at`, which lives in `auth.users` (not directly readable from the client). Add a `SECURITY DEFINER` admin-only RPC:
 
-## Plan
+```sql
+create or replace function public.get_inactive_credit_users()
+returns table(
+  user_id uuid, creator_id uuid, name text, email text,
+  credits int, nudge_count int, last_nudge_sent_at timestamptz,
+  last_sign_in_at timestamptz
+)
+language sql stable security definer set search_path = public as $$
+  select c.user_id, c.id, c.name, u.email, c.credits,
+         c.nudge_count, c.last_nudge_sent_at, u.last_sign_in_at
+  from creators c
+  join auth.users u on u.id = c.user_id
+  where c.credits > 0
+    and (u.last_sign_in_at is null or u.last_sign_in_at < now() - interval '7 days')
+    and public.has_role(auth.uid(), 'admin')
+    and c.nudge_count < 3
+  order by u.last_sign_in_at asc nulls first;
+$$;
+```
 
-### 1. Add the missing event types
-`src/hooks/useAnalytics.ts` — extend `AnalyticsEventType` with:
+Plus an admin-only RPC `bump_nudge_count(_creator_id uuid)` that sets `last_nudge_sent_at = now()` and `nudge_count = nudge_count + 1` (guarded by `has_role(auth.uid(),'admin')` and a same-day re-send block).
 
-- Attribution & growth loops
-  - `signup_attribution` (fired once on signup with `{ source: "invite" | "referral" | "discovery" | "landing" | "direct", invite_request_id?, referrer_user_id? }`)
-  - `referral_link_copied` (`{ surface }`)
-  - `referral_visit` (when `?ref=` lands; deduped per session)
-  - `referral_credit_earned` (mirror of the DB trigger so it shows in the event stream)
-  - `invite_email_clicked` (from email UTM landing)
-- Discovery surface
-  - `discovery_opened`, `discovery_filter_applied` (`{ filter, value }`), `discovery_profile_viewed` (`{ target_username }`), `discovery_substack_opened`, `discovery_invite_clicked`, `discovery_waitlist_signup` (rename of existing `directory_waitlist_signup` for consistency — keep the old one as alias for back-compat)
-- Membership / monetization funnel
-  - `upgrade_prompt_shown` (`{ surface, reason }`), `upgrade_prompt_clicked`, `checkout_started` (`{ plan }`), `checkout_completed` (from Stripe webhook → insert via service role), `credits_purchase_started`, `credits_purchase_completed`
-- Dashboard / navigation
-  - `dashboard_tile_clicked` (`{ tile }`), `nav_link_clicked` (`{ link }`) — wired through `NavLink` and dashboard cards so we don't have to sprinkle handlers
-- Email loop
-  - `email_link_clicked` — fired on landing pages when a `utm_source=email` query param is present
+### 2. Admin Dashboard — "Inactive User Campaign" table
 
-No DB migration needed; `analytics_events` already accepts arbitrary `event_type`.
+In `src/pages/AdminAnalytics.tsx`, add a new section below the existing tables:
 
-### 2. Wire the events at call sites
-- **`src/pages/Signup.tsx`** — read `sessionStorage` for invite/referral context (set by `PublicBooking` invite landings and `?ref=` handler) and emit `signup_attribution` right after `user_signup`.
-- **`src/components/auth/PostAuthRedirect.tsx`** — same attribution emission for OAuth signups (first-login detection).
-- **`src/pages/Discovery.tsx`** — wrap profile click, "Open Substack", "Invite", filter changes with `trackEvent`.
-- **`src/pages/PublicBooking.tsx`** — capture `?ref=` / `?invited_by=` into sessionStorage on mount; fire `referral_visit` once per session.
-- **`src/pages/Subscription.tsx` / `UpgradePrompt.tsx` / `ProjectUpgradePrompt.tsx`** — `upgrade_prompt_shown` on mount, `upgrade_prompt_clicked` and `checkout_started` on CTA.
-- **`src/pages/Dashboard.tsx` + `NavLink.tsx`** — small `useTrackedClick` helper that fires `dashboard_tile_clicked` / `nav_link_clicked` without changing visual code.
-- **`supabase/functions/stripe-webhook/index.ts`** — insert `checkout_completed` / `credits_purchase_completed` into `analytics_events` so revenue events live in the same stream.
-- **Referral copy** — wherever the referral link is shown (Subscription / Dashboard), wrap copy with `referral_link_copied`.
+- Columns: Name · Email · Credits · Last login (relative) · Nudges sent · Action
+- Action column renders one button based on `nudge_count`:
+  - `0` → "Send Strike 1 (Value Debt)"
+  - `1` → "Send Strike 2 (New Feature)"
+  - `2` → "Send Strike 3 (Final Check-in)"
+  - `3` → muted "Campaign complete"
+- Disable the button if `last_nudge_sent_at` is within the last 24h (prevents same-day double-send).
+- Click handler:
+  1. Build the email body (template below) with `[X]` replaced by `credits` and a personalized greeting using first name.
+  2. Copy `Subject\n\nBody` to clipboard via `navigator.clipboard.writeText`.
+  3. Call `bump_nudge_count` RPC, refetch the list, toast `"Strike N copied — paste into your email client"`.
 
-### 3. Surface it in AdminAnalytics
-`src/pages/AdminAnalytics.tsx` — add three new sections without removing existing ones:
+Email templates (Strike 1–3) use the exact copy from the brief. Ensure the `bump_nudge_count` RPC also returns the updated row so the Admin UI reflects the change instantly without a full page reload.
 
-1. **Feature Usage Matrix** — table of every event type with: 7d count, 30d count, unique users, % of WAU. Lets you see at a glance which features are dead vs. alive.
-2. **Growth Loop Funnels** — three small funnel cards:
-   - *Referral loop*: `referral_visit` → `user_signup` (attributed=referral) → `draft_accepted`
-   - *Invite loop*: `invite_email_clicked` → `user_signup` (attributed=invite) → `workspace_opened` → `draft_accepted`
-   - *Discovery loop*: `discovery_opened` → `discovery_profile_viewed` → `discovery_invite_clicked` → resulting `collab_approved`
-3. **Signup Attribution Pie** — % of new accounts by `signup_attribution.source` over selected window. This is the single number that answers "are growth loops working?".
 
-Existing Draft Acceptance Rate and funnel stay untouched.
 
-### 4. Backfill note (call out, don't build)
-Past signups won't have `signup_attribution`. The new funnels start from "today forward". We'll mark pre-rollout users as `source: "unknown"` in the UI rather than back-filling.
+### 3. DAR fix in `AdminAnalytics.tsx`
 
-## Files touched
+Current math counts `draft_accepted` events (line 246) — change to unique `request_id`s:
 
-- `src/hooks/useAnalytics.ts` — event type union
-- `src/pages/Signup.tsx`, `src/components/auth/PostAuthRedirect.tsx` — attribution emission
-- `src/pages/PublicBooking.tsx` — capture ref/invite params
-- `src/pages/Discovery.tsx` — surface tracking
-- `src/pages/Subscription.tsx`, `src/components/subscription/UpgradePrompt.tsx`, `src/components/projects/ProjectUpgradePrompt.tsx` — monetization funnel
-- `src/pages/Dashboard.tsx`, `src/components/NavLink.tsx` — nav/tile clicks
-- `supabase/functions/stripe-webhook/index.ts` — server-side checkout events
-- `src/pages/AdminAnalytics.tsx` — Feature Usage Matrix, Growth Loop Funnels, Attribution Pie
+```ts
+const acceptedRequestIds = new Set(
+  events
+    .filter(e => e.event_type === "draft_accepted")
+    .map(e => (e.event_data as any)?.request_id)
+    .filter(Boolean)
+);
+const draftAccepted = acceptedRequestIds.size;
+```
 
-## Out of scope
+Denominator stays `total_drafts_generated` (count of `draft_generated` events). Add a small caption under the metric: "unique drafts copied or downloaded ÷ drafts generated".
 
-- A/B framework, cohort retention curves, Mixpanel/PostHog migration. We can revisit once the new events have ~2 weeks of baseline data.
+### 4. SharedWorkspace toast + tracking
 
-Approve and I'll ship it.
+`draft_accepted` is already fired from both Copy (line 216) and Download (line 235) — confirmed correct. Only change:
+
+- Update the Copy success toast (line 214) from `"Draft copied — paste it into Substack. You just saved ~30 minutes."` to **"Draft copied — you just saved ~30 minutes."** to match the brief verbatim.
+- Add the same toast text on Download success for consistency: `"Draft downloaded — you just saved ~30 minutes."`
+
+### Open questions
+
+1. Email "from" / signature — should the copied draft include a signature line (e.g. "— Sam") or leave it blank for the admin to paste their own?
+2. Subject lines — the brief gives bodies only. Suggested: S1 "Quick one about your DraftKit credits", S2 "Saving ~30 min per post", S3 "Last check-in". OK?
+3. The brief calls the column `credits_balance` and `last_login` — actual DB has `creators.credits` and `auth.users.last_sign_in_at`. Plan uses the real columns.
+
+### Files touched
+
+- migration (new) — add columns + 2 RPCs
+- `src/pages/AdminAnalytics.tsx` — DAR math, new campaign section, RPC calls
+- `src/components/requests/SharedWorkspace.tsx` — toast copy tweak (Copy + Download)
+- new `src/lib/nudge-templates.ts` — email body builder for the 3 strikes
