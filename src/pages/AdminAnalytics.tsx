@@ -737,6 +737,165 @@ export default function AdminAnalytics() {
           </Card>
         </motion.div>
 
+        {/* Growth Loop Funnels */}
+        <div className="grid lg:grid-cols-2 gap-6 mb-8">
+          {[
+            { title: "Referral Loop", icon: <Users className="w-5 h-5" />, steps: referralFunnel },
+            { title: "Invite Loop", icon: <Sparkles className="w-5 h-5" />, steps: inviteFunnel },
+            { title: "Discovery Loop", icon: <Target className="w-5 h-5" />, steps: discoveryFunnel },
+            { title: "Monetization Funnel", icon: <Zap className="w-5 h-5" />, steps: monetizationFunnel },
+          ].map((funnel, fi) => {
+            const top = funnel.steps[0]?.count || 0;
+            return (
+              <motion.div
+                key={funnel.title}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 1.15 + fi * 0.05 }}
+              >
+                <Card className="glass-card">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      {funnel.icon}
+                      {funnel.title}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {funnel.steps.map((s, i) => {
+                        const pct = top > 0 ? (s.count / top) * 100 : 0;
+                        const prev = i > 0 ? funnel.steps[i - 1].count : s.count;
+                        const conv = prev > 0 ? (s.count / prev) * 100 : 0;
+                        return (
+                          <div key={s.name}>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-sm font-medium">{s.name}</span>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="secondary">{s.count}</Badge>
+                                {i > 0 && (
+                                  <span className="text-xs text-muted-foreground">
+                                    ({conv.toFixed(0)}%)
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="h-2 bg-muted rounded-full overflow-hidden">
+                              <motion.div
+                                initial={{ width: 0 }}
+                                animate={{ width: `${pct}%` }}
+                                transition={{ duration: 0.6, delay: i * 0.05 }}
+                                className="h-full bg-primary"
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            );
+          })}
+        </div>
+
+        {/* Signup Attribution */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.3 }}
+          className="mb-8"
+        >
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="w-5 h-5" />
+                Signup Attribution (last 30 days)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {attributionRows.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">
+                  No attribution data yet. Signup sources will appear here as users join.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {attributionRows.map((r) => (
+                    <div key={r.source}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium capitalize">{r.source.replace(/_/g, " ")}</span>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary">{r.count}</Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {r.pct.toFixed(0)}%
+                          </span>
+                        </div>
+                      </div>
+                      <div className="h-2 bg-muted rounded-full overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${r.pct}%` }}
+                          transition={{ duration: 0.6 }}
+                          className="h-full bg-accent"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  <p className="text-xs text-muted-foreground pt-2">
+                    Total signups attributed: <span className="font-semibold">{attributionTotal}</span>
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Feature Usage Matrix */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.4 }}
+          className="mb-8"
+        >
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="w-5 h-5" />
+                Feature Usage Matrix
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {usageRows.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">
+                  No events recorded in the last 30 days.
+                </p>
+              ) : (
+                <div className="overflow-x-auto max-h-[480px]">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Event</TableHead>
+                        <TableHead className="text-right">7d</TableHead>
+                        <TableHead className="text-right">30d</TableHead>
+                        <TableHead className="text-right">Unique users (7d)</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {usageRows.map((r) => (
+                        <TableRow key={r.event}>
+                          <TableCell className="font-mono text-xs">{r.event}</TableCell>
+                          <TableCell className="text-right">{r.d7}</TableCell>
+                          <TableCell className="text-right text-muted-foreground">{r.d30}</TableCell>
+                          <TableCell className="text-right">{r.users7}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+
         {/* Feedback Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
