@@ -21,6 +21,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { sanitizeSubstackImageUrl } from "@/lib/utils";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 interface DiscoveredPublication {
   id: string;
@@ -51,6 +52,7 @@ function CreatorSearchSection({ currentUsername }: { currentUsername?: string })
   const [results, setResults] = useState<SearchedCreator[]>([]);
   const [searching, setSearching] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const { trackEvent } = useAnalytics();
 
   useEffect(() => {
     if (query.trim().length < 2) {
@@ -67,9 +69,13 @@ function CreatorSearchSection({ currentUsername }: { currentUsername?: string })
           .or(`name.ilike.%${query}%,username.ilike.%${query}%`)
           .not("username", "is", null)
           .limit(12);
-        setResults(
-          (data || []).filter((c) => c.username !== currentUsername)
-        );
+        const filtered = (data || []).filter((c) => c.username !== currentUsername);
+        setResults(filtered);
+        trackEvent("discovery_filter_applied", {
+          filter: "search",
+          query_length: query.trim().length,
+          result_count: filtered.length,
+        });
       } catch {
         setResults([]);
       } finally {
@@ -77,7 +83,7 @@ function CreatorSearchSection({ currentUsername }: { currentUsername?: string })
       }
     }, 300);
     return () => clearTimeout(debounceRef.current);
-  }, [query, currentUsername]);
+  }, [query, currentUsername, trackEvent]);
 
   return (
     <div className="mb-8">
