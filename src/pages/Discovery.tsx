@@ -338,6 +338,17 @@ function RecommendationCard({
 export default function Discovery() {
   const { creator } = useAuth();
   const [lastFetchedAt, setLastFetchedAt] = useState<number>(0);
+  const { trackEvent } = useAnalytics();
+
+  // Fire once per visit
+  const trackedOpenRef = useRef(false);
+  useEffect(() => {
+    if (trackedOpenRef.current) return;
+    trackedOpenRef.current = true;
+    trackEvent("discovery_opened", {
+      has_substack: !!(creator?.newsletter_url || creator?.substack_url),
+    });
+  }, [trackEvent, creator?.newsletter_url, creator?.substack_url]);
 
   const fetchRecommendations = useCallback(async () => {
     const { data, error } = await supabase.functions.invoke(
@@ -377,10 +388,18 @@ export default function Discovery() {
     refetch();
   };
 
-  const handleCopyInviteLink = (pubName: string) => {
+  const handleCopyInviteLink = (pubName: string, subdomain: string) => {
     if (!creator?.username) return;
     const link = `${window.location.origin}/${creator.username}?ref=${creator.username}`;
     navigator.clipboard.writeText(link);
+    trackEvent("discovery_invite_clicked", {
+      target_publication: pubName,
+      target_subdomain: subdomain,
+    });
+    trackEvent("referral_link_copied", {
+      surface: "discovery",
+      ref_username: creator.username,
+    });
     toast({
       title: "Invite link copied!",
       description: `Share your booking page with ${pubName} to start collaborating.`,
