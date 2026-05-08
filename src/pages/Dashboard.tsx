@@ -21,6 +21,7 @@ import { usePro } from "@/hooks/usePro";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import type { Json } from "@/integrations/supabase/types";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 interface CollabRequest {
   id: string;
@@ -45,6 +46,7 @@ export default function Dashboard() {
   const [searchParams] = useSearchParams();
   const { user, creator, loading } = useAuth();
   const { isPro, canHostMore } = usePro();
+  const { trackEvent } = useAnalytics();
   const [availability, setAvailability] = useState<string[]>([]);
   const [requests, setRequests] = useState<CollabRequest[]>([]);
   const [bookedDates, setBookedDates] = useState<string[]>([]);
@@ -410,6 +412,10 @@ export default function Dashboard() {
                 size="icon"
                 onClick={() => {
                   navigator.clipboard.writeText(`${window.location.origin}/${creator.username}`);
+                  trackEvent("referral_link_copied", {
+                    surface: "dashboard_share_link",
+                    ref_username: creator.username,
+                  });
                   toast.success("Link copied to clipboard!");
                 }}
               >
