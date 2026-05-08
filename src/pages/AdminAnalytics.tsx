@@ -922,56 +922,69 @@ export default function AdminAnalytics() {
                   No feedback yet. The feedback widget will collect responses.
                 </p>
               ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Rating</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead className="min-w-[300px]">Message</TableHead>
-                        <TableHead>Page</TableHead>
-                        <TableHead>Date</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {feedback.slice(0, 10).map((fb) => (
-                        <TableRow key={fb.id}>
-                          <TableCell>
-                            {fb.rating ? (
-                              <div className="flex gap-0.5">
-                                {[1, 2, 3, 4, 5].map((star) => (
-                                  <Star
-                                    key={star}
-                                    className={`w-4 h-4 ${
-                                      star <= fb.rating!
-                                        ? "fill-accent text-accent"
-                                        : "text-muted"
-                                    }`}
-                                  />
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="capitalize">
-                              {fb.feedback_type}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="max-w-[300px] truncate">
-                            {fb.message}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground text-sm">
-                            {fb.page_url || "-"}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground text-sm">
-                            {format(parseISO(fb.created_at), "MMM d, HH:mm")}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                <div className="space-y-4">
+                  {feedback.map((fb) => {
+                    let pageLabel = fb.page_url || "";
+                    try {
+                      if (fb.page_url) {
+                        const u = new URL(fb.page_url);
+                        pageLabel = (u.pathname + u.search).replace(/\/$/, "") || "/";
+                      }
+                    } catch { /* keep raw */ }
+                    return (
+                      <div
+                        key={fb.id}
+                        className="rounded-lg border border-border/60 bg-muted/20 p-4"
+                      >
+                        <div className="flex flex-wrap items-center gap-2 mb-3">
+                          <Badge variant="outline" className="capitalize">
+                            {fb.feedback_type}
+                          </Badge>
+                          {fb.rating ? (
+                            <div className="flex gap-0.5">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <Star
+                                  key={star}
+                                  className={`w-4 h-4 ${
+                                    star <= fb.rating!
+                                      ? "fill-accent text-accent"
+                                      : "text-muted"
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                          ) : null}
+                          <span className="text-xs text-muted-foreground ml-auto">
+                            {format(parseISO(fb.created_at), "MMM d, yyyy · HH:mm")}
+                          </span>
+                        </div>
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap break-words text-foreground">
+                          {fb.message}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-3 mt-3 pt-3 border-t border-border/40">
+                          {fb.email && (
+                            <a
+                              href={`mailto:${fb.email}`}
+                              className="text-xs text-muted-foreground hover:text-primary transition-colors break-all"
+                            >
+                              {fb.email}
+                            </a>
+                          )}
+                          {fb.page_url && (
+                            <a
+                              href={fb.page_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+                            >
+                              <span className="truncate max-w-[200px]">{pageLabel}</span>
+                              <TrendingUp className="w-3 h-3 rotate-45" />
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
