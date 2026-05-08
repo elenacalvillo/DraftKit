@@ -117,6 +117,22 @@ serve(async (req) => {
           .update({ stripe_customer_id: customerId })
           .eq("user_id", userId);
       }
+      // Server-side analytics: record checkout completion redundantly
+      try {
+        await supabase.from("analytics_events").insert({
+          event_type: "checkout_completed",
+          user_id: userId ?? null,
+          event_data: {
+            source: "stripe_webhook",
+            mode: session.mode,
+            amount_total: session.amount_total,
+            currency: session.currency,
+            stripe_session_id: session.id,
+            tier_hint: session.metadata?.tier ?? null,
+            test: isTestEvent,
+          },
+        });
+      } catch (_) { /* non-fatal */ }
       return new Response(JSON.stringify({ linked: true }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -172,6 +188,23 @@ serve(async (req) => {
         stripe_subscription_id: sub.id,
       })
       .eq("id", creator.id);
+
+    // Server-side analytics: record subscription activation redundantly
+    try {
+      if (event.type === "customer.subscription.created") {
+        await supabase.from("analytics_events").insert({
+          event_type: "checkout_completed",
+          user_id: creator.user_id ?? null,
+          event_data: {
+            source: "stripe_webhook_sub_created",
+            tier,
+            price_id: priceId,
+            subscription_id: sub.id,
+            test: isTestEvent,
+          },
+        });
+      }
+    } catch (_) { /* non-fatal */ }
 
     return new Response(JSON.stringify({ tier }), {
       status: 200,
