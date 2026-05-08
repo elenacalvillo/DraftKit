@@ -43,7 +43,7 @@ import {
 import { AreaChart, Area, XAxis, YAxis } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
 import { useAdmin } from "@/hooks/useAdmin";
-import { format, subDays, parseISO } from "date-fns";
+import { format, subDays, parseISO, formatDistanceToNow } from "date-fns";
 import { Json } from "@/integrations/supabase/types";
 import { cn } from "@/lib/utils";
 
