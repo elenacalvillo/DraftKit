@@ -2,6 +2,8 @@ import { BookMarked, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useEffect, useRef } from "react";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 /**
  * Shown to Free or Pro tier users when they navigate to the
@@ -11,8 +13,25 @@ import { useNavigate, useLocation } from "react-router-dom";
 export function ProjectUpgradePrompt() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { trackEvent } = useAnalytics();
+
+  const shownRef = useRef(false);
+  useEffect(() => {
+    if (shownRef.current) return;
+    shownRef.current = true;
+    trackEvent("upgrade_prompt_shown", {
+      surface: "project_upgrade_prompt",
+      plan: "project",
+      path: location.pathname,
+    });
+  }, [location.pathname, trackEvent]);
 
   const handleUpgrade = () => {
+    trackEvent("upgrade_prompt_clicked", {
+      surface: "project_upgrade_prompt",
+      plan: "project",
+      path: location.pathname,
+    });
     navigate(
       `/dashboard/subscription?returnTo=${encodeURIComponent(location.pathname)}&plan=project`,
     );

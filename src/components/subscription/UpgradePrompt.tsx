@@ -2,6 +2,8 @@ import { Crown, Sparkles, FileText, Users, Calendar, Palette, MessageSquare, Pen
 import { Button } from "@/components/ui/button";
 import { useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { useEffect, useRef } from "react";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 type FeatureType = 'export' | 'collabs' | 'mode' | 'matching' | 'style' | 'workspace' | 'editor';
 
@@ -56,9 +58,29 @@ const FEATURE_COPY: Record<FeatureType, {
 export function UpgradePrompt({ feature, variant = "inline", className }: UpgradePromptProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { trackEvent } = useAnalytics();
   const { title, description, icon: Icon } = FEATURE_COPY[feature];
 
+  // Fire once per mount per feature/path so we can measure shown vs. clicked.
+  const shownRef = useRef(false);
+  useEffect(() => {
+    if (shownRef.current) return;
+    shownRef.current = true;
+    trackEvent("upgrade_prompt_shown", {
+      surface: "upgrade_prompt",
+      feature,
+      variant,
+      path: location.pathname,
+    });
+  }, [feature, variant, location.pathname, trackEvent]);
+
   const handleUpgrade = () => {
+    trackEvent("upgrade_prompt_clicked", {
+      surface: "upgrade_prompt",
+      feature,
+      variant,
+      path: location.pathname,
+    });
     navigate(`/dashboard/subscription?returnTo=${encodeURIComponent(location.pathname)}`);
   };
 
