@@ -73,6 +73,7 @@ export default function Subscription() {
             await queryClient.invalidateQueries({ queryKey: ["isPro"] });
             await queryClient.invalidateQueries({ queryKey: ["creator-billing", user.id] });
             if (!cancelled) {
+              trackEvent("checkout_completed", { plan: t });
               toast({
                 title: t === "project" ? "Book Projects unlocked 🎉" : "Welcome to Pro 🎉",
                 description: "Your subscription is active.",
@@ -111,6 +112,10 @@ export default function Subscription() {
           body: { sessionId, credits: parseInt(creditsAmount, 10) },
         });
         if (error) throw error;
+        trackEvent("credits_purchase_completed", {
+          credits: parseInt(creditsAmount, 10),
+          new_balance: data?.credits,
+        });
         toast({
           title: `${creditsAmount} credits added! 🎉`,
           description: `Your new balance is ${data.credits} credits.`,
