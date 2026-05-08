@@ -27,7 +27,6 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   bookingFormSchema,
   COLLAB_TYPE_METADATA,
-  COLLAB_MODE_METADATA,
   COLLAB_VIBE_METADATA,
   COLLAB_FORMAT_METADATA,
   parseCollabFormats,
@@ -35,10 +34,20 @@ import {
   newsletterPublicationUrlSchema,
   type CollabStyle,
   type DateMeaning,
-  type CollabMode,
   type CollabVibe,
   type CollabFormat,
 } from "@/lib/validations";
+import {
+  parseExternalLinks,
+  getDisplayLabel,
+  type ExternalLink as ExternalLinkType,
+} from "@/lib/external-links";
+import {
+  clampMinimumNoticeWeeks,
+  filterDatesByMinimumNotice,
+  getCreatorFirstName,
+  getMinimumNoticeGuestLabel,
+} from "@/lib/minimum-notice";
 import { normalizeSubstackUrl, isValidNewsletterPublicationUrl } from "@/lib/substack-url";
 import { toast } from "sonner";
 import { analyzeCollabMatch, type CollabSuggestion, type CollabMatchResult } from "@/lib/api/collab-match";
@@ -63,15 +72,16 @@ interface Creator {
   collab_style: string | null;
   collab_guidelines: string | null;
   date_meaning: DateMeaning | null;
-  collab_mode: CollabMode | null;
   collab_vibe: CollabVibe | null;
   collab_formats: string | null;
   profile_theme: Record<string, unknown> | null;
+  external_links: ExternalLinkType[];
 }
 
 interface Availability {
   available_dates: string[];
   blocked_dates: string[];
+  minimum_notice_weeks: number;
 }
 
 // Parse collab_style from DB (could be single value or JSON array)
@@ -263,7 +273,7 @@ export default function PublicBooking() {
     const { data: creatorData, error } = await supabase
       .from("public_creator_profiles")
       .select(
-        "id, username, name, substack_url, newsletter_url, welcome_message, profile_image_url, collab_style, collab_guidelines, date_meaning, collab_mode, collab_vibe, collab_formats, profile_theme",
+        "id, username, name, substack_url, newsletter_url, welcome_message, profile_image_url, collab_style, collab_guidelines, date_meaning, collab_vibe, collab_formats, profile_theme, external_links",
       )
       .eq("username", username)
       .maybeSingle();
@@ -277,10 +287,10 @@ export default function PublicBooking() {
     const creatorObj: Creator = {
       ...creatorData,
       date_meaning: creatorData.date_meaning as DateMeaning | null,
-      collab_mode: (creatorData.collab_mode || "async") as CollabMode,
       collab_vibe: getCreatorVibe((creatorData as any).collab_vibe),
       collab_formats: (creatorData as any).collab_formats ?? null,
       profile_theme: creatorData.profile_theme as Record<string, unknown> | null,
+      external_links: parseExternalLinks((creatorData as { external_links?: unknown }).external_links),
     };
     setCreator(creatorObj);
 
@@ -334,7 +344,7 @@ export default function PublicBooking() {
     }
     const { data: availData } = await supabase
       .from("availability")
-      .select("available_dates, blocked_dates")
+      .select("available_dates, blocked_dates, minimum_notice_weeks")
       .eq("creator_id", creatorData.id)
       .maybeSingle();
 
@@ -342,6 +352,9 @@ export default function PublicBooking() {
       setAvailability({
         available_dates: availData.available_dates || [],
         blocked_dates: availData.blocked_dates || [],
+        minimum_notice_weeks: clampMinimumNoticeWeeks(
+          (availData as { minimum_notice_weeks?: number }).minimum_notice_weeks ?? 0,
+        ),
       });
     }
 
@@ -846,30 +859,9 @@ export default function PublicBooking() {
           )}
           <h1 className="text-4xl font-bold mb-3">{creator.name}</h1>
 
-          {/* Badge + Substack Link Row */}
+          {/* DRAFT-003: collab_mode badge removed — the vibe pill below already
+             conveys this. DRAFT-002: External link list rendered separately. */}
           <div className="flex items-center justify-center gap-4 mb-4">
-            {/* Mode Badge */}
-            {creator.collab_mode && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/20 rounded-full cursor-help">
-                      <span className="text-lg">{COLLAB_MODE_METADATA[creator.collab_mode].icon}</span>
-                      <span className="font-medium text-primary">
-                        {COLLAB_MODE_METADATA[creator.collab_mode].badge}
-                      </span>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="text-sm max-w-[250px]">{COLLAB_MODE_METADATA[creator.collab_mode].badgeTooltip}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-
-            {/* Separator dot (only if both badge and link exist) */}
-            {creator.collab_mode && creator.substack_url && <span className="text-muted-foreground/50">•</span>}
-
             {creator.substack_url && (
               <a
                 href={creator.substack_url}
@@ -886,33 +878,7 @@ export default function PublicBooking() {
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-6">{creator.welcome_message}</p>
           )}
 
-          {/* Process Steps - only show when not in success state and not filling form */}
-          {!isSuccess && !selectedDate && !isFlexibleDate && creator.collab_mode && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="max-w-md mx-auto mb-8"
-            >
-              {/* Personal headline for process */}
-              <h4 className="text-sm font-semibold text-foreground text-center mb-4">My collaboration process</h4>
-              <div className="flex items-center justify-center gap-4">
-                {COLLAB_MODE_METADATA[creator.collab_mode].processSteps.map((step, index) => (
-                  <div key={step.step} className="flex items-center">
-                    <div className="flex flex-col items-center">
-                      <div className="w-8 h-8 rounded-full bg-card border border-border flex items-center justify-center">
-                        <span className="text-xs font-semibold text-primary">{step.step}</span>
-                      </div>
-                      <span className="text-xs text-muted-foreground mt-1.5 whitespace-nowrap">{step.label}</span>
-                    </div>
-                    {index < COLLAB_MODE_METADATA[creator.collab_mode!].processSteps.length - 1 && (
-                      <ChevronRight className="w-4 h-4 text-muted-foreground/40 mx-1 mb-4" />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          )}
+          {/* DRAFT-003: removed collab_mode-driven process step badges. */}
 
           {/* Vibe + Format header */}
           {(() => {
@@ -954,6 +920,33 @@ export default function PublicBooking() {
               </div>
             );
           })()}
+
+          {/* DRAFT-002: External links — rendered only when at least one
+             valid link is present so the empty state doesn't add clutter. */}
+          {creator.external_links && creator.external_links.length > 0 && (
+            <div
+              className="max-w-lg mx-auto mt-4"
+              data-testid="external-links"
+            >
+              <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
+                Find {getCreatorFirstName(creator.name) || creator.name} elsewhere
+              </p>
+              <div className="flex flex-wrap gap-2 justify-center">
+                {creator.external_links.map((link, idx) => (
+                  <a
+                    key={`${link.url}-${idx}`}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-card/60 border border-border rounded-full text-sm hover:bg-primary/10 hover:border-primary/40 transition-colors"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>{getDisplayLabel(link)}</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
         </motion.div>
 
         {/* Main card */}
@@ -991,13 +984,11 @@ export default function PublicBooking() {
                       <span className="font-medium">{formatSelectedDate(selectedDate)}</span>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      {creator.collab_mode === "discovery"
-                        ? "Requested intro call time"
-                        : creator.date_meaning === "publish"
-                          ? "Target publication date"
-                          : creator.date_meaning === "kickoff"
-                            ? "Kickoff date"
-                            : "Requested collaboration date"}
+                      {creator.date_meaning === "publish"
+                        ? "Target publication date"
+                        : creator.date_meaning === "kickoff"
+                          ? "Kickoff date"
+                          : "Requested collaboration date"}
                     </p>
                   </div>
                 ) : (
@@ -1019,9 +1010,7 @@ export default function PublicBooking() {
                     <div className="flex items-start gap-2">
                       <ArrowRight className="w-4 h-4 mt-0.5 text-primary shrink-0" />
                       <span>
-                        {creator.collab_mode === "discovery"
-                          ? "If accepted, you'll receive a calendar invite for your intro call"
-                          : "If accepted, you'll receive an email with next steps for drafting"}
+                        If accepted, you&apos;ll receive an email with next steps for drafting
                       </span>
                     </div>
                   </div>
@@ -1483,20 +1472,12 @@ export default function PublicBooking() {
             ) : (
               <motion.div key="calendar" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                 <div className="text-center mb-6">
-                  <h2 className="text-xl font-semibold mb-2">
-                    {creator.collab_mode
-                      ? COLLAB_MODE_METADATA[creator.collab_mode].calendarHeader
-                      : "Target Publication Date"}
-                  </h2>
-                  <p className="text-muted-foreground">
-                    {creator.collab_mode === "discovery"
-                      ? "When are you available for a quick intro call?"
-                      : "Select your target publish date"}
-                  </p>
+                  <h2 className="text-xl font-semibold mb-2">When Should This Go Live?</h2>
+                  <p className="text-muted-foreground">Select your target publish date</p>
                 </div>
 
-                {/* Async Mode Explainer - Prominent */}
-                {creator.collab_mode === "async" && (
+                {/* Publishing windows explainer (always shown — DRAFT-003). */}
+                {(
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -1528,13 +1509,17 @@ export default function PublicBooking() {
                   blockedDates={availability?.blocked_dates || []}
                   onDateSelect={handleDateSelect}
                   availableLegendText={
-                    creator.collab_mode === "discovery"
-                      ? "Available for call"
-                      : creator.collab_mode === "async"
-                        ? "Open for publishing"
-                        : getCalendarLegendText(creator.date_meaning)
+                    creator.collab_vibe === "async"
+                      ? "Open for publishing"
+                      : getCalendarLegendText(creator.date_meaning)
                   }
-                  collabMode={creator.collab_mode as "async" | "discovery" | null}
+                  minimumNoticeWeeks={availability?.minimum_notice_weeks ?? 0}
+                  minimumNoticeLabel={
+                    getMinimumNoticeGuestLabel(
+                      availability?.minimum_notice_weeks ?? 0,
+                      getCreatorFirstName(creator.name),
+                    )
+                  }
                 />
 
                 {(!availability?.available_dates || availability.available_dates.length === 0) && (

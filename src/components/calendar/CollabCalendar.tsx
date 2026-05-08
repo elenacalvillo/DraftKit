@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, CalendarDays, Check } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarDays, Check, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn, parseDateString, sanitizeSubstackImageUrl } from "@/lib/utils";
 import { toast } from "sonner";
@@ -11,6 +11,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { isWithinMinimumNotice } from "@/lib/minimum-notice";
 
 export interface BookingInfo {
   date: string;
@@ -32,7 +33,18 @@ interface CollabCalendarProps {
   onToggleBlocked?: (date: string) => void;
   onBookedDateClick?: (requestId: string) => void;
   availableLegendText?: string;
-  collabMode?: 'async' | 'discovery' | null;
+  /**
+   * DRAFT-001: Number of weeks of notice required from a guest. Available
+   * dates inside this window become non-selectable (already-booked dates are
+   * still rendered as booked). Ignored when `isEditable` is true.
+   */
+  minimumNoticeWeeks?: number;
+  /**
+   * DRAFT-001: Optional plain-language label describing the buffer to guests
+   * (e.g. "Elena typically needs 2 weeks from content deadline to
+   * publication"). Rendered above the calendar when present.
+   */
+  minimumNoticeLabel?: string | null;
 }
 
 export function CollabCalendar({
@@ -48,7 +60,8 @@ export function CollabCalendar({
   onToggleBlocked,
   onBookedDateClick,
   availableLegendText = "Available",
-  collabMode,
+  minimumNoticeWeeks = 0,
+  minimumNoticeLabel = null,
 }: CollabCalendarProps) {
   // Helper to get booking info for a date
   const getBookingInfo = (dateStr: string): BookingInfo | undefined => {
@@ -59,22 +72,31 @@ export function CollabCalendar({
     return publishedBookingDetails.find(b => b.date === dateStr);
   };
 
-  // Calculate the first available month
+  // DRAFT-001: when the buffer is active in guest mode, treat dates inside
+  // the buffer as not-selectable. A creator-side calendar (`isEditable`)
+  // is unaffected so the host can still see/edit those days.
+  const noticeWeeks = !isEditable && minimumNoticeWeeks > 0 ? minimumNoticeWeeks : 0;
+  const isInsideNotice = (dateStr: string): boolean =>
+    noticeWeeks > 0 && isWithinMinimumNotice(dateStr, noticeWeeks);
+
+  // Calculate the first selectable available month, respecting the buffer.
   const firstAvailableDate = useMemo(() => {
     if (availableDates.length === 0) return null;
     const sortedDates = [...availableDates].sort();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
-    // Find first available date that's not in the past
+
+    // Find first available date that's not in the past AND not in the buffer
     for (const dateStr of sortedDates) {
       const date = parseDateString(dateStr);
-      if (date >= today) {
-        return date;
-      }
+      if (!date) continue;
+      if (date < today) continue;
+      if (noticeWeeks > 0 && isInsideNotice(dateStr)) continue;
+      return date;
     }
     return null;
-  }, [availableDates]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availableDates, noticeWeeks]);
 
   // Initialize to first available month or current month
   const [currentDate, setCurrentDate] = useState(() => {
@@ -100,12 +122,17 @@ export function CollabCalendar({
 
   const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-  // Check if current month has any available dates
+  // Check if current month has any selectable dates (after buffer filtering).
   const currentMonthHasAvailability = useMemo(() => {
     const monthStart = `${year}-${String(month + 1).padStart(2, "0")}-01`;
     const monthEnd = `${year}-${String(month + 1).padStart(2, "0")}-${daysInMonth}`;
-    return availableDates.some(date => date >= monthStart && date <= monthEnd);
-  }, [availableDates, year, month, daysInMonth]);
+    return availableDates.some((date) => {
+      if (date < monthStart || date > monthEnd) return false;
+      if (noticeWeeks > 0 && isInsideNotice(date)) return false;
+      return true;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availableDates, year, month, daysInMonth, noticeWeeks]);
 
   const prevMonth = () => {
     setCurrentDate(new Date(year, month - 1, 1));
@@ -170,15 +197,21 @@ export function CollabCalendar({
         onToggleAvailable?.(dateStr);
       }
     } else {
-      if (status === "available") {
+      // DRAFT-001: even if the host marked the date available, dates inside
+      // the buffer can't be picked by a guest.
+      if (status === "available" && !isInsideNotice(dateStr)) {
         setSelectedDate(dateStr);
         onDateSelect?.(dateStr);
+      } else if (status === "available" && isInsideNotice(dateStr)) {
+        toast.info(
+          minimumNoticeLabel ||
+            `That date is too close to today. Please pick a date at least ${minimumNoticeWeeks} ${minimumNoticeWeeks === 1 ? "week" : "weeks"} out.`,
+        );
       } else {
-        // Show helpful feedback when clicking unavailable dates (mode-aware)
+        // Show helpful feedback when clicking unavailable dates.
         if (firstAvailableDate) {
           const availMonth = monthNames[firstAvailableDate.getMonth()];
-          const slotType = collabMode === 'discovery' ? 'call slots' : collabMode === 'async' ? 'publication dates' : 'availability';
-          toast.info(`No ${slotType} on this date. Check ${availMonth} for available dates.`, {
+          toast.info(`No publication dates on this date. Check ${availMonth} for available dates.`, {
             action: {
               label: `Go to ${availMonth}`,
               onClick: jumpToAvailability,
@@ -206,26 +239,40 @@ export function CollabCalendar({
     const bookingInfo = status === "booked" ? getBookingInfo(dateStr) : undefined;
     const publishedInfo = status === "published" ? getPublishedBookingInfo(dateStr) : undefined;
 
+    // DRAFT-001: gray out (and prevent selection on) available dates that
+    // fall inside the creator's notice window. Already-booked dates remain
+    // visible as booked even when they're inside the buffer.
+    const isBuffered =
+      status === "available" && !isPast && isInsideNotice(dateStr);
+
     const dayButton = (
       <motion.button
         key={day}
-        whileHover={(!isPast || status === "published" || status === "booked") ? { scale: 1.1 } : {}}
-        whileTap={(!isPast || status === "published" || status === "booked") ? { scale: 0.95 } : {}}
+        whileHover={(!isPast || status === "published" || status === "booked") && !isBuffered ? { scale: 1.1 } : {}}
+        whileTap={(!isPast || status === "published" || status === "booked") && !isBuffered ? { scale: 0.95 } : {}}
         onClick={() => handleDateClick(day)}
-        disabled={isPast && status !== "booked" && status !== "published"}
+        disabled={(isPast && status !== "booked" && status !== "published") || isBuffered}
+        aria-disabled={isBuffered ? true : undefined}
+        title={
+          isBuffered
+            ? minimumNoticeLabel ||
+              `Inside the ${minimumNoticeWeeks}-week minimum notice window`
+            : undefined
+        }
         className={cn(
           "h-12 w-12 rounded-xl font-medium transition-all duration-200 relative",
           isPast && status !== "booked" && status !== "published" && "opacity-30 cursor-not-allowed",
           !isPast && status === "default" && "hover:bg-muted",
-          status === "available" && !isPast && "bg-available/20 text-available hover:bg-available/30 hover:shadow-md",
+          status === "available" && !isPast && !isBuffered && "bg-available/20 text-available hover:bg-available/30 hover:shadow-md",
           status === "booked" && cn("bg-booked/20 text-booked", onBookedDateClick ? "cursor-pointer" : "cursor-default"),
           status === "blocked" && "bg-blocked/20 text-blocked",
           status === "published" && "bg-booked/10 text-booked opacity-60 cursor-pointer",
+          isBuffered && "bg-muted/40 text-muted-foreground/60 cursor-not-allowed line-through decoration-muted-foreground/40",
           isSelected && "ring-2 ring-primary ring-offset-2"
         )}
       >
         {day}
-        {status === "available" && !isPast && (
+        {status === "available" && !isPast && !isBuffered && (
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
@@ -319,6 +366,19 @@ export function CollabCalendar({
 
   return (
     <div className="glass-card p-6">
+      {/* DRAFT-001: minimum notice label (guest mode only). */}
+      {minimumNoticeLabel && noticeWeeks > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-4 p-3 rounded-xl bg-muted/40 border border-border/50 flex items-start gap-2"
+          data-testid="minimum-notice-label"
+        >
+          <Clock className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+          <p className="text-sm text-muted-foreground">{minimumNoticeLabel}</p>
+        </motion.div>
+      )}
+
       {/* Availability banner - show when current month has no availability */}
       {!isEditable && !currentMonthHasAvailability && firstAvailableDate && (
         <motion.div
@@ -329,19 +389,15 @@ export function CollabCalendar({
           <div className="flex items-center gap-2 text-sm">
             <CalendarDays className="w-4 h-4 text-primary" />
             <span>
-              Next available{" "}
-              <span className="font-medium">
-                {collabMode === 'discovery' ? 'call slots' : collabMode === 'async' ? 'publication dates' : 'dates'}
-              </span>{" "}
-              are in{" "}
+              Next available <span className="font-medium">publication dates</span> are in{" "}
               <span className="font-medium text-primary">
                 {monthNames[firstAvailableDate.getMonth()]} {firstAvailableDate.getFullYear()}
               </span>
             </span>
           </div>
-          <Button 
-            size="sm" 
-            variant="ghost" 
+          <Button
+            size="sm"
+            variant="ghost"
             onClick={jumpToAvailability}
             className="shrink-0 text-primary hover:text-primary"
           >
@@ -414,6 +470,12 @@ export function CollabCalendar({
           <div className="w-3 h-3 rounded-full bg-blocked" />
           <span className="text-sm text-muted-foreground">Blocked</span>
         </div>
+        {noticeWeeks > 0 && (
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-muted/60 border border-border" />
+            <span className="text-sm text-muted-foreground">Too soon to book</span>
+          </div>
+        )}
       </div>
     </div>
   );

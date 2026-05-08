@@ -308,13 +308,10 @@ export default function Dashboard() {
     }
   };
 
-  // Mode-aware calendar section (must be after creator null-check)
-  const calendarHeader = creator.collab_mode === "discovery" ? "Your Availability" : "Your Publication Schedule";
-
+  // DRAFT-003: collab_mode removed — always render the publishing schedule.
+  const calendarHeader = "Your Publication Schedule";
   const emptyStateText =
-    creator.collab_mode === "discovery"
-      ? "No call slots set. Click 'Edit Availability' to mark when you're free — guests will book intro calls on these dates."
-      : "No publishing windows set. Click 'Edit Availability' to set dates when you can ship — guests will pick from these as target publish dates.";
+    "No publishing windows set. Click 'Edit Availability' to set dates when you can ship — guests will pick from these as target publish dates.";
 
   return (
     <DashboardLayout>
@@ -472,7 +469,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">{calendarHeader}</h2>
               <Button variant="outline" size="sm" onClick={() => navigate("/dashboard/availability")}>
-                {creator.collab_mode === "discovery" ? "Edit Availability" : "Edit Publishing Dates"}
+                Edit Publishing Dates
               </Button>
             </div>
             <CollabCalendar
@@ -481,7 +478,6 @@ export default function Dashboard() {
               bookingDetails={bookingDetails}
               publishedDates={publishedDates}
               publishedBookingDetails={publishedBookingDetails}
-              collabMode={creator.collab_mode as "async" | "discovery" | null}
               onBookedDateClick={(requestId) => navigate(`/dashboard/workspace/${requestId}`)}
             />
             {availability.length === 0 && (
@@ -491,9 +487,7 @@ export default function Dashboard() {
                 className="mt-4 p-4 rounded-lg bg-accent/10 border border-accent/20"
               >
                 <p className="text-sm text-muted-foreground">
-                  <span className="font-medium text-foreground">
-                    {creator.collab_mode === "discovery" ? "No availability set yet." : "No publishing dates set."}
-                  </span>{" "}
+                  <span className="font-medium text-foreground">No publishing dates set.</span>{" "}
                   {emptyStateText.split(". ").slice(1).join(". ")}
                 </p>
               </motion.div>
