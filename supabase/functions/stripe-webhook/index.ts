@@ -117,6 +117,22 @@ serve(async (req) => {
           .update({ stripe_customer_id: customerId })
           .eq("user_id", userId);
       }
+      // Server-side analytics: record checkout completion redundantly
+      try {
+        await supabase.from("analytics_events").insert({
+          event_type: "checkout_completed",
+          user_id: userId ?? null,
+          event_data: {
+            source: "stripe_webhook",
+            mode: session.mode,
+            amount_total: session.amount_total,
+            currency: session.currency,
+            stripe_session_id: session.id,
+            tier_hint: session.metadata?.tier ?? null,
+            test: isTestEvent,
+          },
+        });
+      } catch (_) { /* non-fatal */ }
       return new Response(JSON.stringify({ linked: true }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
