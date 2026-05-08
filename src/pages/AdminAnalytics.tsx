@@ -409,7 +409,10 @@ export default function AdminAnalytics() {
                   {draftAcceptanceRate.toFixed(1)}%
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {draftAccepted} of {draftGenerated} drafts accepted ({draftCopied} legacy copies)
+                  {draftAccepted} of {draftGenerated} drafts accepted
+                </p>
+                <p className="text-[11px] text-muted-foreground/70 mt-0.5">
+                  unique drafts copied or downloaded ÷ drafts generated
                 </p>
                 {darNeedsAction && (
                   <p className="text-xs text-destructive mt-2">
