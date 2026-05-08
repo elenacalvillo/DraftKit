@@ -948,6 +948,100 @@ export default function AdminAnalytics() {
           </Card>
         </motion.div>
 
+        {/* Inactive User Campaign */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.15 }}
+          className="mb-6"
+        >
+          <Card className="glass-card">
+            <CardHeader>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <CardTitle className="flex items-center gap-2">
+                  <Mail className="w-5 h-5" />
+                  Inactive User Campaign
+                </CardTitle>
+                <span className="text-xs text-muted-foreground">
+                  Users with credits and no login in 7+ days
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {inactiveUsers.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8 text-sm">
+                  Nobody to nudge right now. All credit holders are active or have completed the campaign.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>User</TableHead>
+                        <TableHead>Credits</TableHead>
+                        <TableHead>Last login</TableHead>
+                        <TableHead>Nudges</TableHead>
+                        <TableHead className="text-right">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {inactiveUsers.map((u) => {
+                        const strike = strikeForCount(u.nudge_count);
+                        const recentlyNudged =
+                          !!u.last_nudge_sent_at &&
+                          Date.now() - new Date(u.last_nudge_sent_at).getTime() < 24 * 60 * 60 * 1000;
+                        const tpl = strike ? buildNudge(strike, u.name, u.credits) : null;
+                        return (
+                          <TableRow key={u.creator_id}>
+                            <TableCell>
+                              <div className="font-medium text-sm">{u.name || "—"}</div>
+                              <div className="text-xs text-muted-foreground break-all">{u.email}</div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{u.credits}</Badge>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {u.last_sign_in_at
+                                ? formatDistanceToNow(parseISO(u.last_sign_in_at), { addSuffix: true })
+                                : "Never"}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-sm">{u.nudge_count}/3</span>
+                                {u.last_nudge_sent_at && (
+                                  <span className="text-[10px] text-muted-foreground">
+                                    · {formatDistanceToNow(parseISO(u.last_nudge_sent_at), { addSuffix: true })}
+                                  </span>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {strike && tpl ? (
+                                <Button
+                                  variant={strike === 3 ? "outline" : "default"}
+                                  size="sm"
+                                  disabled={recentlyNudged || nudgingId === u.creator_id}
+                                  onClick={() => handleSendNudge(u, strike)}
+                                  title={recentlyNudged ? "Already nudged in the last 24h" : tpl.subject}
+                                >
+                                  <Send className="w-3.5 h-3.5 mr-1.5" />
+                                  {tpl.label}
+                                </Button>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">Campaign complete</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+
         {/* Feedback Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
