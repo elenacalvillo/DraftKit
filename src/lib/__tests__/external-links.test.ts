@@ -178,7 +178,7 @@ describe("serializeExternalLinks", () => {
   it("filters invalid entries during serialisation", () => {
     const links = [
       { url: "https://elena.dev" },
-      // @ts-expect-error - exercising runtime invariants
+      // exercising runtime invariants
       { url: "javascript:alert(1)" },
     ];
     const out = JSON.parse(serializeExternalLinks(links));
