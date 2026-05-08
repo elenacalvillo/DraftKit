@@ -89,6 +89,8 @@ interface InactiveUser {
   last_nudge_sent_at: string | null;
   last_sign_in_at: string | null;
 }
+
+export default function AdminAnalytics() {
   const navigate = useNavigate();
   const { isAdmin, loading } = useAdmin();
   
