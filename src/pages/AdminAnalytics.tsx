@@ -202,6 +202,35 @@ export default function AdminAnalytics() {
     }))
     .sort((a, b) => b.count - a.count);
 
+  // ---- Growth Loop Funnels ----
+  const countOf = (t: string) => events.filter((e) => e.event_type === t).length;
+  const referralFunnel = [
+    { name: "Referral link copied", count: countOf("referral_link_copied") },
+    { name: "Referral visits", count: countOf("referral_visit") },
+    { name: "Signups (referral)", count: attributionCounts["referral"] || 0 },
+  ];
+  const inviteFunnel = [
+    { name: "Invite emails sent", count: countOf("invite_sent") },
+    { name: "Invite link clicks", count: countOf("invite_email_clicked") },
+    { name: "Signups (invite)", count: attributionCounts["invite"] || 0 },
+  ];
+  const discoveryFunnel = [
+    { name: "Discovery searches", count: countOf("discovery_search") + countOf("discovery_filter_applied") },
+    { name: "Profile views", count: countOf("discovery_profile_viewed") },
+    { name: "Substack opened", count: countOf("discovery_substack_opened") },
+    { name: "Invite clicks", count: countOf("discovery_invite_clicked") },
+  ];
+  const upgradePromptShown = countOf("upgrade_prompt_shown");
+  const upgradePromptClicked = countOf("upgrade_prompt_clicked");
+  const checkoutStarted = countOf("checkout_started");
+  const checkoutCompleted = countOf("checkout_completed");
+  const monetizationFunnel = [
+    { name: "Upgrade prompt shown", count: upgradePromptShown },
+    { name: "Upgrade prompt clicked", count: upgradePromptClicked },
+    { name: "Checkout started", count: checkoutStarted },
+    { name: "Checkout completed", count: checkoutCompleted },
+  ];
+
 
   // Calculate SMART Attachment Rate: % of bookings that used SMART-suggested topics
   const bookingsWithAiSuggestion = events.filter((e) => {
