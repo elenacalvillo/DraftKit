@@ -87,6 +87,8 @@ export default function AdminAnalytics() {
   const [feedback, setFeedback] = useState<UserFeedback[]>([]);
   const [dailyMetrics, setDailyMetrics] = useState<DailyMetric[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [inactiveUsers, setInactiveUsers] = useState<InactiveUser[]>([]);
+  const [nudgingId, setNudgingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && !isAdmin) {
