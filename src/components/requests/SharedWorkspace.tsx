@@ -85,6 +85,57 @@ function clearRecoveryDraft(requestId: string) {
   }
 }
 
+function SaveStatusPill({
+  status,
+  savedAt,
+  visible,
+  isEditing,
+}: {
+  status: "idle" | "unsaved" | "saving" | "saved" | "failed";
+  savedAt: string | null;
+  visible: boolean;
+  isEditing: boolean;
+}) {
+  if (!visible) return null;
+  // While not editing, only surface non-default states.
+  if (!isEditing && status !== "failed" && !savedAt) return null;
+
+  if (status === "saving") {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Loader2 className="w-3 h-3 animate-spin" />
+        Saving…
+      </span>
+    );
+  }
+  if (status === "failed") {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs text-destructive">
+        <CloudOff className="w-3 h-3" />
+        Save failed — retrying
+      </span>
+    );
+  }
+  if (status === "unsaved") {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs text-amber-500">
+        <AlertCircle className="w-3 h-3" />
+        Unsaved changes
+      </span>
+    );
+  }
+  // saved or idle-with-savedAt
+  if (savedAt) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Check className="w-3 h-3 text-success" />
+        Saved · {formatDistanceToNow(new Date(savedAt), { addSuffix: true })}
+      </span>
+    );
+  }
+  return null;
+}
+
 function SharedWorkspaceInner({
   requestId,
   sharedContent,
