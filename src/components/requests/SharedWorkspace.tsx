@@ -1,9 +1,9 @@
-import { useState, useEffect, memo } from "react";
+import { useState, useEffect, memo, useRef, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useWorkspacePresence } from "@/hooks/useWorkspacePresence";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { FileText, Save, X, AlertCircle, PenLine, Lock, Download, Share2, Copy } from "lucide-react";
+import { FileText, Save, X, AlertCircle, PenLine, Lock, Download, Share2, Copy, Check, CloudOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -15,6 +15,7 @@ import { WorkspaceEditor } from "./WorkspaceEditor";
 import { cn } from "@/lib/utils";
 import { exportWorkspaceHtmlToDocx } from "@/lib/export-draft";
 import { useAnalytics } from "@/hooks/useAnalytics";
+import { parseSaveError } from "@/lib/save-workspace-errors";
 
 const ALLOWED_TAGS = ["p", "h1", "h2", "h3", "strong", "em", "s", "code", "pre", "a", "ul", "ol", "li", "br", "hr", "table", "thead", "tbody", "tr", "th", "td", "span"];
 const ALLOWED_ATTR = ["href", "target", "rel", "colspan", "rowspan", "colwidth", "class", "data-comment", "data-author"];
@@ -84,6 +85,57 @@ function clearRecoveryDraft(requestId: string) {
   }
 }
 
+function SaveStatusPill({
+  status,
+  savedAt,
+  visible,
+  isEditing,
+}: {
+  status: "idle" | "unsaved" | "saving" | "saved" | "failed";
+  savedAt: string | null;
+  visible: boolean;
+  isEditing: boolean;
+}) {
+  if (!visible) return null;
+  // While not editing, only surface non-default states.
+  if (!isEditing && status !== "failed" && !savedAt) return null;
+
+  if (status === "saving") {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Loader2 className="w-3 h-3 animate-spin" />
+        Saving…
+      </span>
+    );
+  }
+  if (status === "failed") {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs text-destructive">
+        <CloudOff className="w-3 h-3" />
+        Save failed — retrying
+      </span>
+    );
+  }
+  if (status === "unsaved") {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs text-amber-500">
+        <AlertCircle className="w-3 h-3" />
+        Unsaved changes
+      </span>
+    );
+  }
+  // saved or idle-with-savedAt
+  if (savedAt) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Check className="w-3 h-3 text-success" />
+        Saved · {formatDistanceToNow(new Date(savedAt), { addSuffix: true })}
+      </span>
+    );
+  }
+  return null;
+}
+
 function SharedWorkspaceInner({
   requestId,
   sharedContent,
@@ -105,6 +157,20 @@ function SharedWorkspaceInner({
   const [editStartTime, setEditStartTime] = useState<number | null>(null);
   const [recoveryNotice, setRecoveryNotice] = useState<RecoveryDraft | null>(null);
   const [editBlockedReason, setEditBlockedReason] = useState<string | null>(null);
+  // Save-state machine drives the "Last saved" pill + auto-save loop. Manual
+  // and auto saves both feed it so users always see the current truth.
+  type SaveStatus = "idle" | "unsaved" | "saving" | "saved" | "failed";
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const [savedAt, setSavedAt] = useState<string | null>(lastEditedAt);
+  const [, setNowTick] = useState(0);
+  const lastSavedContentRef = useRef<string>(sanitize(sharedContent || ""));
+  const inFlightRef = useRef(false);
+  const lastFailureToastAtRef = useRef(0);
+  const wasFailedRef = useRef(false);
+  const editingSessionsRef = useRef(editingSessions);
+  useEffect(() => {
+    editingSessionsRef.current = editingSessions;
+  }, [editingSessions]);
   const { user } = useAuth();
   const { trackEvent } = useAnalytics();
 
@@ -235,91 +301,187 @@ function SharedWorkspaceInner({
     setRecoveryNotice(null);
   };
 
-  const handleSave = async () => {
-    setIsSaving(true);
-    const now = new Date().toISOString();
-    const cleanHtml = sanitize(editContent);
-    const durationSeconds = editStartTime ? Math.round((Date.now() - editStartTime) / 1000) : 0;
-    const newSession: EditingSession = {
-      edited_by: currentUserName,
-      saved_at: now,
-      duration_seconds: durationSeconds,
-    };
-    const updatedSessions = [...editingSessions, newSession];
-    try {
-      // Server-authoritative save. The RPC validates auth + access + status,
-      // repairs missing requester/collaborator linkage by email, performs the
-      // UPDATE, and returns the canonical row. Any auth/permission failure
-      // throws a typed error — there is no "silent 0-row" path.
-      const { data, error } = await supabase.rpc("save_workspace_content", {
-        _request_id: requestId,
-        _content: cleanHtml,
-        _editor_name: currentUserName,
-        _editing_sessions: updatedSessions as any,
-      });
-
-      if (error) throw error;
-      const row = Array.isArray(data) ? (data[0] as any) : (data as any);
-      if (!row || !row.id) {
-        throw new Error("Server did not confirm the save. Your draft is preserved locally.");
-      }
-
-      const confirmedContent: string = row.shared_content ?? "";
-      const confirmedBy: string = row.content_last_edited_by ?? currentUserName;
-      const confirmedAt: string = row.content_last_edited_at ?? now;
-
-      onContentSaved(confirmedContent, confirmedBy, confirmedAt);
-      clearRecoveryDraft(requestId);
-      setRecoveryNotice(null);
-      setIsEditing(false);
-      toast.success("Draft saved & synced");
-
-      // Fire-and-forget email notification if checked
-      if (notifyPartner && partnerName) {
-        const emailType = isCreator
-          ? "workspace_updated_by_creator"
-          : "workspace_updated_by_guest";
-        try {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session) {
-            supabase.functions.invoke("send-collab-email", {
-              body: { type: emailType, requestId },
-              headers: { Authorization: `Bearer ${session.access_token}` },
-            });
-          }
-        } catch {
-          // fire-and-forget
+  const performSave = useCallback(
+    async ({ isAuto, closeOnSuccess }: { isAuto: boolean; closeOnSuccess: boolean }) => {
+      if (inFlightRef.current) return;
+      if (editBlockedReason) {
+        if (!isAuto) {
+          toast.error(editBlockedReason, { duration: 8000 });
         }
+        return;
       }
-      setNotifyPartner(false);
-    } catch (error) {
-      console.error("Failed to save workspace content:", error);
-      // Make sure the recovery snapshot reflects the latest in-memory edit
-      // so the user can recover after refresh.
-      writeRecoveryDraft(requestId, {
-        content: editContent,
-        saved_at: new Date().toISOString(),
+      const cleanHtml = sanitize(editContent);
+      // No-op auto-save: nothing changed since last confirmed save.
+      if (isAuto && cleanHtml === lastSavedContentRef.current) {
+        return;
+      }
+      const now = new Date().toISOString();
+      const durationSeconds = editStartTime ? Math.round((Date.now() - editStartTime) / 1000) : 0;
+      const newSession: EditingSession = {
         edited_by: currentUserName,
-      });
-      const rawMsg = error instanceof Error ? error.message : "";
-      // Translate typed RPC errors into human-readable causes.
-      const friendly = rawMsg.includes("not_authenticated")
-        ? "You're not signed in. Please log in and try again."
-        : rawMsg.includes("not_a_participant")
-          ? "Your account isn't linked to this collaboration. Try signing out and signing back in with the email that received the invite."
-          : rawMsg.includes("status_not_approved")
-            ? "This collaboration is no longer active, so the workspace is read-only."
-            : rawMsg.includes("request_not_found")
-              ? "This collaboration no longer exists."
-              : rawMsg || "Your changes are NOT in the database.";
-      toast.error(
-        `CRITICAL: Save Failed. ${friendly} Your draft is preserved locally on this device — please copy your work manually as a backup.`,
-        { duration: 12000 },
-      );
-    } finally {
-      setIsSaving(false);
+        saved_at: now,
+        duration_seconds: durationSeconds,
+      };
+      const updatedSessions = [...editingSessionsRef.current, newSession];
+
+      inFlightRef.current = true;
+      setSaveStatus("saving");
+      if (!isAuto) setIsSaving(true);
+
+      try {
+        const { data, error } = await supabase.rpc("save_workspace_content", {
+          _request_id: requestId,
+          _content: cleanHtml,
+          _editor_name: currentUserName,
+          _editing_sessions: updatedSessions as any,
+        });
+
+        if (error) throw error;
+        const row = Array.isArray(data) ? (data[0] as any) : (data as any);
+        if (!row || !row.id) {
+          throw new Error("Server did not confirm the save. Your draft is preserved locally.");
+        }
+
+        const confirmedContent: string = row.shared_content ?? "";
+        const confirmedBy: string = row.content_last_edited_by ?? currentUserName;
+        const confirmedAt: string = row.content_last_edited_at ?? now;
+
+        lastSavedContentRef.current = cleanHtml;
+        onContentSaved(confirmedContent, confirmedBy, confirmedAt);
+        clearRecoveryDraft(requestId);
+        setRecoveryNotice(null);
+        setSaveStatus("saved");
+        setSavedAt(confirmedAt);
+
+        if (wasFailedRef.current) {
+          // Recovery signal — lets us measure save-failure → success rate.
+          trackEvent("workspace_save_recovered", {
+            request_id: requestId,
+            is_auto_save: isAuto,
+          });
+          wasFailedRef.current = false;
+        }
+
+        if (closeOnSuccess) {
+          setIsEditing(false);
+          toast.success("Draft saved & synced");
+          if (notifyPartner && partnerName) {
+            const emailType = isCreator
+              ? "workspace_updated_by_creator"
+              : "workspace_updated_by_guest";
+            try {
+              const { data: { session } } = await supabase.auth.getSession();
+              if (session) {
+                supabase.functions.invoke("send-collab-email", {
+                  body: { type: emailType, requestId },
+                  headers: { Authorization: `Bearer ${session.access_token}` },
+                });
+              }
+            } catch {
+              /* fire-and-forget */
+            }
+          }
+          setNotifyPartner(false);
+        }
+      } catch (error) {
+        console.error("Failed to save workspace content:", error);
+        // Always preserve a fresh local recovery snapshot of the latest edit.
+        writeRecoveryDraft(requestId, {
+          content: editContent,
+          saved_at: new Date().toISOString(),
+          edited_by: currentUserName,
+        });
+        const parsed = parseSaveError(error);
+        const pgCode =
+          error && typeof error === "object" && "code" in (error as Record<string, unknown>)
+            ? String((error as Record<string, unknown>).code ?? "")
+            : null;
+
+        // Observability: log every failure so we notice regressions without
+        // waiting for users to scream.
+        trackEvent("workspace_save_failed", {
+          request_id: requestId,
+          reason: parsed.reason,
+          detail: parsed.detail,
+          postgres_code: pgCode,
+          is_auto_save: isAuto,
+          content_length: cleanHtml.length,
+        });
+
+        setSaveStatus("failed");
+        wasFailedRef.current = true;
+
+        const nowMs = Date.now();
+        const shouldToast = !isAuto || nowMs - lastFailureToastAtRef.current > 30000;
+        if (shouldToast) {
+          toast.error(
+            `CRITICAL: Save Failed. ${parsed.friendly} Your draft is preserved locally on this device — please copy your work manually as a backup.`,
+            { duration: 12000 },
+          );
+          lastFailureToastAtRef.current = nowMs;
+        }
+      } finally {
+        inFlightRef.current = false;
+        if (!isAuto) setIsSaving(false);
+      }
+    },
+    [
+      editBlockedReason,
+      editContent,
+      editStartTime,
+      currentUserName,
+      requestId,
+      onContentSaved,
+      notifyPartner,
+      partnerName,
+      isCreator,
+      trackEvent,
+    ],
+  );
+
+  const handleSave = useCallback(
+    () => performSave({ isAuto: false, closeOnSuccess: true }),
+    [performSave],
+  );
+
+  // Auto-save: debounced 3s after the last keystroke. Same RPC, same error
+  // path, but silent on success and rate-limited on failure toasts.
+  useEffect(() => {
+    if (!isEditing) return;
+    if (editBlockedReason) return;
+    const cleanHtml = sanitize(editContent);
+    if (cleanHtml === lastSavedContentRef.current) {
+      // Already in sync — make sure the pill reflects that.
+      setSaveStatus((s) => (s === "saving" ? s : "saved"));
+      return;
     }
-  };
+    setSaveStatus((s) => (s === "saving" ? s : "unsaved"));
+    const t = window.setTimeout(() => {
+      performSave({ isAuto: true, closeOnSuccess: false });
+    }, 3000);
+    return () => window.clearTimeout(t);
+  }, [editContent, isEditing, editBlockedReason, performSave]);
+
+  // Keep the "Saved · 12s ago" relative time fresh.
+  useEffect(() => {
+    const id = window.setInterval(() => setNowTick((n) => n + 1), 30000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  // Flush a final save when the user is about to leave with unsynced edits.
+  useEffect(() => {
+    if (!isEditing) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      const cleanHtml = sanitize(editContent);
+      if (cleanHtml !== lastSavedContentRef.current) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [isEditing, editContent]);
+
 
   const navigate = useNavigate();
 
@@ -369,9 +531,17 @@ function SharedWorkspaceInner({
         </div>
       )}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-muted/30">
-        <div className="flex items-center gap-2">
-          <FileText className="w-4 h-4 text-primary" />
-          <span className="text-sm font-medium">Shared Workspace</span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <FileText className="w-4 h-4 text-primary" />
+            <span className="text-sm font-medium">Shared Workspace</span>
+          </div>
+          <SaveStatusPill
+            status={saveStatus}
+            savedAt={savedAt}
+            visible={isEditing || saveStatus === "failed" || (!!savedAt && !isEditing)}
+            isEditing={isEditing}
+          />
         </div>
         <div className="flex items-center gap-2">
           {hasContent && (

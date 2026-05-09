@@ -214,6 +214,22 @@ export default function AdminAnalytics() {
   const collabApproved = events.filter((e) => e.event_type === "collab_approved").length;
   const collabDeclined = events.filter((e) => e.event_type === "collab_declined").length;
 
+  // ---- Workspace save reliability (7d) ----
+  const sevenDaysAgoMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const saveFailEvents = events.filter(
+    (e) => e.event_type === "workspace_save_failed" && new Date(e.created_at).getTime() >= sevenDaysAgoMs,
+  );
+  const saveRecoveredCount = events.filter(
+    (e) => e.event_type === "workspace_save_recovered" && new Date(e.created_at).getTime() >= sevenDaysAgoMs,
+  ).length;
+  const saveFailReasonCounts: Record<string, number> = {};
+  for (const e of saveFailEvents) {
+    const data = (e.event_data && typeof e.event_data === "object" ? (e.event_data as Record<string, unknown>) : {}) as Record<string, unknown>;
+    const reason = (data.reason as string | undefined) ?? "unknown";
+    saveFailReasonCounts[reason] = (saveFailReasonCounts[reason] || 0) + 1;
+  }
+  const topSaveFailReason = Object.entries(saveFailReasonCounts).sort((a, b) => b[1] - a[1])[0];
+
   // ---- Feature Usage Matrix (last 7d / 30d) ----
   const now = Date.now();
   const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
@@ -639,6 +655,31 @@ export default function AdminAnalytics() {
                 <div className="text-3xl font-bold">{userSignups}</div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Last 30 days
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.85 }}
+          >
+            <Card className={cn("glass-card", saveFailEvents.length > 0 && "border-destructive/40")}>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4" />
+                  Workspace save failures (7d)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={cn("text-3xl font-bold", saveFailEvents.length > 0 ? "text-destructive" : "text-success")}>
+                  {saveFailEvents.length}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {topSaveFailReason
+                    ? `Top reason: ${topSaveFailReason[0]} (${topSaveFailReason[1]}) · ${saveRecoveredCount} recovered`
+                    : `${saveRecoveredCount} recovered · all clean`}
                 </p>
               </CardContent>
             </Card>

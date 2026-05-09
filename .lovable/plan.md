@@ -1,73 +1,70 @@
 
-## What's actually happening
+## Goal
 
-You're saving as the **guest** side. Both a success toast AND an error toast appearing, plus old content coming back, is the textbook signature of an RLS silent reject racing with our new strict check:
+Make the Shared Workspace save flow bulletproof and observable so the "lost hours of work" incident can never repeat silently again. Four coordinated changes:
 
-- The `UPDATE` to `collab_requests` returns `error = null` but `data = []` (0 rows).
-- That means Postgres ran the query, no row matched the guest's UPDATE policy, so nothing was written.
-- Old `shared_content` is what's still in the DB → after refresh you see the April 30 version.
+1. Auto-save every few seconds while typing
+2. "Last saved" status indicator
+3. Save-failure alerting to `analytics_events`
+4. Regression test guarding the guest-side save path
 
-For a guest, the only two RLS policies that allow editing `shared_content` are:
+## 1. Auto-save to the database
 
-1. `Requesters can edit shared workspace` → requires `requester_user_id = auth.uid()` AND `status = 'approved'`.
-2. `Collaborators can edit shared workspace content` → requires a row in `workspace_collaborators` for this user AND `status = 'approved'`.
+- Add a debounced auto-save inside `SharedWorkspace.tsx` that fires ~3s after the last keystroke and at most every ~10s while typing continues.
+- Auto-save calls the same `save_workspace_content` RPC that manual Save & Sync uses — single code path, single source of truth.
+- Skip auto-save when:
+  - `editBlockedReason` is set (pre-flight gate failed)
+  - the editor is empty
+  - content hasn't changed since the last successful save (compare hash)
+  - a manual save is already in flight (avoid double writes)
+- Auto-save runs silently — no toast on success. Errors flow through the same critical path as manual save (toast + recovery preserved + analytics event), but rate-limited so a broken connection doesn't spam the user.
+- localStorage recovery draft continues to write on every keystroke as the last-mile safety net.
 
-If the Xian collab was originally invited by email and `requester_user_id` was never linked to your auth user (or you're acting via `workspace_collaborators` but the link trigger didn't fire), every guest UPDATE returns 0 rows and your edits never land.
+## 2. "Last saved" status indicator
 
-## Plan
+- Replace the existing static header area near the Save & Sync button with a small status pill:
+  - `Saving…` (in flight, muted spinner)
+  - `Saved · 12s ago` (relative time, refreshed every 30s)
+  - `Unsaved changes` (dirty + no save in flight yet)
+  - `Save failed — retrying` (last save errored, auto-retry pending)
+- Drives off the auto-save state machine from #1, so manual and auto saves both feed it.
+- On mount, seeds from `content_last_edited_at` so returning users see "Saved · 2h ago" instead of an empty state.
 
-### 1. Server-authoritative save via SECURITY DEFINER RPC
+## 3. Save-failure alerting
 
-Create `public.save_workspace_content(_request_id uuid, _content text, _editor_name text, _editing_sessions jsonb)`:
+- On any caught error from `save_workspace_content` (manual or auto), insert one row into `analytics_events`:
+  - `event_type = "workspace_save_failed"`
+  - `event_data = { request_id, reason, postgres_code, is_auto_save, content_length }`
+  - `reason` uses the typed strings already thrown by the RPC: `not_authenticated`, `not_a_participant`, `status_not_approved:<status>`, `request_not_found`, plus a `network_error` bucket for thrown fetch failures.
+- Existing `analytics_events` INSERT policy already allows authenticated users to log events with their own `user_id`, so no migration needed.
+- Also log a one-shot `workspace_save_recovered` event when a previously-failed dirty buffer succeeds on retry — gives us a recovery rate metric.
+- Admin Analytics page (`/admin/analytics`) gets a new tile: "Workspace save failures (7d)" surfacing count + top reason. Lets us notice regressions without waiting for users to scream.
 
-- `SECURITY DEFINER`, `search_path = public`.
-- Inside, explicitly authorize the caller using one source of truth: `has_workspace_access(auth.uid(), _request_id)` AND `status = 'approved'`.
-- Auto-link the caller into `workspace_collaborators` / `requester_user_id` if their email matches but the linkage was missed (covers off-platform invite case for Xian).
-- `UPDATE collab_requests SET shared_content, content_last_edited_by, content_last_edited_at = now(), editing_sessions WHERE id = _request_id` and `RETURNING ...`.
-- Return the updated row. If 0 rows, `RAISE EXCEPTION` with a precise reason: `not_authenticated`, `not_a_participant`, `status_not_approved`, or `request_not_found`.
+## 4. Regression test for guest-side save
 
-This eliminates the "silent 0-row" path entirely — every save either commits or throws a typed error.
-
-### 2. Pre-flight permission probe in `SharedWorkspace.tsx`
-
-When the user clicks **Edit Draft** (or on workspace mount for a guest), call a lightweight `can_edit_workspace(_request_id)` RPC that returns `{ can_edit, reason }`. If `can_edit = false`, replace the editor with a clear inline message ("This collaboration isn't currently editable: <reason>") instead of letting the user type for an hour into a doomed save. Disable Save & Sync proactively.
-
-### 3. Switch the client save to the new RPC
-
-In `handleSave`:
-
-- Call `supabase.rpc('save_workspace_content', { ... })` instead of the direct `update().select()`.
-- Treat any thrown error as critical (preserve recovery draft, show CRITICAL toast with the exact reason).
-- Treat any returned row as the canonical save (clear recovery draft, success toast).
-- Remove the previous "row count" guesswork — the RPC enforces it.
-
-### 4. Stop the duplicate-toast bug
-
-Right now, the new "0 rows" branch throws and the catch shows an error toast — but the optimistic `onContentSaved` was already firing in some paths, and earlier code briefly showed a success toast. Audit the save flow so success and error toasts are mutually exclusive: success only after the RPC returns a confirmed row, error otherwise. Nothing in between.
-
-### 5. Repair Xian's record (one-shot data fix)
-
-As part of the migration, run a backfill that:
-
-- Finds `collab_requests` rows where `requester_user_id IS NULL` but `requester_email` matches an `auth.users.email` (normalized) and links them.
-- Stamps `joined_at` on `workspace_collaborators` rows similarly.
-
-This makes the existing Xian workspace immediately editable for you again without manual intervention.
-
-### 6. Confirm messaging isolation (no code change expected)
-
-Re-verify in `Workspace.tsx` that opening/sending via `GuestMessageModal` does not bump any state that recreates `<SharedWorkspace />` while the editor has unsaved content. The memo + scoped `msgRefreshKey` already does this; we'll just add a regression note.
+- New Vitest file `src/lib/__tests__/save-workspace.test.ts`.
+- Mocks the Supabase client's `rpc("save_workspace_content", ...)` to simulate four scenarios and asserts the client handler reacts correctly:
+  1. Success (returns one row) → recovery cleared, success state, no error toast.
+  2. RPC throws `not_a_participant` → critical toast, recovery preserved, analytics event fired.
+  3. RPC throws `status_not_approved:cancelled` → critical toast with cancelled reason, edit blocked.
+  4. Network error → retry queued, dirty state preserved.
+- Pure unit test — no live DB. Guards against the silent 0-row regression returning under any future refactor.
 
 ## Files in scope
 
-- `supabase/migrations/<new>.sql` — `save_workspace_content` RPC, `can_edit_workspace` RPC, link backfill.
-- `src/components/requests/SharedWorkspace.tsx` — switch to RPC, add pre-flight gate, tighten toast logic.
-- `src/pages/Workspace.tsx` — pass through pre-flight result, keep messaging isolated from editor.
+- `src/components/requests/SharedWorkspace.tsx` — auto-save state machine, status pill, error → analytics pipeline.
+- `src/components/requests/WorkspaceEditor.tsx` — emit `onContentChange` on every keystroke (already wired) so the parent can debounce.
+- `src/hooks/useAnalytics.ts` — add `workspace_save_failed` and `workspace_save_recovered` to `AnalyticsEventType`.
+- `src/pages/AdminAnalytics.tsx` — small "Save failures" tile.
+- `src/lib/__tests__/save-workspace.test.ts` — new test file.
+
+No database migration required — the RPC, RLS policies, and analytics event table are already in place.
 
 ## Validation
 
-- Guest with linked `requester_user_id` → edit + save → exactly one success toast, DB row updated, recovery cleared.
-- Guest whose `requester_user_id` was NULL → backfill links them → save succeeds.
-- Guest on a `cancelled` collab → pre-flight blocks editing with clear reason; no editor opens.
-- Force a 0-row scenario (e.g. wrong status) → RPC throws typed error → CRITICAL toast with reason, recovery draft preserved, no false success.
-- Send a workspace message mid-edit → editor content untouched, no remount.
+- Type continuously for 30s → exactly one auto-save fires per debounce window, status pill cycles `Unsaved → Saving → Saved`.
+- Kill network mid-edit → status shows `Save failed — retrying`, recovery draft preserved, one `workspace_save_failed` row in `analytics_events`.
+- Restore network → next auto-save succeeds, status returns to `Saved`, one `workspace_save_recovered` row logged.
+- Open a `cancelled` collab → no auto-save fires (gate blocks it), status pill hidden.
+- Run Vitest → all 4 save-workspace scenarios pass.
+

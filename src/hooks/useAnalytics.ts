@@ -36,6 +36,8 @@ export type AnalyticsEventType =
   | "workspace_message_sent"
   | "collaborator_invited"
   | "collaborator_removed"
+  | "workspace_save_failed"
+  | "workspace_save_recovered"
   | "profile_theme_changed"
   | "profile_theme_upgrade_prompt_shown"
   | "directory_waitlist_signup"
