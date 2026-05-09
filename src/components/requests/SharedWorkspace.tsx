@@ -361,7 +361,13 @@ function SharedWorkspaceInner({
           </div>
         </div>
       )}
-      {/* Header */}
+      {/* Edit-blocked banner — shown when pre-flight detects the user can't save here */}
+      {editBlockedReason && !isEditing && canEdit && (
+        <div className="flex items-start gap-2 px-4 py-2.5 border-b border-border/50 bg-destructive/10 text-sm text-destructive">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <span>{editBlockedReason}</span>
+        </div>
+      )}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-muted/30">
         <div className="flex items-center gap-2">
           <FileText className="w-4 h-4 text-primary" />
