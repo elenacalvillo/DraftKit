@@ -990,7 +990,7 @@ export default function AdminAnalytics() {
             <CardContent>
               {usageRows.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-4 text-center">
-                  No events recorded in the last 30 days.
+                  No events recorded in this range.
                 </p>
               ) : (
                 <div className="overflow-x-auto max-h-[480px]">
@@ -998,18 +998,18 @@ export default function AdminAnalytics() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Event</TableHead>
-                        <TableHead className="text-right">7d</TableHead>
-                        <TableHead className="text-right">30d</TableHead>
-                        <TableHead className="text-right">Unique users (7d)</TableHead>
+                        <TableHead className="text-right">{range.label}</TableHead>
+                        <TableHead className="text-right">Prev period</TableHead>
+                        <TableHead className="text-right">Unique users</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {usageRows.map((r) => (
                         <TableRow key={r.event}>
                           <TableCell className="font-mono text-xs">{r.event}</TableCell>
-                          <TableCell className="text-right">{r.d7}</TableCell>
-                          <TableCell className="text-right text-muted-foreground">{r.d30}</TableCell>
-                          <TableCell className="text-right">{r.users7}</TableCell>
+                          <TableCell className="text-right">{r.cur}</TableCell>
+                          <TableCell className="text-right text-muted-foreground">{r.prev}</TableCell>
+                          <TableCell className="text-right">{r.users}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
