@@ -996,6 +996,7 @@ export type Database = {
           nudge_count: number
         }[]
       }
+      can_edit_workspace: { Args: { _request_id: string }; Returns: Json }
       creator_has_public_profile: {
         Args: { _creator_id: string }
         Returns: boolean
@@ -1088,6 +1089,20 @@ export type Database = {
         Returns: boolean
       }
       normalize_email: { Args: { _email: string }; Returns: string }
+      save_workspace_content: {
+        Args: {
+          _content: string
+          _editing_sessions: Json
+          _editor_name: string
+          _request_id: string
+        }
+        Returns: {
+          content_last_edited_at: string
+          content_last_edited_by: string
+          id: string
+          shared_content: string
+        }[]
+      }
       stamp_collaborator_joined: {
         Args: { _request_id: string }
         Returns: undefined
