@@ -256,12 +256,19 @@ serve(async (req: Request): Promise<Response> => {
     const aiDraft = request.ai_draft as CollabDraft | null;
 
     // --- SOLO WORKSPACE DETECTION ---
-    // A row is "effectively solo" when is_solo is set, when both sides resolve
-    // to the same user, or when the names collapse to the same person. This
-    // prevents emails from rendering "With: Karen and Karen" or sending
-    // reminders to one person about a meeting with themselves.
-    const _creatorUserIdForSolo = (request.creators as any)?.user_id ?? null;
+    // A row is "effectively solo" when is_solo is set, or when both sides
+    // resolve to the same user, or when the names collapse to the same
+    // person. This prevents emails from rendering "With: Karen and Karen"
+    // or sending reminders to one person about a meeting with themselves.
     const _requesterUserIdForSolo = request.requester_user_id ?? null;
+    const _creatorRow = request.creator_id
+      ? await supabase
+          .from("creators")
+          .select("user_id")
+          .eq("id", request.creator_id)
+          .maybeSingle()
+      : null;
+    const _creatorUserIdForSolo = _creatorRow?.data?.user_id ?? null;
     const _normName = (n: string | null | undefined) =>
       (n ?? "").trim().toLowerCase();
     const isEffectivelySolo =
