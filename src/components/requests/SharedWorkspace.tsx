@@ -1,9 +1,9 @@
-import { useState, useEffect, memo } from "react";
+import { useState, useEffect, memo, useRef, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useWorkspacePresence } from "@/hooks/useWorkspacePresence";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { FileText, Save, X, AlertCircle, PenLine, Lock, Download, Share2, Copy } from "lucide-react";
+import { FileText, Save, X, AlertCircle, PenLine, Lock, Download, Share2, Copy, Check, CloudOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -15,6 +15,7 @@ import { WorkspaceEditor } from "./WorkspaceEditor";
 import { cn } from "@/lib/utils";
 import { exportWorkspaceHtmlToDocx } from "@/lib/export-draft";
 import { useAnalytics } from "@/hooks/useAnalytics";
+import { parseSaveError } from "@/lib/save-workspace-errors";
 
 const ALLOWED_TAGS = ["p", "h1", "h2", "h3", "strong", "em", "s", "code", "pre", "a", "ul", "ol", "li", "br", "hr", "table", "thead", "tbody", "tr", "th", "td", "span"];
 const ALLOWED_ATTR = ["href", "target", "rel", "colspan", "rowspan", "colwidth", "class", "data-comment", "data-author"];
