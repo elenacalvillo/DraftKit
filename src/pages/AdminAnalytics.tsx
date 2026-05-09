@@ -95,8 +95,18 @@ interface InactiveUser {
 export default function AdminAnalytics() {
   const navigate = useNavigate();
   const { isAdmin, loading } = useAdmin();
-  
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rangeKey: RangeKey = searchParams.get("range") || "last-7d";
+  const range = useMemo(() => resolveRange(rangeKey), [rangeKey]);
+
+  const setRangeKey = (next: RangeKey) => {
+    const sp = new URLSearchParams(searchParams);
+    sp.set("range", next);
+    setSearchParams(sp, { replace: true });
+  };
+
   const [events, setEvents] = useState<AnalyticsEvent[]>([]);
+  const [prevEvents, setPrevEvents] = useState<AnalyticsEvent[]>([]);
   const [feedback, setFeedback] = useState<UserFeedback[]>([]);
   const [dailyMetrics, setDailyMetrics] = useState<DailyMetric[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -113,20 +123,40 @@ export default function AdminAnalytics() {
     if (isAdmin) {
       fetchAnalyticsData();
     }
-  }, [isAdmin]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, rangeKey]);
+
+  /**
+   * Page through analytics_events for a given window, working around
+   * Supabase's 1000-row default. Caps at 5000 rows to keep the page snappy;
+   * older data is summarised on the chart but raw KPIs above already
+   * reflect the selected range.
+   */
+  const fetchEventsInRange = async (startIso: string, endIso: string) => {
+    const PAGE = 1000;
+    const MAX_ROWS = 5000;
+    const all: AnalyticsEvent[] = [];
+    for (let from = 0; from < MAX_ROWS; from += PAGE) {
+      const { data, error } = await supabase
+        .from("analytics_events")
+        .select("*")
+        .gte("created_at", startIso)
+        .lt("created_at", endIso)
+        .order("created_at", { ascending: false })
+        .range(from, from + PAGE - 1);
+      if (error || !data) break;
+      all.push(...(data as AnalyticsEvent[]));
+      if (data.length < PAGE) break;
+    }
+    return all;
+  };
 
   const fetchAnalyticsData = async () => {
     setIsLoading(true);
-    
-    // Fetch events from last 30 days
-    const thirtyDaysAgo = subDays(new Date(), 30).toISOString();
-    
-    const [eventsRes, feedbackRes] = await Promise.all([
-      supabase
-        .from("analytics_events")
-        .select("*")
-        .gte("created_at", thirtyDaysAgo)
-        .order("created_at", { ascending: false }),
+
+    const [curEvents, prevEvts, feedbackRes] = await Promise.all([
+      fetchEventsInRange(range.start, range.end),
+      fetchEventsInRange(range.prevStart, range.prevEnd),
       supabase
         .from("user_feedback")
         .select("*")
@@ -134,37 +164,27 @@ export default function AdminAnalytics() {
         .limit(50),
     ]);
 
-    if (eventsRes.data) {
-      setEvents(eventsRes.data);
-      
-      // Calculate daily metrics
-      const dailyCounts: Record<string, number> = {};
-      for (let i = 6; i >= 0; i--) {
-        const date = format(subDays(new Date(), i), "yyyy-MM-dd");
-        dailyCounts[date] = 0;
-      }
-      
-      eventsRes.data.forEach((event) => {
-        const date = format(parseISO(event.created_at), "yyyy-MM-dd");
-        if (dailyCounts[date] !== undefined) {
-          dailyCounts[date]++;
-        }
-      });
-      
-      setDailyMetrics(
-        Object.entries(dailyCounts).map(([date, events]) => ({
-          date: format(parseISO(date), "MMM d"),
-          events,
-        }))
-      );
-    }
+    setEvents(curEvents);
+    setPrevEvents(prevEvts);
 
-    if (feedbackRes.data) {
-      setFeedback(feedbackRes.data);
+    // Build daily/weekly buckets for the chart based on the range.
+    const startMs = new Date(range.start).getTime();
+    const bucketMs = range.bucket === "week" ? 7 * 24 * 3600 * 1000 : 24 * 3600 * 1000;
+    const buckets: { date: string; events: number; ts: number }[] = [];
+    for (let i = 0; i < range.bucketCount; i++) {
+      const ts = startMs + i * bucketMs;
+      buckets.push({ date: bucketLabel(new Date(ts), range.bucket), events: 0, ts });
     }
+    for (const e of curEvents) {
+      const ts = new Date(e.created_at).getTime();
+      const idx = Math.floor((ts - startMs) / bucketMs);
+      if (idx >= 0 && idx < buckets.length) buckets[idx].events += 1;
+    }
+    setDailyMetrics(buckets.map(({ date, events }) => ({ date, events })));
+
+    if (feedbackRes.data) setFeedback(feedbackRes.data);
 
     await fetchInactiveUsers();
-
     setIsLoading(false);
   };
 
