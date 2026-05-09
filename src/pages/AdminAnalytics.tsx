@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AnalyticsRangePicker } from "@/components/admin/AnalyticsRangePicker";
 import { resolveRange, bucketLabel, type RangeKey } from "@/lib/analytics-range";
+import { computePushFunnel, pushFunnelSteps } from "@/lib/analytics-push-funnel";
 import {
   BarChart3,
   Users,
@@ -336,7 +337,17 @@ export default function AdminAnalytics() {
   const upgradePromptClicked = countOf("upgrade_prompt_clicked");
   const checkoutStarted = countOf("checkout_started");
   const checkoutCompleted = countOf("checkout_completed");
+  // Push funnel — extracted to a pure helper so it dedupes by request_id
+  // (a single user clicking the button 10× must not inflate Push Rate to
+  // 1000%). See src/lib/analytics-push-funnel.ts.
+  const pushFunnel = computePushFunnel(events);
+  const prevPushFunnel = computePushFunnel(prevEvents);
+
   const monetizationFunnel = [
+    // Pro feature blocked is the most direct upsell signal — surface it at
+    // the top of the monetization funnel so the page-end conversion moment
+    // sits next to checkout.
+    { name: "Pro feature blocked (Push to Substack)", count: pushFunnel.pushBlocked },
     { name: "Upgrade prompt shown", count: upgradePromptShown },
     { name: "Upgrade prompt clicked", count: upgradePromptClicked },
     { name: "Checkout started", count: checkoutStarted },
