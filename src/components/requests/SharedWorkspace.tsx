@@ -43,6 +43,47 @@ interface SharedWorkspaceProps {
   onShareClick?: () => void;
 }
 
+// Local recovery draft key per workspace — preserves unsynced edits if a save
+// fails, the tab closes, or the network drops mid-write. Cleared only after a
+// confirmed backend write.
+const recoveryKey = (requestId: string) => `workspace-recovery:${requestId}`;
+
+interface RecoveryDraft {
+  content: string;
+  saved_at: string; // ISO
+  edited_by: string;
+}
+
+function readRecoveryDraft(requestId: string): RecoveryDraft | null {
+  try {
+    const raw = localStorage.getItem(recoveryKey(requestId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (typeof parsed?.content === "string" && typeof parsed?.saved_at === "string") {
+      return parsed as RecoveryDraft;
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function writeRecoveryDraft(requestId: string, draft: RecoveryDraft) {
+  try {
+    localStorage.setItem(recoveryKey(requestId), JSON.stringify(draft));
+  } catch {
+    /* quota or disabled — non-fatal */
+  }
+}
+
+function clearRecoveryDraft(requestId: string) {
+  try {
+    localStorage.removeItem(recoveryKey(requestId));
+  } catch {
+    /* ignore */
+  }
+}
+
 function SharedWorkspaceInner({
   requestId,
   sharedContent,
@@ -62,8 +103,36 @@ function SharedWorkspaceInner({
   const [notifyPartner, setNotifyPartner] = useState(false);
   const [headerPortal, setHeaderPortal] = useState<HTMLElement | null>(null);
   const [editStartTime, setEditStartTime] = useState<number | null>(null);
+  const [recoveryNotice, setRecoveryNotice] = useState<RecoveryDraft | null>(null);
   const { user } = useAuth();
   const { trackEvent } = useAnalytics();
+
+  // On mount / when the canonical content changes, check for an unsynced
+  // recovery draft that's newer than the backend version. We don't auto-apply
+  // it (that would clobber a real partner edit) — we surface a banner letting
+  // the user restore it explicitly.
+  useEffect(() => {
+    const recovery = readRecoveryDraft(requestId);
+    if (!recovery) {
+      setRecoveryNotice(null);
+      return;
+    }
+    const backendTs = lastEditedAt ? new Date(lastEditedAt).getTime() : 0;
+    const recoveryTs = new Date(recovery.saved_at).getTime();
+    if (recovery.content === (sharedContent || "")) {
+      // Backend already has it (or matches) — safe to drop.
+      clearRecoveryDraft(requestId);
+      setRecoveryNotice(null);
+      return;
+    }
+    if (recoveryTs > backendTs) {
+      setRecoveryNotice(recovery);
+    } else {
+      // Backend is newer — discard stale local draft.
+      clearRecoveryDraft(requestId);
+      setRecoveryNotice(null);
+    }
+  }, [requestId, sharedContent, lastEditedAt]);
 
   // Presence heartbeat: active while editing
   const { activeEditors } = useWorkspacePresence({
@@ -107,6 +176,32 @@ function SharedWorkspaceInner({
     setNotifyPartner(false);
   };
 
+  // While editing, persist a local recovery snapshot on every change so that
+  // a network failure / accidental tab close / RLS rejection cannot silently
+  // wipe the user's work.
+  useEffect(() => {
+    if (!isEditing) return;
+    const snapshot: RecoveryDraft = {
+      content: editContent,
+      saved_at: new Date().toISOString(),
+      edited_by: currentUserName,
+    };
+    writeRecoveryDraft(requestId, snapshot);
+  }, [editContent, isEditing, requestId, currentUserName]);
+
+  const handleRestoreRecovery = () => {
+    if (!recoveryNotice) return;
+    setEditContent(recoveryNotice.content);
+    setIsEditing(true);
+    setEditStartTime(Date.now());
+    toast.success("Restored your unsynced draft. Click Save & Sync to keep it.");
+  };
+
+  const handleDiscardRecovery = () => {
+    clearRecoveryDraft(requestId);
+    setRecoveryNotice(null);
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     const now = new Date().toISOString();
@@ -119,7 +214,10 @@ function SharedWorkspaceInner({
     };
     const updatedSessions = [...editingSessions, newSession];
     try {
-      const { error } = await supabase
+      // Write + read-back in one round trip so we know the row actually
+      // accepted the change (covers RLS rejections that don't surface as
+      // errors but return zero rows).
+      const { data: updated, error } = await supabase
         .from("collab_requests")
         .update({
           shared_content: cleanHtml || null,
@@ -127,11 +225,24 @@ function SharedWorkspaceInner({
           content_last_edited_at: now,
           editing_sessions: updatedSessions,
         } as any)
-        .eq("id", requestId);
+        .eq("id", requestId)
+        .select("id, shared_content, content_last_edited_by, content_last_edited_at");
 
       if (error) throw error;
+      if (!updated || updated.length === 0) {
+        throw new Error(
+          "No rows updated — your account may not have edit access on this workspace.",
+        );
+      }
 
-      onContentSaved(cleanHtml, currentUserName, now);
+      const row = updated[0] as any;
+      const confirmedContent: string = row.shared_content ?? "";
+      const confirmedBy: string = row.content_last_edited_by ?? currentUserName;
+      const confirmedAt: string = row.content_last_edited_at ?? now;
+
+      onContentSaved(confirmedContent, confirmedBy, confirmedAt);
+      clearRecoveryDraft(requestId);
+      setRecoveryNotice(null);
       setIsEditing(false);
       toast.success("Draft saved & synced");
 
@@ -155,7 +266,19 @@ function SharedWorkspaceInner({
       setNotifyPartner(false);
     } catch (error) {
       console.error("Failed to save workspace content:", error);
-      toast.error("Failed to save. Please try again.");
+      // Make sure the recovery snapshot reflects the latest in-memory edit
+      // so the user can recover after refresh.
+      writeRecoveryDraft(requestId, {
+        content: editContent,
+        saved_at: new Date().toISOString(),
+        edited_by: currentUserName,
+      });
+      const msg = error instanceof Error ? error.message : "";
+      toast.error(
+        msg
+          ? `Failed to save: ${msg} Your draft is preserved locally — try again or copy it out.`
+          : "Failed to save. Your draft is preserved locally — try again or copy it out.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -181,6 +304,26 @@ function SharedWorkspaceInner({
 
   return (
     <div className="border border-border/50 rounded-xl bg-card/50">
+      {/* Recovery banner — surfaces an unsynced local draft newer than backend */}
+      {recoveryNotice && !isEditing && canEdit && (
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 border-b border-border/50 bg-accent/10">
+          <div className="flex items-center gap-2 text-sm text-accent-foreground">
+            <AlertCircle className="w-4 h-4 text-accent flex-shrink-0" />
+            <span>
+              We found an unsynced draft from{" "}
+              {formatDistanceToNow(new Date(recoveryNotice.saved_at), { addSuffix: true })} on this device.
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleDiscardRecovery}>
+              Discard
+            </Button>
+            <Button variant="gradient" size="sm" className="h-7 text-xs" onClick={handleRestoreRecovery}>
+              Restore draft
+            </Button>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-muted/30">
         <div className="flex items-center gap-2">
