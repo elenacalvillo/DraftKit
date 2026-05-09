@@ -480,9 +480,17 @@ function SharedWorkspaceInner({
         </div>
       )}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-muted/30">
-        <div className="flex items-center gap-2">
-          <FileText className="w-4 h-4 text-primary" />
-          <span className="text-sm font-medium">Shared Workspace</span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <FileText className="w-4 h-4 text-primary" />
+            <span className="text-sm font-medium">Shared Workspace</span>
+          </div>
+          <SaveStatusPill
+            status={saveStatus}
+            savedAt={savedAt}
+            visible={isEditing || saveStatus === "failed" || (!!savedAt && !isEditing)}
+            isEditing={isEditing}
+          />
         </div>
         <div className="flex items-center gap-2">
           {hasContent && (
