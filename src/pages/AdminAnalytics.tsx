@@ -690,6 +690,7 @@ export default function AdminAnalytics() {
                 <p className="text-xs text-muted-foreground mt-1">
                   {range.label}
                 </p>
+                <DeltaText current={userSignups} previous={prevUserSignups} prevLabel={range.prevLabel} />
               </CardContent>
             </Card>
           </motion.div>
