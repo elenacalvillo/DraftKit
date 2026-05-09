@@ -304,6 +304,26 @@ function SharedWorkspaceInner({
 
   return (
     <div className="border border-border/50 rounded-xl bg-card/50">
+      {/* Recovery banner — surfaces an unsynced local draft newer than backend */}
+      {recoveryNotice && !isEditing && canEdit && (
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 border-b border-border/50 bg-accent/10">
+          <div className="flex items-center gap-2 text-sm text-accent-foreground">
+            <AlertCircle className="w-4 h-4 text-accent flex-shrink-0" />
+            <span>
+              We found an unsynced draft from{" "}
+              {formatDistanceToNow(new Date(recoveryNotice.saved_at), { addSuffix: true })} on this device.
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleDiscardRecovery}>
+              Discard
+            </Button>
+            <Button variant="gradient" size="sm" className="h-7 text-xs" onClick={handleRestoreRecovery}>
+              Restore draft
+            </Button>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-muted/30">
         <div className="flex items-center gap-2">
