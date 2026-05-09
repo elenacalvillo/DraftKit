@@ -43,6 +43,47 @@ interface SharedWorkspaceProps {
   onShareClick?: () => void;
 }
 
+// Local recovery draft key per workspace — preserves unsynced edits if a save
+// fails, the tab closes, or the network drops mid-write. Cleared only after a
+// confirmed backend write.
+const recoveryKey = (requestId: string) => `workspace-recovery:${requestId}`;
+
+interface RecoveryDraft {
+  content: string;
+  saved_at: string; // ISO
+  edited_by: string;
+}
+
+function readRecoveryDraft(requestId: string): RecoveryDraft | null {
+  try {
+    const raw = localStorage.getItem(recoveryKey(requestId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (typeof parsed?.content === "string" && typeof parsed?.saved_at === "string") {
+      return parsed as RecoveryDraft;
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function writeRecoveryDraft(requestId: string, draft: RecoveryDraft) {
+  try {
+    localStorage.setItem(recoveryKey(requestId), JSON.stringify(draft));
+  } catch {
+    /* quota or disabled — non-fatal */
+  }
+}
+
+function clearRecoveryDraft(requestId: string) {
+  try {
+    localStorage.removeItem(recoveryKey(requestId));
+  } catch {
+    /* ignore */
+  }
+}
+
 function SharedWorkspaceInner({
   requestId,
   sharedContent,
@@ -62,8 +103,36 @@ function SharedWorkspaceInner({
   const [notifyPartner, setNotifyPartner] = useState(false);
   const [headerPortal, setHeaderPortal] = useState<HTMLElement | null>(null);
   const [editStartTime, setEditStartTime] = useState<number | null>(null);
+  const [recoveryNotice, setRecoveryNotice] = useState<RecoveryDraft | null>(null);
   const { user } = useAuth();
   const { trackEvent } = useAnalytics();
+
+  // On mount / when the canonical content changes, check for an unsynced
+  // recovery draft that's newer than the backend version. We don't auto-apply
+  // it (that would clobber a real partner edit) — we surface a banner letting
+  // the user restore it explicitly.
+  useEffect(() => {
+    const recovery = readRecoveryDraft(requestId);
+    if (!recovery) {
+      setRecoveryNotice(null);
+      return;
+    }
+    const backendTs = lastEditedAt ? new Date(lastEditedAt).getTime() : 0;
+    const recoveryTs = new Date(recovery.saved_at).getTime();
+    if (recovery.content === (sharedContent || "")) {
+      // Backend already has it (or matches) — safe to drop.
+      clearRecoveryDraft(requestId);
+      setRecoveryNotice(null);
+      return;
+    }
+    if (recoveryTs > backendTs) {
+      setRecoveryNotice(recovery);
+    } else {
+      // Backend is newer — discard stale local draft.
+      clearRecoveryDraft(requestId);
+      setRecoveryNotice(null);
+    }
+  }, [requestId, sharedContent, lastEditedAt]);
 
   // Presence heartbeat: active while editing
   const { activeEditors } = useWorkspacePresence({

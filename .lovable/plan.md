@@ -1,36 +1,36 @@
-# Fix plan: Workspace partner messages failing for invited collaborators
+## What I found
+- I checked the live backend row for the Xian collaboration and the saved workspace content is still an older version last edited by Xian on **Apr 30**.
+- That means your newer workspace edits were **not persisted to the backend**. This does not look like a simple rendering issue.
+- I also did **not** find evidence of a newer saved version in the current backend logs snapshot, so the save path needs to be hardened.
 
-## What’s broken
-Invited collaborators in a shared workspace are being treated like the original requester for messaging UI, but their request payload is intentionally privacy-redacted. That leaves the message modal without a valid sender email, and the first insert into `collaboration_messages` fails because `sender_email` is required.
+## Plan
+1. **Harden the workspace save flow**
+   - Update `SharedWorkspace.tsx` so it only shows success after the backend confirms the write.
+   - Immediately re-read the canonical workspace row after save and sync the UI from that result instead of trusting local state.
+   - Surface clearer failure states when a collaborator save is rejected or no row is actually updated.
 
-## What I’ll change
+2. **Protect against silent data loss**
+   - Add a browser-side recovery draft for the workspace editor keyed by `requestId`.
+   - Restore unsynced content on reopen when the local draft is newer than the backend version.
+   - Clear the recovery draft only after a confirmed backend save.
 
-### 1) Fix role-aware message sending in the workspace
-- Update `src/pages/Workspace.tsx` so invited collaborators do not use the requester-only message path blindly.
-- Pass the authenticated user’s email into the collaborator message flow instead of relying on redacted request fields.
-- Keep owner/requester/collaborator behavior explicit so future merges don’t collapse these roles again.
+3. **Verify collaborator-specific behavior**
+   - Audit the invited-collaborator path in `Workspace.tsx` and the shared editor flow to ensure collaborator edits persist exactly like owner/requester edits.
+   - Make sure the refreshed workspace state includes the latest `shared_content`, `content_last_edited_at`, and `editing_sessions` after save.
 
-### 2) Make the guest/collaborator message modal safe
-- Update `src/components/requests/GuestMessageModal.tsx` to accept the actual sender email as a prop.
-- Add a defensive guard so the modal refuses to send and shows a useful error if the sender email is missing.
-- Preserve analytics and existing success/error toast behavior.
-
-### 3) Keep the conversation display aligned with three roles
-- Verify `WorkspaceConversation` / workspace role logic still labels messages correctly for creator vs non-creator views.
-- Ensure the first message from an invited collaborator appears immediately after send via the existing refresh flow.
-
-### 4) Prevent publishing regressions
-- Add or extend a focused test around workspace role/message behavior if there’s already a suitable test surface.
-- Do a targeted codebase check for any other `GuestMessageModal` usage that could still pass the wrong sender identity.
+4. **Add regression coverage**
+   - Extend targeted tests around workspace persistence so a collaborator edit + reload cannot silently fall back to stale content.
+   - Cover the case where the UI should show an error instead of a false “saved” success state.
 
 ## Technical details
-- Root cause is frontend role wiring, not the message table schema.
-- `collaboration_messages.sender_email` is `NOT NULL`.
-- `get_workspace_request(...)` intentionally nulls requester PII for collaborator-only viewers.
-- Because invited collaborators currently enter the `isGuestView` branch, the modal receives requester-derived data that may be null.
-- The safest fix is to source sender identity from the authenticated session, not from the redacted request payload.
+- Suspected failure zone: the current editor flow updates local UI state optimistically after the `collab_requests` update call, but it does not verify the authoritative row afterward.
+- Current risk: a failed or partial collaborator save can leave the user thinking the draft synced when only local in-memory state changed.
+- Files I expect to touch:
+  - `src/components/requests/SharedWorkspace.tsx`
+  - `src/pages/Workspace.tsx`
+  - targeted workspace tests
 
 ## Expected outcome
-- In a workspace invited by Xian, you can start the conversation even when there were no previous messages.
-- Message inserts succeed for creator, requester, and invited collaborator roles.
-- No production crash on publish from this flow.
+- Your workspace will only say it saved when it really saved.
+- If the network or access path fails, the app will preserve the unsynced draft locally instead of losing it.
+- Invited-collaborator edits will survive refresh/reopen reliably.
