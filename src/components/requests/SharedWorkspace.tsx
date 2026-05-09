@@ -106,6 +106,20 @@ function SharedWorkspaceInner({
   const [editStartTime, setEditStartTime] = useState<number | null>(null);
   const [recoveryNotice, setRecoveryNotice] = useState<RecoveryDraft | null>(null);
   const [editBlockedReason, setEditBlockedReason] = useState<string | null>(null);
+  // Save-state machine drives the "Last saved" pill + auto-save loop. Manual
+  // and auto saves both feed it so users always see the current truth.
+  type SaveStatus = "idle" | "unsaved" | "saving" | "saved" | "failed";
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const [savedAt, setSavedAt] = useState<string | null>(lastEditedAt);
+  const [, setNowTick] = useState(0);
+  const lastSavedContentRef = useRef<string>(sanitize(sharedContent || ""));
+  const inFlightRef = useRef(false);
+  const lastFailureToastAtRef = useRef(0);
+  const wasFailedRef = useRef(false);
+  const editingSessionsRef = useRef(editingSessions);
+  useEffect(() => {
+    editingSessionsRef.current = editingSessions;
+  }, [editingSessions]);
   const { user } = useAuth();
   const { trackEvent } = useAnalytics();
 
