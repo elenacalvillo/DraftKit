@@ -92,7 +92,22 @@ interface InactiveUser {
   last_sign_in_at: string | null;
 }
 
-export default function AdminAnalytics() {
+function DeltaText({ current, previous, prevLabel }: { current: number; previous: number; prevLabel: string }) {
+  if (previous === 0 && current === 0) return null;
+  const delta = current - previous;
+  const pct = previous > 0 ? (delta / previous) * 100 : null;
+  const up = delta > 0;
+  const flat = delta === 0;
+  const color = flat ? "text-muted-foreground" : up ? "text-success" : "text-destructive";
+  const arrow = flat ? "→" : up ? "▲" : "▼";
+  const pctText = pct === null ? "new" : `${up ? "+" : ""}${pct.toFixed(0)}%`;
+  return (
+    <p className={cn("text-[11px] mt-1 font-medium", color)}>
+      {arrow} {pctText} {prevLabel} ({previous})
+    </p>
+  );
+}
+
   const navigate = useNavigate();
   const { isAdmin, loading } = useAdmin();
   const [searchParams, setSearchParams] = useSearchParams();
