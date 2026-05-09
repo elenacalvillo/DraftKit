@@ -229,9 +229,15 @@ function SharedWorkspaceInner({
         .select("id, shared_content, content_last_edited_by, content_last_edited_at");
 
       if (error) throw error;
-      if (!updated || updated.length === 0) {
+      // Strict validation: success ONLY if backend confirms exactly 1 row was
+      // written for this request. 0 rows = silent RLS rejection. >1 rows
+      // would indicate a serious data-integrity bug.
+      if (!updated || updated.length !== 1) {
+        const count = updated?.length ?? 0;
         throw new Error(
-          "No rows updated — your account may not have edit access on this workspace.",
+          count === 0
+            ? "Your changes are NOT in the database. Your account may not have edit access on this workspace."
+            : `Unexpected save result (${count} rows affected).`,
         );
       }
 
@@ -276,8 +282,9 @@ function SharedWorkspaceInner({
       const msg = error instanceof Error ? error.message : "";
       toast.error(
         msg
-          ? `Failed to save: ${msg} Your draft is preserved locally — try again or copy it out.`
-          : "Failed to save. Your draft is preserved locally — try again or copy it out.",
+          ? `CRITICAL: Save Failed. ${msg} Your draft is preserved locally on this device — please copy your work manually as a backup.`
+          : "CRITICAL: Save Failed. Your changes are NOT in the database. Your draft is preserved locally on this device — please copy your work manually as a backup.",
+        { duration: 12000 },
       );
     } finally {
       setIsSaving(false);
