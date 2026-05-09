@@ -435,7 +435,14 @@ function SharedWorkspaceInner({
             </Button>
           )}
           {canEdit && !isEditing && (
-            <Button variant="ghost" size="sm" onClick={handleStartEditing} className="h-8">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleStartEditing}
+              className="h-8"
+              disabled={!!editBlockedReason}
+              title={editBlockedReason || undefined}
+            >
               <PenLine className="w-3.5 h-3.5 mr-1.5" />
               {hasContent ? "Edit Draft" : "Start Writing"}
             </Button>
