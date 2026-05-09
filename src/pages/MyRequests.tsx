@@ -489,7 +489,7 @@ export default function MyRequests() {
             onOpenChange={(open) => !open && setMessageModalRequest(null)}
             requestId={messageModalRequest.id}
             creatorName={messageModalRequest.creator?.name || 'Creator'}
-            requesterEmail={messageModalRequest.requester_email}
+            senderEmail={messageModalRequest.requester_email}
           />
         )}
       </div>

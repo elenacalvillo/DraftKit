@@ -1267,7 +1267,10 @@ export default function Workspace() {
           onOpenChange={setShowMessageModal}
           requestId={request.id}
           creatorName={creatorInfo?.name || "Creator"}
-          requesterEmail={request.requester_email}
+          // Prefer the auth user's email so invited collaborators (whose
+          // request.requester_email is intentionally redacted by the
+          // get_workspace_request RPC) can also send the first message.
+          senderEmail={user?.email || request.requester_email || null}
           onMessageSent={handleMessageSent}
         />
       )}
