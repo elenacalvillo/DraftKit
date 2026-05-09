@@ -255,6 +255,52 @@ serve(async (req: Request): Promise<Response> => {
     const collabGuidelines = request.creators?.collab_guidelines;
     const aiDraft = request.ai_draft as CollabDraft | null;
 
+    // --- SOLO WORKSPACE DETECTION ---
+    // A row is "effectively solo" when is_solo is set, or when both sides
+    // resolve to the same user, or when the names collapse to the same
+    // person. This prevents emails from rendering "With: Karen and Karen"
+    // or sending reminders to one person about a meeting with themselves.
+    const _requesterUserIdForSolo = request.requester_user_id ?? null;
+    const _creatorRow = request.creator_id
+      ? await supabase
+          .from("creators")
+          .select("user_id")
+          .eq("id", request.creator_id)
+          .maybeSingle()
+      : null;
+    const _creatorUserIdForSolo = _creatorRow?.data?.user_id ?? null;
+    const _normName = (n: string | null | undefined) =>
+      (n ?? "").trim().toLowerCase();
+    const isEffectivelySolo =
+      !!request.is_solo ||
+      (!!_creatorUserIdForSolo &&
+        !!_requesterUserIdForSolo &&
+        _creatorUserIdForSolo === _requesterUserIdForSolo) ||
+      (!!_normName(creatorName) &&
+        _normName(creatorName) === _normName(requesterName));
+
+    // Render a deduped, solo-aware participants line for email copy.
+    const renderParticipantsLine = (extraNames: string[] = []): string => {
+      const seen = new Set<string>();
+      const out: string[] = [];
+      const push = (raw: string | null | undefined) => {
+        const v = (raw ?? "").trim();
+        if (!v) return;
+        const key = v.toLowerCase();
+        if (seen.has(key)) return;
+        seen.add(key);
+        out.push(v);
+      };
+      push(creatorName);
+      if (!isEffectivelySolo) push(requesterName);
+      for (const n of extraNames) push(n);
+      if (out.length === 0) return "";
+      if (out.length === 1) return isEffectivelySolo ? `${out[0]} (solo)` : out[0];
+      if (out.length === 2) return `${out[0]} and ${out[1]}`;
+      if (out.length === 3) return `${out[0]}, ${out[1]} and ${out[2]}`;
+      return `${out[0]}, ${out[1]} and ${out.length - 2} others`;
+    };
+
     // Format the requested date nicely
     const formattedDate = requestedDate 
       ? parseDateString(requestedDate).toLocaleDateString("en-US", {
@@ -673,6 +719,15 @@ serve(async (req: Request): Promise<Response> => {
         </html>
       `;
     } else if (type === "collab_reminder") {
+      // Solo workspaces have no second party — skip the "you have a collab
+      // with X" reminder entirely instead of emailing Karen about Karen.
+      if (isEffectivelySolo) {
+        console.log(`Skipping collab_reminder for solo request ${requestId}`);
+        return new Response(
+          JSON.stringify({ success: true, skipped: "solo_workspace" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
       // Send reminders to BOTH host and guest
       const hostEmailHtml = `
         <!DOCTYPE html>
@@ -962,6 +1017,14 @@ serve(async (req: Request): Promise<Response> => {
         </html>
       `;
     } else if (type === "collab_published") {
+      // Solo workspace has no partner to notify — short-circuit.
+      if (isEffectivelySolo) {
+        console.log(`Skipping collab_published for solo request ${requestId}`);
+        return new Response(
+          JSON.stringify({ success: true, skipped: "solo_workspace" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
       // Notify the partner (guest) that the collaboration is officially published
       toEmail = requesterEmail;
       emailSubject = `🎉 Your collaboration with ${creatorName} is live!`;
@@ -1047,7 +1110,7 @@ serve(async (req: Request): Promise<Response> => {
             <p style="margin: 0; color: #1e293b;">
               ${request.selected_collab_type ? `<strong>Type:</strong> ${request.selected_collab_type}<br>` : ""}
               ${requestedDate ? `<strong>Target date:</strong> ${formattedDate}<br>` : ""}
-              <strong>With:</strong> ${creatorName} and ${requesterName}
+              <strong>With:</strong> ${renderParticipantsLine()}
             </p>
           </div>
 
