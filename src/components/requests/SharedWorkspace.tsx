@@ -3,10 +3,19 @@ import { useAuth } from "@/hooks/useAuth";
 import { useWorkspacePresence } from "@/hooks/useWorkspacePresence";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { FileText, Save, X, AlertCircle, PenLine, Lock, Download, Share2, Copy, Check, CloudOff, Loader2 } from "lucide-react";
+import { FileText, Save, X, AlertCircle, PenLine, Lock, Download, Share2, Copy, Check, CloudOff, Loader2, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -16,9 +25,22 @@ import { cn } from "@/lib/utils";
 import { exportWorkspaceHtmlToDocx } from "@/lib/export-draft";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { parseSaveError } from "@/lib/save-workspace-errors";
+import { usePro } from "@/hooks/usePro";
+import {
+  htmlToPlainText,
+  isRichClipboardAvailable,
+  stripDraftKitInternalAttrs,
+  writeDraftToClipboard,
+} from "@/lib/clipboard";
+import { PushToSubstackUpgradeModal } from "@/components/subscription/PushToSubstackUpgradeModal";
 
 const ALLOWED_TAGS = ["p", "h1", "h2", "h3", "strong", "em", "s", "code", "pre", "a", "ul", "ol", "li", "br", "hr", "table", "thead", "tbody", "tr", "th", "td", "span"];
 const ALLOWED_ATTR = ["href", "target", "rel", "colspan", "rowspan", "colwidth", "class", "data-comment", "data-author"];
+
+// Substack's "new post" composer. Opening this in a fresh tab (rather than
+// navigating away) preserves the user's workspace context — DRAFT-002
+// explicitly forbids leaving DraftKit on a Push to Substack click.
+const SUBSTACK_NEW_POST_URL = "https://substack.com/publish/post/new";
 
 function sanitize(html: string): string {
   return DOMPurify.sanitize(html, { ALLOWED_TAGS, ALLOWED_ATTR });
@@ -157,6 +179,13 @@ function SharedWorkspaceInner({
   const [editStartTime, setEditStartTime] = useState<number | null>(null);
   const [recoveryNotice, setRecoveryNotice] = useState<RecoveryDraft | null>(null);
   const [editBlockedReason, setEditBlockedReason] = useState<string | null>(null);
+  // Push to Substack UI state (DRAFT-002 / DRAFT-003)
+  // - showSubstackUpgrade: free-user gate modal
+  // - substackFallbackHtml: when the rich Clipboard API isn't available
+  //   (non-HTTPS, older Safari) we surface a manual-copy modal with the
+  //   draft pre-selected so the user can still complete the export.
+  const [showSubstackUpgrade, setShowSubstackUpgrade] = useState(false);
+  const [substackFallbackHtml, setSubstackFallbackHtml] = useState<string | null>(null);
   // Save-state machine drives the "Last saved" pill + auto-save loop. Manual
   // and auto saves both feed it so users always see the current truth.
   type SaveStatus = "idle" | "unsaved" | "saving" | "saved" | "failed";
@@ -173,6 +202,10 @@ function SharedWorkspaceInner({
   }, [editingSessions]);
   const { user } = useAuth();
   const { trackEvent } = useAnalytics();
+  // usePro is the canonical access check for workspace context (DRAFT-002 /
+  // DRAFT-003). We read isPro here rather than threading it through props so
+  // the gate stays close to the button it gates.
+  const { isPro } = usePro();
 
   // Pre-flight permission probe — surface the real reason saves would fail
   // (RLS / status / linkage) BEFORE the user invests time typing.
@@ -494,6 +527,100 @@ function SharedWorkspaceInner({
     });
   };
 
+  // Copy handler.
+  //
+  // DRAFT-001: this is the workspace Copy button. It is intentionally FREE
+  // for all users (Pro and Free) — copying a user's own draft is a commodity
+  // action they can already do with Cmd+C. There is no credit deduction
+  // here, no Supabase credit-charge RPC call, and no analytics event that
+  // tracked a credit charge. If you find yourself adding one, push back —
+  // the friction does not justify the revenue.
+  const handleCopy = useCallback(async () => {
+    if (!sharedContent) return;
+    const html = sharedContent;
+    const plain = htmlToPlainText(html);
+    const wordCount = plain.split(/\s+/).filter(Boolean).length;
+
+    try {
+      const wrote = await writeDraftToClipboard(html);
+      if (!wrote) {
+        // Browser doesn't expose any clipboard API at all — extremely rare,
+        // but we don't want to silently swallow the click.
+        throw new Error("clipboard_unavailable");
+      }
+      toast.success("Draft copied — you just saved ~30 minutes.");
+      // Plain copy/accept telemetry — neither event is tied to a credit
+      // charge (see DRAFT-001 above). They measure how often users actually
+      // ship a draft, which informs roadmap, not billing.
+      trackEvent("draft_copied", { request_id: requestId, surface: "workspace_copy", word_count: wordCount });
+      trackEvent("draft_accepted", { request_id: requestId, surface: "workspace_copy", word_count: wordCount });
+    } catch {
+      toast.error("Couldn't copy. Try selecting and copying manually.");
+    }
+  }, [sharedContent, requestId, trackEvent]);
+
+  // Push to Substack handler — DRAFT-002 (Pro) and DRAFT-003 (Free gate).
+  //
+  // Free users see the button but get the upgrade modal on click; this is a
+  // deliberate funnel design — every blocked click is a high-intent signal.
+  // Pro users get the full one-click flow: clean HTML → clipboard → new
+  // Substack tab → persistent toast prompting them to paste.
+  const handlePushToSubstack = useCallback(async () => {
+    if (!sharedContent) return;
+
+    if (!isPro) {
+      // PRIMARY conversion signal — fire BEFORE showing the modal so we
+      // capture every blocked click even if the modal mount errors.
+      trackEvent("push_to_substack_blocked", { request_id: requestId });
+      setShowSubstackUpgrade(true);
+      return;
+    }
+
+    // Strip DraftKit-internal annotations (data-comment / data-author) so
+    // they don't render as junk attrs in the Substack post.
+    const cleaned = stripDraftKitInternalAttrs(sharedContent);
+
+    // If the rich Clipboard API isn't available (non-HTTPS, certain
+    // browsers) bail to the manual-copy fallback dialog rather than
+    // silently failing. We surface the cleaned HTML so the user gets the
+    // Substack-ready content, not the workspace internal version.
+    if (!isRichClipboardAvailable()) {
+      setSubstackFallbackHtml(cleaned);
+      return;
+    }
+
+    try {
+      const wrote = await writeDraftToClipboard(cleaned);
+      if (!wrote) {
+        // Defensive — isRichClipboardAvailable said yes but the write
+        // returned false anyway. Show the manual fallback.
+        setSubstackFallbackHtml(cleaned);
+        return;
+      }
+
+      // Open the Substack composer in a NEW tab so the user keeps their
+      // workspace context. We do this synchronously inside the click handler
+      // so most browsers' popup blockers allow it.
+      window.open(SUBSTACK_NEW_POST_URL, "_blank", "noopener,noreferrer");
+
+      // Persistent toast — DRAFT-002 explicitly requires no auto-dismiss,
+      // because the user's next action is to switch tabs, and an
+      // auto-dismissed toast would be invisible by the time they come back.
+      // sonner does not auto-dismiss when duration is Infinity.
+      toast.success(
+        "Draft copied! Switch to the new tab and press Cmd+V (Ctrl+V on Windows) to paste.",
+        { duration: Infinity },
+      );
+
+      trackEvent("push_to_substack_success", { request_id: requestId });
+    } catch (err) {
+      console.error("Push to Substack failed:", err);
+      // Permission denied / other clipboard error — fall through to the
+      // manual modal so the user still gets their draft.
+      setSubstackFallbackHtml(cleaned);
+    }
+  }, [sharedContent, isPro, requestId, trackEvent]);
+
   const hasContent = !!sharedContent?.trim();
 
   // Count words from HTML content
@@ -549,34 +676,28 @@ function SharedWorkspaceInner({
               variant="ghost"
               size="sm"
               className="h-8"
-              onClick={async () => {
-                try {
-                  const html = sharedContent || "";
-                  const tmp = document.createElement("div");
-                  tmp.innerHTML = html;
-                  const plain = tmp.textContent || tmp.innerText || "";
-                  const wordCount = plain.split(/\s+/).filter(Boolean).length;
-
-                  if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
-                    const item = new ClipboardItem({
-                      "text/html": new Blob([html], { type: "text/html" }),
-                      "text/plain": new Blob([plain], { type: "text/plain" }),
-                    });
-                    await navigator.clipboard.write([item]);
-                  } else {
-                    await navigator.clipboard.writeText(plain);
-                  }
-
-                  toast.success("Draft copied — you just saved ~30 minutes.");
-                  trackEvent("draft_copied", { request_id: requestId, surface: "workspace_copy", word_count: wordCount });
-                  trackEvent("draft_accepted", { request_id: requestId, surface: "workspace_copy", word_count: wordCount });
-                } catch {
-                  toast.error("Couldn't copy. Try selecting and copying manually.");
-                }
-              }}
+              onClick={handleCopy}
             >
               <Copy className="w-3.5 h-3.5 mr-1.5" />
               Copy
+            </Button>
+          )}
+          {/*
+            Push to Substack — visible to ALL users regardless of plan
+            (DRAFT-003 requirement). The Pro/Free branching happens inside
+            the click handler so the button itself stays a discovery
+            surface for free users.
+          */}
+          {hasContent && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8"
+              onClick={handlePushToSubstack}
+              data-testid="push-to-substack"
+            >
+              <Send className="w-3.5 h-3.5 mr-1.5" />
+              Push to Substack
             </Button>
           )}
           {hasContent && canEdit && (
@@ -748,6 +869,58 @@ function SharedWorkspaceInner({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Free-user gate for Push to Substack (DRAFT-003). Inline modal so the
+          user does NOT lose their workspace context — that constraint is
+          explicit in the ticket. */}
+      <PushToSubstackUpgradeModal
+        open={showSubstackUpgrade}
+        onOpenChange={setShowSubstackUpgrade}
+      />
+
+      {/* Manual-copy fallback for Push to Substack when the rich Clipboard
+          API is unavailable (DRAFT-002). We pre-select the cleaned HTML so
+          the user can press Cmd+C even if navigator.clipboard.write fails. */}
+      <Dialog
+        open={substackFallbackHtml !== null}
+        onOpenChange={(open) => {
+          if (!open) setSubstackFallbackHtml(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Copy your draft manually</DialogTitle>
+            <DialogDescription>
+              Your browser blocked the automatic copy. Select all the text
+              below (Cmd+A / Ctrl+A), copy it (Cmd+C / Ctrl+C), then paste it
+              into Substack.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            readOnly
+            value={substackFallbackHtml ?? ""}
+            className="min-h-[200px] font-mono text-xs"
+            onFocus={(e) => e.currentTarget.select()}
+          />
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setSubstackFallbackHtml(null)}
+            >
+              Close
+            </Button>
+            <Button
+              variant="gradient"
+              onClick={() => {
+                window.open(SUBSTACK_NEW_POST_URL, "_blank", "noopener,noreferrer");
+              }}
+            >
+              <Send className="w-4 h-4 mr-2" />
+              Open Substack
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -19,6 +19,15 @@ export type AnalyticsEventType =
   | "draft_exported_google_docs_fallback"
   | "draft_export_new_tab_opened"
   | "draft_applied_to_workspace"
+  // ---- Push to Substack (Pro export funnel) ----
+  // Fired when a Pro user successfully pushes a draft to Substack — captures
+  // the volume of one-click publishes vs. the legacy copy-paste flow.
+  | "push_to_substack_success"
+  // Fired when a free user clicks the (visible) Push to Substack button and
+  // hits the upgrade gate. This is the PRIMARY conversion signal for the
+  // Pro plan — every blocked click is a high-intent moment because it lands
+  // right at the end of the drafting flow.
+  | "push_to_substack_blocked"
   | "user_signup"
   | "collab_approved"
   | "collab_declined"
