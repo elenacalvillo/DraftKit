@@ -688,7 +688,7 @@ export default function AdminAnalytics() {
               <CardContent>
                 <div className="text-3xl font-bold">{userSignups}</div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Last 30 days
+                  {range.label}
                 </p>
               </CardContent>
             </Card>
@@ -703,7 +703,7 @@ export default function AdminAnalytics() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4" />
-                  Workspace save failures (7d)
+                  Workspace save failures
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -732,7 +732,7 @@ export default function AdminAnalytics() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Calendar className="w-5 h-5" />
-                  Daily Events (Last 7 Days)
+                  Daily Events
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -936,7 +936,7 @@ export default function AdminAnalytics() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="w-5 h-5" />
-                Signup Attribution (last 30 days)
+                Signup Attribution
               </CardTitle>
             </CardHeader>
             <CardContent>
