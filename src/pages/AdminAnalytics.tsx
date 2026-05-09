@@ -659,6 +659,31 @@ export default function AdminAnalytics() {
               </CardContent>
             </Card>
           </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.85 }}
+          >
+            <Card className={cn("glass-card", saveFailEvents.length > 0 && "border-destructive/40")}>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4" />
+                  Workspace save failures (7d)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={cn("text-3xl font-bold", saveFailEvents.length > 0 ? "text-destructive" : "text-success")}>
+                  {saveFailEvents.length}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {topSaveFailReason
+                    ? `Top reason: ${topSaveFailReason[0]} (${topSaveFailReason[1]}) · ${saveRecoveredCount} recovered`
+                    : `${saveRecoveredCount} recovered · all clean`}
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
         </div>
 
         {/* Charts Row */}
