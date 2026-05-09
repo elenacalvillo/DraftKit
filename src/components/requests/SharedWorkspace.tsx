@@ -104,8 +104,41 @@ function SharedWorkspaceInner({
   const [headerPortal, setHeaderPortal] = useState<HTMLElement | null>(null);
   const [editStartTime, setEditStartTime] = useState<number | null>(null);
   const [recoveryNotice, setRecoveryNotice] = useState<RecoveryDraft | null>(null);
+  const [editBlockedReason, setEditBlockedReason] = useState<string | null>(null);
   const { user } = useAuth();
   const { trackEvent } = useAnalytics();
+
+  // Pre-flight permission probe — surface the real reason saves would fail
+  // (RLS / status / linkage) BEFORE the user invests time typing.
+  useEffect(() => {
+    if (!canEdit || !requestId || !user) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase.rpc("can_edit_workspace", { _request_id: requestId });
+      if (cancelled) return;
+      if (error) {
+        setEditBlockedReason(null); // don't block on probe failure; save will surface it
+        return;
+      }
+      const result = (data ?? {}) as { can_edit?: boolean; reason?: string; status?: string };
+      if (result.can_edit === false) {
+        const friendly =
+          result.reason === "not_a_participant"
+            ? "Your account isn't linked to this collaboration. Try signing out and back in with the email that received the invite."
+            : result.reason === "status_not_approved"
+              ? `This collaboration is ${result.status ?? "not active"}, so the workspace is read-only.`
+              : result.reason === "request_not_found"
+                ? "This collaboration no longer exists."
+                : "You don't currently have permission to edit this workspace.";
+        setEditBlockedReason(friendly);
+      } else {
+        setEditBlockedReason(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [canEdit, requestId, user]);
 
   // On mount / when the canonical content changes, check for an unsynced
   // recovery draft that's newer than the backend version. We don't auto-apply
