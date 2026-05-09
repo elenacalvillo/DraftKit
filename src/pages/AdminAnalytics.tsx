@@ -469,14 +469,17 @@ export default function AdminAnalytics() {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
-              <BarChart3 className="w-5 h-5 text-primary-foreground" />
+          <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
+                <BarChart3 className="w-5 h-5 text-primary-foreground" />
+              </div>
+              <h1 className="text-3xl font-bold">Admin Analytics</h1>
             </div>
-            <h1 className="text-3xl font-bold">Admin Analytics</h1>
+            <AnalyticsRangePicker value={rangeKey} onChange={setRangeKey} />
           </div>
           <p className="text-muted-foreground">
-            Track key metrics, funnel performance, and user feedback
+            Showing <span className="font-medium text-foreground">{range.label}</span> · {range.prevLabel.replace(/^vs /, "compared to ")}
           </p>
         </motion.div>
 
