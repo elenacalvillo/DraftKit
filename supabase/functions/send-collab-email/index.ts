@@ -1093,7 +1093,7 @@ serve(async (req: Request): Promise<Response> => {
             <p style="margin: 0; color: #1e293b;">
               ${request.selected_collab_type ? `<strong>Type:</strong> ${request.selected_collab_type}<br>` : ""}
               ${requestedDate ? `<strong>Target date:</strong> ${formattedDate}<br>` : ""}
-              <strong>With:</strong> ${renderParticipantsLine(inviteeEmail && inviteeEmail !== requesterEmail && inviteeEmail !== creatorEmail ? [inviteeEmail.split("@")[0]] : [])}
+              <strong>With:</strong> ${renderParticipantsLine()}
             </p>
           </div>
 
