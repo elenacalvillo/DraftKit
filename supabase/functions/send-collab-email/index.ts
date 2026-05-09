@@ -1017,6 +1017,14 @@ serve(async (req: Request): Promise<Response> => {
         </html>
       `;
     } else if (type === "collab_published") {
+      // Solo workspace has no partner to notify — short-circuit.
+      if (isEffectivelySolo) {
+        console.log(`Skipping collab_published for solo request ${requestId}`);
+        return new Response(
+          JSON.stringify({ success: true, skipped: "solo_workspace" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
       // Notify the partner (guest) that the collaboration is officially published
       toEmail = requesterEmail;
       emailSubject = `🎉 Your collaboration with ${creatorName} is live!`;
