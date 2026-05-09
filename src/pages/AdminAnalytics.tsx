@@ -236,14 +236,25 @@ export default function AdminAnalytics() {
   const collabApproved = events.filter((e) => e.event_type === "collab_approved").length;
   const collabDeclined = events.filter((e) => e.event_type === "collab_declined").length;
 
-  // ---- Workspace save reliability (7d) ----
-  const sevenDaysAgoMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  const saveFailEvents = events.filter(
-    (e) => e.event_type === "workspace_save_failed" && new Date(e.created_at).getTime() >= sevenDaysAgoMs,
+  // Prev-period counts (for delta indicators).
+  const countPrev = (t: string) => prevEvents.filter((e) => e.event_type === t).length;
+  const prevBookingClicks = countPrev("booking_link_clicked");
+  const prevBookingSubmits = countPrev("booking_submitted");
+  const prevDraftGenerated = countPrev("draft_generated");
+  const prevUserSignups = countPrev("user_signup");
+  const prevAcceptedSet = new Set(
+    prevEvents
+      .filter((e) => e.event_type === "draft_accepted")
+      .map((e) => {
+        const d = (e.event_data && typeof e.event_data === "object" ? (e.event_data as Record<string, unknown>) : {}) as Record<string, unknown>;
+        return (d.request_id as string | undefined) ?? `__no_req_${e.id}`;
+      }),
   );
-  const saveRecoveredCount = events.filter(
-    (e) => e.event_type === "workspace_save_recovered" && new Date(e.created_at).getTime() >= sevenDaysAgoMs,
-  ).length;
+  const prevDraftAccepted = prevAcceptedSet.size;
+
+  // ---- Workspace save reliability (selected range) ----
+  const saveFailEvents = events.filter((e) => e.event_type === "workspace_save_failed");
+  const saveRecoveredCount = events.filter((e) => e.event_type === "workspace_save_recovered").length;
   const saveFailReasonCounts: Record<string, number> = {};
   for (const e of saveFailEvents) {
     const data = (e.event_data && typeof e.event_data === "object" ? (e.event_data as Record<string, unknown>) : {}) as Record<string, unknown>;
@@ -252,25 +263,23 @@ export default function AdminAnalytics() {
   }
   const topSaveFailReason = Object.entries(saveFailReasonCounts).sort((a, b) => b[1] - a[1])[0];
 
-  // ---- Feature Usage Matrix (last 7d / 30d) ----
-  const now = Date.now();
-  const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
-  type Row = { event: string; d7: number; d30: number; users7: number };
-  const usageMap = new Map<string, { d7: number; d30: number; users: Set<string> }>();
+  // ---- Feature Usage Matrix (selected range vs prev) ----
+  type Row = { event: string; cur: number; prev: number; users: number };
+  const usageMap = new Map<string, { cur: number; users: Set<string> }>();
   for (const e of events) {
-    const ts = new Date(e.created_at).getTime();
-    const row = usageMap.get(e.event_type) ?? { d7: 0, d30: 0, users: new Set<string>() };
-    row.d30 += 1;
-    if (ts >= sevenDaysAgo) {
-      row.d7 += 1;
-      const uid = (e as unknown as { user_id?: string }).user_id;
-      if (uid) row.users.add(uid);
-    }
+    const row = usageMap.get(e.event_type) ?? { cur: 0, users: new Set<string>() };
+    row.cur += 1;
+    const uid = (e as unknown as { user_id?: string }).user_id;
+    if (uid) row.users.add(uid);
     usageMap.set(e.event_type, row);
   }
+  const prevCounts = new Map<string, number>();
+  for (const e of prevEvents) {
+    prevCounts.set(e.event_type, (prevCounts.get(e.event_type) || 0) + 1);
+  }
   const usageRows: Row[] = Array.from(usageMap.entries())
-    .map(([event, v]) => ({ event, d7: v.d7, d30: v.d30, users7: v.users.size }))
-    .sort((a, b) => b.d7 - a.d7 || b.d30 - a.d30);
+    .map(([event, v]) => ({ event, cur: v.cur, prev: prevCounts.get(event) || 0, users: v.users.size }))
+    .sort((a, b) => b.cur - a.cur || b.prev - a.prev);
 
   // ---- Signup Attribution breakdown ----
   const attributionCounts: Record<string, number> = {};
