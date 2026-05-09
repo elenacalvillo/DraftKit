@@ -247,34 +247,23 @@ function SharedWorkspaceInner({
     };
     const updatedSessions = [...editingSessions, newSession];
     try {
-      // Write + read-back in one round trip so we know the row actually
-      // accepted the change (covers RLS rejections that don't surface as
-      // errors but return zero rows).
-      const { data: updated, error } = await supabase
-        .from("collab_requests")
-        .update({
-          shared_content: cleanHtml || null,
-          content_last_edited_by: currentUserName,
-          content_last_edited_at: now,
-          editing_sessions: updatedSessions,
-        } as any)
-        .eq("id", requestId)
-        .select("id, shared_content, content_last_edited_by, content_last_edited_at");
+      // Server-authoritative save. The RPC validates auth + access + status,
+      // repairs missing requester/collaborator linkage by email, performs the
+      // UPDATE, and returns the canonical row. Any auth/permission failure
+      // throws a typed error — there is no "silent 0-row" path.
+      const { data, error } = await supabase.rpc("save_workspace_content", {
+        _request_id: requestId,
+        _content: cleanHtml,
+        _editor_name: currentUserName,
+        _editing_sessions: updatedSessions as any,
+      });
 
       if (error) throw error;
-      // Strict validation: success ONLY if backend confirms exactly 1 row was
-      // written for this request. 0 rows = silent RLS rejection. >1 rows
-      // would indicate a serious data-integrity bug.
-      if (!updated || updated.length !== 1) {
-        const count = updated?.length ?? 0;
-        throw new Error(
-          count === 0
-            ? "Your changes are NOT in the database. Your account may not have edit access on this workspace."
-            : `Unexpected save result (${count} rows affected).`,
-        );
+      const row = Array.isArray(data) ? (data[0] as any) : (data as any);
+      if (!row || !row.id) {
+        throw new Error("Server did not confirm the save. Your draft is preserved locally.");
       }
 
-      const row = updated[0] as any;
       const confirmedContent: string = row.shared_content ?? "";
       const confirmedBy: string = row.content_last_edited_by ?? currentUserName;
       const confirmedAt: string = row.content_last_edited_at ?? now;
@@ -312,11 +301,19 @@ function SharedWorkspaceInner({
         saved_at: new Date().toISOString(),
         edited_by: currentUserName,
       });
-      const msg = error instanceof Error ? error.message : "";
+      const rawMsg = error instanceof Error ? error.message : "";
+      // Translate typed RPC errors into human-readable causes.
+      const friendly = rawMsg.includes("not_authenticated")
+        ? "You're not signed in. Please log in and try again."
+        : rawMsg.includes("not_a_participant")
+          ? "Your account isn't linked to this collaboration. Try signing out and signing back in with the email that received the invite."
+          : rawMsg.includes("status_not_approved")
+            ? "This collaboration is no longer active, so the workspace is read-only."
+            : rawMsg.includes("request_not_found")
+              ? "This collaboration no longer exists."
+              : rawMsg || "Your changes are NOT in the database.";
       toast.error(
-        msg
-          ? `CRITICAL: Save Failed. ${msg} Your draft is preserved locally on this device — please copy your work manually as a backup.`
-          : "CRITICAL: Save Failed. Your changes are NOT in the database. Your draft is preserved locally on this device — please copy your work manually as a backup.",
+        `CRITICAL: Save Failed. ${friendly} Your draft is preserved locally on this device — please copy your work manually as a backup.`,
         { duration: 12000 },
       );
     } finally {
