@@ -719,6 +719,15 @@ serve(async (req: Request): Promise<Response> => {
         </html>
       `;
     } else if (type === "collab_reminder") {
+      // Solo workspaces have no second party — skip the "you have a collab
+      // with X" reminder entirely instead of emailing Karen about Karen.
+      if (isEffectivelySolo) {
+        console.log(`Skipping collab_reminder for solo request ${requestId}`);
+        return new Response(
+          JSON.stringify({ success: true, skipped: "solo_workspace" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
       // Send reminders to BOTH host and guest
       const hostEmailHtml = `
         <!DOCTYPE html>
