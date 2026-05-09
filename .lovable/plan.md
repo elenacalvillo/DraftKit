@@ -1,61 +1,58 @@
-## What's actually wrong
+## Why your numbers look like they dropped
 
-The email you got says **"With: Karen Smiley and Karen Smiley"** because of a real product bug, not just a typo.
+Nothing is being purged. Every analytics event is still in the database forever. The Admin Analytics page just hard-codes a **rolling last-30-days window** when it queries — so as soon as yesterday's spike rolls outside whichever sub-window a tile uses (some tiles are 7d, some 30d), it appears to "disappear." There is currently no way to look back at a specific past week or month, which is exactly what you're asking for.
 
-What happened:
-1. Yesterday you created a **solo workspace** from the Dashboard ("Start Writing Solo").
-2. Solo workspaces are stored as a `collab_request` where `requester_name = creator.name` and `requester_user_id = creator.user_id` — i.e. Karen is recorded on **both sides** of the request (`Dashboard.tsx` line 274). That's by design so the workspace has a valid row.
-3. Then you invited a collaborator (e.g. Elena) into that solo workspace.
-4. The `workspace_invite` email template blindly renders `With: ${creatorName} and ${requesterName}` (`send-collab-email/index.ts` line 1050). Since both fields are "Karen Smiley", the recipient sees the duplicate.
+## What I'll build
 
-I confirmed this against the row `ba45aef1…` in the DB: `is_solo = true`, both names = Karen Smiley.
+A single time-range control at the top of `/admin/analytics` that drives every tile, chart, funnel, and table on the page. No more snapshot-in-time — you'll be able to scrub backwards.
 
-So your instinct is right: the email is the visible symptom, but the actual issue is that **`is_solo` workspaces aren't handled when we present the participants** — the same pattern can leak into reminders, retrospective copy, and any place that uses requester/creator names to describe "the other party". The current code paths I checked (`Workspace.tsx`, `Requests.tsx`) already special-case `is_solo` for the title/partner label, but the invitation email does not.
+### Range selector (top of page)
 
-## Plan
+Two-part control:
 
-### 1. Fix `workspace_invite` email — `supabase/functions/send-collab-email/index.ts`
-Replace the hard-coded `With: ${creatorName} and ${requesterName}` line with logic that reflects reality:
+1. **Granularity dropdown**: `Last 7 days` · `Last 30 days` · `This week` · `This month` · `Specific week…` · `Specific month…` · `Custom range…`
+2. When you pick "Specific week" or "Specific month," a second dropdown appears listing the last 12 weeks / 12 months (e.g. *Week of May 4 – May 10*, *April 2026*). "Custom range" opens a date picker.
 
-- If `request.is_solo` → render `With: ${creatorName}` (no "and …"), since the inviter is starting a solo room and pulling people in.
-- Else if `creatorName === requesterName` (defensive dedupe for any other edge case) → render the single name only.
-- Else → keep current `With: ${creatorName} and ${requesterName}`.
+Default: **Last 7 days** (so today's view matches what you remember seeing yesterday — currently the default 30d window dilutes recent spikes).
 
-Also pull the actual `workspace_collaborators` list for that `request_id` and append the inviter so the line reads, when applicable: `With: Karen Smiley · plus 1 collaborator` (or list names if ≤3). This way recipients of a solo-room invite see who's actually in the room, not a fake "X and X" pair.
+The selected range is stored in the URL (`?range=week-2026-W19`) so you can bookmark/share a specific week's snapshot.
 
-### 2. Audit and fix neighboring email templates
-Same dedupe/solo guard for any other template that mentions both names. Quick grep showed only `workspace_invite` does the literal "and" join, but I'll also sanity-check:
-- `collab_reminder` (host + guest reminders) — should not fire at all on solo rooms with no real second party. Add a `request.is_solo && requester_user_id === creator.user_id` short-circuit so we don't email Karen a reminder about meeting Karen.
-- `published_together` / `collab_retrospective` — same short-circuit.
+### One Technical Warning for Lovable
 
-### 3. Tighten the data layer so this can't happen silently again
-- `PublicBooking.tsx`: add a guard so a logged-in creator cannot submit a booking on their own public page (`user.id === creator.user_id` → block with a friendly toast). This was the other path that could create a self-on-self duo (non-solo) request.
-- The solo-creation path in `Dashboard.tsx` is intentional and stays as is, but we'll mark these rows clearly in any name-rendering helper.
+Since you mentioned the Supabase **1000-row limit**, make sure Lovable implements **Pagination** or **Aggregate Functions** for that `analytics_events` table. If you have 50 users and they start using the "Rich Copy" feature every day, you’ll hit that 1000-row limit faster than you think.
 
-### 4. Centralize the "describe participants" logic
-Add a small helper `src/lib/workspace-participants.ts` (and mirror it in the edge function) that, given a request row + collaborators list, returns a single string like:
-- Solo, no collaborators: `"Karen Smiley (solo)"`
-- Solo + 1 collaborator: `"Karen Smiley and Elena Calvillo"`
-- Duo: `"Karen Smiley and Elena Calvillo"`
-- Duo + extras: `"Karen Smiley, Elena Calvillo and 2 others"`
+**Instruction for Lovable:** > "When refactoring the data fetching in `AdminAnalytics.tsx`, ensure the query handles pagination or uses a count-only approach for the KPI tiles to avoid being capped by the 1000-row default."
 
-Replace the ad-hoc string in `workspace_invite` with this helper. Cover it with a Vitest unit test (incl. the duplicate-name regression).
+### What the range controls
 
-### 5. Light backfill / cleanup
-No DB migration needed — the row is fine. We just stop misrendering it.
+Every metric on the page recalculates against the selected window:
 
-## Files in scope
+- All KPI tiles (Draft Acceptance, AI Attachment, Regeneration, Guest Conversion, Avg Session, Booking Conversion, SMART Suggestions, User Signups)
+- Daily Events chart (x-axis adapts to the range)
+- Collaboration Funnel (5-Step)
+- Collaboration Outcomes (Approved / Declined / Pending / Approval Rate)
+- Workspace save failures tile
+- Signup Attribution
+- Feature Usage Matrix (replaces the fixed 7d/30d columns with "selected range" + a comparison column for the **previous equivalent period**, so you can see week-over-week deltas)
+- Inactive-credit-holders list (still based on "no login in 7+ days" but only counts users created in range)
 
-- `supabase/functions/send-collab-email/index.ts` — `workspace_invite`, `collab_reminder`, retrospective, published.
-- `src/lib/workspace-participants.ts` — new helper.
-- `src/lib/__tests__/workspace-participants.test.ts` — new tests (incl. "Karen and Karen" regression).
-- `src/pages/PublicBooking.tsx` — block self-booking by the creator.
-- (Edge function mirror of the helper — duplicated, since edge functions can't import from `src/`.)
+### Comparison vs. previous period
 
-## Out of scope
-- No UI redesign of the email; only the participants line and short-circuits.
-- No schema changes, no backfill of existing rows.
-- The workspace UI partner labels are already solo-aware; not touching them.
+Each KPI tile gets a small delta indicator: `15.8% ▲ +4.2pp vs prev 7d`. This is the part that directly answers "why has this dropped?" — you'll see at a glance whether it's a real drop or just a quieter day.
 
-## Why this is the right fix
-The bug isn't "the email template has a typo". It's that the system has two valid shapes for a `collab_request` (solo vs duo) and one of the surfaces (the invite email) was written assuming only the duo shape exists. Patching only the visible string would leave reminders/retros to break the same way later. Fixing the helper + the self-booking guard + the solo short-circuits closes the whole class of bugs in one pass.
+### Data fetching
+
+Currently `AdminAnalytics.tsx` fetches a single `gte(created_at, thirtyDaysAgo)` slice. I'll switch it to fetch `[rangeStart, rangeEnd]` plus the previous equivalent window in one go (so deltas don't cost an extra round-trip). For ranges longer than 90 days I'll page the query to stay under Supabase's 1000-row default.
+
+## Out of scope (flagging for later)
+
+- Long-term retention/archival of `analytics_events` — the table will keep growing; eventually we'll want a rollup table. Not needed now, but worth a follow-up.
+- Per-user drilldown — same page, future task.
+
+## Files touched
+
+- `src/pages/AdminAnalytics.tsx` — add range state, URL sync, refactor all `useMemo` blocks to take `(events, rangeStart, rangeEnd)`, add delta tiles.
+- New `src/components/admin/AnalyticsRangePicker.tsx` — the dropdown + custom-range UI.
+- New `src/lib/analytics-range.ts` — pure helpers for computing `{start, end, prevStart, prevEnd, label}` from a range key, plus tests in `src/lib/__tests__/analytics-range.test.ts` (covers week boundaries, month boundaries, DST, custom ranges).
+
+No DB migration, no edge function changes — purely a frontend refactor of an existing admin page.

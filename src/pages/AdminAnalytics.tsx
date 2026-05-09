@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { AnalyticsRangePicker } from "@/components/admin/AnalyticsRangePicker";
+import { resolveRange, bucketLabel, type RangeKey } from "@/lib/analytics-range";
 import {
   BarChart3,
   Users,
@@ -90,11 +92,37 @@ interface InactiveUser {
   last_sign_in_at: string | null;
 }
 
+function DeltaText({ current, previous, prevLabel }: { current: number; previous: number; prevLabel: string }) {
+  if (previous === 0 && current === 0) return null;
+  const delta = current - previous;
+  const pct = previous > 0 ? (delta / previous) * 100 : null;
+  const up = delta > 0;
+  const flat = delta === 0;
+  const color = flat ? "text-muted-foreground" : up ? "text-success" : "text-destructive";
+  const arrow = flat ? "→" : up ? "▲" : "▼";
+  const pctText = pct === null ? "new" : `${up ? "+" : ""}${pct.toFixed(0)}%`;
+  return (
+    <p className={cn("text-[11px] mt-1 font-medium", color)}>
+      {arrow} {pctText} {prevLabel} ({previous})
+    </p>
+  );
+}
+
 export default function AdminAnalytics() {
   const navigate = useNavigate();
   const { isAdmin, loading } = useAdmin();
-  
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rangeKey: RangeKey = searchParams.get("range") || "last-7d";
+  const range = useMemo(() => resolveRange(rangeKey), [rangeKey]);
+
+  const setRangeKey = (next: RangeKey) => {
+    const sp = new URLSearchParams(searchParams);
+    sp.set("range", next);
+    setSearchParams(sp, { replace: true });
+  };
+
   const [events, setEvents] = useState<AnalyticsEvent[]>([]);
+  const [prevEvents, setPrevEvents] = useState<AnalyticsEvent[]>([]);
   const [feedback, setFeedback] = useState<UserFeedback[]>([]);
   const [dailyMetrics, setDailyMetrics] = useState<DailyMetric[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -111,20 +139,40 @@ export default function AdminAnalytics() {
     if (isAdmin) {
       fetchAnalyticsData();
     }
-  }, [isAdmin]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, rangeKey]);
+
+  /**
+   * Page through analytics_events for a given window, working around
+   * Supabase's 1000-row default. Caps at 5000 rows to keep the page snappy;
+   * older data is summarised on the chart but raw KPIs above already
+   * reflect the selected range.
+   */
+  const fetchEventsInRange = async (startIso: string, endIso: string) => {
+    const PAGE = 1000;
+    const MAX_ROWS = 5000;
+    const all: AnalyticsEvent[] = [];
+    for (let from = 0; from < MAX_ROWS; from += PAGE) {
+      const { data, error } = await supabase
+        .from("analytics_events")
+        .select("*")
+        .gte("created_at", startIso)
+        .lt("created_at", endIso)
+        .order("created_at", { ascending: false })
+        .range(from, from + PAGE - 1);
+      if (error || !data) break;
+      all.push(...(data as AnalyticsEvent[]));
+      if (data.length < PAGE) break;
+    }
+    return all;
+  };
 
   const fetchAnalyticsData = async () => {
     setIsLoading(true);
-    
-    // Fetch events from last 30 days
-    const thirtyDaysAgo = subDays(new Date(), 30).toISOString();
-    
-    const [eventsRes, feedbackRes] = await Promise.all([
-      supabase
-        .from("analytics_events")
-        .select("*")
-        .gte("created_at", thirtyDaysAgo)
-        .order("created_at", { ascending: false }),
+
+    const [curEvents, prevEvts, feedbackRes] = await Promise.all([
+      fetchEventsInRange(range.start, range.end),
+      fetchEventsInRange(range.prevStart, range.prevEnd),
       supabase
         .from("user_feedback")
         .select("*")
@@ -132,37 +180,27 @@ export default function AdminAnalytics() {
         .limit(50),
     ]);
 
-    if (eventsRes.data) {
-      setEvents(eventsRes.data);
-      
-      // Calculate daily metrics
-      const dailyCounts: Record<string, number> = {};
-      for (let i = 6; i >= 0; i--) {
-        const date = format(subDays(new Date(), i), "yyyy-MM-dd");
-        dailyCounts[date] = 0;
-      }
-      
-      eventsRes.data.forEach((event) => {
-        const date = format(parseISO(event.created_at), "yyyy-MM-dd");
-        if (dailyCounts[date] !== undefined) {
-          dailyCounts[date]++;
-        }
-      });
-      
-      setDailyMetrics(
-        Object.entries(dailyCounts).map(([date, events]) => ({
-          date: format(parseISO(date), "MMM d"),
-          events,
-        }))
-      );
-    }
+    setEvents(curEvents);
+    setPrevEvents(prevEvts);
 
-    if (feedbackRes.data) {
-      setFeedback(feedbackRes.data);
+    // Build daily/weekly buckets for the chart based on the range.
+    const startMs = new Date(range.start).getTime();
+    const bucketMs = range.bucket === "week" ? 7 * 24 * 3600 * 1000 : 24 * 3600 * 1000;
+    const buckets: { date: string; events: number; ts: number }[] = [];
+    for (let i = 0; i < range.bucketCount; i++) {
+      const ts = startMs + i * bucketMs;
+      buckets.push({ date: bucketLabel(new Date(ts), range.bucket), events: 0, ts });
     }
+    for (const e of curEvents) {
+      const ts = new Date(e.created_at).getTime();
+      const idx = Math.floor((ts - startMs) / bucketMs);
+      if (idx >= 0 && idx < buckets.length) buckets[idx].events += 1;
+    }
+    setDailyMetrics(buckets.map(({ date, events }) => ({ date, events })));
+
+    if (feedbackRes.data) setFeedback(feedbackRes.data);
 
     await fetchInactiveUsers();
-
     setIsLoading(false);
   };
 
@@ -214,14 +252,25 @@ export default function AdminAnalytics() {
   const collabApproved = events.filter((e) => e.event_type === "collab_approved").length;
   const collabDeclined = events.filter((e) => e.event_type === "collab_declined").length;
 
-  // ---- Workspace save reliability (7d) ----
-  const sevenDaysAgoMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  const saveFailEvents = events.filter(
-    (e) => e.event_type === "workspace_save_failed" && new Date(e.created_at).getTime() >= sevenDaysAgoMs,
+  // Prev-period counts (for delta indicators).
+  const countPrev = (t: string) => prevEvents.filter((e) => e.event_type === t).length;
+  const prevBookingClicks = countPrev("booking_link_clicked");
+  const prevBookingSubmits = countPrev("booking_submitted");
+  const prevDraftGenerated = countPrev("draft_generated");
+  const prevUserSignups = countPrev("user_signup");
+  const prevAcceptedSet = new Set(
+    prevEvents
+      .filter((e) => e.event_type === "draft_accepted")
+      .map((e) => {
+        const d = (e.event_data && typeof e.event_data === "object" ? (e.event_data as Record<string, unknown>) : {}) as Record<string, unknown>;
+        return (d.request_id as string | undefined) ?? `__no_req_${e.id}`;
+      }),
   );
-  const saveRecoveredCount = events.filter(
-    (e) => e.event_type === "workspace_save_recovered" && new Date(e.created_at).getTime() >= sevenDaysAgoMs,
-  ).length;
+  const prevDraftAccepted = prevAcceptedSet.size;
+
+  // ---- Workspace save reliability (selected range) ----
+  const saveFailEvents = events.filter((e) => e.event_type === "workspace_save_failed");
+  const saveRecoveredCount = events.filter((e) => e.event_type === "workspace_save_recovered").length;
   const saveFailReasonCounts: Record<string, number> = {};
   for (const e of saveFailEvents) {
     const data = (e.event_data && typeof e.event_data === "object" ? (e.event_data as Record<string, unknown>) : {}) as Record<string, unknown>;
@@ -230,25 +279,23 @@ export default function AdminAnalytics() {
   }
   const topSaveFailReason = Object.entries(saveFailReasonCounts).sort((a, b) => b[1] - a[1])[0];
 
-  // ---- Feature Usage Matrix (last 7d / 30d) ----
-  const now = Date.now();
-  const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
-  type Row = { event: string; d7: number; d30: number; users7: number };
-  const usageMap = new Map<string, { d7: number; d30: number; users: Set<string> }>();
+  // ---- Feature Usage Matrix (selected range vs prev) ----
+  type Row = { event: string; cur: number; prev: number; users: number };
+  const usageMap = new Map<string, { cur: number; users: Set<string> }>();
   for (const e of events) {
-    const ts = new Date(e.created_at).getTime();
-    const row = usageMap.get(e.event_type) ?? { d7: 0, d30: 0, users: new Set<string>() };
-    row.d30 += 1;
-    if (ts >= sevenDaysAgo) {
-      row.d7 += 1;
-      const uid = (e as unknown as { user_id?: string }).user_id;
-      if (uid) row.users.add(uid);
-    }
+    const row = usageMap.get(e.event_type) ?? { cur: 0, users: new Set<string>() };
+    row.cur += 1;
+    const uid = (e as unknown as { user_id?: string }).user_id;
+    if (uid) row.users.add(uid);
     usageMap.set(e.event_type, row);
   }
+  const prevCounts = new Map<string, number>();
+  for (const e of prevEvents) {
+    prevCounts.set(e.event_type, (prevCounts.get(e.event_type) || 0) + 1);
+  }
   const usageRows: Row[] = Array.from(usageMap.entries())
-    .map(([event, v]) => ({ event, d7: v.d7, d30: v.d30, users7: v.users.size }))
-    .sort((a, b) => b.d7 - a.d7 || b.d30 - a.d30);
+    .map(([event, v]) => ({ event, cur: v.cur, prev: prevCounts.get(event) || 0, users: v.users.size }))
+    .sort((a, b) => b.cur - a.cur || b.prev - a.prev);
 
   // ---- Signup Attribution breakdown ----
   const attributionCounts: Record<string, number> = {};
@@ -438,14 +485,17 @@ export default function AdminAnalytics() {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
-              <BarChart3 className="w-5 h-5 text-primary-foreground" />
+          <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
+                <BarChart3 className="w-5 h-5 text-primary-foreground" />
+              </div>
+              <h1 className="text-3xl font-bold">Admin Analytics</h1>
             </div>
-            <h1 className="text-3xl font-bold">Admin Analytics</h1>
+            <AnalyticsRangePicker value={rangeKey} onChange={setRangeKey} />
           </div>
           <p className="text-muted-foreground">
-            Track key metrics, funnel performance, and user feedback
+            Showing <span className="font-medium text-foreground">{range.label}</span> · {range.prevLabel.replace(/^vs /, "compared to ")}
           </p>
         </motion.div>
 
@@ -654,8 +704,9 @@ export default function AdminAnalytics() {
               <CardContent>
                 <div className="text-3xl font-bold">{userSignups}</div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Last 30 days
+                  {range.label}
                 </p>
+                <DeltaText current={userSignups} previous={prevUserSignups} prevLabel={range.prevLabel} />
               </CardContent>
             </Card>
           </motion.div>
@@ -669,7 +720,7 @@ export default function AdminAnalytics() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4" />
-                  Workspace save failures (7d)
+                  Workspace save failures
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -698,7 +749,7 @@ export default function AdminAnalytics() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Calendar className="w-5 h-5" />
-                  Daily Events (Last 7 Days)
+                  Daily Events
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -902,7 +953,7 @@ export default function AdminAnalytics() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="w-5 h-5" />
-                Signup Attribution (last 30 days)
+                Signup Attribution
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -959,7 +1010,7 @@ export default function AdminAnalytics() {
             <CardContent>
               {usageRows.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-4 text-center">
-                  No events recorded in the last 30 days.
+                  No events recorded in this range.
                 </p>
               ) : (
                 <div className="overflow-x-auto max-h-[480px]">
@@ -967,18 +1018,18 @@ export default function AdminAnalytics() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Event</TableHead>
-                        <TableHead className="text-right">7d</TableHead>
-                        <TableHead className="text-right">30d</TableHead>
-                        <TableHead className="text-right">Unique users (7d)</TableHead>
+                        <TableHead className="text-right">{range.label}</TableHead>
+                        <TableHead className="text-right">Prev period</TableHead>
+                        <TableHead className="text-right">Unique users</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {usageRows.map((r) => (
                         <TableRow key={r.event}>
                           <TableCell className="font-mono text-xs">{r.event}</TableCell>
-                          <TableCell className="text-right">{r.d7}</TableCell>
-                          <TableCell className="text-right text-muted-foreground">{r.d30}</TableCell>
-                          <TableCell className="text-right">{r.users7}</TableCell>
+                          <TableCell className="text-right">{r.cur}</TableCell>
+                          <TableCell className="text-right text-muted-foreground">{r.prev}</TableCell>
+                          <TableCell className="text-right">{r.users}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
