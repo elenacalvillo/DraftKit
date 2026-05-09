@@ -48,6 +48,12 @@ export function GuestMessageModal({
       return;
     }
 
+    if (!senderEmail) {
+      console.error("GuestMessageModal: missing senderEmail — cannot insert message");
+      toast.error("We couldn't identify your email. Please refresh and try again.");
+      return;
+    }
+
     setIsSending(true);
 
     try {
@@ -55,7 +61,7 @@ export function GuestMessageModal({
       const { error } = await supabase.from("collaboration_messages").insert({
         request_id: requestId,
         sender_type: "requester",
-        sender_email: requesterEmail,
+        sender_email: senderEmail,
         content: message.trim(),
       });
 
