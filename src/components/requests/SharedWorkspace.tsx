@@ -176,6 +176,32 @@ function SharedWorkspaceInner({
     setNotifyPartner(false);
   };
 
+  // While editing, persist a local recovery snapshot on every change so that
+  // a network failure / accidental tab close / RLS rejection cannot silently
+  // wipe the user's work.
+  useEffect(() => {
+    if (!isEditing) return;
+    const snapshot: RecoveryDraft = {
+      content: editContent,
+      saved_at: new Date().toISOString(),
+      edited_by: currentUserName,
+    };
+    writeRecoveryDraft(requestId, snapshot);
+  }, [editContent, isEditing, requestId, currentUserName]);
+
+  const handleRestoreRecovery = () => {
+    if (!recoveryNotice) return;
+    setEditContent(recoveryNotice.content);
+    setIsEditing(true);
+    setEditStartTime(Date.now());
+    toast.success("Restored your unsynced draft. Click Save & Sync to keep it.");
+  };
+
+  const handleDiscardRecovery = () => {
+    clearRecoveryDraft(requestId);
+    setRecoveryNotice(null);
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     const now = new Date().toISOString();
@@ -188,7 +214,10 @@ function SharedWorkspaceInner({
     };
     const updatedSessions = [...editingSessions, newSession];
     try {
-      const { error } = await supabase
+      // Write + read-back in one round trip so we know the row actually
+      // accepted the change (covers RLS rejections that don't surface as
+      // errors but return zero rows).
+      const { data: updated, error } = await supabase
         .from("collab_requests")
         .update({
           shared_content: cleanHtml || null,
@@ -196,11 +225,24 @@ function SharedWorkspaceInner({
           content_last_edited_at: now,
           editing_sessions: updatedSessions,
         } as any)
-        .eq("id", requestId);
+        .eq("id", requestId)
+        .select("id, shared_content, content_last_edited_by, content_last_edited_at");
 
       if (error) throw error;
+      if (!updated || updated.length === 0) {
+        throw new Error(
+          "No rows updated — your account may not have edit access on this workspace.",
+        );
+      }
 
-      onContentSaved(cleanHtml, currentUserName, now);
+      const row = updated[0] as any;
+      const confirmedContent: string = row.shared_content ?? "";
+      const confirmedBy: string = row.content_last_edited_by ?? currentUserName;
+      const confirmedAt: string = row.content_last_edited_at ?? now;
+
+      onContentSaved(confirmedContent, confirmedBy, confirmedAt);
+      clearRecoveryDraft(requestId);
+      setRecoveryNotice(null);
       setIsEditing(false);
       toast.success("Draft saved & synced");
 
@@ -224,7 +266,19 @@ function SharedWorkspaceInner({
       setNotifyPartner(false);
     } catch (error) {
       console.error("Failed to save workspace content:", error);
-      toast.error("Failed to save. Please try again.");
+      // Make sure the recovery snapshot reflects the latest in-memory edit
+      // so the user can recover after refresh.
+      writeRecoveryDraft(requestId, {
+        content: editContent,
+        saved_at: new Date().toISOString(),
+        edited_by: currentUserName,
+      });
+      const msg = error instanceof Error ? error.message : "";
+      toast.error(
+        msg
+          ? `Failed to save: ${msg} Your draft is preserved locally — try again or copy it out.`
+          : "Failed to save. Your draft is preserved locally — try again or copy it out.",
+      );
     } finally {
       setIsSaving(false);
     }
