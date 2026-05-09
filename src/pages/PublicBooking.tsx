@@ -543,6 +543,17 @@ export default function PublicBooking() {
       return;
     }
 
+    // Block self-booking: a logged-in creator viewing their own public page
+    // must not be able to submit a request against themselves. This was
+    // creating duo rows where both sides resolved to the same person, which
+    // then leaked into emails as "With: X and X".
+    if (user && authCreator && creator && authCreator.id === creator.id) {
+      toast.error("You can't book your own page", {
+        description: "Use 'Start Writing Solo' from your dashboard instead.",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
 
     // Wait for turnstile token if not ready yet (invisible mode may still be processing)
