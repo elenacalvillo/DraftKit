@@ -1,88 +1,36 @@
-## 3-Stage Retention Campaign + DAR Fix
+# Fix plan: Workspace partner messages failing for invited collaborators
 
-### 1. Database changes (migration)
+## What’s broken
+Invited collaborators in a shared workspace are being treated like the original requester for messaging UI, but their request payload is intentionally privacy-redacted. That leaves the message modal without a valid sender email, and the first insert into `collaboration_messages` fails because `sender_email` is required.
 
-Add to `creators`:
+## What I’ll change
 
-- `last_nudge_sent_at timestamptz null`
-- `nudge_count integer not null default 0`
+### 1) Fix role-aware message sending in the workspace
+- Update `src/pages/Workspace.tsx` so invited collaborators do not use the requester-only message path blindly.
+- Pass the authenticated user’s email into the collaborator message flow instead of relying on redacted request fields.
+- Keep owner/requester/collaborator behavior explicit so future merges don’t collapse these roles again.
 
-To detect "inactive" users we need `last_sign_in_at`, which lives in `auth.users` (not directly readable from the client). Add a `SECURITY DEFINER` admin-only RPC:
+### 2) Make the guest/collaborator message modal safe
+- Update `src/components/requests/GuestMessageModal.tsx` to accept the actual sender email as a prop.
+- Add a defensive guard so the modal refuses to send and shows a useful error if the sender email is missing.
+- Preserve analytics and existing success/error toast behavior.
 
-```sql
-create or replace function public.get_inactive_credit_users()
-returns table(
-  user_id uuid, creator_id uuid, name text, email text,
-  credits int, nudge_count int, last_nudge_sent_at timestamptz,
-  last_sign_in_at timestamptz
-)
-language sql stable security definer set search_path = public as $$
-  select c.user_id, c.id, c.name, u.email, c.credits,
-         c.nudge_count, c.last_nudge_sent_at, u.last_sign_in_at
-  from creators c
-  join auth.users u on u.id = c.user_id
-  where c.credits > 0
-    and (u.last_sign_in_at is null or u.last_sign_in_at < now() - interval '7 days')
-    and public.has_role(auth.uid(), 'admin')
-    and c.nudge_count < 3
-  order by u.last_sign_in_at asc nulls first;
-$$;
-```
+### 3) Keep the conversation display aligned with three roles
+- Verify `WorkspaceConversation` / workspace role logic still labels messages correctly for creator vs non-creator views.
+- Ensure the first message from an invited collaborator appears immediately after send via the existing refresh flow.
 
-Plus an admin-only RPC `bump_nudge_count(_creator_id uuid)` that sets `last_nudge_sent_at = now()` and `nudge_count = nudge_count + 1` (guarded by `has_role(auth.uid(),'admin')` and a same-day re-send block).
+### 4) Prevent publishing regressions
+- Add or extend a focused test around workspace role/message behavior if there’s already a suitable test surface.
+- Do a targeted codebase check for any other `GuestMessageModal` usage that could still pass the wrong sender identity.
 
-### 2. Admin Dashboard — "Inactive User Campaign" table
+## Technical details
+- Root cause is frontend role wiring, not the message table schema.
+- `collaboration_messages.sender_email` is `NOT NULL`.
+- `get_workspace_request(...)` intentionally nulls requester PII for collaborator-only viewers.
+- Because invited collaborators currently enter the `isGuestView` branch, the modal receives requester-derived data that may be null.
+- The safest fix is to source sender identity from the authenticated session, not from the redacted request payload.
 
-In `src/pages/AdminAnalytics.tsx`, add a new section below the existing tables:
-
-- Columns: Name · Email · Credits · Last login (relative) · Nudges sent · Action
-- Action column renders one button based on `nudge_count`:
-  - `0` → "Send Strike 1 (Value Debt)"
-  - `1` → "Send Strike 2 (New Feature)"
-  - `2` → "Send Strike 3 (Final Check-in)"
-  - `3` → muted "Campaign complete"
-- Disable the button if `last_nudge_sent_at` is within the last 24h (prevents same-day double-send).
-- Click handler:
-  1. Build the email body (template below) with `[X]` replaced by `credits` and a personalized greeting using first name.
-  2. Copy `Subject\n\nBody` to clipboard via `navigator.clipboard.writeText`.
-  3. Call `bump_nudge_count` RPC, refetch the list, toast `"Strike N copied — paste into your email client"`.
-
-Email templates (Strike 1–3) use the exact copy from the brief. Ensure the `bump_nudge_count` RPC also returns the updated row so the Admin UI reflects the change instantly without a full page reload.
-
-
-
-### 3. DAR fix in `AdminAnalytics.tsx`
-
-Current math counts `draft_accepted` events (line 246) — change to unique `request_id`s:
-
-```ts
-const acceptedRequestIds = new Set(
-  events
-    .filter(e => e.event_type === "draft_accepted")
-    .map(e => (e.event_data as any)?.request_id)
-    .filter(Boolean)
-);
-const draftAccepted = acceptedRequestIds.size;
-```
-
-Denominator stays `total_drafts_generated` (count of `draft_generated` events). Add a small caption under the metric: "unique drafts copied or downloaded ÷ drafts generated".
-
-### 4. SharedWorkspace toast + tracking
-
-`draft_accepted` is already fired from both Copy (line 216) and Download (line 235) — confirmed correct. Only change:
-
-- Update the Copy success toast (line 214) from `"Draft copied — paste it into Substack. You just saved ~30 minutes."` to **"Draft copied — you just saved ~30 minutes."** to match the brief verbatim.
-- Add the same toast text on Download success for consistency: `"Draft downloaded — you just saved ~30 minutes."`
-
-### Open questions
-
-1. Email "from" / signature — should the copied draft include a signature line (e.g. "— Sam") or leave it blank for the admin to paste their own?
-2. Subject lines — the brief gives bodies only. Suggested: S1 "Quick one about your DraftKit credits", S2 "Saving ~30 min per post", S3 "Last check-in". OK?
-3. The brief calls the column `credits_balance` and `last_login` — actual DB has `creators.credits` and `auth.users.last_sign_in_at`. Plan uses the real columns.
-
-### Files touched
-
-- migration (new) — add columns + 2 RPCs
-- `src/pages/AdminAnalytics.tsx` — DAR math, new campaign section, RPC calls
-- `src/components/requests/SharedWorkspace.tsx` — toast copy tweak (Copy + Download)
-- new `src/lib/nudge-templates.ts` — email body builder for the 3 strikes
+## Expected outcome
+- In a workspace invited by Xian, you can start the conversation even when there were no previous messages.
+- Message inserts succeed for creator, requester, and invited collaborator roles.
+- No production crash on publish from this flow.

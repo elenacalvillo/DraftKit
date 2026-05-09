@@ -19,7 +19,14 @@ interface GuestMessageModalProps {
   onOpenChange: (open: boolean) => void;
   requestId: string;
   creatorName: string;
-  requesterEmail: string;
+  /**
+   * Email of the *sender* (the currently signed-in non-creator user).
+   * For original requesters this is their requester_email; for invited
+   * collaborators this is their auth user email. Required because the
+   * `collaboration_messages.sender_email` column is NOT NULL — passing a
+   * null here is what was breaking the first message in the conversation.
+   */
+  senderEmail: string | null | undefined;
   onMessageSent?: () => void;
 }
 
@@ -28,7 +35,7 @@ export function GuestMessageModal({
   onOpenChange,
   requestId,
   creatorName,
-  requesterEmail,
+  senderEmail,
   onMessageSent,
 }: GuestMessageModalProps) {
   const [message, setMessage] = useState("");
