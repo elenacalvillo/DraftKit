@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { AnalyticsRangePicker } from "@/components/admin/AnalyticsRangePicker";
+import { resolveRange, bucketLabel, type RangeKey } from "@/lib/analytics-range";
 import {
   BarChart3,
   Users,
