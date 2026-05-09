@@ -108,6 +108,7 @@ function DeltaText({ current, previous, prevLabel }: { current: number; previous
   );
 }
 
+export default function AdminAnalytics() {
   const navigate = useNavigate();
   const { isAdmin, loading } = useAdmin();
   const [searchParams, setSearchParams] = useSearchParams();
