@@ -589,34 +589,51 @@ function SharedWorkspaceInner({
       return;
     }
 
+    // POPUP-BLOCKER GUARD: open the tab FIRST, synchronously, while we still
+    // have a fresh user-gesture. If we await the clipboard before opening,
+    // most browsers will block the window. We keep a handle so we can close
+    // it later if the clipboard write fails (no Ghost Copy: never claim
+    // "Draft copied!" unless the write actually succeeded).
+    const popup = window.open(SUBSTACK_NEW_POST_URL, "_blank", "noopener,noreferrer");
+
     try {
       const wrote = await writeDraftToClipboard(cleaned);
       if (!wrote) {
-        // Defensive — isRichClipboardAvailable said yes but the write
-        // returned false anyway. Show the manual fallback.
+        // Clipboard write failed — close the tab we just opened and surface
+        // the manual fallback so the user can still complete the export.
+        try { popup?.close(); } catch { /* cross-origin close may throw */ }
+        toast.error("Clipboard access denied. Use the manual Copy fallback below.");
         setSubstackFallbackHtml(cleaned);
         return;
       }
 
-      // Open the Substack composer in a NEW tab so the user keeps their
-      // workspace context. We do this synchronously inside the click handler
-      // so most browsers' popup blockers allow it.
-      window.open(SUBSTACK_NEW_POST_URL, "_blank", "noopener,noreferrer");
-
-      // Persistent toast — DRAFT-002 explicitly requires no auto-dismiss,
-      // because the user's next action is to switch tabs, and an
-      // auto-dismissed toast would be invisible by the time they come back.
-      // sonner does not auto-dismiss when duration is Infinity.
-      toast.success(
-        "Draft copied! Switch to the new tab and press Cmd+V (Ctrl+V on Windows) to paste.",
-        { duration: Infinity },
-      );
+      if (!popup || popup.closed) {
+        // Pop-up blocked. Clipboard succeeded though, so give the user a
+        // clickable toast to open Substack themselves — no Ghost Copy risk.
+        toast.success(
+          "Draft copied! Click to open Substack and paste (Cmd+V / Ctrl+V).",
+          {
+            duration: Infinity,
+            action: {
+              label: "Open Substack",
+              onClick: () => window.open(SUBSTACK_NEW_POST_URL, "_blank", "noopener,noreferrer"),
+            },
+          },
+        );
+      } else {
+        // Persistent toast — no auto-dismiss because the user's next move
+        // is to switch tabs.
+        toast.success(
+          "Draft copied! Switch to the new tab and press Cmd+V (Ctrl+V on Windows) to paste.",
+          { duration: Infinity },
+        );
+      }
 
       trackEvent("push_to_substack_success", { request_id: requestId });
     } catch (err) {
       console.error("Push to Substack failed:", err);
-      // Permission denied / other clipboard error — fall through to the
-      // manual modal so the user still gets their draft.
+      try { popup?.close(); } catch { /* noop */ }
+      toast.error("Clipboard access denied. Please use the manual 'Copy' fallback.");
       setSubstackFallbackHtml(cleaned);
     }
   }, [sharedContent, isPro, requestId, trackEvent]);
