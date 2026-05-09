@@ -748,6 +748,83 @@ export default function AdminAnalytics() {
           </motion.div>
         </div>
 
+        {/* Push to Substack — top-of-page revenue lever block.
+            Lives ABOVE Charts Row on purpose: while this feature ramps,
+            the team needs the success/blocked split front-and-center. */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.88 }}
+          className="mb-8"
+        >
+          <Card className="glass-card border-primary/30">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Send className="w-5 h-5 text-primary" />
+                Push to Substack
+                <Badge variant="secondary" className="ml-2 text-[10px]">New</Badge>
+              </CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                {range.label} · deduped by request_id (intent, not raw clicks)
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-3 gap-4 mb-6">
+                <div className="rounded-lg border border-border/50 p-4">
+                  <div className="text-xs text-muted-foreground mb-1">Substack Push Rate</div>
+                  <div className="text-2xl font-bold">{pushFunnel.pushRate.toFixed(1)}%</div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    success / (success + blocked)
+                  </div>
+                </div>
+                <div className="rounded-lg border border-border/50 p-4">
+                  <div className="text-xs text-muted-foreground mb-1">Pro pushes</div>
+                  <div className="text-2xl font-bold">{pushFunnel.pushSuccess}</div>
+                  <DeltaText current={pushFunnel.pushSuccess} previous={prevPushFunnel.pushSuccess} prevLabel={range.prevLabel} />
+                </div>
+                <div className="rounded-lg border border-border/50 p-4">
+                  <div className="text-xs text-muted-foreground mb-1">Blocked → Upgrade</div>
+                  <div className="text-2xl font-bold">{pushFunnel.blockedToUpgradeConversion.toFixed(1)}%</div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    of blocked users who later checked out
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-3">
+                {pushFunnelSteps(pushFunnel).map((s, i, arr) => {
+                  const top = arr[0]?.count || 0;
+                  const pct = top > 0 ? (s.count / top) * 100 : 0;
+                  const prev = i > 0 ? arr[i - 1].count : s.count;
+                  const conv = prev > 0 ? (s.count / prev) * 100 : 0;
+                  return (
+                    <div key={s.name}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium">{s.name}</span>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary">{s.count}</Badge>
+                          {i > 0 && (
+                            <span className="text-xs text-muted-foreground">
+                              ({conv.toFixed(0)}%)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="h-2 bg-muted rounded-full overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${pct}%` }}
+                          transition={{ duration: 0.6, delay: i * 0.05 }}
+                          className="h-full bg-primary"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
         {/* Charts Row */}
         <div className="grid lg:grid-cols-2 gap-6 mb-8">
           {/* Daily Events Chart */}
