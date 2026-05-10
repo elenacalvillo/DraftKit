@@ -33,14 +33,17 @@ import {
   writeDraftToClipboard,
 } from "@/lib/clipboard";
 import { PushToSubstackUpgradeModal } from "@/components/subscription/PushToSubstackUpgradeModal";
+import { resolveSubstackPublishUrl } from "@/lib/substack-url";
 
 const ALLOWED_TAGS = ["p", "h1", "h2", "h3", "strong", "em", "s", "code", "pre", "a", "ul", "ol", "li", "br", "hr", "table", "thead", "tbody", "tr", "th", "td", "span"];
 const ALLOWED_ATTR = ["href", "target", "rel", "colspan", "rowspan", "colwidth", "class", "data-comment", "data-author"];
 
-// Substack's "new post" composer. Opening this in a fresh tab (rather than
-// navigating away) preserves the user's workspace context — DRAFT-002
+// The destination Substack composer URL is resolved per-user from
+// creator.newsletter_url (preferred) → creator.substack_url → generic
+// substack.com/publish (fallback). Opening this in a fresh tab (rather
+// than navigating away) preserves the user's workspace context — DRAFT-002
 // explicitly forbids leaving DraftKit on a Push to Substack click.
-const SUBSTACK_NEW_POST_URL = "https://substack.com/publish/post/new";
+// See resolveSubstackPublishUrl in src/lib/substack-url.ts.
 
 function sanitize(html: string): string {
   return DOMPurify.sanitize(html, { ALLOWED_TAGS, ALLOWED_ATTR });
@@ -200,7 +203,7 @@ function SharedWorkspaceInner({
   useEffect(() => {
     editingSessionsRef.current = editingSessions;
   }, [editingSessions]);
-  const { user } = useAuth();
+  const { user, creator } = useAuth();
   const { trackEvent } = useAnalytics();
   // usePro is the canonical access check for workspace context (DRAFT-002 /
   // DRAFT-003). We read isPro here rather than threading it through props so
@@ -580,6 +583,15 @@ function SharedWorkspaceInner({
     // they don't render as junk attrs in the Substack post.
     const cleaned = stripDraftKitInternalAttrs(sharedContent);
 
+    // Resolve the user's own publication composer URL. Priority:
+    //   newsletter_url (required, validated) → substack_url (optional) →
+    //   generic substack.com/publish fallback. No new DB column or input
+    //   modal — both fields already live on the creator profile.
+    const targetUrl = resolveSubstackPublishUrl(
+      creator?.newsletter_url,
+      creator?.substack_url,
+    );
+
     // If the rich Clipboard API isn't available (non-HTTPS, certain
     // browsers) bail to the manual-copy fallback dialog rather than
     // silently failing. We surface the cleaned HTML so the user gets the
@@ -594,7 +606,7 @@ function SharedWorkspaceInner({
     // most browsers will block the window. We keep a handle so we can close
     // it later if the clipboard write fails (no Ghost Copy: never claim
     // "Draft copied!" unless the write actually succeeded).
-    const popup = window.open(SUBSTACK_NEW_POST_URL, "_blank", "noopener,noreferrer");
+    const popup = window.open(targetUrl, "_blank", "noopener,noreferrer");
 
     try {
       const wrote = await writeDraftToClipboard(cleaned);
@@ -616,7 +628,7 @@ function SharedWorkspaceInner({
             duration: Infinity,
             action: {
               label: "Open Substack",
-              onClick: () => window.open(SUBSTACK_NEW_POST_URL, "_blank", "noopener,noreferrer"),
+              onClick: () => window.open(targetUrl, "_blank", "noopener,noreferrer"),
             },
           },
         );
@@ -636,7 +648,7 @@ function SharedWorkspaceInner({
       toast.error("Clipboard access denied. Please use the manual 'Copy' fallback.");
       setSubstackFallbackHtml(cleaned);
     }
-  }, [sharedContent, isPro, requestId, trackEvent]);
+  }, [sharedContent, isPro, requestId, trackEvent, creator?.newsletter_url, creator?.substack_url]);
 
   const hasContent = !!sharedContent?.trim();
 
@@ -929,7 +941,14 @@ function SharedWorkspaceInner({
             <Button
               variant="gradient"
               onClick={() => {
-                window.open(SUBSTACK_NEW_POST_URL, "_blank", "noopener,noreferrer");
+                window.open(
+                  resolveSubstackPublishUrl(
+                    creator?.newsletter_url,
+                    creator?.substack_url,
+                  ),
+                  "_blank",
+                  "noopener,noreferrer",
+                );
               }}
             >
               <Send className="w-4 h-4 mr-2" />
