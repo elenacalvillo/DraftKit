@@ -12,7 +12,7 @@ export interface NormalizeResult {
 
 /**
  * Normalize any Substack URL format to the canonical https://username.substack.com format
- * 
+ *
  * Supported formats:
  * - username.substack.com
  * - https://username.substack.com
@@ -26,13 +26,13 @@ export function normalizeSubstackUrl(input: string): NormalizeResult {
   }
 
   let url = input.trim();
-  
+
   // Remove query parameters and hash fragments
   url = url.replace(/[?#].*$/, '');
-  
+
   // Remove trailing slashes
   url = url.replace(/\/+$/, '');
-  
+
   // Remove protocol for pattern matching
   const withoutProtocol = url.replace(/^https?:\/\//, '');
 
@@ -100,37 +100,37 @@ export function isValidSubstackUrl(input: string): boolean {
 /**
  * Check if input is a valid newsletter publication URL (NOT a profile URL)
  * Profile URLs like substack.com/@username are rejected because they don't have RSS feeds
- * 
+ *
  * This is stricter than isValidSubstackUrl - use this when you need to fetch RSS/content
  */
 export function isValidNewsletterPublicationUrl(input: string): boolean {
   if (!input || typeof input !== 'string') return false;
-  
+
   let url = input.trim();
   url = url.replace(/[?#].*$/, '');
   url = url.replace(/\/+$/, '');
   const withoutProtocol = url.replace(/^https?:\/\//, '');
-  
+
   // REJECT: substack.com/@username (Profile URLs don't have RSS feeds)
   const profileMatch = withoutProtocol.match(/^(?:www\.)?substack\.com\/@/i);
   if (profileMatch) {
     return false;
   }
-  
+
   // ACCEPT: open.substack.com/pub/username (Mobile share - points to publication)
   const mobileMatch = withoutProtocol.match(/^open\.substack\.com\/pub\/([a-zA-Z0-9_-]+)/i);
   if (mobileMatch) return true;
-  
+
   // ACCEPT: username.substack.com (Standard newsletter format)
   const standardMatch = withoutProtocol.match(/^([a-zA-Z0-9][a-zA-Z0-9_-]*)\.substack\.com(?:\/.*)?$/i);
   if (standardMatch) return true;
-  
+
   // ACCEPT: Bare username (will be converted to username.substack.com)
   const bareUsernameMatch = withoutProtocol.match(/^([a-zA-Z0-9][a-zA-Z0-9_-]{1,49})$/);
   if (bareUsernameMatch && !withoutProtocol.includes('.') && !withoutProtocol.includes('/')) {
     return true;
   }
-  
+
   return false;
 }
 
@@ -139,4 +139,43 @@ export function isValidNewsletterPublicationUrl(input: string): boolean {
  */
 export function extractSubstackUsername(input: string): string | null {
   return normalizeSubstackUrl(input).username;
+}
+
+/**
+ * Generic Substack publish entry point. We open this when we cannot resolve
+ * the user's own publication subdomain — Substack's own router will redirect
+ * the user to whichever publication they are signed into. Always-safe fallback.
+ */
+export const SUBSTACK_GENERIC_PUBLISH_URL = "https://substack.com/publish";
+
+/**
+ * Resolve the URL that "Push to Substack" should open in a new tab for the
+ * current user. We deliberately do NOT require any new DB column or input
+ * modal — both fields below already live on the creator profile (DRAFT-002).
+ *
+ * Resolution order:
+ *   1. `newsletterUrl` — the required, validated publication URL on the
+ *      creator profile. Most reliable signal.
+ *   2. `substackUrl` — optional fallback. May be a profile or publication URL.
+ *   3. Generic `https://substack.com/publish` — fires when the user has no
+ *      Substack URL at all, or uses a non-Substack platform. Substack's
+ *      router will land them on their own publication composer once signed
+ *      in, so this is still useful (never silently fail).
+ *
+ * Each candidate runs through `normalizeSubstackUrl` so that any of the
+ * supported input formats (bare username, mobile share, profile URL, etc.)
+ * resolve to the same canonical `${username}.substack.com` subdomain.
+ */
+export function resolveSubstackPublishUrl(
+  newsletterUrl: string | null | undefined,
+  substackUrl: string | null | undefined,
+): string {
+  for (const candidate of [newsletterUrl, substackUrl]) {
+    if (!candidate || typeof candidate !== "string" || !candidate.trim()) continue;
+    const result = normalizeSubstackUrl(candidate);
+    if (result.isValid && result.username) {
+      return `https://${result.username}.substack.com/publish/post/new`;
+    }
+  }
+  return SUBSTACK_GENERIC_PUBLISH_URL;
 }
