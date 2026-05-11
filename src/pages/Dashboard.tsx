@@ -22,6 +22,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import type { Json } from "@/integrations/supabase/types";
 import { useAnalytics } from "@/hooks/useAnalytics";
+import { MetricInfo } from "@/components/admin/MetricInfo";
 
 interface CollabRequest {
   id: string;
