@@ -791,6 +791,7 @@ export default function AdminAnalytics() {
                 <Send className="w-5 h-5 text-primary" />
                 Push to Substack
                 <Badge variant="secondary" className="ml-2 text-[10px]">New</Badge>
+                <MetricInfo id="push_funnel" />
               </CardTitle>
               <p className="text-xs text-muted-foreground mt-1">
                 {range.label} · deduped by request_id (intent, not raw clicks)
@@ -799,19 +800,28 @@ export default function AdminAnalytics() {
             <CardContent>
               <div className="grid md:grid-cols-3 gap-4 mb-6">
                 <div className="rounded-lg border border-border/50 p-4">
-                  <div className="text-xs text-muted-foreground mb-1">Substack Push Rate</div>
+                  <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5">
+                    Substack Push Rate
+                    <MetricInfo id="push_rate" />
+                  </div>
                   <div className="text-2xl font-bold">{pushFunnel.pushRate.toFixed(1)}%</div>
                   <div className="text-xs text-muted-foreground mt-1">
                     success / (success + blocked)
                   </div>
                 </div>
                 <div className="rounded-lg border border-border/50 p-4">
-                  <div className="text-xs text-muted-foreground mb-1">Pro pushes</div>
+                  <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5">
+                    Pro pushes
+                    <MetricInfo id="pro_pushes" />
+                  </div>
                   <div className="text-2xl font-bold">{pushFunnel.pushSuccess}</div>
                   <DeltaText current={pushFunnel.pushSuccess} previous={prevPushFunnel.pushSuccess} prevLabel={range.prevLabel} />
                 </div>
                 <div className="rounded-lg border border-border/50 p-4">
-                  <div className="text-xs text-muted-foreground mb-1">Blocked → Upgrade</div>
+                  <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5">
+                    Blocked → Upgrade
+                    <MetricInfo id="blocked_to_upgrade" />
+                  </div>
                   <div className="text-2xl font-bold">{pushFunnel.blockedToUpgradeConversion.toFixed(1)}%</div>
                   <div className="text-xs text-muted-foreground mt-1">
                     of blocked users who later checked out
@@ -909,6 +919,7 @@ export default function AdminAnalytics() {
                 <CardTitle className="flex items-center gap-2">
                   <Sparkles className="w-5 h-5" />
                   Collaboration Funnel (5-Step)
+                  <MetricInfo id="core_funnel" />
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -962,6 +973,7 @@ export default function AdminAnalytics() {
               <CardTitle className="flex items-center gap-2">
                 <CheckCircle className="w-5 h-5" />
                 Collaboration Outcomes
+                <MetricInfo id="collab_outcomes" />
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -999,12 +1011,12 @@ export default function AdminAnalytics() {
 
         {/* Growth Loop Funnels */}
         <div className="grid lg:grid-cols-2 gap-6 mb-8">
-          {[
-            { title: "Referral Loop", icon: <Users className="w-5 h-5" />, steps: referralFunnel },
-            { title: "Invite Loop", icon: <Sparkles className="w-5 h-5" />, steps: inviteFunnel },
-            { title: "Discovery Loop", icon: <Target className="w-5 h-5" />, steps: discoveryFunnel },
-            { title: "Monetization Funnel", icon: <Zap className="w-5 h-5" />, steps: monetizationFunnel },
-          ].map((funnel, fi) => {
+          {([
+            { title: "Referral Loop", icon: <Users className="w-5 h-5" />, steps: referralFunnel, legendId: "referral_funnel" as const },
+            { title: "Invite Loop", icon: <Sparkles className="w-5 h-5" />, steps: inviteFunnel, legendId: "invite_funnel" as const },
+            { title: "Discovery Loop", icon: <Target className="w-5 h-5" />, steps: discoveryFunnel, legendId: "discovery_funnel" as const },
+            { title: "Monetization Funnel", icon: <Zap className="w-5 h-5" />, steps: monetizationFunnel, legendId: "monetization_funnel" as const },
+          ]).map((funnel, fi) => {
             const top = funnel.steps[0]?.count || 0;
             return (
               <motion.div
@@ -1018,6 +1030,7 @@ export default function AdminAnalytics() {
                     <CardTitle className="flex items-center gap-2">
                       {funnel.icon}
                       {funnel.title}
+                      <MetricInfo id={funnel.legendId} />
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -1070,6 +1083,7 @@ export default function AdminAnalytics() {
               <CardTitle className="flex items-center gap-2">
                 <Users className="w-5 h-5" />
                 Signup Attribution
+                <MetricInfo id="signup_attribution" />
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -1121,6 +1135,7 @@ export default function AdminAnalytics() {
               <CardTitle className="flex items-center gap-2">
                 <BarChart3 className="w-5 h-5" />
                 Feature Usage Matrix
+                <MetricInfo id="feature_usage_matrix" />
               </CardTitle>
             </CardHeader>
             <CardContent>
