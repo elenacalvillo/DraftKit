@@ -1,149 +1,104 @@
-## What the merged PR actually changed
+## What you're asking
 
-PR #5 (`agent/...copy-my-draft-without-spending`) is **frontend-only**. No SQL, no edge functions, no schema, no triggers.
+You want every tile, funnel, and chart to **show its formula**, so nobody (you, me, or a future PM) has to guess what a number means. Today the math lives in `AdminAnalytics.tsx` and `Dashboard.tsx` but is invisible to the reader.
 
-- `src/lib/clipboard.ts` (+ tests) — rich clipboard helpers
-- `src/components/subscription/PushToSubstackUpgradeModal.tsx` — Pro gate modal
-- `src/components/requests/SharedWorkspace.tsx` — adds Copy + **Push to Substack** buttons; removes credit-charge on copy
-- `src/hooks/useAnalytics.ts` — adds two new event types: `push_to_substack_success`, `push_to_substack_blocked`
-
-Earlier (already merged) `c0dfebe` is the analytics range picker — also frontend only.
-
-## Will this crash the platform? No, and here's why
-
-I checked every surface that could break:
-
-1. **DB schema** — unchanged. Both new events go to `analytics_events`, which has an `INSERT` RLS that only requires `event_type` length 1–100. `"push_to_substack_success"` (24 chars) and `"push_to_substack_blocked"` (24 chars) pass the check. No migration needed.
-2. **RLS / triggers** — no policies or triggers touch these event names. The `Anyone can log events` policy already permits anonymous and authenticated inserts with the existing constraints.
-3. **Edge functions** — none call these strings; nothing to redeploy.
-4. **Types** — `AnalyticsEventType` union was extended in the same PR, so `trackEvent("push_to_substack_*")` typechecks.
-5. **Credit removal in Copy handler** — the old handler never called any credit RPC; it only `trackEvent`'d. So removing the "credit charge" is a no-op on the backend (no orphaned counter to reconcile, no row to backfill). Safe.
-6. **Clipboard fallback** — `isRichClipboardAvailable()` guards `ClipboardItem`, with a manual-paste modal fallback. SSR/preview won't crash because the calls are inside event handlers.
-7. **Free-tier gate** — `usePro()` is the canonical check (matches existing memory rule); button still renders for free users so the blocked-click signal fires.
-
-**Conclusion:** the merge is safe to ship as-is. No DB work required.
-
-## What's actually missing — the analytics gap you're asking about
-
-The events fire from the UI, but **nothing on `/admin/analytics` surfaces them**. They'll silently land in the Feature Usage Matrix as raw rows and that's it. To "reflect the new feature in metrics" properly, here's the plan.
-
-### Plan
-
-**1. New "Push to Substack" funnel block on AdminAnalytics**
-
-A 4-step funnel (mirrors the existing Monetization funnel styling), driven by the selected range + delta vs prev period:
-
-```text
-Push to Substack
-  Workspace opened  (workspace_opened)
-  Copy clicks       (draft_copied where surface = "workspace_copy")
-  Push success      (push_to_substack_success)   ← Pro
-  Push blocked      (push_to_substack_blocked)   ← free → conversion signal
-```
-
-Plus two derived KPIs:
-
-- **Substack Push Rate** = `push_to_substack_success / (success + blocked)` — adoption among users who tried.
-- **Push→Upgrade Conversion** = signups/upgrades within the selected range whose users previously fired `push_to_substack_blocked`. Computed in-memory from the same `events` array — no extra query.
-
-**2. Wire into existing range/delta machinery**
-
-Both new events get added to:
-
-- `countOf` calls in the range-aware section
-- `countPrev` for delta (`▲ +N% vs prev`)
-- The Feature Usage Matrix already auto-includes any event_type, so it'll show up there for free.
-
-**3. Surface "blocked clicks" on the existing Monetization funnel**
-
-Add a fifth row before "Upgrade prompt shown":
-
-```text
-Pro feature blocked (push_to_substack_blocked)
-```
-
-This makes the page-end conversion moment visible alongside the modal/checkout funnel.
-
-### The "Pop-up Blocker" Trap (Reliability)
-
-When a Pro user clicks "Push to Substack," we call `window.open()`. Browsers often block pop-ups that happen alongside other heavy actions (like clipboard writes).
-
-- **The Prevention:** I will ensure the `window.open` call is the **first** thing triggered by the click event. If the browser blocks it, the "Push" feels broken. I'll add a fallback: if the tab doesn't open, the toast will say: *"Draft copied! [Click here to open Substack] and paste."*
-- CAREFULL HERE: WE DON'T WANT PEOPLE TO LOSE THEIR CONTENT OR ANYTHING IF THEY DECIDE TO PAY AND GO TO A CHECKOUT PAGE. THEIR CONTENT MUST REMAIN SAFE ALWAYS.
-
-**4. Tests**
-
-- Extend `src/lib/__tests__/analytics-range.test.ts`: add a fixture covering the new event types being included in `countOf` / delta. (Range util is unchanged; this is just a smoke test.)
-- New `src/pages/__tests__/admin-analytics.compute.test.ts` (or co-located) that imports a small extracted pure function `computePushFunnel(events, prevEvents)` and asserts:
-  - Empty events → all zeros, NaN-safe
-  - Mixed events → correct success/blocked split
-  - Filters by `request_id` correctly (no double-count)
-  - Free user firing `success` (shouldn't happen) is still counted but flagged in a console warning
-
-To enable that, refactor the funnel computation in `AdminAnalytics.tsx` into `src/lib/analytics-push-funnel.ts` so it's testable without rendering the page.
-
-**5. No-regression checks I'll run after the changes**
-
-- `vitest run` (existing analytics-range + new tests).
-- `rg "trackEvent\(\"push_to_substack" src` to confirm fire sites are exactly the two known ones.
-- A read-only `analytics_events` query for the last 24h to verify the events are actually arriving (`select count(*), event_type from analytics_events where event_type like 'push_to_substack%' group by event_type;`). If the count is zero the gap is in the UI, not the dashboard — useful signal.
-
-### Files touched
-
-- `src/pages/AdminAnalytics.tsx` — add funnel block, extend `countOf`/`countPrev`, add Pro-blocked row to Monetization funnel.
-- New `src/lib/analytics-push-funnel.ts` — pure compute helper.
-- New `src/lib/__tests__/analytics-push-funnel.test.ts` — unit tests.
-
-### Out of scope
-
-- Backfilling historical Push events (none exist yet — the events only started firing after PR #5 merged).
-- Rollup/archival of `analytics_events` — separate follow-up already noted in the previous plan.
-
-## Question before I implement
-
-I want to confirm one thing — should the new funnel be its **own block** at the top of the page (high visibility because it's the new revenue lever), or tucked under the existing Monetization section? My default is **top, own block** because for the next ~2 weeks you'll want it front-and-center while the feature ramps.
-
-**Top, own block.** No question.
-
-This isn't just another feature; this is the **"DraftKit to Substack"** bridge. If this funnel is buried, you won't see the immediate friction points that tell you if people are bouncing because of the Pro paywall or because the "Paste" flow is too clunky.
-
-### Why Top Block is the only choice:
-
-- **The Revenue Lever:** You need to see the "Push Blocked" (Free users) numbers the second you open the page. That is your most direct upgrade signal.
-- **Adoption Pulse:** Since we just removed the credit charge for copying, we need to know if that actually increased the "Intent to Publish" or if people are still just copying manually without the button.
-- **Immediate Calibration:** If the "Push Success" is low but "Copy Clicks" are high, we know the Substack handoff isn't "magical" enough yet. We need that feedback loop front-and-center.
-
-Here's some answers:
-
-### 2. The "Ghost Copy" (Trust)
-
-If a user clicks the button and the clipboard write fails (rare, but happens on some mobile browsers or weird permissions), they will paste *whatever was on their clipboard before* into Substack. Imagine them pasting a private password or a random link into their newsletter.
-
-- **The Prevention:** I’ll ensure the success toast **only** appears after the `navigator.clipboard` promise resolves. If it fails, we show a Red Error toast immediately: *"Clipboard access denied. Please use the manual 'Copy' button."*
-
-### 3. The "Stale Data" (Analytics)
-
-You’re worried about the metrics. If we just "track" the click, we don't know if they actually pasted it.
-
-- **The Prevention:** In the **Success Metrics** logic on the Admin page, I will deduplicate these events by `request_id`. This prevents a single user clicking the button 10 times from artificially inflating your "Push Rate" to 1,000%.
+Below is **exactly how each metric is computed today** (verified from the code), followed by what I'll add to the UI.
 
 ---
 
-## Instructions for Lovable: The "Push to Substack" Analytics Suite
+## How every metric is calculated today
 
-"Implement the Analytics and Admin UI for the 'Push to Substack' feature.
+### Dashboard (`/dashboard`) — your stats row
 
-**1. Primary Metric: The Substack Funnel** Add a high-visibility funnel at the **TOP** of `AdminAnalytics.tsx` (above the general monetization funnel).
+| Tile | Formula | Source |
+|---|---|---|
+| **Ship Rate** | `published requests ÷ eligible requests × 100` (eligible = not pending/declined/expired) | `collab_requests.status` |
+| **Published Collabs** | `count of UNIQUE requester_substack_url` where `status = 'published'` | `collab_requests` |
+| **Time Saved** | `published_count × (8.5 − 1.0) = published × 7.5 hrs` | Two constants in `Dashboard.tsx`: `MANUAL_TAX_HOURS=8.5`, `DRAFTKIT_EFFICIENCY_HOURS=1.0` |
 
-- **Steps**: Workspace Opened → Copy Clicks → Push Success (Pro) → Push Blocked (Free).
-- **Goal**: This is our new 'Revenue Lever.' We need to see how many people are hitting the 'Pro' gate.
+> The "7.5 hrs per published collab" number is currently a **hard-coded baseline**, not a per-user measurement. The legend will say so explicitly so we don't oversell it.
 
-**2. Conversion Signal** In the existing **Monetization Funnel**, add a row for `push_to_substack_blocked`. This tells us exactly how many people are being 'upsold' by this specific feature vs. the general paywall.
+### Admin Analytics (`/admin/analytics`) — every tile and funnel
 
-**3. Safety & Logic**
+All counts are scoped to the **selected range** (URL `?range=`), pulled in 1000-row pages up to 5000 rows from `analytics_events`. Δ comparisons use the prior window of the same length.
 
-- Create `src/lib/analytics-push-funnel.ts` to handle the math.
-- Deduplicate events by `request_id` so we track **intent**, not just repetitive clicks.
-- Use the **Range Picker** logic we built yesterday so I can see 'Push' performance for 'This Week' vs 'Last Week'.
+**KPI tiles**
 
-**4. The 'Copy' Button Logic** Confirm the `SharedWorkspace.tsx` no longer attempts to 'charge' a credit for a standard copy. It should simply `trackEvent('draft_copied')` and execute the `richClipboard` logic."
+- **Draft Acceptance Rate** = `unique request_ids with draft_accepted ÷ count(draft_generated) × 100`. Red ring when <30% and there are drafts.
+- **AI Attachment Rate** = `bookings where event_data.used_ai_suggestion=true ÷ bookings × 100`.
+- **Regeneration Rate** = `draft_regeneration_requested ÷ draft_generated × 100`. Amber ring above 50%.
+- **Guest Conversion** = `user_signup ÷ booking_submitted × 100`. Yellow ring when <5% and ≥10 bookings.
+- **Avg Session Duration** = mean of `event_data.session_duration_ms` on `booking_submitted` events.
+- **Booking Conversion** = `booking_submitted ÷ booking_link_clicked × 100`.
+- **SMART Suggestions Used** = raw count of `ai_match_suggestion_selected`.
+- **User Signups** = raw count of `user_signup` + Δ vs prev window.
+- **Workspace save failures** = raw count of `workspace_save_failed` + top reason from `event_data.reason` + recovered count.
+
+**Push to Substack block** (`src/lib/analytics-push-funnel.ts`)
+
+- All four steps are **deduped by `event_data.request_id`** — 10 clicks on the same draft = 1 intent.
+- **Substack Push Rate** = `success ÷ (success + blocked) × 100`.
+- **Pro pushes** = unique `push_to_substack_success` (with Δ).
+- **Blocked → Upgrade** = `(unique user_ids that fired blocked AND later checkout_completed) ÷ unique blocked users × 100`. Anonymous blocked users don't count.
+- Funnel rows: Workspace opened → Copy clicks (filtered to `surface = workspace_copy`) → Push success → Push blocked.
+
+**Core funnel** (Link clicks → SMART match → Booking → Draft generated → Draft copied)
+
+- Each step % is computed **vs. the first step** (Link Clicks = 100%); the small `(N%)` next to each row is the **step-over-step** conversion. That's two different denominators living next to each other — the legend will make this explicit.
+
+**Monetization funnel**
+
+- Rows: Pro feature blocked (Push) → Upgrade prompt shown → clicked → Checkout started → Checkout completed. Each row's `%` next to the count is vs. the previous row.
+
+**Other funnels** (Referral / Invite / Discovery): same pattern — raw event counts in order, with step-over-step %.
+
+**Signup Attribution** = `count by event_data.source ÷ total signup_attribution × 100`.
+
+**Feature Usage Matrix** = per `event_type`: total count, unique `user_id` count, Δ vs prev window.
+
+---
+
+## What I'll add (UI changes only — no formula changes)
+
+The goal is "every number explains itself, on hover, in one line." Two complementary touches:
+
+1. **One-line legend under each value** (already there for DAR; I'll extend the pattern). Example: under "Substack Push Rate" → *"success ÷ (success + blocked), deduped by request_id."*
+
+2. **Info icon (`<Info className="w-3 h-3" />`) next to every KPI title and funnel header**, opening a Radix tooltip with:
+   - The plain-English definition
+   - The exact formula
+   - The data source (event types / table)
+   - For Time Saved: the constants `8.5 − 1.0 = 7.5 hrs` and a note that it's a baseline, not measured per-user
+
+3. **A `MetricLegend` component** so the copy lives in one place (`src/lib/metric-legends.ts`) — easy to edit, easy to test, no drift between tile and tooltip.
+
+```text
+┌─ Card ─────────────────────────────────┐
+│ Draft Acceptance Rate    [ⓘ tooltip]   │
+│ 42.0%                                  │
+│ 21 of 50 drafts accepted               │
+│ unique drafts copied/downloaded ÷      │
+│   drafts generated                     │
+└────────────────────────────────────────┘
+```
+
+### Files I'll touch
+
+- **New** `src/lib/metric-legends.ts` — one source of truth: `{ id, title, definition, formula, source }` for every metric on both pages.
+- **New** `src/components/admin/MetricInfo.tsx` — tiny tooltip-wrapped `Info` icon.
+- **Edit** `src/pages/AdminAnalytics.tsx` — drop `<MetricInfo id="dar" />` next to each title; add a one-liner legend under each value where missing (AI Attachment, Regeneration, Guest, Avg Session, Booking Conversion, Workspace failures, all funnel headers).
+- **Edit** `src/pages/Dashboard.tsx` — same treatment for Ship Rate / Published Collabs / Time Saved. Time Saved tooltip explicitly says: *"Baseline estimate: 8.5h of manual coordination per collab − 1.0h with DraftKit = 7.5h saved per published collab. Not measured per-user."*
+- **New** `src/lib/__tests__/metric-legends.test.ts` — snapshot test so every metric `id` referenced from the pages exists in the legend map (prevents silent breakage if I rename one).
+
+### Out of scope (will not touch)
+
+- Any **formula change** — including the 8.5/1.0 Time Saved constants. If you want those tweaked, that's a separate, opinionated decision (I'd want your input on the manual baseline).
+- New events or DB work.
+- Changing how the core funnel mixes "% vs first step" with step-over-step — I'll just *explain* both in tooltips. Happy to unify if you say so.
+
+---
+
+## Two questions before I build
+
+1. **Time Saved baseline** — keep `8.5 − 1.0 = 7.5h` as-is and just disclose it, or do you want to revisit the numbers? (My vote: disclose now, revisit when we have real data from `collab_metrics`.)
+2. **Tooltip vs. always-visible legend** — info icon with hover tooltip (clean, dense) or always-visible one-liner under every tile (more obvious, slightly busier)? Default plan does **both**: legend under the value + tooltip with the full formula. Say the word if you want only one.
