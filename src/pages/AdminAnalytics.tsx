@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { AnalyticsRangePicker } from "@/components/admin/AnalyticsRangePicker";
 import { resolveRange, bucketLabel, type RangeKey } from "@/lib/analytics-range";
 import { computePushFunnel, pushFunnelSteps } from "@/lib/analytics-push-funnel";
+import { MetricInfo } from "@/components/admin/MetricInfo";
 import {
   BarChart3,
   Users,
