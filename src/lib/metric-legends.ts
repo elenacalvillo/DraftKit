@@ -155,6 +155,6 @@ export const METRIC_LEGENDS = {
     formula: "Approved / Declined raw counts. Approval Rate = approved ÷ (approved + declined) × 100. Pending = bookings − approved − declined.",
     source: "analytics_events: collab_approved, collab_declined, booking_submitted",
   },
-} as const satisfies Record<string, MetricLegend>;
+} satisfies Record<string, MetricLegend>;
 
 export type MetricLegendId = keyof typeof METRIC_LEGENDS;
