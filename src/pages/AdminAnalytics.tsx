@@ -524,6 +524,7 @@ export default function AdminAnalytics() {
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <Copy className="w-4 h-4" />
                   Draft Acceptance Rate
+                  <MetricInfo id="draft_acceptance_rate" />
                   {darNeedsAction && (
                     <Badge variant="destructive" className="ml-auto text-xs">
                       Action Needed
@@ -561,12 +562,16 @@ export default function AdminAnalytics() {
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <Sparkles className="w-4 h-4" />
                   AI Attachment Rate
+                  <MetricInfo id="ai_attachment_rate" />
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold text-accent">{aiAttachmentRate.toFixed(1)}%</div>
                 <p className="text-xs text-muted-foreground mt-1">
                   {bookingsWithAiSuggestion} of {bookingSubmits} bookings used AI ideas
+                </p>
+                <p className="text-[11px] text-muted-foreground/70 mt-0.5">
+                  bookings using AI suggestions ÷ all bookings
                 </p>
               </CardContent>
             </Card>
@@ -583,6 +588,7 @@ export default function AdminAnalytics() {
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <RefreshCw className="w-4 h-4" />
                   Regeneration Rate
+                  <MetricInfo id="regeneration_rate" />
                   {regenNeedsAction && (
                     <Badge className="ml-auto text-xs bg-accent/20 text-accent border-accent/30">
                       High
@@ -596,6 +602,9 @@ export default function AdminAnalytics() {
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   {draftRegenRequested} regenerations of {draftGenerated} drafts
+                </p>
+                <p className="text-[11px] text-muted-foreground/70 mt-0.5">
+                  draft_regeneration_requested ÷ draft_generated
                 </p>
                 {regenNeedsAction && (
                   <p className="text-xs text-accent mt-2">
@@ -617,6 +626,7 @@ export default function AdminAnalytics() {
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <Users className="w-4 h-4" />
                   Guest Conversion
+                  <MetricInfo id="guest_conversion" />
                   {guestConversionNeedsAction && (
                     <Badge className="ml-auto text-xs bg-yellow-500/20 text-yellow-600 border-yellow-500/30">
                       Low
@@ -628,6 +638,9 @@ export default function AdminAnalytics() {
                 <div className="text-3xl font-bold text-success">{guestConversionRate.toFixed(1)}%</div>
                 <p className="text-xs text-muted-foreground mt-1">
                   {userSignups} signups from {bookingSubmits} guests
+                </p>
+                <p className="text-[11px] text-muted-foreground/70 mt-0.5">
+                  user_signup ÷ booking_submitted (selected range)
                 </p>
               </CardContent>
             </Card>
@@ -646,12 +659,16 @@ export default function AdminAnalytics() {
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <Clock className="w-4 h-4" />
                   Avg Session Duration
+                  <MetricInfo id="avg_session_duration" />
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold">{formatDuration(avgSessionDurationMs)}</div>
                 <p className="text-xs text-muted-foreground mt-1">
                   From link click to booking
+                </p>
+                <p className="text-[11px] text-muted-foreground/70 mt-0.5">
+                  mean of session_duration_ms on booking_submitted
                 </p>
               </CardContent>
             </Card>
@@ -667,6 +684,7 @@ export default function AdminAnalytics() {
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <TrendingUp className="w-4 h-4" />
                   Booking Conversion
+                  <MetricInfo id="booking_conversion" />
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -675,6 +693,9 @@ export default function AdminAnalytics() {
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   {bookingSubmits} of {bookingClicks} link clicks converted
+                </p>
+                <p className="text-[11px] text-muted-foreground/70 mt-0.5">
+                  booking_submitted ÷ booking_link_clicked
                 </p>
               </CardContent>
             </Card>
@@ -690,12 +711,16 @@ export default function AdminAnalytics() {
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <Target className="w-4 h-4" />
                   SMART Suggestions Used
+                  <MetricInfo id="smart_suggestions_used" />
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold text-primary">{aiSuggestionSelected}</div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Topics selected from SMART matches
+                </p>
+                <p className="text-[11px] text-muted-foreground/70 mt-0.5">
+                  raw count of ai_match_suggestion_selected
                 </p>
               </CardContent>
             </Card>
@@ -711,6 +736,7 @@ export default function AdminAnalytics() {
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <Users className="w-4 h-4" />
                   User Signups
+                  <MetricInfo id="user_signups" />
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -733,6 +759,7 @@ export default function AdminAnalytics() {
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4" />
                   Workspace save failures
+                  <MetricInfo id="workspace_save_failures" />
                 </CardTitle>
               </CardHeader>
               <CardContent>
