@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { AnalyticsRangePicker } from "@/components/admin/AnalyticsRangePicker";
 import { resolveRange, bucketLabel, type RangeKey } from "@/lib/analytics-range";
 import { computePushFunnel, pushFunnelSteps } from "@/lib/analytics-push-funnel";
+import { MetricInfo } from "@/components/admin/MetricInfo";
 import {
   BarChart3,
   Users,
@@ -523,6 +524,7 @@ export default function AdminAnalytics() {
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <Copy className="w-4 h-4" />
                   Draft Acceptance Rate
+                  <MetricInfo id="draft_acceptance_rate" />
                   {darNeedsAction && (
                     <Badge variant="destructive" className="ml-auto text-xs">
                       Action Needed
@@ -560,12 +562,16 @@ export default function AdminAnalytics() {
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <Sparkles className="w-4 h-4" />
                   AI Attachment Rate
+                  <MetricInfo id="ai_attachment_rate" />
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold text-accent">{aiAttachmentRate.toFixed(1)}%</div>
                 <p className="text-xs text-muted-foreground mt-1">
                   {bookingsWithAiSuggestion} of {bookingSubmits} bookings used AI ideas
+                </p>
+                <p className="text-[11px] text-muted-foreground/70 mt-0.5">
+                  bookings using AI suggestions ÷ all bookings
                 </p>
               </CardContent>
             </Card>
@@ -582,6 +588,7 @@ export default function AdminAnalytics() {
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <RefreshCw className="w-4 h-4" />
                   Regeneration Rate
+                  <MetricInfo id="regeneration_rate" />
                   {regenNeedsAction && (
                     <Badge className="ml-auto text-xs bg-accent/20 text-accent border-accent/30">
                       High
@@ -595,6 +602,9 @@ export default function AdminAnalytics() {
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   {draftRegenRequested} regenerations of {draftGenerated} drafts
+                </p>
+                <p className="text-[11px] text-muted-foreground/70 mt-0.5">
+                  draft_regeneration_requested ÷ draft_generated
                 </p>
                 {regenNeedsAction && (
                   <p className="text-xs text-accent mt-2">
@@ -616,6 +626,7 @@ export default function AdminAnalytics() {
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <Users className="w-4 h-4" />
                   Guest Conversion
+                  <MetricInfo id="guest_conversion" />
                   {guestConversionNeedsAction && (
                     <Badge className="ml-auto text-xs bg-yellow-500/20 text-yellow-600 border-yellow-500/30">
                       Low
@@ -627,6 +638,9 @@ export default function AdminAnalytics() {
                 <div className="text-3xl font-bold text-success">{guestConversionRate.toFixed(1)}%</div>
                 <p className="text-xs text-muted-foreground mt-1">
                   {userSignups} signups from {bookingSubmits} guests
+                </p>
+                <p className="text-[11px] text-muted-foreground/70 mt-0.5">
+                  user_signup ÷ booking_submitted (selected range)
                 </p>
               </CardContent>
             </Card>
@@ -645,12 +659,16 @@ export default function AdminAnalytics() {
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <Clock className="w-4 h-4" />
                   Avg Session Duration
+                  <MetricInfo id="avg_session_duration" />
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold">{formatDuration(avgSessionDurationMs)}</div>
                 <p className="text-xs text-muted-foreground mt-1">
                   From link click to booking
+                </p>
+                <p className="text-[11px] text-muted-foreground/70 mt-0.5">
+                  mean of session_duration_ms on booking_submitted
                 </p>
               </CardContent>
             </Card>
@@ -666,6 +684,7 @@ export default function AdminAnalytics() {
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <TrendingUp className="w-4 h-4" />
                   Booking Conversion
+                  <MetricInfo id="booking_conversion" />
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -674,6 +693,9 @@ export default function AdminAnalytics() {
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   {bookingSubmits} of {bookingClicks} link clicks converted
+                </p>
+                <p className="text-[11px] text-muted-foreground/70 mt-0.5">
+                  booking_submitted ÷ booking_link_clicked
                 </p>
               </CardContent>
             </Card>
@@ -689,12 +711,16 @@ export default function AdminAnalytics() {
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <Target className="w-4 h-4" />
                   SMART Suggestions Used
+                  <MetricInfo id="smart_suggestions_used" />
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold text-primary">{aiSuggestionSelected}</div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Topics selected from SMART matches
+                </p>
+                <p className="text-[11px] text-muted-foreground/70 mt-0.5">
+                  raw count of ai_match_suggestion_selected
                 </p>
               </CardContent>
             </Card>
@@ -710,6 +736,7 @@ export default function AdminAnalytics() {
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <Users className="w-4 h-4" />
                   User Signups
+                  <MetricInfo id="user_signups" />
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -732,6 +759,7 @@ export default function AdminAnalytics() {
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4" />
                   Workspace save failures
+                  <MetricInfo id="workspace_save_failures" />
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -763,6 +791,7 @@ export default function AdminAnalytics() {
                 <Send className="w-5 h-5 text-primary" />
                 Push to Substack
                 <Badge variant="secondary" className="ml-2 text-[10px]">New</Badge>
+                <MetricInfo id="push_funnel" />
               </CardTitle>
               <p className="text-xs text-muted-foreground mt-1">
                 {range.label} · deduped by request_id (intent, not raw clicks)
@@ -771,19 +800,28 @@ export default function AdminAnalytics() {
             <CardContent>
               <div className="grid md:grid-cols-3 gap-4 mb-6">
                 <div className="rounded-lg border border-border/50 p-4">
-                  <div className="text-xs text-muted-foreground mb-1">Substack Push Rate</div>
+                  <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5">
+                    Substack Push Rate
+                    <MetricInfo id="push_rate" />
+                  </div>
                   <div className="text-2xl font-bold">{pushFunnel.pushRate.toFixed(1)}%</div>
                   <div className="text-xs text-muted-foreground mt-1">
                     success / (success + blocked)
                   </div>
                 </div>
                 <div className="rounded-lg border border-border/50 p-4">
-                  <div className="text-xs text-muted-foreground mb-1">Pro pushes</div>
+                  <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5">
+                    Pro pushes
+                    <MetricInfo id="pro_pushes" />
+                  </div>
                   <div className="text-2xl font-bold">{pushFunnel.pushSuccess}</div>
                   <DeltaText current={pushFunnel.pushSuccess} previous={prevPushFunnel.pushSuccess} prevLabel={range.prevLabel} />
                 </div>
                 <div className="rounded-lg border border-border/50 p-4">
-                  <div className="text-xs text-muted-foreground mb-1">Blocked → Upgrade</div>
+                  <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5">
+                    Blocked → Upgrade
+                    <MetricInfo id="blocked_to_upgrade" />
+                  </div>
                   <div className="text-2xl font-bold">{pushFunnel.blockedToUpgradeConversion.toFixed(1)}%</div>
                   <div className="text-xs text-muted-foreground mt-1">
                     of blocked users who later checked out
@@ -881,6 +919,7 @@ export default function AdminAnalytics() {
                 <CardTitle className="flex items-center gap-2">
                   <Sparkles className="w-5 h-5" />
                   Collaboration Funnel (5-Step)
+                  <MetricInfo id="core_funnel" />
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -934,6 +973,7 @@ export default function AdminAnalytics() {
               <CardTitle className="flex items-center gap-2">
                 <CheckCircle className="w-5 h-5" />
                 Collaboration Outcomes
+                <MetricInfo id="collab_outcomes" />
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -971,12 +1011,12 @@ export default function AdminAnalytics() {
 
         {/* Growth Loop Funnels */}
         <div className="grid lg:grid-cols-2 gap-6 mb-8">
-          {[
-            { title: "Referral Loop", icon: <Users className="w-5 h-5" />, steps: referralFunnel },
-            { title: "Invite Loop", icon: <Sparkles className="w-5 h-5" />, steps: inviteFunnel },
-            { title: "Discovery Loop", icon: <Target className="w-5 h-5" />, steps: discoveryFunnel },
-            { title: "Monetization Funnel", icon: <Zap className="w-5 h-5" />, steps: monetizationFunnel },
-          ].map((funnel, fi) => {
+          {([
+            { title: "Referral Loop", icon: <Users className="w-5 h-5" />, steps: referralFunnel, legendId: "referral_funnel" as const },
+            { title: "Invite Loop", icon: <Sparkles className="w-5 h-5" />, steps: inviteFunnel, legendId: "invite_funnel" as const },
+            { title: "Discovery Loop", icon: <Target className="w-5 h-5" />, steps: discoveryFunnel, legendId: "discovery_funnel" as const },
+            { title: "Monetization Funnel", icon: <Zap className="w-5 h-5" />, steps: monetizationFunnel, legendId: "monetization_funnel" as const },
+          ]).map((funnel, fi) => {
             const top = funnel.steps[0]?.count || 0;
             return (
               <motion.div
@@ -990,6 +1030,7 @@ export default function AdminAnalytics() {
                     <CardTitle className="flex items-center gap-2">
                       {funnel.icon}
                       {funnel.title}
+                      <MetricInfo id={funnel.legendId} />
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -1042,6 +1083,7 @@ export default function AdminAnalytics() {
               <CardTitle className="flex items-center gap-2">
                 <Users className="w-5 h-5" />
                 Signup Attribution
+                <MetricInfo id="signup_attribution" />
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -1093,6 +1135,7 @@ export default function AdminAnalytics() {
               <CardTitle className="flex items-center gap-2">
                 <BarChart3 className="w-5 h-5" />
                 Feature Usage Matrix
+                <MetricInfo id="feature_usage_matrix" />
               </CardTitle>
             </CardHeader>
             <CardContent>

@@ -22,6 +22,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import type { Json } from "@/integrations/supabase/types";
 import { useAnalytics } from "@/hooks/useAnalytics";
+import { MetricInfo } from "@/components/admin/MetricInfo";
 
 interface CollabRequest {
   id: string;
@@ -192,6 +193,7 @@ export default function Dashboard() {
     {
       icon: TrendingUp,
       label: "Ship Rate",
+      legendId: "ship_rate" as const,
       subLabel: "Requests turned into published work",
       value: shipRateDisplay,
       isEmpty: shipRate === null || shipRate === 0,
@@ -204,6 +206,7 @@ export default function Dashboard() {
     {
       icon: Globe,
       label: "Published Collabs",
+      legendId: "published_collabs" as const,
       subLabel: "Unique audiences you've shipped with",
       value: reachDisplay,
       isEmpty: publishedReach === 0,
@@ -216,6 +219,7 @@ export default function Dashboard() {
     {
       icon: Zap,
       label: "Time Saved",
+      legendId: "time_saved" as const,
       subLabel: "vs. manual coordination baseline",
       value: timeSavedDisplay,
       isEmpty: publishedCount === 0,
@@ -446,7 +450,10 @@ export default function Dashboard() {
                 </div>
                 <div className="flex-1">
                   <p className="text-3xl font-bold">{stat.value}</p>
-                  <p className="text-sm font-medium text-foreground">{stat.label}</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-sm font-medium text-foreground">{stat.label}</p>
+                    <MetricInfo id={stat.legendId} />
+                  </div>
                   <p className="text-xs text-muted-foreground">{stat.subLabel}</p>
                 </div>
               </div>
