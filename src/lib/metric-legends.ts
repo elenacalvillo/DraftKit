@@ -18,7 +18,7 @@ export interface MetricLegend {
   note?: string;
 }
 
-export const METRIC_LEGENDS = {
+const LEGENDS = {
   // ---------- Dashboard (per-user) ----------
   ship_rate: {
     definition: "Share of your collab requests that turned into published work.",
@@ -157,4 +157,5 @@ export const METRIC_LEGENDS = {
   },
 } satisfies Record<string, MetricLegend>;
 
-export type MetricLegendId = keyof typeof METRIC_LEGENDS;
+export type MetricLegendId = keyof typeof LEGENDS;
+export const METRIC_LEGENDS: Record<MetricLegendId, MetricLegend> = LEGENDS;
