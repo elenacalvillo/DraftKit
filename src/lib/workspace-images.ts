@@ -170,13 +170,15 @@ export async function compressWorkspaceImage(
       initialQuality: 0.85,
     });
 
-    // browser-image-compression returns a Blob in some paths; coerce
-    // back to a File so storage.upload() infers the filename + type
-    // identically to the user-provided File.
-    if (compressed instanceof File) return compressed;
+    // Always re-wrap into a fresh File. Even when the library returns
+    // a File, production builds have surfaced uploads with malformed
+    // payloads (Supabase responds 400 Bad Request) when the original
+    // object is forwarded as-is. Constructing a new File with an
+    // explicit name + mime + lastModified guarantees storage.upload()
+    // sees a clean, fully-typed payload identical across browsers.
     return new File([compressed], file.name, {
-      type: file.type,
-      lastModified: file.lastModified,
+      type: file.type || compressed.type || "application/octet-stream",
+      lastModified: Date.now(),
     });
   } catch (err) {
     throw new WorkspaceImageError(
