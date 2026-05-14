@@ -582,8 +582,8 @@ export default function ProjectDetail() {
               {pendingRevert ? (
                 <>
                   You're about to move this chapter from{" "}
-                  <strong>{pendingRevert.from}</strong> back to{" "}
-                  <strong>{pendingRevert.to}</strong>. Reviewers and writers will
+                  <strong>{CHAPTER_STAGE_LABEL[pendingRevert.from]}</strong> back to{" "}
+                  <strong>{CHAPTER_STAGE_LABEL[pendingRevert.to]}</strong>. Reviewers and writers will
                   be notified of the change.
                 </>
               ) : null}
