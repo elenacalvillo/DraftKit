@@ -185,6 +185,19 @@ describe("compressWorkspaceImage", () => {
     expect(result.type).toBe("image/jpeg");
   });
 
+  it("re-wraps even a File result into a fresh File (defensive against malformed payloads)", async () => {
+    const original = makeFile("photo.jpg", "image/jpeg");
+    const compressorFile = makeFile("photo.jpg", "image/jpeg", 128);
+    vi.mocked(imageCompression).mockResolvedValueOnce(compressorFile);
+
+    const result = await compressWorkspaceImage(original);
+    expect(result).toBeInstanceOf(File);
+    // A new File instance — not the exact object the compressor returned.
+    expect(result).not.toBe(compressorFile);
+    expect(result.name).toBe("photo.jpg");
+    expect(result.type).toBe("image/jpeg");
+  });
+
   it("wraps compression failures in WorkspaceImageError", async () => {
     vi.mocked(imageCompression).mockRejectedValueOnce(new Error("worker died"));
     await expect(
