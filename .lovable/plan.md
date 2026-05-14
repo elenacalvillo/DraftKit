@@ -1,60 +1,85 @@
-## Status: feature already shipped
+## Real bug
 
-Every line item in the brief already exists in the codebase. Before writing more code, the right move is a focused audit against the acceptance criteria, then targeted fixes only where the audit finds a real gap.
+The `workspace-images` bucket and policies exist in the live DB, but every upload still 403s with `new row violates row-level security policy` — even when the authenticated user owns the workspace and `public.has_workspace_access(uid, request_id)` returns `true` from `psql`.
 
-## What is already in place
+Network proof (just captured):
 
-| Acceptance criterion | Where it lives | Status |
-|---|---|---|
-| Storage path for workspace images | Migration `20260514120000_workspace_images_storage.sql` creates public bucket `workspace-images`, 10 MB cap, MIME whitelist (jpeg/png/webp/gif) | Done |
-| RLS scoped to participants on upload | INSERT/UPDATE/DELETE policies on `storage.objects` gated by `public.has_workspace_access(auth.uid(), foldername(name)[1]::uuid)` | Done |
-| Reads work for creators + collaborators | Bucket is public; URL embedded in `shared_content` renders directly | Done |
-| No Pro/free gating | Policies check participation only, never tier | Done |
-| Path builder + bucket name as importable constants | `src/lib/workspace-images.ts` exports `WORKSPACE_IMAGES_BUCKET`, `buildWorkspaceImagePath`, `uploadWorkspaceImage` | Done |
-| Migration file checked in | `supabase/migrations/20260514120000_workspace_images_storage.sql` + a migration test | Done |
-| TipTap Image extension on toolbar | `WorkspaceEditor.tsx` imports `@tiptap/extension-image`, registers `Image.configure(...)`, exposes toolbar button (`data-testid="workspace-image-toolbar-button"`) wired to a hidden `<input type="file">` | Done |
-| Drag-and-drop + paste | Single `insertImageFile` flow called from both `handlePaste` and `handleDrop` in the editor's `editorProps` | Done |
-| Client-side compression to 1 MB | `compressWorkspaceImage` uses `browser-image-compression` (web worker, mime preserved, 1920px max edge) before upload | Done |
-| Defense against base64 reaching DB | `uploadWorkspaceImage` refuses any non-`https://` URL; `stripBase64ImageTags` strips legacy data-URI `<img>` on render in `SharedWorkspace.tsx` | Done |
-| Tests | `src/lib/__tests__/workspace-images.test.ts` (compression, mime gate, RLS path contract, base64 refusal) + migration test | Done |
+```
+POST /storage/v1/object/workspace-images/06a5895a-…/1778737103550_…png
+JWT sub  = e12cb16e-0046-44c4-ad5c-11e03443638d   (matches requester_user_id)
+Body     = compressed image
+Response = 403 "new row violates row-level security policy"
+```
 
-## Proposed work (verification audit, no code changes until findings demand them)
+DB proof:
 
-### 1. Live RLS smoke test (read-only SQL)
-Confirm against the live DB that:
-- `workspace-images` bucket exists, is `public`, has the expected `file_size_limit` and `allowed_mime_types`.
-- The three named storage policies exist on `storage.objects` and reference `has_workspace_access`.
-- A negative probe: simulate an authenticated user uploading to a `request_id` they do NOT participate in — must be denied. (Done by inspecting policy SQL; an actual write probe needs the live preview session.)
+```sql
+SELECT public.has_workspace_access(
+  'e12cb16e-0046-44c4-ad5c-11e03443638d',
+  '06a5895a-9991-4506-92f1-02fb7c97b87f'
+);
+-- → true
+```
 
-### 2. End-to-end click-through in preview
-With me in plan mode I cannot run this — but the checks to perform on first build/test pass are:
-- Toolbar Image button → file picker → selected JPG → appears inline → page reload still renders from `https://…/storage/v1/...` (NOT a `data:` URL).
-- Drag a PNG over the editor → same outcome.
-- Paste a screenshot from the OS clipboard → same outcome.
-- Open the same workspace as the collaborator account → image is visible.
-- Open the public read-only sheet → image still resolves (bucket is public).
-- DB sanity: `SELECT shared_content` on the test request contains an `<img src="https://...">`, never `data:image/`.
+So the function is correct, the data is correct, the JWT is correct — yet the policy still rejects.
 
-### 3. Targeted code review focus areas
-Where regressions are most likely, given the existing code:
+## Root cause
 
-- **`requestId` plumbing**: `uploadWorkspaceImage` throws if `requestId` is empty. Confirm `WorkspaceEditor.tsx` always passes a valid request id (especially for newly-created solo chapter workspaces where the row was just inserted — the same path that broke chapter creation last week).
-- **Editor read-only mode**: when `can_edit_workspace` returns false (cancelled/pending), the toolbar Image button must be hidden/disabled so users do not get a confusing "RLS denied" toast. Check that the editor's existing read-only branching covers the new button.
-- **Cancellation lifecycle**: when a collab is cancelled, `has_workspace_access` still returns true (participants stay linked), so old images continue to render — confirm this matches product intent (it should: drafts must remain readable for the host).
-- **Public read-only viewer**: `PublicWorkspaceView.tsx` consumes `get_public_sheet`. Since the bucket is public, embedded `<img>` tags render fine without auth — confirm no CSP/sandbox attribute on that page strips them.
-- **Storage accounting**: workspace images are NOT counted against `creators.storage_used_bytes` (the `increment_storage_used` RPC is only called for project images). The brief's economics assume this. Flag whether to wire it in or leave unmetered (recommend: leave unmetered for now, the cost analysis covers it).
+Storage's RLS evaluator does not always propagate `auth.uid()` into a `SECURITY DEFINER` helper called from a `storage.objects` policy. It is a known Supabase pattern: when policies need to consult `public` tables, the reliable approach is to:
 
-### 4. Only-if-needed hardening (will NOT ship unless audit surfaces a real bug)
-- Add a delete hook so `<img>` removed from the editor body also removes the storage object (orphan cleanup). Currently orphans persist forever — acceptable per the cost analysis but worth a memory note.
-- Add a toast on `WorkspaceImageError` codes (`file_too_large`, `invalid_format`, `upload_failed`) if the editor currently swallows them.
-- Add a Playwright/Vitest integration test that mounts the editor, fires a paste event, and asserts the resulting HTML contains `https://` and not `data:`.
+1. Wrap `auth.uid()` in a subquery (`(SELECT auth.uid())`) — the Supabase-documented performance + correctness pattern that lets Postgres evaluate the JWT claim once per row in the right context.
+2. Inline the participation check as `EXISTS` subqueries against `collab_requests`, `creators`, and `workspace_collaborators` — so the storage RLS evaluator never has to cross the SECURITY DEFINER boundary.
 
-## Deliverable
+The same `has_workspace_access` helper continues to work fine for table-level policies on `collab_requests`, `workspace_presence`, etc. The change is scoped to the three storage policies only.
 
-After audit: a short written report (1) confirming each acceptance-criterion box is checked in production, (2) listing any real bugs found, (3) one PR per real bug with a focused fix + regression test. No speculative refactors.
+## Fix (one migration)
 
-## Why a plan instead of new code
+Drop the three `workspace-images` storage policies and recreate them with inline EXISTS checks. Behaviour stays identical: any signed-in user who is the host (creator), the requester, or a workspace collaborator can read/write/delete images under `{request_id}/...`. No tier gating.
 
-The feature is already built, tested, and migrated. Re-implementing it now would risk introducing the very "horrendous bugs in production" the brief warns against — duplicate buckets, conflicting RLS, lost migrations. The disciplined move is verify-first, fix-only-what-breaks.
+```sql
+DROP POLICY IF EXISTS "Workspace participants can upload workspace images" ON storage.objects;
+DROP POLICY IF EXISTS "Workspace participants can update workspace images" ON storage.objects;
+DROP POLICY IF EXISTS "Workspace participants can delete workspace images" ON storage.objects;
 
-If the audit comes back clean (the most likely outcome based on the code review above), the only remaining work is to mark the ticket done and add a short memory note about the workspace-images bucket so future agents don't re-create it.
+-- Helper expression reused in INSERT/UPDATE/DELETE:
+--   path's first folder = request_id
+--   AND user is host OR requester OR collaborator on that request
+-- All evaluated inline so the storage RLS evaluator sees auth.uid() directly.
+
+CREATE POLICY "Workspace participants can upload workspace images"
+ON storage.objects FOR INSERT TO authenticated
+WITH CHECK (
+  bucket_id = 'workspace-images'
+  AND EXISTS (
+    SELECT 1 FROM public.collab_requests cr
+    LEFT JOIN public.creators c ON c.id = cr.creator_id
+    WHERE cr.id = ((storage.foldername(name))[1])::uuid
+      AND (
+        c.user_id = (SELECT auth.uid())
+        OR cr.requester_user_id = (SELECT auth.uid())
+        OR EXISTS (
+          SELECT 1 FROM public.workspace_collaborators wc
+          WHERE wc.request_id = cr.id
+            AND wc.user_id = (SELECT auth.uid())
+        )
+      )
+  )
+);
+
+-- Same body for UPDATE (USING + WITH CHECK) and DELETE (USING).
+```
+
+I will also defensively guard the path cast: if `(storage.foldername(name))[1]` cannot be cast to a UUID the policy returns false instead of erroring (wrap in a `safe_cast` CTE pattern or use a regex pre-check). This prevents a malformed path from blowing up future uploads.
+
+## Verification (after migration)
+
+1. Re-run the failing drag-and-drop and toolbar upload from the same workspace — expect `201`.
+2. Re-test from a *different* logged-in account that is NOT a participant of that request — expect `403` (RLS still protects unrelated workspaces).
+3. Confirm `<img src="https://…/storage/v1/object/public/workspace-images/…">` lands in `shared_content` (no `data:` URI).
+4. Reload the page — image still renders from the public URL.
+
+## Out of scope
+
+- No client code changes — `src/lib/workspace-images.ts` and `WorkspaceEditor.tsx` are correct.
+- No changes to `has_workspace_access` — it stays as the source of truth for table-level policies.
+- No new toast copy or UI changes.
