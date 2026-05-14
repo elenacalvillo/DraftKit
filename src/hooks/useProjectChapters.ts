@@ -161,7 +161,7 @@ export function useProjectChapters(projectId: string | undefined) {
     isLoading: chaptersQuery.isLoading,
     error: chaptersQuery.error,
     createChapter,
-    updateChapterStatus,
+    updateChapterStage,
     reorderChapters,
     assignWriter,
   };
