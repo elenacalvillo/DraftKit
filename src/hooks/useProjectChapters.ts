@@ -1,18 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables, TablesInsert } from "@/integrations/supabase/types";
-import { CHAPTER_STATUSES, type ChapterStatus } from "@/lib/access";
+import { CHAPTER_STAGES, type ChapterStage } from "@/lib/access";
 import { useAuth } from "./useAuth";
 
 export type Chapter = Tables<"collab_requests">;
 
-/** Type-narrow a collab_requests row's status to ChapterStatus when it
- *  is a project workspace. */
-export function asChapterStatus(value: string | null | undefined): ChapterStatus {
-  if (CHAPTER_STATUSES.includes(value as ChapterStatus)) {
-    return value as ChapterStatus;
+/** Type-narrow a collab_requests row's chapter_stage to ChapterStage. */
+export function asChapterStage(value: string | null | undefined): ChapterStage {
+  if (value && (CHAPTER_STAGES as readonly string[]).includes(value)) {
+    return value as ChapterStage;
   }
-  return "Draft";
+  return "draft";
 }
 
 export function useProjectChapters(projectId: string | undefined) {
