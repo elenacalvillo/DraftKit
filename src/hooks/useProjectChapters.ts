@@ -1,18 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables, TablesInsert } from "@/integrations/supabase/types";
-import { CHAPTER_STATUSES, type ChapterStatus } from "@/lib/access";
+import { CHAPTER_STAGES, type ChapterStage } from "@/lib/access";
 import { useAuth } from "./useAuth";
 
 export type Chapter = Tables<"collab_requests">;
 
-/** Type-narrow a collab_requests row's status to ChapterStatus when it
- *  is a project workspace. */
-export function asChapterStatus(value: string | null | undefined): ChapterStatus {
-  if (CHAPTER_STATUSES.includes(value as ChapterStatus)) {
-    return value as ChapterStatus;
+/** Type-narrow a collab_requests row's chapter_stage to ChapterStage. */
+export function asChapterStage(value: string | null | undefined): ChapterStage {
+  if (value && (CHAPTER_STAGES as readonly string[]).includes(value)) {
+    return value as ChapterStage;
   }
-  return "Draft";
+  return "draft";
 }
 
 export function useProjectChapters(projectId: string | undefined) {
@@ -58,9 +57,14 @@ export function useProjectChapters(projectId: string | undefined) {
         chapter_order: next,
         is_solo: true,
         message: trimmed,
+        requester_user_id: user.id,
         requester_email: user.email,
         requester_name: creator.name ?? user.email,
-        status: "Draft",
+        // Reuse the collaboration "approved" lifecycle so existing
+        // workspace access + edit policies apply unchanged. The book
+        // workflow stage lives in chapter_stage.
+        status: "approved",
+        chapter_stage: "draft",
       };
       const { data, error } = await supabase
         .from("collab_requests")
@@ -68,9 +72,6 @@ export function useProjectChapters(projectId: string | undefined) {
         .select("*")
         .single();
       if (error) {
-        // Surface a friendly message when RLS blocks the insert (Postgres 42501).
-        // The raw PostgREST error ("No API key found in request" / generic 401)
-        // is misleading and previously hid the real "Add chapter" failure.
         console.error("[useProjectChapters] createChapter failed", error);
         if ((error as { code?: string }).code === "42501") {
           throw new Error(
@@ -86,17 +87,17 @@ export function useProjectChapters(projectId: string | undefined) {
     },
   });
 
-  const updateChapterStatus = useMutation({
+  const updateChapterStage = useMutation({
     mutationFn: async ({
       chapterId,
-      status,
+      stage,
     }: {
       chapterId: string;
-      status: ChapterStatus;
+      stage: ChapterStage;
     }) => {
       const { data, error } = await supabase
         .from("collab_requests")
-        .update({ status })
+        .update({ chapter_stage: stage })
         .eq("id", chapterId)
         .select("*")
         .single();
@@ -160,7 +161,7 @@ export function useProjectChapters(projectId: string | undefined) {
     isLoading: chaptersQuery.isLoading,
     error: chaptersQuery.error,
     createChapter,
-    updateChapterStatus,
+    updateChapterStage,
     reorderChapters,
     assignWriter,
   };

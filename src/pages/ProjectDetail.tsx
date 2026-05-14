@@ -44,20 +44,21 @@ import { useProjectMembers } from "@/hooks/useProjectMembers";
 import { useProjectChapters } from "@/hooks/useProjectChapters";
 import { useProjectBroadcasts } from "@/hooks/useProjectBroadcasts";
 import {
-  CHAPTER_STATUSES,
+  CHAPTER_STAGES,
+  CHAPTER_STAGE_LABEL,
   PROJECT_MEMBER_ROLES,
-  type ChapterStatus,
+  type ChapterStage,
   type ProjectMemberRole,
-  isValidChapterTransition,
+  isValidChapterStageTransition,
   roleLabel,
 } from "@/lib/access";
 import { ProjectUpgradePrompt } from "@/components/projects/ProjectUpgradePrompt";
 
-const STATUS_BADGE: Record<ChapterStatus, string> = {
-  Draft: "bg-slate-200 text-slate-800",
-  "Peer Review": "bg-blue-100 text-blue-800",
-  Editorial: "bg-amber-100 text-amber-800",
-  Final: "bg-emerald-100 text-emerald-800",
+const STAGE_BADGE: Record<ChapterStage, string> = {
+  draft: "bg-slate-200 text-slate-800",
+  peer_review: "bg-blue-100 text-blue-800",
+  editorial: "bg-amber-100 text-amber-800",
+  final: "bg-emerald-100 text-emerald-800",
 };
 
 export default function ProjectDetail() {
@@ -71,7 +72,7 @@ export default function ProjectDetail() {
   const {
     chapters,
     createChapter,
-    updateChapterStatus,
+    updateChapterStage,
     reorderChapters,
   } = useProjectChapters(projectId);
   const { broadcasts, sendBroadcast } = useProjectBroadcasts(projectId);
@@ -85,8 +86,8 @@ export default function ProjectDetail() {
   const [broadcastMessage, setBroadcastMessage] = useState("");
   const [pendingRevert, setPendingRevert] = useState<{
     id: string;
-    from: ChapterStatus;
-    to: ChapterStatus;
+    from: ChapterStage;
+    to: ChapterStage;
   } | null>(null);
 
   if (isProLoading || isProjectLoading) {
@@ -151,25 +152,25 @@ export default function ProjectDetail() {
 
   const handleStatusChange = (
     chapterId: string,
-    from: ChapterStatus,
-    to: ChapterStatus,
+    from: ChapterStage,
+    to: ChapterStage,
     hasWriter: boolean,
   ) => {
-    if (!isValidChapterTransition(from, to)) return;
+    if (!isValidChapterStageTransition(from, to)) return;
     if (!hasWriter && to !== from) {
       toast.error("Assign a writer before advancing this chapter.");
       return;
     }
-    const fromIdx = CHAPTER_STATUSES.indexOf(from);
-    const toIdx = CHAPTER_STATUSES.indexOf(to);
+    const fromIdx = CHAPTER_STAGES.indexOf(from);
+    const toIdx = CHAPTER_STAGES.indexOf(to);
     if (toIdx < fromIdx) {
       // Backward — confirm
       setPendingRevert({ id: chapterId, from, to });
       return;
     }
-    updateChapterStatus
-      .mutateAsync({ chapterId, status: to })
-      .then(() => toast.success(`Moved to ${to}`))
+    updateChapterStage
+      .mutateAsync({ chapterId, stage: to })
+      .then(() => toast.success(`Moved to ${CHAPTER_STAGE_LABEL[to]}`))
       .catch((err) =>
         toast.error(err instanceof Error ? err.message : "Failed"),
       );
@@ -178,11 +179,11 @@ export default function ProjectDetail() {
   const confirmRevert = async () => {
     if (!pendingRevert) return;
     try {
-      await updateChapterStatus.mutateAsync({
+      await updateChapterStage.mutateAsync({
         chapterId: pendingRevert.id,
-        status: pendingRevert.to,
+        stage: pendingRevert.to,
       });
-      toast.success(`Reverted to ${pendingRevert.to}`);
+      toast.success(`Reverted to ${CHAPTER_STAGE_LABEL[pendingRevert.to]}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed");
     } finally {
@@ -309,11 +310,11 @@ export default function ProjectDetail() {
             ) : (
               <div className="space-y-2">
                 {chapters.map((c, idx) => {
-                  const status = (CHAPTER_STATUSES as readonly string[]).includes(
-                    c.status,
+                  const stage: ChapterStage = (CHAPTER_STAGES as readonly string[]).includes(
+                    c.chapter_stage ?? "",
                   )
-                    ? (c.status as ChapterStatus)
-                    : "Draft";
+                    ? (c.chapter_stage as ChapterStage)
+                    : "draft";
                   const hasWriter = !!c.requester_user_id;
                   return (
                     <div
@@ -350,17 +351,17 @@ export default function ProjectDetail() {
                         </div>
                       </div>
                       <span
-                        className={`text-xs px-2 py-1 rounded ${STATUS_BADGE[status]}`}
+                        className={`text-xs px-2 py-1 rounded ${STAGE_BADGE[stage]}`}
                       >
-                        {status}
+                        {CHAPTER_STAGE_LABEL[stage]}
                       </span>
                       <Select
-                        value={status}
+                        value={stage}
                         onValueChange={(value) =>
                           handleStatusChange(
                             c.id,
-                            status,
-                            value as ChapterStatus,
+                            stage,
+                            value as ChapterStage,
                             hasWriter,
                           )
                         }
@@ -370,9 +371,9 @@ export default function ProjectDetail() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {CHAPTER_STATUSES.map((s) => (
+                          {CHAPTER_STAGES.map((s) => (
                             <SelectItem key={s} value={s}>
-                              {s}
+                              {CHAPTER_STAGE_LABEL[s]}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -581,8 +582,8 @@ export default function ProjectDetail() {
               {pendingRevert ? (
                 <>
                   You're about to move this chapter from{" "}
-                  <strong>{pendingRevert.from}</strong> back to{" "}
-                  <strong>{pendingRevert.to}</strong>. Reviewers and writers will
+                  <strong>{CHAPTER_STAGE_LABEL[pendingRevert.from]}</strong> back to{" "}
+                  <strong>{CHAPTER_STAGE_LABEL[pendingRevert.to]}</strong>. Reviewers and writers will
                   be notified of the change.
                 </>
               ) : null}

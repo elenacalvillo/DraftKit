@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ACTIVE_PROJECT_LIMIT,
   ACTIVE_PROJECT_LIMIT_MESSAGE,
-  CHAPTER_STATUSES,
+  CHAPTER_STAGES,
   MAX_IMAGE_BYTES,
   PROJECT_MEMBER_ROLES,
   STORAGE_CAP_BYTES,
@@ -13,7 +13,7 @@ import {
   hasProAccess,
   hasProjectAccess,
   isAcceptedImageMime,
-  isValidChapterTransition,
+  isValidChapterStageTransition,
   normalizeTier,
   roleLabel,
 } from "../access";
@@ -29,11 +29,11 @@ describe("access constants", () => {
       "peer_reviewer",
       "cross_chapter_reviewer",
     ]);
-    expect(CHAPTER_STATUSES).toEqual([
-      "Draft",
-      "Peer Review",
-      "Editorial",
-      "Final",
+    expect(CHAPTER_STAGES).toEqual([
+      "draft",
+      "peer_review",
+      "editorial",
+      "final",
     ]);
   });
 
@@ -145,16 +145,16 @@ describe("image upload helpers", () => {
 });
 
 describe("chapter lifecycle", () => {
-  it("allows any forward or backward transition between distinct statuses", () => {
-    expect(isValidChapterTransition("Draft", "Peer Review")).toBe(true);
-    expect(isValidChapterTransition("Peer Review", "Editorial")).toBe(true);
-    expect(isValidChapterTransition("Editorial", "Final")).toBe(true);
+  it("allows any forward or backward transition between distinct stages", () => {
+    expect(isValidChapterStageTransition("draft", "peer_review")).toBe(true);
+    expect(isValidChapterStageTransition("peer_review", "editorial")).toBe(true);
+    expect(isValidChapterStageTransition("editorial", "final")).toBe(true);
     // Backward transition (admin can revert with confirmation)
-    expect(isValidChapterTransition("Final", "Editorial")).toBe(true);
+    expect(isValidChapterStageTransition("final", "editorial")).toBe(true);
   });
 
   it("rejects no-op transitions", () => {
-    expect(isValidChapterTransition("Draft", "Draft")).toBe(false);
+    expect(isValidChapterStageTransition("draft", "draft")).toBe(false);
   });
 });
 

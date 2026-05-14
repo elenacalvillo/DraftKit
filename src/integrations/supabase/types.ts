@@ -151,6 +151,7 @@ export type Database = {
           ai_suggestion_used: Json | null
           approved_at: string | null
           chapter_order: number | null
+          chapter_stage: string | null
           collab_link: string | null
           content_last_edited_at: string | null
           content_last_edited_by: string | null
@@ -187,6 +188,7 @@ export type Database = {
           ai_suggestion_used?: Json | null
           approved_at?: string | null
           chapter_order?: number | null
+          chapter_stage?: string | null
           collab_link?: string | null
           content_last_edited_at?: string | null
           content_last_edited_by?: string | null
@@ -223,6 +225,7 @@ export type Database = {
           ai_suggestion_used?: Json | null
           approved_at?: string | null
           chapter_order?: number | null
+          chapter_stage?: string | null
           collab_link?: string | null
           content_last_edited_at?: string | null
           content_last_edited_by?: string | null

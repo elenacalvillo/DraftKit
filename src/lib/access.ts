@@ -110,24 +110,31 @@ export function formatStorageUsage(usedBytes: number): string {
   return `${mb.toFixed(1)} MB of 1GB used`;
 }
 
-/** Chapter lifecycle states (project workspaces only). */
-export const CHAPTER_STATUSES = [
-  "Draft",
-  "Peer Review",
-  "Editorial",
-  "Final",
+/** Chapter editorial workflow stages (project workspaces only).
+ *  Stored in collab_requests.chapter_stage. The collab_requests.status
+ *  field is unrelated and tracks the row's collaboration lifecycle. */
+export const CHAPTER_STAGES = [
+  "draft",
+  "peer_review",
+  "editorial",
+  "final",
 ] as const;
-export type ChapterStatus = (typeof CHAPTER_STATUSES)[number];
+export type ChapterStage = (typeof CHAPTER_STAGES)[number];
+
+export const CHAPTER_STAGE_LABEL: Record<ChapterStage, string> = {
+  draft: "Draft",
+  peer_review: "Peer Review",
+  editorial: "Editorial",
+  final: "Final",
+};
 
 /** Allowed forward + backward chapter transitions, controlled by admin. */
-export function isValidChapterTransition(
-  from: ChapterStatus,
-  to: ChapterStatus,
+export function isValidChapterStageTransition(
+  from: ChapterStage,
+  to: ChapterStage,
 ): boolean {
   if (from === to) return false;
-  // Forward / backward transitions are both allowed; admin confirms
-  // backward steps in the UI.
-  return CHAPTER_STATUSES.includes(from) && CHAPTER_STATUSES.includes(to);
+  return CHAPTER_STAGES.includes(from) && CHAPTER_STAGES.includes(to);
 }
 
 /** Project member roles. Strings must match the DB CHECK constraint. */
