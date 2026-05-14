@@ -14,7 +14,8 @@ export function useActiveCollabs() {
         .from('collab_requests')
         .select('*', { count: 'exact', head: true })
         .eq('creator_id', creator.id)
-        .eq('status', 'approved');
+        .eq('status', 'approved')
+        .eq('is_project_workspace', false);
       
       if (error) {
         console.error("Error counting active collabs:", error);

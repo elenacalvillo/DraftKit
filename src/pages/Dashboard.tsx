@@ -111,6 +111,7 @@ export default function Dashboard() {
       )
       .eq("creator_id", creator.id)
       .eq("hidden_by_creator", false)
+      .eq("is_project_workspace", false)
       .order("created_at", { ascending: false });
 
     if (reqData) {
