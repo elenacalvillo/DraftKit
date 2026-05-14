@@ -310,11 +310,11 @@ export default function ProjectDetail() {
             ) : (
               <div className="space-y-2">
                 {chapters.map((c, idx) => {
-                  const status = (CHAPTER_STATUSES as readonly string[]).includes(
-                    c.status,
+                  const stage: ChapterStage = (CHAPTER_STAGES as readonly string[]).includes(
+                    c.chapter_stage ?? "",
                   )
-                    ? (c.status as ChapterStatus)
-                    : "Draft";
+                    ? (c.chapter_stage as ChapterStage)
+                    : "draft";
                   const hasWriter = !!c.requester_user_id;
                   return (
                     <div
@@ -351,17 +351,17 @@ export default function ProjectDetail() {
                         </div>
                       </div>
                       <span
-                        className={`text-xs px-2 py-1 rounded ${STATUS_BADGE[status]}`}
+                        className={`text-xs px-2 py-1 rounded ${STAGE_BADGE[stage]}`}
                       >
-                        {status}
+                        {CHAPTER_STAGE_LABEL[stage]}
                       </span>
                       <Select
-                        value={status}
+                        value={stage}
                         onValueChange={(value) =>
                           handleStatusChange(
                             c.id,
-                            status,
-                            value as ChapterStatus,
+                            stage,
+                            value as ChapterStage,
                             hasWriter,
                           )
                         }
@@ -371,9 +371,9 @@ export default function ProjectDetail() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {CHAPTER_STATUSES.map((s) => (
+                          {CHAPTER_STAGES.map((s) => (
                             <SelectItem key={s} value={s}>
-                              {s}
+                              {CHAPTER_STAGE_LABEL[s]}
                             </SelectItem>
                           ))}
                         </SelectContent>
