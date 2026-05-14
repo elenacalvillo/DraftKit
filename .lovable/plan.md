@@ -1,104 +1,132 @@
-## What you're asking
+## Why "Add chapter" fails
 
-You want every tile, funnel, and chart to **show its formula**, so nobody (you, me, or a future PM) has to guess what a number means. Today the math lives in `AdminAnalytics.tsx` and `Dashboard.tsx` but is invisible to the reader.
+The chapter creation flow inserts into `collab_requests` with:
 
-Below is **exactly how each metric is computed today** (verified from the code), followed by what I'll add to the UI.
+- `is_project_workspace: true`
+- `is_solo: true`
+- `status: "Draft"`
+- `creator_id`: the project owner's creator id
 
----
+Currently `collab_requests` has only two INSERT RLS policies:
 
-## How every metric is calculated today
+1. **"Anyone can create requests"** — requires `status = 'pending'`
+2. **"Creators can create solo workspaces"** — requires `status = 'approved'` AND `auth.uid() = requester_user_id`
 
-### Dashboard (`/dashboard`) — your stats row
+A chapter row with `status = 'Draft'` matches **neither**, so RLS rejects every insert. The toast shows "Failed" and the response surfaces the misleading apikey/PostgREST error in the console.
 
-| Tile | Formula | Source |
-|---|---|---|
-| **Ship Rate** | `published requests ÷ eligible requests × 100` (eligible = not pending/declined/expired) | `collab_requests.status` |
-| **Published Collabs** | `count of UNIQUE requester_substack_url` where `status = 'published'` | `collab_requests` |
-| **Time Saved** | `published_count × (8.5 − 1.0) = published × 7.5 hrs` | Two constants in `Dashboard.tsx`: `MANUAL_TAX_HOURS=8.5`, `DRAFTKIT_EFFICIENCY_HOURS=1.0` |
+(The actual triggers — `link_request_to_existing_user`, `validate_requester_substack_url`, `notify_new_collab_request` — are fine; the notify trigger only fires on `status='pending'`, and the URL validator skips solo rows.)
 
-> The "7.5 hrs per published collab" number is currently a **hard-coded baseline**, not a per-user measurement. The legend will say so explicitly so we don't oversell it.
+## Plan
 
-### Admin Analytics (`/admin/analytics`) — every tile and funnel
+### 1. Add a dedicated RLS INSERT policy for project chapters (migration)
 
-All counts are scoped to the **selected range** (URL `?range=`), pulled in 1000-row pages up to 5000 rows from `analytics_events`. Δ comparisons use the prior window of the same length.
-
-**KPI tiles**
-
-- **Draft Acceptance Rate** = `unique request_ids with draft_accepted ÷ count(draft_generated) × 100`. Red ring when <30% and there are drafts.
-- **AI Attachment Rate** = `bookings where event_data.used_ai_suggestion=true ÷ bookings × 100`.
-- **Regeneration Rate** = `draft_regeneration_requested ÷ draft_generated × 100`. Amber ring above 50%.
-- **Guest Conversion** = `user_signup ÷ booking_submitted × 100`. Yellow ring when <5% and ≥10 bookings.
-- **Avg Session Duration** = mean of `event_data.session_duration_ms` on `booking_submitted` events.
-- **Booking Conversion** = `booking_submitted ÷ booking_link_clicked × 100`.
-- **SMART Suggestions Used** = raw count of `ai_match_suggestion_selected`.
-- **User Signups** = raw count of `user_signup` + Δ vs prev window.
-- **Workspace save failures** = raw count of `workspace_save_failed` + top reason from `event_data.reason` + recovered count.
-
-**Push to Substack block** (`src/lib/analytics-push-funnel.ts`)
-
-- All four steps are **deduped by `event_data.request_id`** — 10 clicks on the same draft = 1 intent.
-- **Substack Push Rate** = `success ÷ (success + blocked) × 100`.
-- **Pro pushes** = unique `push_to_substack_success` (with Δ).
-- **Blocked → Upgrade** = `(unique user_ids that fired blocked AND later checkout_completed) ÷ unique blocked users × 100`. Anonymous blocked users don't count.
-- Funnel rows: Workspace opened → Copy clicks (filtered to `surface = workspace_copy`) → Push success → Push blocked.
-
-**Core funnel** (Link clicks → SMART match → Booking → Draft generated → Draft copied)
-
-- Each step % is computed **vs. the first step** (Link Clicks = 100%); the small `(N%)` next to each row is the **step-over-step** conversion. That's two different denominators living next to each other — the legend will make this explicit.
-
-**Monetization funnel**
-
-- Rows: Pro feature blocked (Push) → Upgrade prompt shown → clicked → Checkout started → Checkout completed. Each row's `%` next to the count is vs. the previous row.
-
-**Other funnels** (Referral / Invite / Discovery): same pattern — raw event counts in order, with step-over-step %.
-
-**Signup Attribution** = `count by event_data.source ÷ total signup_attribution × 100`.
-
-**Feature Usage Matrix** = per `event_type`: total count, unique `user_id` count, Δ vs prev window.
-
----
-
-## What I'll add (UI changes only — no formula changes)
-
-The goal is "every number explains itself, on hover, in one line." Two complementary touches:
-
-1. **One-line legend under each value** (already there for DAR; I'll extend the pattern). Example: under "Substack Push Rate" → *"success ÷ (success + blocked), deduped by request_id."*
-
-2. **Info icon (`<Info className="w-3 h-3" />`) next to every KPI title and funnel header**, opening a Radix tooltip with:
-   - The plain-English definition
-   - The exact formula
-   - The data source (event types / table)
-   - For Time Saved: the constants `8.5 − 1.0 = 7.5 hrs` and a note that it's a baseline, not measured per-user
-
-3. **A `MetricLegend` component** so the copy lives in one place (`src/lib/metric-legends.ts`) — easy to edit, easy to test, no drift between tile and tooltip.
-
-```text
-┌─ Card ─────────────────────────────────┐
-│ Draft Acceptance Rate    [ⓘ tooltip]   │
-│ 42.0%                                  │
-│ 21 of 50 drafts accepted               │
-│ unique drafts copied/downloaded ÷      │
-│   drafts generated                     │
-└────────────────────────────────────────┘
+```sql
+CREATE POLICY "Project owners can create chapter workspaces"
+ON public.collab_requests
+FOR INSERT
+TO authenticated
+WITH CHECK (
+  is_project_workspace = true
+  AND project_id IS NOT NULL
+  AND status = ANY (ARRAY['Draft','In Review','Approved','Scheduled','Published'])
+  AND creator_id IN (
+    SELECT c.id FROM public.creators c WHERE c.user_id = auth.uid()
+  )
+  -- Reuse the same hardening as the existing INSERT policy
+  AND hidden_by_creator = false
+  AND hidden_by_requester = false
+  AND requester_name IS NOT NULL
+  AND char_length(btrim(requester_name)) BETWEEN 1 AND 100
+  AND requester_email IS NOT NULL
+  AND char_length(btrim(requester_email)) BETWEEN 3 AND 255
+  AND btrim(requester_email) ~* '^[^\s@]+@[^\s@]+\.[^\s@]+$'
+  AND ai_draft IS NULL
+  AND approved_at IS NULL
+  AND reminder_sent_at IS NULL
+  AND creator_notes IS NULL
+);
 ```
 
-### Files I'll touch
+This is scoped strictly to project workspaces owned by the current user, so it does not weaken any existing RLS rule on regular collab requests.
 
-- **New** `src/lib/metric-legends.ts` — one source of truth: `{ id, title, definition, formula, source }` for every metric on both pages.
-- **New** `src/components/admin/MetricInfo.tsx` — tiny tooltip-wrapped `Info` icon.
-- **Edit** `src/pages/AdminAnalytics.tsx` — drop `<MetricInfo id="dar" />` next to each title; add a one-liner legend under each value where missing (AI Attachment, Regeneration, Guest, Avg Session, Booking Conversion, Workspace failures, all funnel headers).
-- **Edit** `src/pages/Dashboard.tsx` — same treatment for Ship Rate / Published Collabs / Time Saved. Time Saved tooltip explicitly says: *"Baseline estimate: 8.5h of manual coordination per collab − 1.0h with DraftKit = 7.5h saved per published collab. Not measured per-user."*
-- **New** `src/lib/__tests__/metric-legends.test.ts` — snapshot test so every metric `id` referenced from the pages exists in the legend map (prevents silent breakage if I rename one).
+### 2. Surface a clearer error in the UI
 
-### Out of scope (will not touch)
+In `src/hooks/useProjectChapters.ts` `createChapter`, wrap the insert error to map Postgres code `42501` (RLS violation) to a friendlier message: "You don't have permission to add a chapter to this project." Then in `src/pages/ProjectDetail.tsx#handleCreateChapter`, log `console.error` with the original error so future regressions don't appear as the cryptic "No API key" string.
 
-- Any **formula change** — including the 8.5/1.0 Time Saved constants. If you want those tweaked, that's a separate, opinionated decision (I'd want your input on the manual baseline).
-- New events or DB work.
-- Changing how the core funnel mixes "% vs first step" with step-over-step — I'll just *explain* both in tooltips. Happy to unify if you say so.
+### 3. Verify
+
+- Run the migration.
+- Re-test "Add chapter" as the project owner — should succeed and the new chapter should appear in the list.
+- Quick check that creating a regular (non-project) collab request still works (existing "Anyone can create requests" policy unchanged).
+- Run the existing unit tests (`vitest run`) to make sure nothing else regressed.
+
+Lovable's plan is technically sound for fixing the immediate bug, but as a PM, you’re missing the **Lifecycle and Discovery** parts of this feature. Fixing the "Add Chapter" button is only 50% of the job; the other 50% is making sure the user knows what to do with it and that it doesn't create a "ghost town" of empty drafts.
+
+Here is what is missing to make this a professional-grade feature:
+
+### 1. The "First Chapter" Onboarding
+
+Right now, if a project has 0 chapters, what does the user see?
+
+- **Missing:** An "Empty State" component.
+- **The Elena Move:** If `chapters.length === 0`, show a punchy call-to-action: *"Every great project starts with a single chapter. Add your first one to get moving."*
+
+### 2. Chapter Sequencing (The "Messy Room" Risk)
+
+As Dinah adds 20 chapters, they will likely be returned in the order they were created (ID-based) or last edited.
+
+- **Missing:** A `sort_order` or `sequence_index` column.
+- **The Risk:** If she writes Chapter 5 before Chapter 2, her project view will be a mess.
+- **The Fix:** We should add a hidden `sort_order` integer to the insert logic so we can eventually allow "Drag and Drop" reordering.
+
+### 3. The "Unused Row" Cleanup
+
+If people click "Add Chapter" 50 times just to see what happens, your `collab_requests` table will fill up with junk.
+
+- **Missing:** A "Delete Chapter" function.
+- **The Logic:** Since these are `is_solo: true` and `is_project_workspace: true`, the creator should have full destructive power over them. Lovable needs to add a `DELETE` RLS policy alongside the `INSERT` one.
 
 ---
 
-## Two questions before I build
+### The Economic & Performance Guardrails
 
-1. **Time Saved baseline** — keep `8.5 − 1.0 = 7.5h` as-is and just disclose it, or do you want to revisit the numbers? (My vote: disclose now, revisit when we have real data from `collab_metrics`.)
-2. **Tooltip vs. always-visible legend** — info icon with hover tooltip (clean, dense) or always-visible one-liner under every tile (more obvious, slightly busier)? Default plan does **both**: legend under the value + tooltip with the full formula. Say the word if you want only one.
+Since you asked about costs earlier, here is the breakdown of how "Chapters" change your database load:
+
+
+|                  |            |                                                                                                                            |
+| ---------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------- |
+| **Metric**       | **Impact** | **Strategy**                                                                                                               |
+| **Index Bloat**  | Low        | We need an index on `project_id` to keep the Chapter list fast as the table grows.                                         |
+| **API Latency**  | Medium     | Loading a project with 50 chapters might slow down the UI. We should use **Select Filtering** (already in Lovable's plan). |
+| **Storage COGS** | Zero       | Unless they add images, chapters are effectively free.                                                                     |
+
+
+---
+
+### Final Instruction for Lovable (The "Project Completion" Pass)
+
+"The RLS fix is a start, but we need to harden the Project Feature for a public launch. Implement these three additions:
+
+**1. Sequential Logic**
+
+- Add a `sort_order` integer to the `collab_requests` table (default to 0).
+- When creating a chapter, set `sort_order` to `current_max_order + 1`.
+
+**2. The Delete Policy**
+
+- Add an RLS `DELETE` policy: **'Project owners can delete their own chapters.'**
+- Constraint: `is_project_workspace = true AND creator_id = auth.uid()`.
+
+**3. Empty State UI**
+
+- In `ProjectDetail.tsx`, if no chapters exist, render a high-intent 'Empty State' illustration and a large 'Add First Chapter' button instead of just a blank list.
+
+**4. Performance**
+
+- Ensure we have a database index on `project_id` to keep the chapter fetch snappy."
+
+## Out of scope
+
+- No changes to triggers, the notify function, or any other RLS policy.
+- No edits to chapter UI/visual styling.
+- Analytics/metrics dashboard work from previous turns is untouched.
