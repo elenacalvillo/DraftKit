@@ -108,6 +108,8 @@ export function useProjectChapters(projectId: string | undefined) {
       queryClient.invalidateQueries({ queryKey: ["project_chapters", projectId] });
     },
   });
+
+  const reorderChapters = useMutation({
     mutationFn: async (orderedIds: string[]) => {
       // Issue updates sequentially — small N (book chapters), no
       // transaction wrapper required for v1.
