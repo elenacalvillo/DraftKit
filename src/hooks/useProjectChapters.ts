@@ -57,9 +57,14 @@ export function useProjectChapters(projectId: string | undefined) {
         chapter_order: next,
         is_solo: true,
         message: trimmed,
+        requester_user_id: user.id,
         requester_email: user.email,
         requester_name: creator.name ?? user.email,
-        status: "Draft",
+        // Reuse the collaboration "approved" lifecycle so existing
+        // workspace access + edit policies apply unchanged. The book
+        // workflow stage lives in chapter_stage.
+        status: "approved",
+        chapter_stage: "draft",
       };
       const { data, error } = await supabase
         .from("collab_requests")
@@ -67,9 +72,6 @@ export function useProjectChapters(projectId: string | undefined) {
         .select("*")
         .single();
       if (error) {
-        // Surface a friendly message when RLS blocks the insert (Postgres 42501).
-        // The raw PostgREST error ("No API key found in request" / generic 401)
-        // is misleading and previously hid the real "Add chapter" failure.
         console.error("[useProjectChapters] createChapter failed", error);
         if ((error as { code?: string }).code === "42501") {
           throw new Error(
@@ -85,17 +87,17 @@ export function useProjectChapters(projectId: string | undefined) {
     },
   });
 
-  const updateChapterStatus = useMutation({
+  const updateChapterStage = useMutation({
     mutationFn: async ({
       chapterId,
-      status,
+      stage,
     }: {
       chapterId: string;
-      status: ChapterStatus;
+      stage: ChapterStage;
     }) => {
       const { data, error } = await supabase
         .from("collab_requests")
-        .update({ status })
+        .update({ chapter_stage: stage })
         .eq("id", chapterId)
         .select("*")
         .single();
@@ -106,8 +108,6 @@ export function useProjectChapters(projectId: string | undefined) {
       queryClient.invalidateQueries({ queryKey: ["project_chapters", projectId] });
     },
   });
-
-  const reorderChapters = useMutation({
     mutationFn: async (orderedIds: string[]) => {
       // Issue updates sequentially — small N (book chapters), no
       // transaction wrapper required for v1.
