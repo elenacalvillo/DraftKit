@@ -67,7 +67,18 @@ export function useProjectChapters(projectId: string | undefined) {
         .insert(payload)
         .select("*")
         .single();
-      if (error) throw error;
+      if (error) {
+        // Surface a friendly message when RLS blocks the insert (Postgres 42501).
+        // The raw PostgREST error ("No API key found in request" / generic 401)
+        // is misleading and previously hid the real "Add chapter" failure.
+        console.error("[useProjectChapters] createChapter failed", error);
+        if ((error as { code?: string }).code === "42501") {
+          throw new Error(
+            "You don't have permission to add a chapter to this project.",
+          );
+        }
+        throw error;
+      }
       return data as Chapter;
     },
     onSuccess: () => {
