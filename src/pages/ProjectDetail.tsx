@@ -125,10 +125,12 @@ export default function ProjectDetail() {
       return;
     }
     try {
-      await createChapter.mutateAsync({ title: chapterTitle });
+      const created = await createChapter.mutateAsync({ title: chapterTitle });
       setChapterTitle("");
       setShowCreateChapter(false);
       toast.success("Chapter created");
+      // Drop the writer straight into the new chapter's workspace.
+      if (created?.id) navigate(`/dashboard/workspace/${created.id}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed";
       toast.error(msg);
@@ -319,7 +321,7 @@ export default function ProjectDetail() {
                   return (
                     <div
                       key={c.id}
-                      className="flex items-center gap-3 rounded-xl border border-border bg-card p-3"
+                      className="flex items-center gap-3 rounded-xl border border-border bg-card p-3 transition-colors hover:border-primary/40 hover:bg-accent/30"
                     >
                       <div className="flex flex-col gap-0.5">
                         <button
@@ -339,8 +341,11 @@ export default function ProjectDetail() {
                           <ChevronDown className="w-4 h-4" />
                         </button>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">
+                      <Link
+                        to={`/dashboard/workspace/${c.id}`}
+                        className="flex-1 min-w-0 group"
+                      >
+                        <div className="font-medium truncate group-hover:text-primary">
                           {idx + 1}. {c.message ?? "Untitled chapter"}
                         </div>
                         <div className="text-xs text-muted-foreground">
@@ -349,7 +354,7 @@ export default function ProjectDetail() {
                             <span className="italic">Unassigned</span>
                           )}
                         </div>
-                      </div>
+                      </Link>
                       <span
                         className={`text-xs px-2 py-1 rounded ${STAGE_BADGE[stage]}`}
                       >

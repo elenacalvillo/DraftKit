@@ -88,6 +88,8 @@ interface WorkspaceRequest {
   content_last_edited_at: string | null;
   selected_collab_type: string | null;
   is_solo: boolean;
+  is_project_workspace?: boolean;
+  project_id?: string | null;
 }
 
 interface CreatorInfo {
@@ -238,6 +240,18 @@ export default function Workspace() {
         }
       }
 
+      // Fetch project context (project_id / is_project_workspace) — not in
+      // get_workspace_request payload. Owner & requester can SELECT this row
+      // directly via existing RLS policies.
+      const { data: ctx } = await supabase
+        .from("collab_requests")
+        .select("project_id, is_project_workspace")
+        .eq("id", requestId!)
+        .maybeSingle();
+      if (ctx) {
+        resolvedData = { ...resolvedData, project_id: ctx.project_id, is_project_workspace: ctx.is_project_workspace };
+      }
+
       setRequest(resolvedData as WorkspaceRequest);
       setLocalDraft((data.ai_draft as unknown as CollabDraft) || null);
 
@@ -372,7 +386,11 @@ export default function Workspace() {
 
   const currentUserName = isCreator ? creator!.name : request?.requester_name || "Guest";
 
-  const backPath = isCreator ? "/dashboard/requests" : "/dashboard/my-requests";
+  const backPath = request?.is_project_workspace && request?.project_id
+    ? `/dashboard/projects/${request.project_id}`
+    : isCreator
+      ? "/dashboard/requests"
+      : "/dashboard/my-requests";
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return null;
