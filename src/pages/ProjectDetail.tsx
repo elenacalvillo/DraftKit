@@ -152,25 +152,25 @@ export default function ProjectDetail() {
 
   const handleStatusChange = (
     chapterId: string,
-    from: ChapterStatus,
-    to: ChapterStatus,
+    from: ChapterStage,
+    to: ChapterStage,
     hasWriter: boolean,
   ) => {
-    if (!isValidChapterTransition(from, to)) return;
+    if (!isValidChapterStageTransition(from, to)) return;
     if (!hasWriter && to !== from) {
       toast.error("Assign a writer before advancing this chapter.");
       return;
     }
-    const fromIdx = CHAPTER_STATUSES.indexOf(from);
-    const toIdx = CHAPTER_STATUSES.indexOf(to);
+    const fromIdx = CHAPTER_STAGES.indexOf(from);
+    const toIdx = CHAPTER_STAGES.indexOf(to);
     if (toIdx < fromIdx) {
       // Backward — confirm
       setPendingRevert({ id: chapterId, from, to });
       return;
     }
-    updateChapterStatus
-      .mutateAsync({ chapterId, status: to })
-      .then(() => toast.success(`Moved to ${to}`))
+    updateChapterStage
+      .mutateAsync({ chapterId, stage: to })
+      .then(() => toast.success(`Moved to ${CHAPTER_STAGE_LABEL[to]}`))
       .catch((err) =>
         toast.error(err instanceof Error ? err.message : "Failed"),
       );
@@ -179,11 +179,11 @@ export default function ProjectDetail() {
   const confirmRevert = async () => {
     if (!pendingRevert) return;
     try {
-      await updateChapterStatus.mutateAsync({
+      await updateChapterStage.mutateAsync({
         chapterId: pendingRevert.id,
-        status: pendingRevert.to,
+        stage: pendingRevert.to,
       });
-      toast.success(`Reverted to ${pendingRevert.to}`);
+      toast.success(`Reverted to ${CHAPTER_STAGE_LABEL[pendingRevert.to]}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed");
     } finally {
