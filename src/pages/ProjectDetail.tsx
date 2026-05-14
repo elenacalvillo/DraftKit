@@ -44,20 +44,21 @@ import { useProjectMembers } from "@/hooks/useProjectMembers";
 import { useProjectChapters } from "@/hooks/useProjectChapters";
 import { useProjectBroadcasts } from "@/hooks/useProjectBroadcasts";
 import {
-  CHAPTER_STATUSES,
+  CHAPTER_STAGES,
+  CHAPTER_STAGE_LABEL,
   PROJECT_MEMBER_ROLES,
-  type ChapterStatus,
+  type ChapterStage,
   type ProjectMemberRole,
-  isValidChapterTransition,
+  isValidChapterStageTransition,
   roleLabel,
 } from "@/lib/access";
 import { ProjectUpgradePrompt } from "@/components/projects/ProjectUpgradePrompt";
 
-const STATUS_BADGE: Record<ChapterStatus, string> = {
-  Draft: "bg-slate-200 text-slate-800",
-  "Peer Review": "bg-blue-100 text-blue-800",
-  Editorial: "bg-amber-100 text-amber-800",
-  Final: "bg-emerald-100 text-emerald-800",
+const STAGE_BADGE: Record<ChapterStage, string> = {
+  draft: "bg-slate-200 text-slate-800",
+  peer_review: "bg-blue-100 text-blue-800",
+  editorial: "bg-amber-100 text-amber-800",
+  final: "bg-emerald-100 text-emerald-800",
 };
 
 export default function ProjectDetail() {
@@ -71,7 +72,7 @@ export default function ProjectDetail() {
   const {
     chapters,
     createChapter,
-    updateChapterStatus,
+    updateChapterStage,
     reorderChapters,
   } = useProjectChapters(projectId);
   const { broadcasts, sendBroadcast } = useProjectBroadcasts(projectId);
@@ -85,8 +86,8 @@ export default function ProjectDetail() {
   const [broadcastMessage, setBroadcastMessage] = useState("");
   const [pendingRevert, setPendingRevert] = useState<{
     id: string;
-    from: ChapterStatus;
-    to: ChapterStatus;
+    from: ChapterStage;
+    to: ChapterStage;
   } | null>(null);
 
   if (isProLoading || isProjectLoading) {
