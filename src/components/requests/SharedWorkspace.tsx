@@ -32,11 +32,16 @@ import {
   stripDraftKitInternalAttrs,
   writeDraftToClipboard,
 } from "@/lib/clipboard";
+import { stripBase64ImageTags } from "@/lib/workspace-images";
 import { PushToSubstackUpgradeModal } from "@/components/subscription/PushToSubstackUpgradeModal";
 import { resolveSubstackPublishUrl } from "@/lib/substack-url";
 
-const ALLOWED_TAGS = ["p", "h1", "h2", "h3", "strong", "em", "s", "code", "pre", "a", "ul", "ol", "li", "br", "hr", "table", "thead", "tbody", "tr", "th", "td", "span"];
-const ALLOWED_ATTR = ["href", "target", "rel", "colspan", "rowspan", "colwidth", "class", "data-comment", "data-author"];
+// Inline images live alongside the rest of the rich text. We allow `img`
+// with only `src` and `alt`; the upload pipeline guarantees every src is
+// a Supabase Storage public URL. We additionally strip any data: URI img
+// tags as a defence-in-depth step before sanitising.
+const ALLOWED_TAGS = ["p", "h1", "h2", "h3", "strong", "em", "s", "code", "pre", "a", "ul", "ol", "li", "br", "hr", "table", "thead", "tbody", "tr", "th", "td", "span", "img"];
+const ALLOWED_ATTR = ["href", "target", "rel", "src", "alt", "colspan", "rowspan", "colwidth", "class", "data-comment", "data-author"];
 
 // The destination Substack composer URL is resolved per-user from
 // creator.newsletter_url (preferred) → creator.substack_url → generic
@@ -46,7 +51,15 @@ const ALLOWED_ATTR = ["href", "target", "rel", "colspan", "rowspan", "colwidth",
 // See resolveSubstackPublishUrl in src/lib/substack-url.ts.
 
 function sanitize(html: string): string {
-  return DOMPurify.sanitize(html, { ALLOWED_TAGS, ALLOWED_ATTR });
+  // CRITICAL: pre-strip <img src="data:..."> tags BEFORE DOMPurify
+  // ever sees them. DOMPurify's defaults do not block base64 image
+  // sources, but the ticket's hard requirement is that no data: URI
+  // ever renders OR persists - so we strip them here, in the single
+  // function used to write to React state and to read back into the
+  // editor. Newly inserted images always carry an https:// Supabase
+  // Storage URL via the workspace-images upload pipeline.
+  const noBase64Images = stripBase64ImageTags(html);
+  return DOMPurify.sanitize(noBase64Images, { ALLOWED_TAGS, ALLOWED_ATTR });
 }
 
 interface EditingSession {
@@ -798,6 +811,7 @@ function SharedWorkspaceInner({
               onChange={setEditContent}
               editable={true}
               currentUserName={currentUserName}
+              requestId={requestId}
             />
 
             {/* Zen header portal: Save & Notify */}
