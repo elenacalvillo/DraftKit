@@ -1,94 +1,87 @@
-# Update DraftKit_Full_Specification.md to May 2026
+## Goal
 
-The current spec is comprehensive but ~1 month stale. I'll rewrite it in-place at `/mnt/documents/DraftKit_Full_Specification.md` (and save a `_v2` copy) bumping the version header to **May 2026** and folding in every shipped change since the last revision. No source code is touched — this is a documentation-only update.
+Ship a self-executing "Big Send" so the 18 existing ghost users receive the recovery email immediately when this change goes live — no manual broadcast, no manual POST call.
 
-## What's missing / out of date
+## Current state (already in place)
 
-Cross-referenced against `mem://index.md` and the current codebase. Items the existing spec does not mention or describes incorrectly:
+The `send-ghost-user-recovery` edge function already:
 
-### Workspace editor
-- **Inline image uploads** (toolbar button, drag-and-drop, paste) → `workspace-images` Supabase Storage bucket, client-side compression to ≤1 MB via `browser-image-compression`, public URLs (never base64), RLS via `(storage.foldername(name))[1]::uuid` + `has_workspace_access`, 25 MB raw cap, JPEG/PNG/GIF/WebP only
-- **Tables** in Tiptap (extensions + DOMPurify whitelist) — currently only one-line mention
-- **Sticky Highlights** — async inline annotations with tooltip logic
-- **Long-form scaling** — architecture supports 5k–50k word drafts
-- **Floating pill toolbar** active-formatting tracking specifics
+- Enumerates `auth.users`, subtracts `creators`, produces the ghost list
+- Excludes `abi@rezonant.app`
+- Dedups via `recovery_emails_sent` (each user emailed exactly once, ever)
+- Sends via Resend transactional API (`/emails`)
+- Uses the exact subject and body the user specified, linking to `/signup`
 
-### Book Projects (entirely missing from spec)
-- `/dashboard/projects` and `/dashboard/projects/:id` routes
-- `projects`, `project_members`, `project_chapters`, `project_broadcasts` tables
-- `project-images` Storage bucket + `increment_storage_used` RPC + 1 GB per-creator cap (`creators.storage_used_bytes`)
-- `project-broadcast` edge function
-- Upgrade prompt + Pro gating
+So the function itself is correct. The only missing piece is **automatic first-run on deployment**.
 
-### Auth & access
-- Guest account linking trigger (`link_requests_to_new_user`) for off-platform invites — covered briefly, needs the database-trigger detail
-- Writer's Room: host-exclusive administrative authority (only host can remove/invite, 1:many guest capacity rules)
-- Workspace access policy: permanent access after first credit spend (Host Gate)
+## Changes
 
-### Monetization & subscription
-- "No Dead Ends" routing on Manage Subscription button
-- Stripe Checkout: VAT collection + currency retry fallback specifics
-- Membership Hub (`/dashboard/subscription`) growth-engine rules and phrasing
-- Founding Member vs standard subscription distinction (already partial)
+### 1. Auto-fire on deploy via a one-shot pg_cron job
 
-### Discovery & growth
-- 3-tier Substack ID resolution (Search API → RSS → direct URL) — mentioned, needs the "Discovery Resilience" framing
-- Registered-creator priority sorting and search in Network
-- Profile image fallback for missing/corrupted Substack CDN avatars
-- Radial community network visualization on landing
-- Agent-Led Growth: JSON-LD + hidden metadata for AI crawlers (partial)
+Add a migration that schedules a cron entry which:
 
-### Communications & retention
-- Weekly "Elena" release notes via filtered Conventional Commits
-- Resend audience auto-sync for marketing
-- Two-way platform messaging via `collaboration_messages` (already there, needs schema detail)
-- Reschedule flow conflict-free logic
-- Retrospective `/retro/:collabId` frictionless route (covered, needs current copy)
+- Runs once, ~2 minutes after the migration applies (gives the edge function time to redeploy)
+- Calls `send-ghost-user-recovery` via `net.http_post` with the service-role key (read from Vault, same pattern as `notify_new_collab_request`)
+- Immediately unschedules itself inside the same job so it never fires again
 
-### UI / brand
-- Action-First Navigation (Pending items as a to-do list on dashboards)
-- Strategic terminology rename history (Requests→Collabs, Sent Requests→Proposals, AI→SMART, etc.) — covered, add note that this is a hard rule
-- Footer 3-row centered stacking
-- Accessibility & high-contrast styling system
-- Contextual Request Card progressive disclosure
-- Premium positioning / "ultra-bright watercolor" booking customization
-- Zen mode layout constraints
+This is the only reliable "run on deploy" hook available — edge functions have no startup lifecycle, and we explicitly do NOT want a recurring schedule (dedup table already prevents resends, but a recurring job would be misleading).
 
-### Database additions to schema section
-- `projects`, `project_members`, `project_chapters`, `project_broadcasts`
-- `creators.storage_used_bytes` column
-- Storage buckets list: `workspace-images`, `project-images`
-- `increment_storage_used` RPC
-- New edge function: `project-broadcast`
+### 2. Tighten the function for the Big Send
 
-### Security
-- Multi-layered RLS with helper functions in `internal` schema notes
-- Storage RLS for both buckets (folder-derived request_id / project_id)
-- Per-account 1 GB storage cap enforcement
-- Realtime policy hardening (auth.uid() participant check, not `USING true`)
-- PII column-level protection (zombie policy cleanup)
+Small edits to `supabase/functions/send-ghost-user-recovery/index.ts`:
 
-### Test cases to add
-- Workspace image upload (toolbar / drop / paste, free + Pro, RLS denial for non-participants)
-- Book Projects CRUD + Pro gating
-- Storage cap reached → friendly error
-- Reschedule does not create conflict
-- Founding member retains Pro after subscription cancel
+- Confirm the CTA link points to `/signup` (already does — keep as is)
+- Confirm subject/body match the approved copy verbatim (already do — no change needed)
+- No behavior change beyond a log line noting "auto-trigger" vs manual call (optional, harmless)
 
-## How the document will be restructured
+### 3. Verify after deploy
 
-- Bump version header to **May 2026**
-- Keep the existing 15 top-level sections; insert subsections rather than reshuffle so the diff stays reviewable
-- Add a new **§5.18 Book Projects** subsection
-- Add a new **§5.19 Workspace Image Uploads** subsection
-- Expand **§4 Database Schema** with new tables, columns, storage buckets, and the `increment_storage_used` RPC
-- Expand **§6 Security Architecture** with storage RLS, realtime hardening, storage cap, and the "no zombie policies" rule
-- Expand **§8 Edge Functions** with `project-broadcast`
-- Add a short **Changelog since April 2026** appendix at the end so future updates have a running history
+- Tail `supabase--edge_function_logs` for `send-ghost-user-recovery` to confirm the one-shot cron fired and the 18 sends succeeded
+- Query `recovery_emails_sent` to confirm 18 rows landed (17 if `abi@rezonant.app` had somehow been in there)
 
-## Deliverables
+### One Small Engineering Note
 
-1. `/mnt/documents/DraftKit_Full_Specification.md` — updated in place
-2. `/mnt/documents/DraftKit_Full_Specification_v2.md` — versioned snapshot of the May 2026 revision so the April baseline remains comparable
+Since the cron is set for `now() + interval '2 minutes'`, just make sure the Edge Function deployment finishes *before* that 2-minute window closes. If the deployment is slow and the cron fires while the function is still updating, it might hit the "old" version or a 404.
 
-No code, schema, or backend changes will be made.
+> **Tip:** If you want to be extra safe, you could tell Lovable to bump that to **5 minutes**. It doesn't hurt anyone if the emails go out 3 minutes later, but it guarantees the new code is live.
+
+## Technical detail
+
+```sql
+-- One-shot trigger: runs once ~2 min after apply, then unschedules itself
+SELECT cron.schedule(
+  'ghost-recovery-bigsend-oneshot',
+  -- next minute boundary +2
+  to_char(now() + interval '2 minutes', 'MI HH24 DD MM *'),
+  $$
+  DO $body$
+  DECLARE
+    service_key text;
+  BEGIN
+    SELECT decrypted_secret INTO service_key
+      FROM vault.decrypted_secrets
+      WHERE name = 'SUPABASE_SERVICE_ROLE_KEY' LIMIT 1;
+
+    PERFORM net.http_post(
+      url := 'https://cbgchxesngdsvkevbqwh.supabase.co/functions/v1/send-ghost-user-recovery',
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json',
+        'Authorization', 'Bearer ' || service_key
+      ),
+      body := '{}'::jsonb
+    );
+
+    PERFORM cron.unschedule('ghost-recovery-bigsend-oneshot');
+  END
+  $body$;
+  $$
+);
+```
+
+The dedup table (`recovery_emails_sent`) guarantees that even if this somehow fires twice, no ghost user receives a second email.
+
+## Out of scope
+
+- DRAFT-001 (atomic creator profile RPC) — separate ticket
+- DRAFT-003 (hourly monitor) — already implemented as `monitor-ghost-users`
+- Editing the email copy — already matches the approved template
