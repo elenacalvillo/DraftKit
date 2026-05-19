@@ -74,7 +74,13 @@ export type AnalyticsEventType =
   | "dashboard_tile_clicked"
   | "nav_link_clicked"
   // ---- Email loop ----
-  | "email_link_clicked";
+  | "email_link_clicked"
+  // ---- Ghost-user observability ----
+  // Fired whenever the create_creator_profile RPC (or the
+  // follow-up refreshCreator cache update) fails. Lets us
+  // detect a fresh accumulation of ghost users without waiting
+  // for the hourly pg_cron monitor to alert.
+  | "creator_creation_failed";
 
 function getOrCreateSessionId(): string {
   let sessionId = sessionStorage.getItem("draftkit_session_id");

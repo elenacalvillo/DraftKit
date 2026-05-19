@@ -31,6 +31,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { supabase } from "@/integrations/supabase/client";
 import { signupStep1Schema, signupStep2Schema } from "@/lib/validations";
+import {
+  createCreatorProfileViaRpc,
+  type CreateCreatorProfileErrorReason,
+} from "@/lib/creator-profile";
 import { toast } from "sonner";
 import { GoogleIcon } from "@/components/icons/GoogleIcon";
 import { TurnstileWidget } from "@/components/turnstile/TurnstileWidget";
@@ -287,52 +291,86 @@ export default function Signup() {
       }
     }
 
-    // Create creator profile
-    const { data: newCreator, error } = await supabase
-      .from('creators')
-      .insert({
-        user_id: session.user.id,
-        username: formData.username,
-        name: formData.name,
-        substack_url: formData.substackUrl || null,
-        newsletter_url: formData.newsletterUrl,
-        welcome_message: formData.welcomeMessage || `Hi! I'm ${formData.name}. Let's collaborate!`,
-        join_directory_waitlist: formData.joinDirectory,
-        profile_image_url: profileImageUrl,
-        referred_by: referredByUserId,
-      } as any)
-      .select()
-      .single();
+    // Atomic creator profile creation via the create_creator_profile
+    // RPC — wraps the creators + creator_contacts inserts in a single
+    // Postgres transaction. Previously these were two separate inserts
+    // with a best-effort rollback that silently failed, leaving
+    // "ghost users" behind.
+    const rpcResult = await createCreatorProfileViaRpc(supabase, {
+      username: formData.username,
+      name: formData.name,
+      email: formData.email,
+      substackUrl: formData.substackUrl || null,
+      newsletterUrl: formData.newsletterUrl,
+      welcomeMessage: formData.welcomeMessage || null,
+      joinDirectoryWaitlist: formData.joinDirectory,
+      profileImageUrl,
+      referredByUserId,
+    });
 
-    if (error) {
-      toast.error("Failed to create profile. Please try again.");
+    if (!rpcResult.creator) {
+      const rpcError = rpcResult.error ?? {
+        reason: "rpc_unknown" as const,
+        message: "",
+      };
+      const reasonToMessage: Record<CreateCreatorProfileErrorReason, string> = {
+        username_taken: "Username is already taken",
+        username_required: "Please choose a username",
+        email_required: "We couldn't read your email. Please sign in again.",
+        not_authenticated: "Session expired. Please sign in again.",
+        rpc_unknown: "Failed to create profile. Please try again.",
+      };
+      const reason = rpcError.reason;
+      const userMessage = reasonToMessage[reason];
+      if (reason === "username_taken" || reason === "username_required") {
+        setErrors({ username: userMessage });
+      } else {
+        toast.error(userMessage);
+      }
+      // Observability: every creator-creation failure lands in the
+      // analytics_events table so we can detect regressions without
+      // waiting for users to report them.
+      try {
+        trackEvent("creator_creation_failed", {
+          reason,
+          username: formData.username,
+          message: rpcError.message,
+        });
+      } catch (e) {
+        console.error("failed to log creator_creation_failed", e);
+      }
+      if (reason === "not_authenticated") {
+        navigate("/login");
+      }
       setIsLoading(false);
       return;
     }
 
-    // Store email in the private creator_contacts table (not in public creators table)
-    const { error: contactError } = await supabase
-      .from('creator_contacts')
-      .insert({
-        creator_id: newCreator.id,
-        email: formData.email,
-      });
-
-    if (contactError) {
-      // Best-effort rollback so we don't leave a partially created account
-      await supabase.from('creators').delete().eq('id', newCreator.id);
-      toast.error("Failed to save your email. Please try again.");
-      setIsLoading(false);
-      return;
-    }
+    const newCreator = rpcResult.creator;
 
     setCreatedUser({
       id: newCreator.id,
       username: newCreator.username,
       name: newCreator.name,
     });
-    
-    await refreshCreator();
+
+    // refreshCreator() is a best-effort cache update: if it fails the
+    // creator row is already committed so the user is fine to proceed,
+    // but we log the miss so a systemic regression is visible.
+    try {
+      await refreshCreator();
+    } catch (e) {
+      console.error("refreshCreator failed after signup:", e);
+      try {
+        trackEvent("creator_creation_failed", {
+          reason: "refresh_failed",
+          username: newCreator.username,
+          message: e instanceof Error ? e.message : String(e),
+        });
+      } catch {
+        /* analytics-of-analytics is not worth a cascade */
+      }
+    }
     setIsLoading(false);
     setCurrentStep(3);
     
