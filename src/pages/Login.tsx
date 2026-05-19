@@ -17,7 +17,7 @@ import { verifyTurnstileToken } from "@/lib/turnstile";
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { signIn, signInWithGoogle, user, creator, loading } = useAuth();
+  const { signIn, signInWithGoogle, user, creator, creatorLoading, loading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -79,8 +79,22 @@ export default function Login() {
     }
     if (creator) {
       navigate(from || "/dashboard", { replace: true });
+      return;
     }
-  }, [user, creator, loading, navigate, location.state]);
+    // OAuth gap fix: an authenticated user with NO creators row is a
+    // ghost-user-in-the-making. We've already excluded workspace/guest
+    // deep links above (invited collaborators legitimately have no
+    // creator profile), so the only remaining cohort is a Google
+    // signup that never completed Step 2. Send them straight to
+    // /signup so they can finish — the Signup component auto-resumes
+    // at Step 2 when it detects a session with no creator row.
+    //
+    // We wait for creatorLoading to settle so we don't redirect
+    // mid-fetch and double-route the user.
+    if (!creatorLoading && !creator) {
+      navigate("/signup", { replace: true });
+    }
+  }, [user, creator, creatorLoading, loading, navigate, location.state]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

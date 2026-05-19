@@ -66,3 +66,17 @@ verify_jwt = true
 # verified by stripe.webhooks.constructEvent() inside the function.
 [functions.stripe-webhook]
 verify_jwt = false
+
+# send-ghost-user-recovery: invoked manually by an admin to email
+# auth users who never finished their creator profile. Uses the
+# service role key internally and de-dups via
+# public.recovery_emails_sent so each ghost user is contacted once.
+[functions.send-ghost-user-recovery]
+verify_jwt = false
+
+# monitor-ghost-users: hourly pg_cron pings this to check the
+# count gap between auth.users and public.creators. JWT is not
+# verified at the gateway because the cron caller passes the
+# service role key directly.
+[functions.monitor-ghost-users]
+verify_jwt = false
