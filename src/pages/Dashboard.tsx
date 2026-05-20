@@ -84,10 +84,11 @@ export default function Dashboard() {
   }, [loading, searchParams, navigate]);
 
   useEffect(() => {
-    if (creator) {
+    if (creator?.id) {
       fetchData();
     }
-  }, [creator]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [creator?.id]);
 
   const fetchData = async () => {
     if (!creator) return;
