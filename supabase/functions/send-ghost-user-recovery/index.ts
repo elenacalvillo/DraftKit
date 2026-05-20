@@ -181,18 +181,47 @@ serve(async (req: Request): Promise<Response> => {
       page += 1;
     }
 
-    // 2. Subtract users who already have a creator profile.
+    // 2. A user is a "ghost" if they have no creators row, OR
+    //    their creators row is an empty placeholder (no
+    //    substack_url, no newsletter_url, and no creator_contacts
+    //    entry). The 18 ghosts that were manually backfilled into
+    //    `creators` to fix the count fall into the second bucket.
     const { data: creatorRows, error: creatorErr } = await admin
       .from("creators")
-      .select("user_id");
+      .select("id, user_id, substack_url, newsletter_url");
     if (creatorErr) throw creatorErr;
-    const creatorUserIds = new Set<string>(
-      (creatorRows ?? [])
-        .map((r: { user_id: string | null }) => r.user_id)
+
+    const { data: contactRows, error: contactErr } = await admin
+      .from("creator_contacts")
+      .select("creator_id");
+    if (contactErr) throw contactErr;
+    const contactCreatorIds = new Set<string>(
+      (contactRows ?? [])
+        .map((r: { creator_id: string | null }) => r.creator_id)
         .filter((v: string | null): v is string => Boolean(v)),
     );
+
+    const completeUserIds = new Set<string>();
+    for (const c of creatorRows ?? []) {
+      const row = c as {
+        id: string;
+        user_id: string | null;
+        substack_url: string | null;
+        newsletter_url: string | null;
+      };
+      if (!row.user_id) continue;
+      const hasUrl = Boolean(
+        (row.substack_url && row.substack_url.trim()) ||
+          (row.newsletter_url && row.newsletter_url.trim()),
+      );
+      const hasContact = contactCreatorIds.has(row.id);
+      if (hasUrl || hasContact) {
+        completeUserIds.add(row.user_id);
+      }
+    }
+
     const ghosts: GhostUser[] = allUsers.filter(
-      (u) => !creatorUserIds.has(u.id),
+      (u) => !completeUserIds.has(u.id),
     );
 
     // 3. Subtract users we've already reminded.
