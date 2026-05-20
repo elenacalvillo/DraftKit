@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { lovable } from '@/integrations/lovable/index';
@@ -49,6 +49,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [creatorLoading, setCreatorLoading] = useState(false);
 
+  // Track the user id we've already fetched a creator profile for, so that
+  // benign auth events (TOKEN_REFRESHED, tab-sync INITIAL_SESSION echoes,
+  // window-focus re-evaluations) don't thrash `creator` and cascade refetches
+  // into every consumer (Dashboard, usePro, etc).
+  const fetchedForUserIdRef = useRef<string | null>(null);
+
   const fetchCreator = async (userId: string) => {
     setCreatorLoading(true);
     try {
@@ -57,8 +63,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .select('*')
         .eq('user_id', userId)
         .maybeSingle();
-      
-      setCreator((data as Creator) ?? null);
+
+      const next = (data as Creator) ?? null;
+      // Preserve reference identity when nothing meaningful changed — this
+      // keeps `useEffect([creator])` consumers and RQ queryKeys stable.
+      setCreator((prev) => {
+        if (!prev && !next) return prev;
+        if (prev && next && prev.id === next.id && prev.updated_at === next.updated_at) {
+          return prev;
+        }
+        return next;
+      });
     } finally {
       setCreatorLoading(false);
     }
@@ -67,19 +82,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      (_event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
-        
-        // Defer Supabase calls with setTimeout
-        if (session?.user) {
-          setTimeout(() => {
-            fetchCreator(session.user.id);
-          }, 0);
-        } else {
+
+        const nextUserId = session?.user?.id ?? null;
+
+        if (nextUserId) {
+          // Only refetch when the signed-in identity actually changed.
+          if (fetchedForUserIdRef.current !== nextUserId) {
+            fetchedForUserIdRef.current = nextUserId;
+            setTimeout(() => {
+              fetchCreator(nextUserId);
+            }, 0);
+          }
+        } else if (fetchedForUserIdRef.current !== null) {
+          // True sign-out transition.
+          fetchedForUserIdRef.current = null;
           setCreator(null);
         }
-        
+
         setLoading(false);
       }
     );
@@ -88,11 +110,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      
-      if (session?.user) {
+
+      if (session?.user && fetchedForUserIdRef.current !== session.user.id) {
+        fetchedForUserIdRef.current = session.user.id;
         fetchCreator(session.user.id);
       }
-      
+
       setLoading(false);
     });
 

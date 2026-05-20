@@ -1,87 +1,42 @@
-## Goal
+## What's actually happening
 
-Ship a self-executing "Big Send" so the 18 existing ghost users receive the recovery email immediately when this change goes live — no manual broadcast, no manual POST call.
+The user is logged in as `hello@elenacalvillo.com` and sitting on `/dashboard`. Their `creators` row is fully populated, so the suspected `dashboard ↔ signup` redirect loop is **not** what's firing — `ProtectedRoute` lets them through and `Signup`'s effect only redirects when `user && creator`. No route bounce is happening for this account.
 
-## Current state (already in place)
+What network traffic actually shows (sampled 16:40:34–16:40:37):
 
-The `send-ghost-user-recovery` edge function already:
-
-- Enumerates `auth.users`, subtracts `creators`, produces the ghost list
-- Excludes `abi@rezonant.app`
-- Dedups via `recovery_emails_sent` (each user emailed exactly once, ever)
-- Sends via Resend transactional API (`/emails`)
-- Uses the exact subject and body the user specified, linking to `/signup`
-
-So the function itself is correct. The only missing piece is **automatic first-run on deployment**.
-
-## Changes
-
-### 1. Auto-fire on deploy via a one-shot pg_cron job
-
-Add a migration that schedules a cron entry which:
-
-- Runs once, ~2 minutes after the migration applies (gives the edge function time to redeploy)
-- Calls `send-ghost-user-recovery` via `net.http_post` with the service-role key (read from Vault, same pattern as `notify_new_collab_request`)
-- Immediately unschedules itself inside the same job so it never fires again
-
-This is the only reliable "run on deploy" hook available — edge functions have no startup lifecycle, and we explicitly do NOT want a recurring schedule (dedup table already prevents resends, but a recurring job would be misleading).
-
-### 2. Tighten the function for the Big Send
-
-Small edits to `supabase/functions/send-ghost-user-recovery/index.ts`:
-
-- Confirm the CTA link points to `/signup` (already does — keep as is)
-- Confirm subject/body match the approved copy verbatim (already do — no change needed)
-- No behavior change beyond a log line noting "auto-trigger" vs manual call (optional, harmless)
-
-### 3. Verify after deploy
-
-- Tail `supabase--edge_function_logs` for `send-ghost-user-recovery` to confirm the one-shot cron fired and the 18 sends succeeded
-- Query `recovery_emails_sent` to confirm 18 rows landed (17 if `abi@rezonant.app` had somehow been in there)
-
-### One Small Engineering Note
-
-Since the cron is set for `now() + interval '2 minutes'`, just make sure the Edge Function deployment finishes *before* that 2-minute window closes. If the deployment is slow and the cron fires while the function is still updating, it might hit the "old" version or a 404.
-
-> **Tip:** If you want to be extra safe, you could tell Lovable to bump that to **5 minutes**. It doesn't hurt anyone if the emails go out 3 minutes later, but it guarantees the new code is live.
-
-## Technical detail
-
-```sql
--- One-shot trigger: runs once ~2 min after apply, then unschedules itself
-SELECT cron.schedule(
-  'ghost-recovery-bigsend-oneshot',
-  -- next minute boundary +2
-  to_char(now() + interval '2 minutes', 'MI HH24 DD MM *'),
-  $$
-  DO $body$
-  DECLARE
-    service_key text;
-  BEGIN
-    SELECT decrypted_secret INTO service_key
-      FROM vault.decrypted_secrets
-      WHERE name = 'SUPABASE_SERVICE_ROLE_KEY' LIMIT 1;
-
-    PERFORM net.http_post(
-      url := 'https://cbgchxesngdsvkevbqwh.supabase.co/functions/v1/send-ghost-user-recovery',
-      headers := jsonb_build_object(
-        'Content-Type', 'application/json',
-        'Authorization', 'Bearer ' || service_key
-      ),
-      body := '{}'::jsonb
-    );
-
-    PERFORM cron.unschedule('ghost-recovery-bigsend-oneshot');
-  END
-  $body$;
-  $$
-);
+```text
+GET /creators?select=*&user_id=eq.<self>            ← every ~1s, sometimes 2× same second
+GET /creators?select=user_id,profile_image_url&...  ← every ~1s, in bursts of 2–4
 ```
 
-The dedup table (`recovery_emails_sent`) guarantees that even if this somehow fires twice, no ghost user receives a second email.
+So two things are looping in lockstep:
+
+1. `useAuth.fetchCreator` — runs whenever `onAuthStateChange` fires. The `select=*` query is its signature.
+2. `Dashboard.fetchData` — `useEffect(..., [creator])`. Because `fetchCreator` replaces `creator` with a brand-new object reference each run, the effect re-fires, which then issues the `select=user_id,profile_image_url&user_id=in.(...)` batch image-resolution query for the same 3 collab requester IDs.
+
+So the root chain is: **something is firing `onAuthStateChange` on a ~1 Hz cadence**, which thrashes `creator`, which thrashes the Dashboard effect, which thrashes the UI (the "flicker"). The new ghost-recovery migration/edge function did not touch auth or RLS on `creators`, so the regression is in client code, not the backend.
+
+## Plan
+
+1. **Confirm the trigger** (1 file read, no edits)
+   - Add a single temporary `console.log("[auth]", event)` inside `onAuthStateChange` in `src/hooks/useAuth.tsx`, reload `/dashboard`, capture console. Expect to see `TOKEN_REFRESHED` or `INITIAL_SESSION` firing repeatedly. This pins the source before we touch logic.
+
+2. **Stop reacting to no-op auth events** in `src/hooks/useAuth.tsx`
+   - In the `onAuthStateChange` callback, only call `fetchCreator` when the `session.user.id` actually changed compared to the previous value (track via `useRef`). `TOKEN_REFRESHED` and tab-sync events keep the same user id → skip the refetch.
+   - Keep the initial `getSession()` path as the single source of the first `fetchCreator` call.
+   - Same guard for clearing `creator`: only `setCreator(null)` on a true sign-out transition, not on every event with no user.
+
+3. **Stabilise the `creator` reference** so consumers don't churn even if `fetchCreator` does run
+   - In `fetchCreator`, after the query returns, compare the new row to the previous `creator` (shallow compare on the handful of fields we actually read) and **reuse the prior reference** when nothing changed. This makes the Dashboard `useEffect([creator])` and `usePro`'s `queryKey: [..., creator?.id]` immune to identity-only updates.
+
+4. **Tighten the Dashboard effect** in `src/pages/Dashboard.tsx`
+   - Change `useEffect(..., [creator])` to depend on `creator?.id` instead of the full object. Defensive belt-and-braces fix in case any other path produces a new `creator` reference with the same data.
+
+5. **Verify**
+   - Reload `/dashboard`, watch network: `creators?select=*` should fire once on mount, then not at all until a real auth change. The image-resolution `IN` query should fire once per `requests` payload, not every second.
+   - Remove the temporary `console.log` from step 1.
 
 ## Out of scope
 
-- DRAFT-001 (atomic creator profile RPC) — separate ticket
-- DRAFT-003 (hourly monitor) — already implemented as `monitor-ghost-users`
-- Editing the email copy — already matches the approved template
+- Ghost-recovery edge function, migration, or `recovery_emails_sent` table — unrelated to this flicker.
+- Any change to `ProtectedRoute` / `Signup` redirect logic — those are not in the loop for this user. We'll only revisit them if step 1 shows the trigger is actually a route bounce on a *different* account (e.g. one of the 18 backfilled ghosts whose `creator` row exists but is empty).
