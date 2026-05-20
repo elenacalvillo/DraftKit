@@ -744,6 +744,24 @@ export type Database = {
           },
         ]
       }
+      recovery_emails_sent: {
+        Row: {
+          email: string
+          sent_at: string
+          user_id: string
+        }
+        Insert: {
+          email: string
+          sent_at?: string
+          user_id: string
+        }
+        Update: {
+          email?: string
+          sent_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       referral_credits: {
         Row: {
           created_at: string
