@@ -220,22 +220,49 @@ export function WorkspaceEditor({ content, onChange, editable, currentUserName, 
             return true;
           }
 
-          // Markdown paste support. Triggers whenever the plain-text
-          // payload contains structural markdown tokens (headings, hr,
-          // lists, blockquote, fenced code) — even if the clipboard
-          // also carries an HTML wrapper (Notion, Notes, chat apps,
-          // browsers all add one). Rich web-page pastes don't match
-          // because their text/plain fallback strips these tokens.
-          const text = event.clipboardData?.getData("text/plain");
-          if (text && hasStructuralMarkdown(text)) {
+          // ============================================================
+          // MARKDOWN PASTE — runs BEFORE any HTML handling. If the
+          // plain-text payload contains structural markdown tokens
+          // (headings, hr, lists, blockquote, fenced code) we ignore
+          // any text/html wrapper the clipboard provides and force the
+          // markdown → sanitized HTML pipeline. Many apps (Notion,
+          // Notes, even pasting from a .md file via some editors) put
+          // a literal HTML wrapper on the clipboard that just contains
+          // the raw `#` / `---` characters — that wrapper would
+          // hijack the paste and render markdown as plain text.
+          // ============================================================
+          const text = event.clipboardData?.getData("text/plain") ?? "";
+          const html = event.clipboardData?.getData("text/html") ?? "";
+          const types = event.clipboardData?.types
+            ? Array.from(event.clipboardData.types)
+            : [];
+          const isMd = hasStructuralMarkdown(text);
+          console.debug("[markdown-paste] paste event", {
+            types,
+            textLen: text.length,
+            htmlLen: html.length,
+            isMd,
+            preview: text.slice(0, 80),
+          });
+
+          if (text && isMd) {
+            console.log("MARKDOWN DETECTED - FORCING CONVERSION");
             const converted = markdownToSanitizedHtml(text);
             if (converted && converted.trim()) {
               const ed = editorRef.current;
               if (ed) {
                 event.preventDefault();
-                console.debug("[markdown-paste] inserted", { length: converted.length });
-                ed.commands.insertContent(converted, {
-                  parseOptions: { preserveWhitespace: false },
+                const before = view.state.doc.content.size;
+                ed.chain()
+                  .focus()
+                  .insertContent(converted, {
+                    parseOptions: { preserveWhitespace: false },
+                  })
+                  .run();
+                const after = ed.state.doc.content.size;
+                console.debug("[markdown-paste] inserted", {
+                  htmlLen: converted.length,
+                  docDelta: after - before,
                 });
                 return true;
               }
