@@ -220,54 +220,11 @@ export function WorkspaceEditor({ content, onChange, editable, currentUserName, 
             return true;
           }
 
-          // ============================================================
-          // MARKDOWN PASTE — runs BEFORE any HTML handling. If the
-          // plain-text payload contains structural markdown tokens
-          // (headings, hr, lists, blockquote, fenced code) we ignore
-          // any text/html wrapper the clipboard provides and force the
-          // markdown → sanitized HTML pipeline. Many apps (Notion,
-          // Notes, even pasting from a .md file via some editors) put
-          // a literal HTML wrapper on the clipboard that just contains
-          // the raw `#` / `---` characters — that wrapper would
-          // hijack the paste and render markdown as plain text.
-          // ============================================================
-          const text = event.clipboardData?.getData("text/plain") ?? "";
-          const html = event.clipboardData?.getData("text/html") ?? "";
-          const types = event.clipboardData?.types
-            ? Array.from(event.clipboardData.types)
-            : [];
-          const isMd = hasStructuralMarkdown(text);
-          console.debug("[markdown-paste] paste event", {
-            types,
-            textLen: text.length,
-            htmlLen: html.length,
-            isMd,
-            preview: text.slice(0, 80),
-          });
-
-          if (text && isMd) {
-            console.log("MARKDOWN DETECTED - FORCING CONVERSION");
-            const converted = markdownToSanitizedHtml(text);
-            if (converted && converted.trim()) {
-              const ed = editorRef.current;
-              if (ed) {
-                event.preventDefault();
-                const before = view.state.doc.content.size;
-                ed.chain()
-                  .focus()
-                  .insertContent(converted, {
-                    parseOptions: { preserveWhitespace: false },
-                  })
-                  .run();
-                const after = ed.state.doc.content.size;
-                console.debug("[markdown-paste] inserted", {
-                  htmlLen: converted.length,
-                  docDelta: after - before,
-                });
-                return true;
-              }
-            }
-          }
+          // NOTE: Markdown paste handling lives in the top-level
+          // `editorProps.handlePaste` defined on useEditor below.
+          // That handler wins before this plugin runs, so we only
+          // need to keep the image-file guard here as a safety net
+          // for any path that reaches the plugin chain directly.
           return false;
         },
         handleDrop(view, event) {
@@ -304,6 +261,12 @@ export function WorkspaceEditor({ content, onChange, editable, currentUserName, 
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
         blockquote: false,
+        // StarterKit v3 bundles its own Link extension. We disable it
+        // here so our standalone `Link.configure(...)` below is the
+        // ONLY link extension registered — otherwise Tiptap warns
+        // "Duplicate extension names found: ['link']" and our custom
+        // paste plugins risk being ignored.
+        link: false,
       }),
       Link.configure({
         openOnClick: false,
@@ -352,6 +315,50 @@ export function WorkspaceEditor({ content, onChange, editable, currentUserName, 
         class:
           "workspace-prose min-h-[300px] px-5 py-4 focus:outline-none font-sans text-[15px] leading-[1.6] break-words",
         style: "overflow-wrap: break-word; word-break: break-word",
+      },
+      // ============================================================
+      // PRIORITY KILL SWITCH — top-level handlePaste.
+      // Defined directly on editorProps so it wins BEFORE any
+      // extension's ProseMirror plugin and BEFORE the browser's
+      // default paste behaviour. If text/plain looks like markdown,
+      // we preventDefault, insert sanitized HTML, and return true to
+      // terminate the event chain so raw `#` / `---` characters can
+      // never leak through.
+      // ============================================================
+      handlePaste: (view, event) => {
+        // 1. Image files first — preserve the existing workspace
+        //    upload pipeline (no base64, scoped to requestId).
+        const imageFile = findImageInDataTransfer(event.clipboardData);
+        if (imageFile) {
+          event.preventDefault();
+          insertImageFileRef.current(imageFile, view.state.selection.from);
+          return true;
+        }
+
+        // 2. Markdown detection on text/plain.
+        const text = event.clipboardData?.getData("text/plain") ?? "";
+        console.log("--- RAW PASTE INTERCEPTED ---", {
+          hasText: !!text,
+          textLen: text.length,
+        });
+
+        if (text && hasStructuralMarkdown(text)) {
+          console.log("!!! FORCING MARKDOWN CONVERSION !!!", {
+            preview: text.slice(0, 80),
+          });
+          event.preventDefault();
+          const html = markdownToSanitizedHtml(text);
+          const ed = editorRef.current;
+          if (ed && html && html.trim()) {
+            ed.chain().focus().insertContent(html, {
+              parseOptions: { preserveWhitespace: false },
+            }).run();
+          }
+          return true; // kill the event chain
+        }
+
+        // 3. Not markdown, not an image — let Tiptap handle it.
+        return false;
       },
     },
   });
