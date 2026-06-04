@@ -8,6 +8,7 @@ import {
   BookMarked,
   ChevronUp,
   ChevronDown,
+  Download,
   Lock,
   Megaphone,
   Plus,
@@ -53,6 +54,7 @@ import {
   roleLabel,
 } from "@/lib/access";
 import { ProjectUpgradePrompt } from "@/components/projects/ProjectUpgradePrompt";
+import { ExportBookDialog } from "@/components/projects/ExportBookDialog";
 
 const STAGE_BADGE: Record<ChapterStage, string> = {
   draft: "bg-slate-200 text-slate-800",
@@ -84,6 +86,7 @@ export default function ProjectDetail() {
     "chapter_writer",
   );
   const [broadcastMessage, setBroadcastMessage] = useState("");
+  const [showExportDialog, setShowExportDialog] = useState(false);
   const [pendingRevert, setPendingRevert] = useState<{
     id: string;
     from: ChapterStage;
@@ -251,33 +254,51 @@ export default function ProjectDetail() {
               )}
             </div>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              toggleArchive
-                .mutateAsync({ id: project.id, archive: !project.is_archived })
-                .then(() =>
-                  toast.success(
-                    project.is_archived ? "Project unarchived" : "Slot Available",
-                  ),
-                )
-                .catch((err) =>
-                  toast.error(err instanceof Error ? err.message : "Failed"),
-                )
-            }
-          >
-            {project.is_archived ? (
-              <>
-                <ArchiveRestore className="w-4 h-4 mr-1.5" /> Unarchive
-              </>
-            ) : (
-              <>
-                <Archive className="w-4 h-4 mr-1.5" /> Archive
-              </>
+          <div className="flex items-center gap-2">
+            {isProject && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowExportDialog(true)}
+              >
+                <Download className="w-4 h-4 mr-1.5" /> Export book
+              </Button>
             )}
-          </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                toggleArchive
+                  .mutateAsync({ id: project.id, archive: !project.is_archived })
+                  .then(() =>
+                    toast.success(
+                      project.is_archived ? "Project unarchived" : "Slot Available",
+                    ),
+                  )
+                  .catch((err) =>
+                    toast.error(err instanceof Error ? err.message : "Failed"),
+                  )
+              }
+            >
+              {project.is_archived ? (
+                <>
+                  <ArchiveRestore className="w-4 h-4 mr-1.5" /> Unarchive
+                </>
+              ) : (
+                <>
+                  <Archive className="w-4 h-4 mr-1.5" /> Archive
+                </>
+              )}
+            </Button>
+          </div>
         </div>
+
+        <ExportBookDialog
+          open={showExportDialog}
+          onOpenChange={setShowExportDialog}
+          projectId={project.id}
+          projectTitle={project.title}
+        />
 
         <Tabs defaultValue="chapters">
           <TabsList>

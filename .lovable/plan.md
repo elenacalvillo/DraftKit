@@ -1,59 +1,94 @@
-## Plan
+# Book Project Export Suite + Table Export Fix
 
-1. Move markdown paste into top-level `editorProps.handlePaste` (priority kill switch)
-   - Define `handlePaste(view, event)` directly inside the `useEditor` config so it runs before any extension plugin or browser default.
-   - First line: `console.log('--- RAW PASTE INTERCEPTED ---', { hasText: !!text })` to prove the handler fires.
-   - Read `text/plain`, run `hasStructuralMarkdown(text)`.
+Two related tracks:
+1. New Project-tier feature: bulk export an entire book project in multiple formats.
+2. Fix the existing `.docx` export so Tiptap tables (and other formatting) survive intact when opened locally.
 
-2. Enforce the kill switch when markdown is detected
-   - Call `event.preventDefault()` BEFORE inserting, to stop the browser from also dumping raw `#` / `---` text.
-   - Convert with `markdownToSanitizedHtml(text)` and insert via `editor.commands.insertContent(html)` (using the captured editor ref).
-   - Explicitly `return true` to terminate the paste event chain so nothing else (browser default, other plugins) can run after us.
-   - Log `'!!! FORCING MARKDOWN CONVERSION !!!'` right before insertion for clear console evidence.
+---
 
-3. Keep image paste working without blocking markdown
-   - Run the image-file check first (existing workspace upload path). If an image is found, handle it and `return true`.
-   - If no image and no markdown match, `return false` so normal plain-text paste continues to work.
-   - The existing image upload ProseMirror plugin stays in place for drop events and as a safety net, but markdown decisions now live in the top-level handler.
+## Track 1 — Bulk Book Export (Project tier)
 
-4. Remove the duplicate `link` extension registration
-   - Investigate the `[tiptap warn]: Duplicate extension names found: ['link']` warning.
-   - StarterKit v3 may already register `link`; if so, drop the standalone `Link` import OR disable `link` in `StarterKit.configure({ link: false })` so only one `Link` extension is active. Pick whichever path lets us keep the current `openOnClick: false` + `validate` config.
-   - Confirm the warning disappears so custom plugins are no longer at risk of being ignored due to a messy extension chain.
+### Where it lives
+- New "Export book" button on the Project Detail page header (`src/pages/ProjectDetail.tsx`), gated by `hasProjectAccess(creator)`.
+- Free / Pro users see the button with a lock + `UpgradePrompt(feature="export")` upsell modal.
 
-5. Validate end-to-end with the actual failing paste
-   - Reload, open console, paste the Prólogo `.md` content.
-   - Required console evidence: `--- RAW PASTE INTERCEPTED ---` appears, then `!!! FORCING MARKDOWN CONVERSION !!!`, and the document renders real headings / horizontal rules / lists instead of literal `#` and `---` characters.
-   - If interception fires but rendering still fails, fall back to inspecting the converted HTML output before insertion.
+### Export dialog
+A single dialog with 4 format options (user can pick one per export, but all 4 are always available to Project members):
 
-## Technical details
+1. **ZIP of individual chapter `.docx` files** — `01 — Chapter Title.docx`, `02 — …`, etc.
+2. **ZIP of individual chapter `.md` files** — same naming convention, HTML → Markdown via `turndown`.
+3. **Single combined `.pdf`** — title page (project title + author + date), auto-generated TOC, then each chapter starting on a new page with an `H1` chapter title.
+4. **Single combined `.docx`** — same structure as the PDF (title page, TOC field, chapters separated by page breaks).
 
-- Primary file: `src/components/requests/WorkspaceEditor.tsx`
-- Supporting file (read-only unless heuristic needs a tweak): `src/lib/markdown-paste.ts`
-- Editor shape after change:
+Chapter ordering: use the existing `chapter_order` column (already sorted ascending in `useProjectChapters`). No reorder UI at export time.
 
-```text
-useEditor({
-  extensions: [...one Link only...],
-  editorProps: {
-    attributes: { ... },
-    handlePaste(view, event) {
-      // 1. image file? handle + return true
-      // 2. text/plain + hasStructuralMarkdown?
-      //      event.preventDefault()
-      //      editor.commands.insertContent(markdownToSanitizedHtml(text))
-      //      return true   <-- kill switch
-      // 3. otherwise return false
-    }
-  }
-})
-```
+Filename: `{Project Title} — Export ({YYYY-MM-DD}).{ext|zip}`, sanitized.
 
-- No backend, schema, RLS, storage, or sanitization-policy changes.
-- DOMPurify whitelist and no-base64 image rule remain untouched.
+### Progress + UX
+- Dialog shows a progress bar while building (chapter count can be large).
+- Generation happens client-side using each chapter's `content_html` already fetched by `useProjectChapters`. No edge function needed.
+- After build, file downloads via `file-saver`. Toast on success/error.
+- Analytics: `book_export_started` / `book_export_completed` with `{ format, chapter_count, tier }`.
 
-## Compliance check
+### Libraries
+- `docx` (already installed) — `.docx` files.
+- `jszip` — zipping per-chapter files (new dep).
+- `turndown` — HTML → Markdown (new dep).
+- `pdf-lib` or `jspdf` + `html2canvas` is heavy; instead generate PDF by reusing the combined `.docx` path through a lightweight HTML-to-PDF route: render combined HTML in a hidden iframe and use the browser's `window.print()` is unreliable. **Plan: use `pdfmake`** (new dep, ~300KB) which accepts a structured doc model — same content tree we build for `docx`, mapped to pdfmake's format. Single dependency, no server.
 
-- **Read Constraints:** Scanned the project root for `CLAUDE.md` — not present; followed in-prompt project rules instead.
-- **Audit Active Rules:** No changes to `has_workspace_access`, public column exposure, or realtime policies. Editor sanitization whitelist preserved.
-- **Verify Compliance:** This change does not conflict with the 1 GB storage cap, the editor sanitization whitelist, or the in-app document retention mandate.
+### Access gating
+- Button disabled + tooltip "Project tier feature" when `!hasProjectAccess`.
+- On click while gated → navigate to `/dashboard/subscription?returnTo=…` (consistent with `UpgradePrompt`).
+- No backend/RLS changes needed — content is already readable to project members.
+
+---
+
+## Track 2 — Fix Table Rendering in `.docx` Export
+
+Current `exportWorkspaceHtmlToDocx` in `src/lib/export-draft.ts` walks only top-level children and handles `h1/h2/h3/ul/ol/p`. It **completely ignores `<table>`**, so Tiptap tables vanish or get flattened to plain text. It also drops inline formatting (bold, italic, links) because each block becomes a single `TextRun` from `textContent`.
+
+### New HTML → DOCX converter
+Replace the ad-hoc walker with a proper recursive converter:
+
+- **Inline runs**: walk child nodes; emit `TextRun` per span, preserving `bold`, `italics`, `underline`, `strike`, `code`, hyperlinks (`ExternalHyperlink`).
+- **Block-level handlers**:
+  - `h1/h2/h3` → `HeadingLevel.HEADING_1/2/3` with inline runs.
+  - `p` → `Paragraph` with inline runs (skip empty).
+  - `ul/ol` → numbered config (`bullets` / `numbers` reference) per docx rules — never literal `•` characters. Support nesting via `level`.
+  - `blockquote` → indented italic paragraphs.
+  - `hr` → empty paragraph with bottom border.
+  - `img` → `ImageRun` (fetch from Supabase public URL, base64, supply `type` from extension).
+  - `table` → `Table` with `WidthType.DXA`, `columnWidths` summing to 9360 (US Letter content width), each cell sets matching `width`, `margins`, light gray border, `ShadingType.CLEAR` for header row. Walk `tr` → `td/th`; cell children go through the same block converter recursively.
+- Set explicit US Letter page size (12240×15840 DXA, 1440 margins) and Arial default font in `Document.styles` so tables render identically in Word / Pages / Google Docs.
+
+### Where it's used
+- `SharedWorkspace.tsx` "Download as Word" action — picks up the fix automatically.
+- Per-chapter `.docx` in the new ZIP export uses the same converter.
+- Combined `.docx` book export uses the same converter, wrapped with a title page + page breaks between chapters.
+
+### Reuse for PDF
+The same intermediate node tree (paragraphs / lists / tables / images) is mapped to pdfmake's content array for the combined PDF path — one HTML parser, two renderers.
+
+---
+
+## Technical notes
+
+- New files:
+  - `src/lib/html-to-docx.ts` — recursive converter (replaces current logic in `export-draft.ts`).
+  - `src/lib/html-to-pdf.ts` — pdfmake mapper.
+  - `src/lib/book-export.ts` — orchestrator: fetch chapters, build per-format outputs.
+  - `src/components/projects/ExportBookDialog.tsx` — format picker + progress UI.
+- Dependencies to add: `jszip`, `turndown`, `pdfmake`.
+- `docx` version already in use is compatible.
+- No DB migrations, no edge functions, no RLS changes.
+- Sanitization untouched — exports read HTML that's already been DOMPurified on save.
+- Storage cap unaffected — exports are downloaded client-side, nothing uploaded.
+
+## Out of scope
+- Reordering chapters at export time (uses saved `chapter_order`).
+- ePub / Kindle formats (can be added later if requested).
+- Per-chapter individual download (already covered by ZIP option).
+- Watermarked free preview — not requested; Project-tier gate only.
+
+## Open question for next iteration
+User will provide a sample workspace HTML / broken `.docx` so we can confirm the new converter handles their exact table shape (merged cells? wide tables?). Plan covers standard Tiptap tables; if her file uses merged cells (`colspan`/`rowspan`) we'll extend the cell handler.
