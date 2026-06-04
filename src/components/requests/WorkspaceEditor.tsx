@@ -304,6 +304,12 @@ export function WorkspaceEditor({ content, onChange, editable, currentUserName, 
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
         blockquote: false,
+        // StarterKit v3 bundles its own Link extension. We disable it
+        // here so our standalone `Link.configure(...)` below is the
+        // ONLY link extension registered — otherwise Tiptap warns
+        // "Duplicate extension names found: ['link']" and our custom
+        // paste plugins risk being ignored.
+        link: false,
       }),
       Link.configure({
         openOnClick: false,
@@ -352,6 +358,50 @@ export function WorkspaceEditor({ content, onChange, editable, currentUserName, 
         class:
           "workspace-prose min-h-[300px] px-5 py-4 focus:outline-none font-sans text-[15px] leading-[1.6] break-words",
         style: "overflow-wrap: break-word; word-break: break-word",
+      },
+      // ============================================================
+      // PRIORITY KILL SWITCH — top-level handlePaste.
+      // Defined directly on editorProps so it wins BEFORE any
+      // extension's ProseMirror plugin and BEFORE the browser's
+      // default paste behaviour. If text/plain looks like markdown,
+      // we preventDefault, insert sanitized HTML, and return true to
+      // terminate the event chain so raw `#` / `---` characters can
+      // never leak through.
+      // ============================================================
+      handlePaste: (view, event) => {
+        // 1. Image files first — preserve the existing workspace
+        //    upload pipeline (no base64, scoped to requestId).
+        const imageFile = findImageInDataTransfer(event.clipboardData);
+        if (imageFile) {
+          event.preventDefault();
+          insertImageFileRef.current(imageFile, view.state.selection.from);
+          return true;
+        }
+
+        // 2. Markdown detection on text/plain.
+        const text = event.clipboardData?.getData("text/plain") ?? "";
+        console.log("--- RAW PASTE INTERCEPTED ---", {
+          hasText: !!text,
+          textLen: text.length,
+        });
+
+        if (text && hasStructuralMarkdown(text)) {
+          console.log("!!! FORCING MARKDOWN CONVERSION !!!", {
+            preview: text.slice(0, 80),
+          });
+          event.preventDefault();
+          const html = markdownToSanitizedHtml(text);
+          const ed = editorRef.current;
+          if (ed && html && html.trim()) {
+            ed.chain().focus().insertContent(html, {
+              parseOptions: { preserveWhitespace: false },
+            }).run();
+          }
+          return true; // kill the event chain
+        }
+
+        // 3. Not markdown, not an image — let Tiptap handle it.
+        return false;
       },
     },
   });
