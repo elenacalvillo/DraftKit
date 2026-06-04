@@ -8,6 +8,7 @@ import {
   BookMarked,
   ChevronUp,
   ChevronDown,
+  Download,
   Lock,
   Megaphone,
   Plus,
