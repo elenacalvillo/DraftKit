@@ -221,12 +221,14 @@ export function WorkspaceEditor({ content, onChange, editable, currentUserName, 
             return true;
           }
 
-          // Markdown paste support. Only kicks in for plain-text clipboard
-          // payloads that look like markdown — rich HTML pastes from web
-          // pages still go through TipTap's default HTML pipeline.
-          const html = event.clipboardData?.getData("text/html");
+          // Markdown paste support. Triggers whenever the plain-text
+          // payload contains structural markdown tokens (headings, hr,
+          // lists, blockquote, fenced code) — even if the clipboard
+          // also carries an HTML wrapper (Notion, Notes, chat apps,
+          // browsers all add one). Rich web-page pastes don't match
+          // because their text/plain fallback strips these tokens.
           const text = event.clipboardData?.getData("text/plain");
-          if (!html && text && looksLikeMarkdown(text)) {
+          if (text && hasStructuralMarkdown(text)) {
             const converted = markdownToSanitizedHtml(text);
             if (converted && converted.trim()) {
               event.preventDefault();
