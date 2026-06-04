@@ -17,6 +17,20 @@ const ALLOWED_ATTR = ["href", "target", "rel", "colspan", "rowspan", "class"];
  * Conservative — only true when at least one strong markdown token is
  * present, so ordinary prose pastes still behave like plain text.
  */
+export function hasStructuralMarkdown(text: string): boolean {
+  if (!text) return false;
+  const patterns: RegExp[] = [
+    /^#{1,6}\s+\S/m,        // # ATX heading
+    /^\s*[-*+]\s+\S/m,      // - bullet
+    /^\s*\d+\.\s+\S/m,      // 1. ordered list
+    /^\s*>\s+\S/m,          // > blockquote
+    /^\s*(?:---|\*\*\*|___)\s*$/m, // thematic break
+    /^\s*={2,}\s*$/m,       // setext heading underline
+    /```/,                  // fenced code block
+  ];
+  return patterns.some((re) => re.test(text));
+}
+
 export function looksLikeMarkdown(text: string): boolean {
   if (!text || text.length < 2) return false;
   const patterns: RegExp[] = [
