@@ -80,7 +80,10 @@ export type AnalyticsEventType =
   // follow-up refreshCreator cache update) fails. Lets us
   // detect a fresh accumulation of ghost users without waiting
   // for the hourly pg_cron monitor to alert.
-  | "creator_creation_failed";
+  | "creator_creation_failed"
+  // ---- Book Project bulk export ----
+  | "book_export_started"
+  | "book_export_completed";
 
 function getOrCreateSessionId(): string {
   let sessionId = sessionStorage.getItem("draftkit_session_id");
