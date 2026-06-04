@@ -1,42 +1,41 @@
-## What's actually happening
+## Problem
 
-The user is logged in as `hello@elenacalvillo.com` and sitting on `/dashboard`. Their `creators` row is fully populated, so the suspected `dashboard ↔ signup` redirect loop is **not** what's firing — `ProtectedRoute` lets them through and `Signup`'s effect only redirects when `user && creator`. No route bounce is happening for this account.
+Pasting markdown into the Shared Workspace editor leaves the raw syntax (`#`, `##`, `**bold**`, `- item`, `---`, etc.) as literal text. Nothing gets formatted, as visible in the screenshot of "Prólogo".
 
-What network traffic actually shows (sampled 16:40:34–16:40:37):
-
-```text
-GET /creators?select=*&user_id=eq.<self>            ← every ~1s, sometimes 2× same second
-GET /creators?select=user_id,profile_image_url&...  ← every ~1s, in bursts of 2–4
-```
-
-So two things are looping in lockstep:
-
-1. `useAuth.fetchCreator` — runs whenever `onAuthStateChange` fires. The `select=*` query is its signature.
-2. `Dashboard.fetchData` — `useEffect(..., [creator])`. Because `fetchCreator` replaces `creator` with a brand-new object reference each run, the effect re-fires, which then issues the `select=user_id,profile_image_url&user_id=in.(...)` batch image-resolution query for the same 3 collab requester IDs.
-
-So the root chain is: **something is firing `onAuthStateChange` on a ~1 Hz cadence**, which thrashes `creator`, which thrashes the Dashboard effect, which thrashes the UI (the "flicker"). The new ghost-recovery migration/edge function did not touch auth or RLS on `creators`, so the regression is in client code, not the backend.
+Root cause: `WorkspaceEditor.tsx` uses Tiptap's `StarterKit` with no markdown handling. Tiptap only converts pasted **HTML**, not plain-text markdown. When the user copies from a `.md` file or another markdown source, the clipboard only carries `text/plain`, so it lands verbatim.
 
 ## Plan
 
-1. **Confirm the trigger** (1 file read, no edits)
-   - Add a single temporary `console.log("[auth]", event)` inside `onAuthStateChange` in `src/hooks/useAuth.tsx`, reload `/dashboard`, capture console. Expect to see `TOKEN_REFRESHED` or `INITIAL_SESSION` firing repeatedly. This pins the source before we touch logic.
+1. **Add a markdown parser dependency**
+   - Install `marked` (small, fast, well-maintained, MIT). Used only client-side inside the editor paste handler.
 
-2. **Stop reacting to no-op auth events** in `src/hooks/useAuth.tsx`
-   - In the `onAuthStateChange` callback, only call `fetchCreator` when the `session.user.id` actually changed compared to the previous value (track via `useRef`). `TOKEN_REFRESHED` and tab-sync events keep the same user id → skip the refetch.
-   - Keep the initial `getSession()` path as the single source of the first `fetchCreator` call.
-   - Same guard for clearing `creator`: only `setCreator(null)` on a true sign-out transition, not on every event with no user.
+2. **Markdown detection helper** (`src/lib/markdown-paste.ts`)
+   - `looksLikeMarkdown(text: string): boolean` — true if the pasted text contains any of: ATX headings (`^#{1,6} `), setext underlines (`^=+$` / `^-+$`), thematic break (`^---$`), list markers (`^[-*+] `, `^\d+\. `), blockquote (`^> `), fenced code (` ``` `), bold/italic (`**…**`, `*…*`, `__…__`), inline code (`` `…` ``), links `[x](http…)`, or images `![…](…)`.
+   - `markdownToSanitizedHtml(md: string): string` — runs `marked.parse(md, { gfm: true, breaks: false })` then passes the result through the existing DOMPurify config used elsewhere (same `ALLOWED_TAGS` / `ALLOWED_ATTR` as `PublicWorkspaceView`, restricted to the workspace whitelist: headings h1–h3, p, strong, em, s, code, pre, a, ul, ol, li, br, hr, blockquote, table tags). Strip `<img>` from markdown paste (images must go through the existing upload pipeline to honor the 1 GB storage and no-base64 rules) and strip `data:` URIs.
 
-3. **Stabilise the `creator` reference** so consumers don't churn even if `fetchCreator` does run
-   - In `fetchCreator`, after the query returns, compare the new row to the previous `creator` (shallow compare on the handful of fields we actually read) and **reuse the prior reference** when nothing changed. This makes the Dashboard `useEffect([creator])` and `usePro`'s `queryKey: [..., creator?.id]` immune to identity-only updates.
+3. **Wire it into the paste plugin** (`WorkspaceEditor.tsx`, inside `imageUploadPlugin`)
+   - Add a `handlePaste` branch that runs **before** the existing image check:
+     - If `event.clipboardData` has `text/html` → let Tiptap handle it (return false). This preserves rich paste from web pages.
+     - Else if it has `text/plain` AND `looksLikeMarkdown(text)` is true:
+       - `event.preventDefault()`
+       - Convert to sanitized HTML
+       - Insert via `editor.commands.insertContent(html, { parseOptions: { preserveWhitespace: false } })` using the view's dispatch
+       - Return `true`
+     - Otherwise return `false` (fall through to existing image handler and default plain-text paste).
+   - Rename the plugin to `workspacePastePlugin` since it now handles more than images. Keep image drop/paste behavior unchanged.
 
-4. **Tighten the Dashboard effect** in `src/pages/Dashboard.tsx`
-   - Change `useEffect(..., [creator])` to depend on `creator?.id` instead of the full object. Defensive belt-and-braces fix in case any other path produces a new `creator` reference with the same data.
+4. **No backend / schema / sanitizer-whitelist changes.** The output stays inside the existing DOMPurify whitelist used on save (`src/lib/save-workspace-errors.ts` / workspace save path) so nothing new is allowed through.
 
 5. **Verify**
-   - Reload `/dashboard`, watch network: `creators?select=*` should fire once on mount, then not at all until a real auth change. The image-resolution `IN` query should fire once per `requests` payload, not every second.
-   - Remove the temporary `console.log` from step 1.
+   - Paste the exact Prólogo markdown from the screenshot → headings, hr, paragraphs, emphasis render correctly.
+   - Paste a list / fenced code / blockquote → renders as list / code block / quote.
+   - Paste plain prose (no markdown tokens) → behaves like before (plain text).
+   - Paste rich HTML from a webpage → unchanged (Tiptap handles it).
+   - Paste an image → unchanged (existing upload path).
+   - Save & reload → formatting persists (sanitizer already permits these tags).
 
 ## Out of scope
 
-- Ghost-recovery edge function, migration, or `recovery_emails_sent` table — unrelated to this flicker.
-- Any change to `ProtectedRoute` / `Signup` redirect logic — those are not in the loop for this user. We'll only revisit them if step 1 shows the trigger is actually a route bounce on a *different* account (e.g. one of the 18 backfilled ghosts whose `creator` row exists but is empty).
+- Markdown **export** (Copy / Download already exist as HTML/docx).
+- A "paste as markdown" toggle UI — detection is automatic and conservative.
+- Changes to the public viewer, mobile, or any other surface.

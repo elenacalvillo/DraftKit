@@ -1,5 +1,6 @@
 import { useEditor, EditorContent } from "@tiptap/react";
 import { Plugin } from "@tiptap/pm/state";
+import { DOMParser as PMDOMParser } from "@tiptap/pm/model";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
@@ -8,6 +9,7 @@ import { TableRow } from "@tiptap/extension-table-row";
 import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
 import { StickyComment } from "@/lib/tiptap-sticky-comment";
+import { looksLikeMarkdown, markdownToSanitizedHtml } from "@/lib/markdown-paste";
 import {
   Bold,
   Italic,
@@ -217,6 +219,26 @@ export function WorkspaceEditor({ content, onChange, editable, currentUserName, 
             // Insert at the current selection head.
             insertImageFileRef.current(file, view.state.selection.from);
             return true;
+          }
+
+          // Markdown paste support. Only kicks in for plain-text clipboard
+          // payloads that look like markdown — rich HTML pastes from web
+          // pages still go through TipTap's default HTML pipeline.
+          const html = event.clipboardData?.getData("text/html");
+          const text = event.clipboardData?.getData("text/plain");
+          if (!html && text && looksLikeMarkdown(text)) {
+            const converted = markdownToSanitizedHtml(text);
+            if (converted && converted.trim()) {
+              event.preventDefault();
+              const { state } = view;
+              const parser = new DOMParser();
+              const doc = parser.parseFromString(`<div>${converted}</div>`, "text/html");
+              const container = doc.body.firstChild as HTMLElement;
+              const pmSlice = PMDOMParser.fromSchema(state.schema).parseSlice(container);
+              const tr = state.tr.replaceSelection(pmSlice).scrollIntoView();
+              view.dispatch(tr);
+              return true;
+            }
           }
           return false;
         },
