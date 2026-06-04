@@ -220,54 +220,11 @@ export function WorkspaceEditor({ content, onChange, editable, currentUserName, 
             return true;
           }
 
-          // ============================================================
-          // MARKDOWN PASTE — runs BEFORE any HTML handling. If the
-          // plain-text payload contains structural markdown tokens
-          // (headings, hr, lists, blockquote, fenced code) we ignore
-          // any text/html wrapper the clipboard provides and force the
-          // markdown → sanitized HTML pipeline. Many apps (Notion,
-          // Notes, even pasting from a .md file via some editors) put
-          // a literal HTML wrapper on the clipboard that just contains
-          // the raw `#` / `---` characters — that wrapper would
-          // hijack the paste and render markdown as plain text.
-          // ============================================================
-          const text = event.clipboardData?.getData("text/plain") ?? "";
-          const html = event.clipboardData?.getData("text/html") ?? "";
-          const types = event.clipboardData?.types
-            ? Array.from(event.clipboardData.types)
-            : [];
-          const isMd = hasStructuralMarkdown(text);
-          console.debug("[markdown-paste] paste event", {
-            types,
-            textLen: text.length,
-            htmlLen: html.length,
-            isMd,
-            preview: text.slice(0, 80),
-          });
-
-          if (text && isMd) {
-            console.log("MARKDOWN DETECTED - FORCING CONVERSION");
-            const converted = markdownToSanitizedHtml(text);
-            if (converted && converted.trim()) {
-              const ed = editorRef.current;
-              if (ed) {
-                event.preventDefault();
-                const before = view.state.doc.content.size;
-                ed.chain()
-                  .focus()
-                  .insertContent(converted, {
-                    parseOptions: { preserveWhitespace: false },
-                  })
-                  .run();
-                const after = ed.state.doc.content.size;
-                console.debug("[markdown-paste] inserted", {
-                  htmlLen: converted.length,
-                  docDelta: after - before,
-                });
-                return true;
-              }
-            }
-          }
+          // NOTE: Markdown paste handling lives in the top-level
+          // `editorProps.handlePaste` defined on useEditor below.
+          // That handler wins before this plugin runs, so we only
+          // need to keep the image-file guard here as a safety net
+          // for any path that reaches the plugin chain directly.
           return false;
         },
         handleDrop(view, event) {
