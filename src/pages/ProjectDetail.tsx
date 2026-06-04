@@ -86,6 +86,7 @@ export default function ProjectDetail() {
     "chapter_writer",
   );
   const [broadcastMessage, setBroadcastMessage] = useState("");
+  const [showExportDialog, setShowExportDialog] = useState(false);
   const [pendingRevert, setPendingRevert] = useState<{
     id: string;
     from: ChapterStage;
