@@ -231,14 +231,9 @@ export function WorkspaceEditor({ content, onChange, editable, currentUserName, 
             if (converted && converted.trim()) {
               event.preventDefault();
               const { state } = view;
-              const slice = (view.props as any) // use editor commands via DOM dispatch
-                ? null
-                : null;
-              // Insert as HTML through ProseMirror so it parses into nodes.
               const parser = new DOMParser();
               const doc = parser.parseFromString(`<div>${converted}</div>`, "text/html");
               const container = doc.body.firstChild as HTMLElement;
-              const { DOMParser: PMDOMParser } = require("@tiptap/pm/model");
               const pmSlice = PMDOMParser.fromSchema(state.schema).parseSlice(container);
               const tr = state.tr.replaceSelection(pmSlice).scrollIntoView();
               view.dispatch(tr);
