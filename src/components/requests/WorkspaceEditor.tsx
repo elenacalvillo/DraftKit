@@ -219,6 +219,31 @@ export function WorkspaceEditor({ content, onChange, editable, currentUserName, 
             insertImageFileRef.current(file, view.state.selection.from);
             return true;
           }
+
+          // Markdown paste support. Only kicks in for plain-text clipboard
+          // payloads that look like markdown — rich HTML pastes from web
+          // pages still go through TipTap's default HTML pipeline.
+          const html = event.clipboardData?.getData("text/html");
+          const text = event.clipboardData?.getData("text/plain");
+          if (!html && text && looksLikeMarkdown(text)) {
+            const converted = markdownToSanitizedHtml(text);
+            if (converted && converted.trim()) {
+              event.preventDefault();
+              const { state } = view;
+              const slice = (view.props as any) // use editor commands via DOM dispatch
+                ? null
+                : null;
+              // Insert as HTML through ProseMirror so it parses into nodes.
+              const parser = new DOMParser();
+              const doc = parser.parseFromString(`<div>${converted}</div>`, "text/html");
+              const container = doc.body.firstChild as HTMLElement;
+              const { DOMParser: PMDOMParser } = require("@tiptap/pm/model");
+              const pmSlice = PMDOMParser.fromSchema(state.schema).parseSlice(container);
+              const tr = state.tr.replaceSelection(pmSlice).scrollIntoView();
+              view.dispatch(tr);
+              return true;
+            }
+          }
           return false;
         },
         handleDrop(view, event) {
