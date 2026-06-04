@@ -1,6 +1,5 @@
 import { useEditor, EditorContent } from "@tiptap/react";
 import { Plugin } from "@tiptap/pm/state";
-import { DOMParser as PMDOMParser } from "@tiptap/pm/model";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
@@ -231,15 +230,15 @@ export function WorkspaceEditor({ content, onChange, editable, currentUserName, 
           if (text && hasStructuralMarkdown(text)) {
             const converted = markdownToSanitizedHtml(text);
             if (converted && converted.trim()) {
-              event.preventDefault();
-              const { state } = view;
-              const parser = new DOMParser();
-              const doc = parser.parseFromString(`<div>${converted}</div>`, "text/html");
-              const container = doc.body.firstChild as HTMLElement;
-              const pmSlice = PMDOMParser.fromSchema(state.schema).parseSlice(container);
-              const tr = state.tr.replaceSelection(pmSlice).scrollIntoView();
-              view.dispatch(tr);
-              return true;
+              const ed = editorRef.current;
+              if (ed) {
+                event.preventDefault();
+                console.debug("[markdown-paste] inserted", { length: converted.length });
+                ed.commands.insertContent(converted, {
+                  parseOptions: { preserveWhitespace: false },
+                });
+                return true;
+              }
             }
           }
           return false;
