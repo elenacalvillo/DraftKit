@@ -54,6 +54,7 @@ import {
   roleLabel,
 } from "@/lib/access";
 import { ProjectUpgradePrompt } from "@/components/projects/ProjectUpgradePrompt";
+import { ExportBookDialog } from "@/components/projects/ExportBookDialog";
 
 const STAGE_BADGE: Record<ChapterStage, string> = {
   draft: "bg-slate-200 text-slate-800",
