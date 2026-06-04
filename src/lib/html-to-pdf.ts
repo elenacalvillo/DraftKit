@@ -247,7 +247,9 @@ export async function chaptersToCombinedPdfBlob(
 
   return new Promise<Blob>((resolve, reject) => {
     try {
-      pdfMake.createPdf(docDef).getBlob((blob: Blob) => resolve(blob));
+      (pdfMake.createPdf(docDef) as unknown as {
+        getBlob: (cb: (blob: Blob) => void) => void;
+      }).getBlob((blob: Blob) => resolve(blob));
     } catch (err) {
       reject(err);
     }
