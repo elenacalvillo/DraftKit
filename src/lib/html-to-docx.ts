@@ -23,6 +23,9 @@ import {
   TextRun,
   WidthType,
 } from "docx";
+import { yieldToBrowser } from "./async-yield";
+
+export type ChapterProgressFn = (info: { current: number; total: number; label: string }) => void;
 
 type DocxBlock = Paragraph | Table;
 
@@ -488,8 +491,13 @@ export interface BookChapterForDocx {
 export async function chaptersToCombinedDocxBlob(
   projectTitle: string,
   chapters: BookChapterForDocx[],
+  onProgress?: ChapterProgressFn,
 ): Promise<Blob> {
   const children: DocxBlock[] = [];
+  const total = chapters.length;
+
+  onProgress?.({ current: 0, total, label: "Preparing title page…" });
+  await yieldToBrowser();
 
   // Title page.
   children.push(
@@ -536,6 +544,8 @@ export async function chaptersToCombinedDocxBlob(
 
   for (let i = 0; i < chapters.length; i += 1) {
     const c = chapters[i];
+    onProgress?.({ current: i, total, label: `Rendering chapter ${i + 1} of ${total}: ${c.title}` });
+    await yieldToBrowser();
     children.push(
       new Paragraph({
         heading: HeadingLevel.HEADING_1,
@@ -549,6 +559,9 @@ export async function chaptersToCombinedDocxBlob(
       children.push(new Paragraph({ children: [new PageBreak()] }));
     }
   }
+
+  onProgress?.({ current: total, total, label: "Finalizing document…" });
+  await yieldToBrowser();
 
   const docDef = new Document({
     numbering: NUMBERING,
