@@ -90,7 +90,11 @@ export function ExportBookDialog({
         onProgress: (p) => setProgress(p),
       });
       trackEvent("book_export_completed", { format: selected });
-      toast.success("Export ready — your download has started.");
+      if (selected === "pdf") {
+        toast.success("Print dialog opened — choose 'Save as PDF' to download your book.");
+      } else {
+        toast.success("Export ready — your download has started.");
+      }
       onOpenChange(false);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Export failed";
