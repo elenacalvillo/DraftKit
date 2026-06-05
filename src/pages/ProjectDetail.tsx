@@ -9,6 +9,7 @@ import {
   ChevronUp,
   ChevronDown,
   Download,
+  Info,
   Lock,
   Megaphone,
   Plus,
@@ -309,12 +310,21 @@ export default function ProjectDetail() {
             </TabsTrigger>
             <TabsTrigger value="broadcast">
               <Megaphone className="w-4 h-4 mr-1.5" />
-              Writer's Room
+              Broadcasts
             </TabsTrigger>
           </TabsList>
 
           {/* Chapters tab */}
           <TabsContent value="chapters" className="pt-4">
+            <p className="text-sm text-muted-foreground mb-4">
+              Manage and organize your manuscript structure. Changing a chapter's workflow state updates its status for your team — your content is always safely preserved and never lost.
+            </p>
+            <div className="w-full mb-4 flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+              <Info className="w-3.5 h-3.5 shrink-0" />
+              <span>
+                Workflow States are just progress labels. Your text stays fully intact, editable, and backed up across every transition.
+              </span>
+            </div>
             <div className="flex justify-end mb-3">
               <Button
                 size="sm"
@@ -422,6 +432,9 @@ export default function ProjectDetail() {
 
           {/* Members tab */}
           <TabsContent value="members" className="pt-4">
+            <p className="text-sm text-muted-foreground mb-4">
+              Manage project access. Invite editors, co-authors, or beta readers and assign roles to control who can view or edit your manuscript.
+            </p>
             <Card>
               <CardContent className="p-4 space-y-4">
                 <div className="grid gap-2 md:grid-cols-[1fr_180px_auto]">
@@ -510,6 +523,9 @@ export default function ProjectDetail() {
 
           {/* Broadcast tab */}
           <TabsContent value="broadcast" className="pt-4">
+            <p className="text-sm text-muted-foreground mb-4">
+              Send important updates or announcements to everyone participating in this book project. Past broadcasts will appear in your history below.
+            </p>
             <Card className="mb-4">
               <CardContent className="p-4 space-y-3">
                 <Label htmlFor="broadcast-message">
@@ -521,7 +537,7 @@ export default function ProjectDetail() {
                   value={broadcastMessage}
                   onChange={(e) => setBroadcastMessage(e.target.value)}
                   disabled={isReadOnly}
-                  placeholder="Quick update for the writers' room…"
+                  placeholder="Share an update with everyone on this project…"
                 />
                 <div className="flex justify-end">
                   <Button
