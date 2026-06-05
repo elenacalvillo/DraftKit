@@ -78,8 +78,10 @@ export function ExportBookDialog({
 
   const handleExport = async () => {
     setBusy(true);
-    setProgress({ current: 0, total: 1, label: "Loading chapters…" });
+    setProgress({ current: 0, total: 1, label: "Assembling files…" });
     trackEvent("book_export_started", { format: selected });
+    // Yield to let the modal repaint before kicking off heavy work.
+    await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
     try {
       await exportBookProject({
         projectId,
@@ -152,6 +154,9 @@ export function ExportBookDialog({
           <div className="space-y-2">
             <Progress value={pct} />
             <div className="text-xs text-muted-foreground truncate">{progress.label}</div>
+            <div className="text-[11px] text-muted-foreground/80">
+              Compiling chapters. This may take a moment for longer projects — keep this tab open.
+            </div>
           </div>
         )}
 
