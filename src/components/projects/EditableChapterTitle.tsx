@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Check, Loader2, Pencil, X } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -40,6 +41,7 @@ export function EditableChapterTitle({
   const [saving, setSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const cancelledRef = useRef(false);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!editing) setValue(title);
@@ -99,8 +101,13 @@ export function EditableChapterTitle({
       return;
     }
     setEditing(false);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["project_chapters"] }),
+      queryClient.invalidateQueries({ queryKey: ["workspace_request", chapterId] }),
+    ]);
     onSaved?.(trimmed);
   };
+
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
