@@ -1,32 +1,42 @@
-## Plan: Project dashboard clarity pass
+## Plan: Inline-editable chapter titles
 
-All changes live in `src/pages/ProjectDetail.tsx`. No logic, schema, or backend changes.
+Chapter titles live in `collab_requests.message`. The existing `enforce_collaborator_field_restrictions` trigger already permits the project owner and the chapter's assigned writer (requester) to edit `message`, so no schema or RLS changes are needed.
 
-### 1. Rename "Writer's Room" → "Broadcasts"
+### 1. New mutation in `src/hooks/useProjectChapters.ts`
 
-- Update the `TabsTrigger value="broadcast"` label from "Writer's Room" to "Broadcasts".
-- Swap the current icon for `Megaphone` (from lucide-react) for a clearer one-way-announcement metaphor.
-- Update incidental copy on the broadcast panel: the textarea placeholder ("Quick update for the writers' room…") becomes "Share an update with everyone on this project…", and the card heading stays "Send a message to all project members".
+Add `updateChapterTitle` alongside the other mutations:
+- Input: `{ chapterId: string; title: string }`.
+- Trims the title, rejects empty strings.
+- `supabase.from("collab_requests").update({ message: trimmed }).eq("id", chapterId)`.
+- On success, invalidate `["project_chapters", projectId]` **and** `["workspace_request", chapterId]` (used by the Workspace page) so both views refresh.
+- Surface a permission error (`code === "42501"`) as "You don't have permission to rename this chapter."
 
-### 2. Per-tab header guide (muted helper text under the TabsList)
+### 2. `src/pages/ProjectDetail.tsx` — inline edit in the chapter row
 
-Render a small muted paragraph inside each `TabsContent`, directly above its existing content. Style: `text-sm text-muted-foreground mb-4`.
+Inside the chapter row (around line 375, the `<Link>` containing `{idx + 1}. {c.message ?? "Untitled chapter"}`):
 
-- **Chapters:** "Manage and organize your manuscript structure. Changing a chapter's workflow state updates its status for your team — your content is always safely preserved and never lost."
-- **Members:** "Manage project access. Invite editors, co-authors, or beta readers and assign roles to control who can view or edit your manuscript."
-- **Broadcasts:** "Send important updates or announcements to everyone participating in this book project. Past broadcasts will appear in your history below."
+- Replace the title `<div>` with a small `ChapterTitleInline` block (kept local to the file — no new file needed).
+- Default state: render `{idx + 1}. {title}` as a clickable link to the workspace, with a muted `Pencil` icon button (lucide-react, `w-3.5 h-3.5`) appearing next to it. The pencil is always visible but `opacity-0 group-hover:opacity-100 focus-visible:opacity-100` for a clean resting state; on touch it stays visible.
+- Editing state: swap the title into an `<Input>` (shadcn) pre-filled with the current title, plus a small Check / X icon pair. The numeric prefix (`{idx + 1}.`) stays static outside the input.
+- Save triggers on Enter or Check click; cancel triggers on Escape or X click; blur saves if dirty, cancels if unchanged.
+- While the mutation is pending: disable the input, show a small spinner in place of the Check icon.
+- Hide the Pencil entirely when `isReadOnly` is true.
+- Keep the existing `Link` navigation — clicking the title text (not the pencil) still routes to `/dashboard/workspace/${c.id}`. The pencil button uses `e.preventDefault(); e.stopPropagation()` to avoid navigating.
+- Toast on error using existing `toast.error`; silent success (no toast) to stay quiet.
 
-### 3. Workflow-state reassurance strip (Chapters tab only)
+### 3. `src/pages/Workspace.tsx` — editable header title
 
-Directly above the first chapter row (and above the "Add chapter" button row, inside the Chapters tab), add a single-line inline notice:
+The header currently passes `zenTitle={isSolo ? \`Drafting: ${request.message || "Untitled Project"}\` : \`Drafting with ${partnerName}\`}` (around line 587).
 
-- **Placement:** Put this notice in its own independent row at the very top of the tab content, completely above the "Add chapter" button row, using `w-full mb-4`.
-- Icon: `Info` (lucide), muted foreground.
-- Copy: "Workflow States are just progress labels. Your text stays fully intact, editable, and backed up across every transition."
-- Style: subtle rounded border, `bg-muted/40 border-border text-xs text-muted-foreground px-3 py-2 flex items-center gap-2`. Not dismissible — it's short and contextual.
+- For solo / project-workspace chapters (where the current user has edit permission — owner or assigned writer), replace the static string with a small inline-editable component rendered inside the zen header.
+- Resting state: shows `Drafting: <Title>` with the title styled as a subtle click-target (`hover:bg-muted/40 rounded px-1 -mx-1 cursor-text`), no pencil icon needed in the zen bar to keep it minimal — a `title="Click to rename"` tooltip is enough.
+- Click → swap the title text into a borderless input sized to content, autofocused, text selected.
+- Save on Enter or blur; revert on Escape. Pending state shows a small spinner appended; errors raise a `toast.error` and revert the input value.
+- Reuses the same `updateChapterTitle` mutation; on success the workspace request query invalidates and the header rerenders with the new title.
+- Read-only viewers (collaborators who are not the requester and not the owner) get the existing static text — no edit affordance.
 
 ### Out of scope
 
-- No changes to chapter status enum, broadcast backend, or member roles.
-- No tooltips on the status dropdown itself (the strip above the list covers the same fear without per-row noise).
+- No changes to the left summary card on the workspace (it reads from the same request and will pick up the new title on refetch via the cache invalidation above; if needed in a later pass we can wire it to the same component, but the user asked for the two specific surfaces).
+- No schema/RLS changes, no new tables, no changes to chapter status, ordering, or writer assignment.
 - No new dependencies.
