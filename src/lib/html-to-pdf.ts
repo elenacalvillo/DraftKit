@@ -191,10 +191,18 @@ export interface BookChapterForPdf {
   html: string;
 }
 
+import { yieldToBrowser } from "./async-yield";
+import type { ChapterProgressFn } from "./html-to-docx";
+
 export async function chaptersToCombinedPdfBlob(
   projectTitle: string,
   chapters: BookChapterForPdf[],
+  onProgress?: ChapterProgressFn,
 ): Promise<Blob> {
+  const total = chapters.length;
+  onProgress?.({ current: 0, total, label: "Preparing title page…" });
+  await yieldToBrowser();
+
   const content: Content[] = [];
   content.push(
     {
@@ -222,13 +230,19 @@ export async function chaptersToCombinedPdfBlob(
   });
   content.push({ text: "", pageBreak: "after" });
 
-  chapters.forEach((c, i) => {
+  for (let i = 0; i < chapters.length; i += 1) {
+    const c = chapters[i];
+    onProgress?.({ current: i, total, label: `Rendering chapter ${i + 1} of ${total}: ${c.title}` });
+    await yieldToBrowser();
     content.push({ text: c.title, style: "h1", margin: [0, 0, 0, 10] });
     content.push(...htmlToPdfContent(c.html));
     if (i < chapters.length - 1) {
       content.push({ text: "", pageBreak: "after" });
     }
-  });
+  }
+
+  onProgress?.({ current: total, total, label: "Rendering PDF…" });
+  await yieldToBrowser();
 
   const docDef: TDocumentDefinitions = {
     pageSize: "LETTER",
