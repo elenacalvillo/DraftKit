@@ -1,58 +1,78 @@
-# Fix Combined PDF Export (Replace pdfmake with Native Print)
+## Plan: Book Onboarding & Privacy Trust Signals
 
-## Why it's failing
+Your husband identified two gaps: new users don't understand how book projects work, and users worry their content feeds LLMs. This plan adds lightweight, contextual explanations at the exact points of friction.
 
-`pdfmake` builds the whole document **synchronously on the main thread**, with no chunking hooks. For a multi-chapter book this regularly:
+---
 
-- Stalls inside `createPdf(...).getBlob()` (the line that's frozen on "Rendering PDF…"),
-- Bloats the JS bundle by ~1 MB (fonts VFS),
-- Has known VFS-loading edge cases under Vite that swallow errors silently.
+### 1. Book Onboarding (Fix Expert Bias)
 
-The ZIP/DOCX paths work because `docx` + `JSZip` chunk naturally — pdfmake doesn't. No amount of `requestAnimationFrame` yielding fixes a single blocking C-style call.
+New users see "Book Projects" but have no mental model for how chapters become a manuscript. We add two small, dismissible teaching moments:
 
-## The fix: native browser print-to-PDF
+#### A. Projects list — empty-state info card
 
-Replace `pdfmake` with a popup-window print flow. The browser is already the best HTML→PDF renderer on the machine, it streams natively, handles any length, and supports user-side options (page size, margins, "Save as PDF").
+When a user has zero active projects, replace the plain "Create your first book project" text with a brief, value-oriented explanation.
 
-### How it works
+- **What**: A compact info card above the empty-state Card.
+- **Copy**: "DraftKit turns your chapters into a single publication-ready manuscript. Write in pieces, export as one."
+- **Dismissible**: Yes, via localStorage. Once dismissed, never shown again.
+- **Visual**: `BookOpen` icon + muted text, no extra colors.
 
-1. Build a self-contained HTML string from the same chapters we already pass to the combined DOCX path:
-   - `<style>` block with print-tuned CSS (Letter page, 1" margins, `page-break-before: always` on chapter `<h1>`, serif/sans pair matching brand, table borders, image max-width).
-   - Title page `<section>` (project title, date).
-   - Auto-generated TOC list.
-   - Each chapter wrapped in `<section class="chapter">` with `<h1>` + sanitized `content_html` (already DOMPurified at save time, safe to inject).
-2. Open a popup via `window.open("", "_blank", "width=900,height=1100")`, write the HTML, wait for `onload` + images via `Promise.all(img.decode())`, then call `popup.focus(); popup.print();`.
-3. The browser shows its native print dialog where the user chooses **Save as PDF**. Popup closes itself after print/cancel via `onafterprint`.
-4. Toast in the originating tab: *"Print dialog opened — choose 'Save as PDF' to download your book."*
+#### B. Export dialog — top explainer
 
-### What changes
+Inside `ExportBookDialog`, replace the current generic description with one sentence that connects the formats to the chapter concept.
 
-- **Remove** `src/lib/html-to-pdf.ts` (and the `pdfmake` + `pdfmake/build/vfs_fonts` imports). Drop `pdfmake` from `package.json`.
-- **New** `src/lib/book-export-pdf.ts` — builds the combined HTML and orchestrates the popup print.
-- **Update** `src/lib/book-export.ts` — the `format === "pdf"` branch calls the new helper instead of `chaptersToCombinedPdfBlob`. No yielding needed; the work is delegated to the browser's print pipeline.
-- **Update** `src/components/projects/ExportBookDialog.tsx` — when PDF is selected, the progress copy becomes *"Opening print dialog…"* and the dialog closes immediately after the popup is launched (no fake progress bar for the PDF case).
-- **Update** `src/lib/html-to-docx.ts` — remove the now-orphaned `ChapterProgressFn` re-export consumer if needed (keep the type — it's still used by the combined DOCX path).
+- **Current**: "Download your entire book project in the format you need. Chapters use your saved order."
+- **New**: "Your chapters are compiled in order into a single publication-ready file. Pick your format below."
 
-### Popup blocker safety net
+---
 
-If `window.open` returns `null` (popup blocked), surface a clear toast: *"Allow popups for DraftKit to export PDFs, or use the Combined Word document option."* — and re-enable the export button.
+### 2. Privacy / LLM Trust Shield
 
-### Why not keep pdfmake in a Web Worker?
+Users fear their IP is training data. We add explicit, point-of-friction reassurance in three places.
 
-- Worker setup with pdfmake under Vite requires custom Rollup config, VFS shipping, and a second copy of fonts — fragile and 1 MB heavier.
-- Native print is zero bytes added, faster, and produces PDFs that match what the user sees if they print.
-- Trade-off: the user clicks "Save as PDF" once in the browser dialog. Acceptable for a Project-tier power-user feature, and arguably **more** premium (they choose paper size, can preview).
+#### A. Export dialog — local-processing trust badge
 
-## Out of scope
+At the bottom of `ExportBookDialog`, below the format list and above the progress bar, add a static trust row.
 
-- Server-side PDF rendering (Puppeteer edge function) — heavy, slower, costs egress, and the native path solves the problem.
-- Per-chapter PDF export — ZIP-of-DOCX already covers individual editing; PDFs per chapter can be added later if requested.
-- Changing the ZIP-DOCX or Combined-DOCX paths — they work.
+- **Icon**: `Lock` (or `ShieldCheck`)
+- **Copy**: "Your manuscript is compiled locally in your browser. It never leaves your device and is never used to train any language model."
+- **Visual**: Small muted text with a subtle success-colored icon. Non-interactive, always visible.
 
-## Files touched
+#### B. Workspace — Smart Draft contextual note
 
-- `src/lib/book-export.ts` (rewire PDF branch)
-- `src/lib/book-export-pdf.ts` (new)
-- `src/components/projects/ExportBookDialog.tsx` (PDF copy + early close)
-- `src/lib/html-to-pdf.ts` (delete)
-- `package.json` (drop `pdfmake`)
+In `Workspace.tsx`, near the "Generate SMART Draft" button, add a one-line subtitle that frames the feature as optional and isolated.
+
+- **Copy**: "Smart Draft is 100% optional. DraftKit never stores your writing or uses it for AI training."
+- **Visual**: Same muted style as existing helper text.
+
+#### C. Settings — Privacy reassurance panel
+
+Add a new card near the bottom of `Settings.tsx` titled "Your data & privacy".
+
+- **Copy block**:
+  - "Everything you write stays yours."
+  - "Exports happen in your browser — your manuscript is never uploaded to our servers."
+  - "The SMART Draft feature is the only optional AI-assisted tool. It runs when you explicitly request it and does not use your content for model training."
+- **Visual**: Standard `glass-card p-6` section, matching existing Settings cards.
+
+---
+
+### Files to change
+
+
+| File                                           | Change                                                 |
+| ---------------------------------------------- | ------------------------------------------------------ |
+| `src/pages/Projects.tsx`                       | Add dismissible empty-state info card (A)              |
+| `src/components/projects/ExportBookDialog.tsx` | Update DialogDescription (B), add trust badge row (2A) |
+| `src/pages/Workspace.tsx`                      | Add subtitle under SMART Draft button (2B)             |
+| `src/pages/Settings.tsx`                       | Add "Your data & privacy" card (2C)                    |
+
+
+---
+
+### No-go items (out of scope)
+
+- No new dependencies.
+- No backend changes.
+- No changes to export logic, Smart Draft generation, or workspace saving.
+- No modal tours, tooltips, or animations beyond existing Framer patterns.
