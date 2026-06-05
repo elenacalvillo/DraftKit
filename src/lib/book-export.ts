@@ -12,6 +12,7 @@ import {
 } from "./html-to-docx";
 import { chaptersToCombinedPdfBlob } from "./html-to-pdf";
 import { htmlToMarkdown } from "./html-to-markdown";
+import { yieldToBrowser } from "./async-yield";
 
 export type BookExportFormat = "zip-docx" | "zip-md" | "pdf" | "docx";
 
@@ -73,13 +74,15 @@ export async function exportBookProject(opts: ExportBookOptions): Promise<void> 
   if (format === "zip-docx") {
     const zip = new JSZip();
     for (let i = 0; i < chapters.length; i += 1) {
-      onProgress?.({ current: i, total, label: chapters[i].title });
+      onProgress?.({ current: i, total, label: `Building chapter ${i + 1} of ${total}: ${chapters[i].title}` });
+      await yieldToBrowser();
       const blob = await htmlToDocxBlob(chapters[i].html);
       const buf = await blob.arrayBuffer();
       zip.file(`${pad(i + 1)} — ${sanitize(chapters[i].title)}.docx`, buf);
     }
-    onProgress?.({ current: total, total, label: "Packaging…" });
-    const out = await zip.generateAsync({ type: "blob" });
+    onProgress?.({ current: total, total, label: "Packaging archive…" });
+    await yieldToBrowser();
+    const out = await zip.generateAsync({ type: "blob", streamFiles: true });
     saveAs(out, `${base}.zip`);
     return;
   }
@@ -87,28 +90,30 @@ export async function exportBookProject(opts: ExportBookOptions): Promise<void> 
   if (format === "zip-md") {
     const zip = new JSZip();
     for (let i = 0; i < chapters.length; i += 1) {
-      onProgress?.({ current: i, total, label: chapters[i].title });
+      onProgress?.({ current: i, total, label: `Converting chapter ${i + 1} of ${total}: ${chapters[i].title}` });
+      await yieldToBrowser();
       const md = `# ${chapters[i].title}\n\n${htmlToMarkdown(chapters[i].html)}\n`;
       zip.file(`${pad(i + 1)} — ${sanitize(chapters[i].title)}.md`, md);
     }
-    onProgress?.({ current: total, total, label: "Packaging…" });
-    const out = await zip.generateAsync({ type: "blob" });
+    onProgress?.({ current: total, total, label: "Packaging archive…" });
+    await yieldToBrowser();
+    const out = await zip.generateAsync({ type: "blob", streamFiles: true });
     saveAs(out, `${base}.zip`);
     return;
   }
 
   if (format === "docx") {
     onProgress?.({ current: 0, total, label: "Building combined document…" });
-    const blob = await chaptersToCombinedDocxBlob(projectTitle, chapters);
-    onProgress?.({ current: total, total, label: "Done" });
+    await yieldToBrowser();
+    const blob = await chaptersToCombinedDocxBlob(projectTitle, chapters, onProgress);
     saveAs(blob, `${base}.docx`);
     return;
   }
 
   if (format === "pdf") {
     onProgress?.({ current: 0, total, label: "Rendering PDF…" });
-    const blob = await chaptersToCombinedPdfBlob(projectTitle, chapters);
-    onProgress?.({ current: total, total, label: "Done" });
+    await yieldToBrowser();
+    const blob = await chaptersToCombinedPdfBlob(projectTitle, chapters, onProgress);
     saveAs(blob, `${base}.pdf`);
     return;
   }
