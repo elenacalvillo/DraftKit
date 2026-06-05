@@ -920,6 +920,22 @@ Example:
           </div>
         </motion.div>
 
+        {/* Your data & privacy */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35 }}
+          className="glass-card p-6 mb-6"
+        >
+          <h2 className="text-lg font-semibold mb-3">Your data & privacy</h2>
+          <ul className="space-y-2 text-sm text-muted-foreground leading-relaxed">
+            <li>• Everything you write stays yours. We do not sell, share, or repurpose your content.</li>
+            <li>• Exports (PDF, Word, Markdown, ZIP) are compiled in your browser and downloaded directly to your device — your manuscript never touches an AI service.</li>
+            <li>• SMART Draft is the only optional AI-assisted feature. It runs only when you explicitly click it, and your content is never used to train any language model.</li>
+          </ul>
+        </motion.div>
+
+
         {/* Danger Zone */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}

@@ -43,6 +43,13 @@ export default function Projects() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [titleError, setTitleError] = useState<string | null>(null);
+  const [showPrimer, setShowPrimer] = useState(
+    () => typeof window !== "undefined" && localStorage.getItem("projects-primer-dismissed") !== "true",
+  );
+  const dismissPrimer = () => {
+    setShowPrimer(false);
+    try { localStorage.setItem("projects-primer-dismissed", "true"); } catch { /* ignore */ }
+  };
 
   const handleNewProject = () => {
     if (!canCreate) {
@@ -134,6 +141,24 @@ export default function Projects() {
               {activeLimitMessage}
             </CardContent>
           </Card>
+        )}
+        {showPrimer && (
+          <div className="mb-6 rounded-xl border border-border bg-card p-4 flex items-start gap-3">
+            <BookOpen className="w-5 h-5 text-primary mt-0.5 shrink-0" />
+            <div className="flex-1 text-sm">
+              <p className="font-medium mb-1">How book projects work</p>
+              <p className="text-muted-foreground leading-relaxed">
+                Write each chapter in its own workspace, then export them as one publication-ready manuscript — PDF, Word, Markdown, or chapter-by-chapter ZIP. Your content stays yours and is never used to train any AI.
+              </p>
+            </div>
+            <button
+              onClick={dismissPrimer}
+              aria-label="Dismiss"
+              className="text-muted-foreground hover:text-foreground shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         )}
 
         {/* Active projects */}
