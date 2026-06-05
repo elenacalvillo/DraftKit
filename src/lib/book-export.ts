@@ -10,7 +10,7 @@ import {
   htmlToDocxBlob,
   type BookChapterForDocx,
 } from "./html-to-docx";
-import { chaptersToCombinedPdfBlob } from "./html-to-pdf";
+import { openPrintableBook } from "./book-export-pdf";
 import { htmlToMarkdown } from "./html-to-markdown";
 import { yieldToBrowser } from "./async-yield";
 
@@ -111,10 +111,14 @@ export async function exportBookProject(opts: ExportBookOptions): Promise<void> 
   }
 
   if (format === "pdf") {
-    onProgress?.({ current: 0, total, label: "Rendering PDF…" });
+    onProgress?.({ current: total, total, label: "Opening print dialog…" });
     await yieldToBrowser();
-    const blob = await chaptersToCombinedPdfBlob(projectTitle, chapters, onProgress);
-    saveAs(blob, `${base}.pdf`);
+    const ok = openPrintableBook({ projectTitle, chapters });
+    if (!ok) {
+      throw new Error(
+        "Popup blocked. Allow popups for DraftKit to export PDFs, or use the Combined Word document option.",
+      );
+    }
     return;
   }
 }
