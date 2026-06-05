@@ -106,6 +106,8 @@ export function EditableChapterTitle({
       queryClient.invalidateQueries({ queryKey: ["workspace_request", chapterId] }),
     ]);
     onSaved?.(trimmed);
+  };
+
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
