@@ -206,12 +206,21 @@ export function EditableChapterTitle({
   }
 
   // row variant: inline title + pencil that appears on hover.
+  const staticContent = (
+    <>
+      {prefix ? `${prefix} ` : ""}
+      {title}
+    </>
+  );
   return (
     <span className={cn("inline-flex items-center gap-1.5 min-w-0", className)}>
-      <span className="truncate">
-        {prefix ? `${prefix} ` : ""}
-        {title}
-      </span>
+      {titleHref ? (
+        <Link to={titleHref} className={cn("truncate min-w-0 hover:underline", titleClassName)}>
+          {staticContent}
+        </Link>
+      ) : (
+        <span className={cn("truncate", titleClassName)}>{staticContent}</span>
+      )}
       {canEdit && (
         <button
           type="button"
@@ -225,4 +234,5 @@ export function EditableChapterTitle({
       )}
     </span>
   );
+
 }
