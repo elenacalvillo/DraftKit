@@ -584,7 +584,22 @@ export default function Workspace() {
   return (
     <DashboardLayout
       zenMode
-      zenTitle={isSolo ? `Drafting: ${request.message || "Untitled Project"}` : `Drafting with ${partnerName}`}
+      zenTitle={
+        isSolo ? (
+          <span className="inline-flex items-center gap-1.5 min-w-0 justify-center">
+            <span className="text-muted-foreground shrink-0">Drafting:</span>
+            <EditableChapterTitle
+              chapterId={request.id}
+              title={request.message || "Untitled Project"}
+              canEdit={isCreator || request.requester_user_id === user?.id}
+              variant="header"
+              onSaved={(t) => setRequest((prev) => (prev ? { ...prev, message: t } : prev))}
+            />
+          </span>
+        ) : (
+          `Drafting with ${partnerName}`
+        )
+      }
       zenBackPath={backPath}
     >
       <div className="max-w-6xl mx-auto min-w-0">
