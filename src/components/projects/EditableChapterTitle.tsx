@@ -18,6 +18,10 @@ interface EditableChapterTitleProps {
   prefix?: string;
   /** Optional class for the static text display. */
   className?: string;
+  /** If provided, wraps the static title in a Link so the row stays navigable. */
+  titleHref?: string;
+  /** Extra class for the static title text element. */
+  titleClassName?: string;
 }
 
 export function EditableChapterTitle({
