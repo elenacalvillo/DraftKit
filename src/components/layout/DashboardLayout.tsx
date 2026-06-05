@@ -52,7 +52,7 @@ const baseNavItems = [
 interface DashboardLayoutProps {
   children: React.ReactNode;
   zenMode?: boolean;
-  zenTitle?: string;
+  zenTitle?: React.ReactNode;
   zenBackPath?: string;
 }
 
