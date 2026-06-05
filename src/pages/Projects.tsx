@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Archive, ArchiveRestore, BookMarked, Plus } from "lucide-react";
+import { Archive, ArchiveRestore, BookMarked, BookOpen, Plus, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";

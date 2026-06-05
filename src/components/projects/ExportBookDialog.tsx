@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Crown, Download, FileArchive, FileText, FileType2, Loader2 } from "lucide-react";
+import { Crown, Download, FileArchive, FileText, FileType2, Loader2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -115,7 +115,7 @@ export function ExportBookDialog({
             <Crown className="w-4 h-4 text-primary" /> Export book
           </DialogTitle>
           <DialogDescription>
-            Download your entire book project in the format you need. Chapters use your saved order.
+            Your chapters are compiled in order into a single publication-ready file. Pick the format your publisher or editor needs.
           </DialogDescription>
         </DialogHeader>
 
@@ -152,6 +152,14 @@ export function ExportBookDialog({
               </button>
             );
           })}
+        </div>
+
+        <div className="flex items-start gap-2 rounded-md border border-border bg-muted/30 px-3 py-2">
+          <ShieldCheck className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            <span className="font-medium text-foreground">Local compilation.</span>{" "}
+            Your manuscript is assembled in your browser, downloaded straight to your device, and is never used to train any language model.
+          </p>
         </div>
 
         {progress && (
