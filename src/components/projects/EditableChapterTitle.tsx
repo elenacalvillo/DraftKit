@@ -32,6 +32,8 @@ export function EditableChapterTitle({
   variant = "row",
   prefix,
   className,
+  titleHref,
+  titleClassName,
 }: EditableChapterTitleProps) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(title);
