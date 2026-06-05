@@ -101,8 +101,11 @@ export function EditableChapterTitle({
       return;
     }
     setEditing(false);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["project_chapters"] }),
+      queryClient.invalidateQueries({ queryKey: ["workspace_request", chapterId] }),
+    ]);
     onSaved?.(trimmed);
-  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
