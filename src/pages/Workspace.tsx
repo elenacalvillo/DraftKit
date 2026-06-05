@@ -922,15 +922,20 @@ export default function Workspace() {
             {/* Action Buttons */}
             <div className="space-y-2">
               {isCreator && (
-                <Button
-                  variant={localDraft ? "outline" : "gradient"}
-                  size="sm"
-                  onClick={handleViewDraft}
-                  className="w-full"
-                >
-                  <FileText className="w-4 h-4 mr-2" />
-                  {localDraft ? "View SMART Draft" : "Generate SMART Draft"}
-                </Button>
+                <div className="space-y-1.5">
+                  <Button
+                    variant={localDraft ? "outline" : "gradient"}
+                    size="sm"
+                    onClick={handleViewDraft}
+                    className="w-full"
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    {localDraft ? "View SMART Draft" : "Generate SMART Draft"}
+                  </Button>
+                  <p className="text-[11px] text-muted-foreground leading-snug px-0.5">
+                    Optional. DraftKit never stores your writing or uses it to train any language model.
+                  </p>
+                </div>
               )}
 
               <Button variant="outline" size="sm" onClick={() => setShowMessageModal(true)} className="w-full">
