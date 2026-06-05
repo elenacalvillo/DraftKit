@@ -41,6 +41,7 @@ export function EditableChapterTitle({
   const [saving, setSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const cancelledRef = useRef(false);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!editing) setValue(title);
