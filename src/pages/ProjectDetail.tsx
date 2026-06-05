@@ -56,6 +56,7 @@ import {
 } from "@/lib/access";
 import { ProjectUpgradePrompt } from "@/components/projects/ProjectUpgradePrompt";
 import { ExportBookDialog } from "@/components/projects/ExportBookDialog";
+import { EditableChapterTitle } from "@/components/projects/EditableChapterTitle";
 
 const STAGE_BADGE: Record<ChapterStage, string> = {
   draft: "bg-slate-200 text-slate-800",
@@ -372,12 +373,17 @@ export default function ProjectDetail() {
                           <ChevronDown className="w-4 h-4" />
                         </button>
                       </div>
-                      <Link
-                        to={`/dashboard/workspace/${c.id}`}
-                        className="flex-1 min-w-0 group"
-                      >
-                        <div className="font-medium truncate group-hover:text-primary">
-                          {idx + 1}. {c.message ?? "Untitled chapter"}
+                      <div className="flex-1 min-w-0 group">
+                        <div className="font-medium truncate">
+                          <EditableChapterTitle
+                            chapterId={c.id}
+                            title={c.message ?? "Untitled chapter"}
+                            canEdit={!isReadOnly}
+                            variant="row"
+                            prefix={`${idx + 1}.`}
+                            titleHref={`/dashboard/workspace/${c.id}`}
+                            titleClassName="group-hover:text-primary"
+                          />
                         </div>
                         <div className="text-xs text-muted-foreground">
                           Writer:{" "}
@@ -385,7 +391,8 @@ export default function ProjectDetail() {
                             <span className="italic">Unassigned</span>
                           )}
                         </div>
-                      </Link>
+                      </div>
+
                       <span
                         className={`text-xs px-2 py-1 rounded ${STAGE_BADGE[stage]}`}
                       >
