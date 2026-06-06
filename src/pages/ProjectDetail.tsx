@@ -386,100 +386,125 @@ export default function ProjectDetail() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-2">
-                {chapters.map((c, idx) => {
-                  const stage: ChapterStage = (CHAPTER_STAGES as readonly string[]).includes(
-                    c.chapter_stage ?? "",
-                  )
-                    ? (c.chapter_stage as ChapterStage)
-                    : "draft";
-                  const hasWriter = !!c.requester_user_id;
-                  return (
-                    <div
-                      key={c.id}
-                      className="flex items-center gap-3 rounded-xl border border-border bg-card p-3 transition-colors hover:border-primary/40 hover:bg-accent/30"
-                    >
-                      <div className="flex flex-col gap-0.5">
-                        <button
-                          aria-label="Move up"
-                          className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                          onClick={() => handleMove(c.id, "up")}
-                          disabled={isReadOnly || idx === 0}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={chapters.map((c) => c.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-2">
+                    {chapters.map((c, idx) => {
+                      const stage: ChapterStage = (CHAPTER_STAGES as readonly string[]).includes(
+                        c.chapter_stage ?? "",
+                      )
+                        ? (c.chapter_stage as ChapterStage)
+                        : "draft";
+                      const hasWriter = !!c.requester_user_id;
+                      return (
+                        <SortableChapterRow
+                          key={c.id}
+                          id={c.id}
+                          disabled={isReadOnly}
                         >
-                          <ChevronUp className="w-4 h-4" />
-                        </button>
-                        <button
-                          aria-label="Move down"
-                          className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                          onClick={() => handleMove(c.id, "down")}
-                          disabled={isReadOnly || idx === chapters.length - 1}
-                        >
-                          <ChevronDown className="w-4 h-4" />
-                        </button>
-                      </div>
-                      <div className="flex-1 min-w-0 group">
-                        <div className="font-medium truncate">
-                          <EditableChapterTitle
-                            chapterId={c.id}
-                            title={c.message ?? "Untitled chapter"}
-                            canEdit={!isReadOnly}
-                            variant="row"
-                            prefix={`${idx + 1}.`}
-                            titleHref={`/dashboard/workspace/${c.id}`}
-                            titleClassName="group-hover:text-primary"
-                          />
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          Writer:{" "}
-                          {c.requester_name || (
-                            <span className="italic">Unassigned</span>
-                          )}
-                        </div>
-                      </div>
+                          {({ dragHandleProps }) => (
+                            <>
+                              <button
+                                {...dragHandleProps}
+                                aria-label="Drag to reorder"
+                                className="cursor-grab touch-none text-muted-foreground hover:text-foreground active:cursor-grabbing disabled:opacity-30"
+                                disabled={isReadOnly}
+                              >
+                                <GripVertical className="w-4 h-4" />
+                              </button>
+                              <div className="flex flex-col gap-0.5">
+                                <button
+                                  aria-label="Move up"
+                                  className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                                  onClick={() => handleMove(c.id, "up")}
+                                  disabled={isReadOnly || idx === 0}
+                                >
+                                  <ChevronUp className="w-4 h-4" />
+                                </button>
+                                <button
+                                  aria-label="Move down"
+                                  className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                                  onClick={() => handleMove(c.id, "down")}
+                                  disabled={isReadOnly || idx === chapters.length - 1}
+                                >
+                                  <ChevronDown className="w-4 h-4" />
+                                </button>
+                              </div>
+                              <div className="flex-1 min-w-0 group">
+                                <div className="font-medium truncate">
+                                  <EditableChapterTitle
+                                    chapterId={c.id}
+                                    title={c.message ?? "Untitled chapter"}
+                                    canEdit={!isReadOnly}
+                                    variant="row"
+                                    prefix={`${idx + 1}.`}
+                                    titleHref={`/dashboard/workspace/${c.id}`}
+                                    titleClassName="group-hover:text-primary"
+                                  />
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  Writer:{" "}
+                                  {c.requester_name || (
+                                    <span className="italic">Unassigned</span>
+                                  )}
+                                </div>
+                              </div>
 
-                      <span
-                        className={`text-xs px-2 py-1 rounded ${STAGE_BADGE[stage]}`}
-                      >
-                        {CHAPTER_STAGE_LABEL[stage]}
-                      </span>
-                      <Select
-                        value={stage}
-                        onValueChange={(value) =>
-                          handleStatusChange(
-                            c.id,
-                            stage,
-                            value as ChapterStage,
-                            hasWriter,
-                          )
-                        }
-                        disabled={isReadOnly}
-                      >
-                        <SelectTrigger className="w-[170px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {CHAPTER_STAGES.map((s) => (
-                            <SelectItem key={s} value={s}>
-                              {CHAPTER_STAGE_LABEL[s]}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {!hasWriter && !isReadOnly && (
-                        <span
-                          title="Assign a writer before advancing"
-                          className="text-xs text-amber-700"
-                        >
-                          <ArrowRight className="w-3.5 h-3.5 inline mr-1" />
-                          Assign writer
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                              <span
+                                className={`text-xs px-2 py-1 rounded ${STAGE_BADGE[stage]}`}
+                              >
+                                {CHAPTER_STAGE_LABEL[stage]}
+                              </span>
+                              <Select
+                                value={stage}
+                                onValueChange={(value) =>
+                                  handleStatusChange(
+                                    c.id,
+                                    stage,
+                                    value as ChapterStage,
+                                    hasWriter,
+                                  )
+                                }
+                                disabled={isReadOnly}
+                              >
+                                <SelectTrigger className="w-[170px]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {CHAPTER_STAGES.map((s) => (
+                                    <SelectItem key={s} value={s}>
+                                      {CHAPTER_STAGE_LABEL[s]}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              {!hasWriter && !isReadOnly && (
+                                <span
+                                  title="Assign a writer before advancing"
+                                  className="text-xs text-amber-700"
+                                >
+                                  <ArrowRight className="w-3.5 h-3.5 inline mr-1" />
+                                  Assign writer
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </SortableChapterRow>
+                      );
+                    })}
+                  </div>
+                </SortableContext>
+              </DndContext>
             )}
           </TabsContent>
+
 
           {/* Members tab */}
           <TabsContent value="members" className="pt-4">
