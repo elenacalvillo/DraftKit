@@ -724,7 +724,7 @@ type SortableChapterRowProps = {
   disabled?: boolean;
   children: (args: {
     dragHandleProps: Record<string, unknown>;
-  }) => React.ReactNode;
+  }) => ReactNode;
 };
 
 function SortableChapterRow({ id, disabled, children }: SortableChapterRowProps) {
@@ -736,7 +736,7 @@ function SortableChapterRow({ id, disabled, children }: SortableChapterRowProps)
     transition,
     isDragging,
   } = useSortable({ id, disabled });
-  const style: React.CSSProperties = {
+  const style: CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.6 : 1,
