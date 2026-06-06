@@ -109,6 +109,7 @@ export default function ProjectDetail() {
     updateChapterStage,
     reorderChapters,
     swapChapters,
+    deleteChapter,
   } = useProjectChapters(projectId);
   const { broadcasts, sendBroadcast } = useProjectBroadcasts(projectId);
 
