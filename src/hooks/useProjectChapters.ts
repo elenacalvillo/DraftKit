@@ -247,6 +247,7 @@ export function useProjectChapters(projectId: string | undefined) {
     createChapter,
     updateChapterStage,
     reorderChapters,
+    swapChapters,
     assignWriter,
   };
 }
