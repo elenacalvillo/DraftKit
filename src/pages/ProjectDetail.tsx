@@ -217,17 +217,42 @@ export default function ProjectDetail() {
     }
   };
 
-  const handleMove = async (chapterId: string, direction: "up" | "down") => {
+  const handleMove = (chapterId: string, direction: "up" | "down") => {
     const idx = chapters.findIndex((c) => c.id === chapterId);
     const swap = direction === "up" ? idx - 1 : idx + 1;
     if (idx < 0 || swap < 0 || swap >= chapters.length) return;
-    const ordered = [...chapters];
-    [ordered[idx], ordered[swap]] = [ordered[swap], ordered[idx]];
-    try {
-      await reorderChapters.mutateAsync(ordered.map((c) => c.id));
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed");
-    }
+    const a = chapters[idx];
+    const b = chapters[swap];
+    // Fire-and-forget: optimistic update moves the row immediately.
+    swapChapters
+      .mutateAsync({
+        aId: a.id,
+        bId: b.id,
+        aOrder: a.chapter_order ?? idx + 1,
+        bOrder: b.chapter_order ?? swap + 1,
+      })
+      .catch((err) =>
+        toast.error(err instanceof Error ? err.message : "Failed to reorder"),
+      );
+  };
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = chapters.findIndex((c) => c.id === active.id);
+    const newIndex = chapters.findIndex((c) => c.id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+    const newIds = arrayMove(chapters, oldIndex, newIndex).map((c) => c.id);
+    reorderChapters
+      .mutateAsync(newIds)
+      .catch((err) =>
+        toast.error(err instanceof Error ? err.message : "Failed to reorder"),
+      );
   };
 
   const handleSendBroadcast = async () => {
