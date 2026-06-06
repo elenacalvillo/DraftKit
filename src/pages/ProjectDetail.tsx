@@ -254,6 +254,15 @@ export default function ProjectDetail() {
       );
   };
 
+  const handleDeleteChapter = async (chapterId: string) => {
+    try {
+      await deleteChapter.mutateAsync({ chapterId });
+      toast.success("Chapter deleted");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete chapter");
+    }
+  };
+
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
