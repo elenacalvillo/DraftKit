@@ -517,6 +517,35 @@ export default function ProjectDetail() {
                                   Assign writer
                                 </span>
                               )}
+                              {!isReadOnly && (
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <button
+                                      aria-label="Delete chapter"
+                                      className="text-muted-foreground hover:text-destructive transition-colors p-1"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete this chapter?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        This permanently removes &ldquo;{c.message ?? "Untitled chapter"}&rdquo; and all of its drafted content. This cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                        onClick={() => handleDeleteChapter(c.id)}
+                                      >
+                                        Delete chapter
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              )}
                             </>
                           )}
                         </SortableChapterRow>
