@@ -1,44 +1,44 @@
-# Why reordering feels slow today
+# Chapter deletion UX
 
-Two real causes, both in `src/hooks/useProjectChapters.ts` + `src/pages/ProjectDetail.tsx`:
+## Problem
 
-1. **No optimistic UI.** Clicking ▲/▼ calls `reorderChapters.mutateAsync(...)`, waits for the network round-trip, then waits for React Query to invalidate and refetch the whole chapter list before the row visibly moves. That's typically 2 sequential round-trips before any pixel changes.
-2. **N sequential UPDATEs.** `reorderChapters` loops over every chapter and issues a separate `supabase.update(...).eq("id", ...)` for each one — even when only two rows actually swapped. For a 20-chapter book that's 20 serial HTTP calls per arrow click.
+Chapters are stored as `collab_requests` rows with `is_project_workspace = true`, reusing the collab workspace UI. As a result:
 
-# Plan
+- **No way to delete a chapter** from the Project page — the rows have move/reorder/status controls but no trash action.
+- Inside the chapter workspace, the only destructive control is **"Cancel Collab"**, which sets `status = 'cancelled'` and locks editing. For a project chapter this is confusing: it leaves an orphaned "cancelled chapter" in the project list that the user actually wants gone.
 
-## 1. Make the arrows feel instant (optimistic update + minimal writes)
+## Plan
 
-In `src/hooks/useProjectChapters.ts`:
+### 1. `src/hooks/useProjectChapters.ts` — add `deleteChapter` mutation
+- New mutation `deleteChapter({ chapterId })` that does `supabase.from("collab_requests").delete().eq("id", chapterId)`.
+- RLS `Creators can delete own requests` already covers this — no schema/policy changes.
+- Optimistic cache update on `["project_chapters", projectId]`: remove the row immediately, snapshot for rollback on error.
+- Export from the hook alongside the existing mutations.
 
-- Add a new mutation `swapChapters({ aId, bId, aOrder, bOrder })` that issues only the two `UPDATE`s needed for an adjacent swap, in parallel via `Promise.all`.
-- Add `onMutate` / `onError` / `onSettled` to do an **optimistic cache update** on `["project_chapters", projectId]`: reorder the array in place, snapshot the previous value, roll back on error, and skip the post-success invalidate (or do a silent background refetch) so the UI never flashes.
-- Keep `reorderChapters` (used for drag-and-drop, see below) but also give it optimistic cache updates and switch its body to `Promise.all` of the updates instead of a `for await` loop. Only write rows whose `chapter_order` actually changed.
+### 2. `src/pages/ProjectDetail.tsx` — per-row delete button
+- Add a `Trash2` ghost icon button at the end of each `SortableChapterRow`, visible only when `!isReadOnly` (owner), styled `text-muted-foreground hover:text-destructive`.
+- Wrap in an `AlertDialog` with copy:
+  - Title: "Delete this chapter?"
+  - Description: "This permanently removes \"{chapter title}\" and all of its drafted content. This cannot be undone."
+  - Confirm button: "Delete chapter" (destructive variant)
+- On confirm, call `deleteChapter.mutateAsync({ chapterId: c.id })`, toast success/error.
+- Renumbering happens naturally because the list re-renders with one fewer item; `chapter_order` gaps are harmless (the query orders by it, then `created_at`).
 
-In `src/pages/ProjectDetail.tsx` `handleMove`:
+### 3. `src/pages/Workspace.tsx` — context-aware destructive action
+When `request.is_project_workspace === true` and viewer is owner:
+- Replace the "Cancel Collab" `AlertDialog` block (lines 974–1023) with a **"Delete Chapter"** variant:
+  - Title: "Delete this chapter?"
+  - Description: "This permanently removes this chapter and its drafted content from your project. This cannot be undone."
+  - Confirm: `supabase.from("collab_requests").delete().eq("id", request.id)`, then `navigate("/dashboard/projects/" + request.project_id)`.
+  - Skip the `send-collab-email` `collab_cancelled` invocation (no external collaborator to notify on a solo chapter).
+- Keep the existing "Cancel Collab" behavior unchanged for normal (non-chapter) collabs.
 
-- Call the new `swapChapters` mutation with the two neighbors instead of `reorderChapters` over the full list.
-- Disable the arrow buttons only on the row being moved (visually) but don't block on the network — the optimistic update already moved the row, so the user can click again immediately.
+Implementation note: gate via `request.is_project_workspace` (already on the row, in `types.ts`). Use a small `isChapterWorkspace` boolean inside the existing owner-only block to swap labels/handlers without duplicating the surrounding JSX.
 
-Expected result: arrow clicks update the list in the next frame; the DB write happens in the background.
+## Files touched
 
-## 2. Add drag-and-drop reordering
+- `src/hooks/useProjectChapters.ts` — new `deleteChapter` mutation with optimistic update.
+- `src/pages/ProjectDetail.tsx` — per-row trash button + confirm dialog.
+- `src/pages/Workspace.tsx` — split owner destructive action into "Delete Chapter" vs "Cancel Collab" based on `is_project_workspace`.
 
-Install `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities` (lightweight, already the de-facto choice in the Tailwind/Radix ecosystem).
-
-In the chapter list section of `ProjectDetail.tsx`:
-
-- Wrap the chapter list in `<DndContext>` + `<SortableContext strategy={verticalListSortingStrategy}>`.
-- Extract each chapter row into a small `SortableChapterRow` component that uses `useSortable({ id })` and applies `transform` / `transition` via `@dnd-kit/utilities`.
-- Add a drag handle (grip icon, `lucide-react` `GripVertical`) on the left of each row, visible on hover/focus, with `{...attributes} {...listeners}` so the title and pencil-edit affordance still work normally.
-- On `onDragEnd`, compute the new ordered id array with `arrayMove`, call `reorderChapters.mutateAsync(newIds)` (which is now optimistic + parallel). Keep the ▲/▼ arrows as a fallback for keyboard / touch users — `useSortable` already supplies keyboard support, but the arrows remain familiar.
-
-Accessibility: `@dnd-kit` ships keyboard sensors and screen-reader announcements out of the box; wire up `KeyboardSensor` with `sortableKeyboardCoordinates`.
-
-## 3. Files touched
-
-- `src/hooks/useProjectChapters.ts` — add `swapChapters`, rewrite `reorderChapters` to parallel + only-changed rows, add optimistic cache updates to both.
-- `src/pages/ProjectDetail.tsx` — switch arrow handler to `swapChapters`, wrap chapter list in `DndContext` + `SortableContext`, extract `SortableChapterRow`, add `GripVertical` handle.
-- `package.json` — add `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities`.
-
-No schema changes, no RLS changes, no edge function changes. Existing `chapter_order` column and `Creators can update own requests` policy already cover the writes.
+No DB schema, RLS, or edge function changes.

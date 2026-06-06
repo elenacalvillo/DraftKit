@@ -971,56 +971,80 @@ export default function Workspace() {
                 </Button>
               )}
 
-              {isOwnerView && request.status === "approved" && (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="w-full text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                    >
-                      <XCircle className="w-4 h-4 mr-2" />
-                      Cancel Collab
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Cancel this collaboration?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This will cancel the collaboration with {partnerName}. The workspace content will be preserved
-                        but editing will be locked.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Keep Collab</AlertDialogCancel>
-                      <AlertDialogAction
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        onClick={async () => {
-                          try {
-                            const { error } = await supabase
-                              .from("collab_requests")
-                              .update({ status: "cancelled" })
-                              .eq("id", request.id);
-                            if (error) throw error;
-                            toast.success("Collaboration cancelled");
-                            supabase.functions
-                              .invoke("send-collab-email", {
-                                body: { type: "collab_cancelled", requestId: request.id },
-                              })
-                              .catch((err) => console.error("Failed to send cancellation email:", err));
-                            navigate(isCreator ? "/dashboard/requests" : "/dashboard/my-requests");
-                          } catch (err) {
-                            console.error("Error cancelling collab:", err);
-                            toast.error("Failed to cancel collaboration");
-                          }
-                        }}
+              {isOwnerView && request.status === "approved" && (() => {
+                const isChapter = !!request.is_project_workspace;
+                return (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                       >
-                        Cancel Collab
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              )}
+                        <XCircle className="w-4 h-4 mr-2" />
+                        {isChapter ? "Delete Chapter" : "Cancel Collab"}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>
+                          {isChapter ? "Delete this chapter?" : "Cancel this collaboration?"}
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {isChapter
+                            ? "This permanently removes this chapter and its drafted content from your project. This cannot be undone."
+                            : `This will cancel the collaboration with ${partnerName}. The workspace content will be preserved but editing will be locked.`}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>
+                          {isChapter ? "Keep Chapter" : "Keep Collab"}
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          onClick={async () => {
+                            try {
+                              if (isChapter) {
+                                const { error } = await supabase
+                                  .from("collab_requests")
+                                  .delete()
+                                  .eq("id", request.id);
+                                if (error) throw error;
+                                toast.success("Chapter deleted");
+                                navigate(
+                                  request.project_id
+                                    ? `/dashboard/projects/${request.project_id}`
+                                    : "/dashboard/projects",
+                                );
+                              } else {
+                                const { error } = await supabase
+                                  .from("collab_requests")
+                                  .update({ status: "cancelled" })
+                                  .eq("id", request.id);
+                                if (error) throw error;
+                                toast.success("Collaboration cancelled");
+                                supabase.functions
+                                  .invoke("send-collab-email", {
+                                    body: { type: "collab_cancelled", requestId: request.id },
+                                  })
+                                  .catch((err) => console.error("Failed to send cancellation email:", err));
+                                navigate(isCreator ? "/dashboard/requests" : "/dashboard/my-requests");
+                              }
+                            } catch (err) {
+                              console.error("Error on destructive action:", err);
+                              toast.error(
+                                isChapter ? "Failed to delete chapter" : "Failed to cancel collaboration",
+                              );
+                            }
+                          }}
+                        >
+                          {isChapter ? "Delete Chapter" : "Cancel Collab"}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                );
+              })()}
             </div>
 
             {/* Writer's Room — Collaborators */}

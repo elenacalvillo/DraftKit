@@ -16,7 +16,19 @@ import {
   UserPlus,
   Users,
   GripVertical,
+  Trash2,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   DndContext,
   closestCenter,
@@ -97,6 +109,7 @@ export default function ProjectDetail() {
     updateChapterStage,
     reorderChapters,
     swapChapters,
+    deleteChapter,
   } = useProjectChapters(projectId);
   const { broadcasts, sendBroadcast } = useProjectBroadcasts(projectId);
 
@@ -239,6 +252,15 @@ export default function ProjectDetail() {
       .catch((err) =>
         toast.error(err instanceof Error ? err.message : "Failed to reorder"),
       );
+  };
+
+  const handleDeleteChapter = async (chapterId: string) => {
+    try {
+      await deleteChapter.mutateAsync({ chapterId });
+      toast.success("Chapter deleted");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete chapter");
+    }
   };
 
 
@@ -494,6 +516,35 @@ export default function ProjectDetail() {
                                   <ArrowRight className="w-3.5 h-3.5 inline mr-1" />
                                   Assign writer
                                 </span>
+                              )}
+                              {!isReadOnly && (
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <button
+                                      aria-label="Delete chapter"
+                                      className="text-muted-foreground hover:text-destructive transition-colors p-1"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete this chapter?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        This permanently removes &ldquo;{c.message ?? "Untitled chapter"}&rdquo; and all of its drafted content. This cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                        onClick={() => handleDeleteChapter(c.id)}
+                                      >
+                                        Delete chapter
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
                               )}
                             </>
                           )}

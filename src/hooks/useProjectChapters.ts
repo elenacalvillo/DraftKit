@@ -240,6 +240,36 @@ export function useProjectChapters(projectId: string | undefined) {
     },
   });
 
+  const deleteChapter = useMutation({
+    mutationFn: async ({ chapterId }: { chapterId: string }) => {
+      const { error } = await supabase
+        .from("collab_requests")
+        .delete()
+        .eq("id", chapterId);
+      if (error) throw error;
+    },
+    onMutate: async ({ chapterId }) => {
+      const key = ["project_chapters", projectId];
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData<Chapter[]>(key);
+      if (previous) {
+        queryClient.setQueryData<Chapter[]>(
+          key,
+          previous.filter((c) => c.id !== chapterId),
+        );
+      }
+      return { previous };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.previous) {
+        queryClient.setQueryData(["project_chapters", projectId], ctx.previous);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["project_chapters", projectId] });
+    },
+  });
+
   return {
     chapters: chaptersQuery.data ?? [],
     isLoading: chaptersQuery.isLoading,
@@ -249,5 +279,6 @@ export function useProjectChapters(projectId: string | undefined) {
     reorderChapters,
     swapChapters,
     assignWriter,
+    deleteChapter,
   };
 }
