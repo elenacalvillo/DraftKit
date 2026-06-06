@@ -236,10 +236,6 @@ export default function ProjectDetail() {
       );
   };
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
