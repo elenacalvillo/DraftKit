@@ -718,3 +718,37 @@ export default function ProjectDetail() {
     </DashboardLayout>
   );
 }
+
+type SortableChapterRowProps = {
+  id: string;
+  disabled?: boolean;
+  children: (args: {
+    dragHandleProps: Record<string, unknown>;
+  }) => React.ReactNode;
+};
+
+function SortableChapterRow({ id, disabled, children }: SortableChapterRowProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id, disabled });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-3 rounded-xl border border-border bg-card p-3 transition-colors hover:border-primary/40 hover:bg-accent/30"
+    >
+      {children({ dragHandleProps: { ...attributes, ...listeners } })}
+    </div>
+  );
+}
