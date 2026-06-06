@@ -15,7 +15,6 @@ import {
   Plus,
   UserPlus,
   Users,
-  Users,
   GripVertical,
 } from "lucide-react";
 import {
