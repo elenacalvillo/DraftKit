@@ -8,7 +8,7 @@ export type Chapter = Tables<"collab_requests">;
 
 /** Slim row used by the project dashboard list — excludes heavy HTML/JSON. */
 const CHAPTER_LIST_COLUMNS =
-  "id, project_id, creator_id, message, chapter_order, chapter_stage, status, requester_user_id, requester_email, requester_name, requester_profile_image_url, is_project_workspace, is_solo, created_at, updated_at";
+  "id, project_id, creator_id, message, chapter_order, chapter_stage, status, requester_user_id, requester_email, requester_name, requester_profile_image_url, is_project_workspace, is_solo, created_at";
 
 export type ChapterListItem = Pick<
   Chapter,
@@ -26,7 +26,6 @@ export type ChapterListItem = Pick<
   | "is_project_workspace"
   | "is_solo"
   | "created_at"
-  | "updated_at"
 >;
 
 /** Type-narrow a collab_requests row's chapter_stage to ChapterStage. */
