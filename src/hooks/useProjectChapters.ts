@@ -163,7 +163,7 @@ export function useProjectChapters(projectId: string | undefined) {
             const row = byId.get(id);
             return row ? { ...row, chapter_order: i + 1 } : null;
           })
-          .filter((r): r is Chapter => r !== null);
+          .filter((r): r is ChapterListItem => r !== null);
         queryClient.setQueryData<ChapterListItem[]>(key, next);
       }
       return { previous };
