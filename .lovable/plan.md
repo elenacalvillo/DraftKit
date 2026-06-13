@@ -1,88 +1,33 @@
-# Add ePub export for book projects
+# Fix terrifying empty-state flash + speed up Project page with 50 chapters
 
-## Why
+## Problem
+On `/dashboard/projects/:id`, while `useProjectChapters` is still fetching, `chapters.length === 0` is true, so the "No chapters yet…" empty-state card renders for a beat — looking, to a writer with 50 chapters, like the entire book vanished. The query also does `select("*")`, pulling every chapter's full `shared_content` HTML, `ai_draft` JSON, `editing_sessions` JSON, etc. on first paint. That's the freeze.
 
-PDF exports render terribly on Kindle — fixed page size means microscopic text and pan/zoom. ePub is reflowable, so early readers get a native e-reader experience (adjustable fonts, margins, page progress). We already have the chapter assembly pipeline from the PDF/DOCX exports, so this is mostly packaging.
+## Fix
 
-## Approach
+### 1. `src/hooks/useProjectChapters.ts` — slim down the list query
+- Replace `.select("*")` in `chaptersQuery` with an explicit metadata column list:
+  `id, project_id, creator_id, message, chapter_order, chapter_stage, status, requester_user_id, requester_email, requester_name, requester_profile_image_url, is_project_workspace, is_solo, created_at, updated_at`.
+- Add a new exported type `ChapterListItem` for that shape; keep the existing `Chapter = Tables<"collab_requests">` export for the mutations that still need the full row.
+- Update `chaptersQuery`'s return type to `ChapterListItem[]` and cast accordingly.
+- `createChapter`, `updateChapterStage`, `assignWriter` mutations still `.select("*")` for the single returned row — fine, the cache is overwritten by invalidation anyway. After their `onSuccess` invalidate, the list refetches with the slim payload.
+- Reorder/swap/delete optimistic updates already operate on the cached list shape — they keep working because they spread existing rows.
+- Already returns `isLoading: chaptersQuery.isLoading`. No API change needed beyond the type tweak — `ProjectDetail.tsx` only reads `id`, `chapter_order`, `chapter_stage`, `message`, `requester_user_id` from the list (verified via grep), so nothing breaks.
 
-Build ePub 3.0 client-side using the existing `JSZip` dependency — no new packages. An ePub is just a zip with a fixed file layout, and we already produce sanitized chapter HTML.
-
-### 1. `src/lib/book-export-epub.ts` (new)
-
-Helper `buildEpubBlob({ projectTitle, author, chapters })` that returns a `Blob` with mime `application/epub+zip`.
-
-Internal layout written into the zip:
-
-```text
-mimetype                        (stored, no compression — first entry, required)
-META-INF/container.xml          (points to OEBPS/content.opf)
-OEBPS/content.opf               (package: metadata, manifest, spine)
-OEBPS/toc.ncx                   (EPUB2 nav fallback)
-OEBPS/nav.xhtml                 (EPUB3 nav doc)
-OEBPS/styles/book.css           (reflowable typography)
-OEBPS/title.xhtml               (cover/title page)
-OEBPS/chap-001.xhtml … chap-NNN.xhtml
-```
-
-Per-chapter XHTML wraps the existing sanitized `shared_content` HTML in a valid `<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml">…</html>` shell with a `<h1>` chapter title and a link to `book.css`. Reuse `sanitize()` from `book-export.ts` for filenames; reuse `escapeHtml` pattern from `book-export-pdf.ts` for attribute/title escaping.
-
-CSS: serif body, generous line-height, `h1.chapter-title { page-break-before: always; }`, no fixed widths — let the reader reflow.
-
-UUID for `dc:identifier` via `crypto.randomUUID()`. `dc:language` = `en` (matches existing copy). Author = current creator's display name (lookup via `supabase.from("creators").select("name").eq("id", user.id).single()` inside the orchestrator, fall back to "Unknown Author").
-
-That makes total sense. If you are writing the book in Spanish, setting the metadata tag to `"es"` is exactly what you need so that Kindles load the correct Spanish dictionary, hyphenation rules, and text-to-speech engine for your readers.
-
-Since your platform might have both English and Spanish writers, the cleanest approach is to have Lovable look at the actual content or project configuration, with a smart fallback.
-
-Here is the exact modification to drop into Section 1 of the Lovable prompt before you run it:
-
-Plaintext
-
-```
-- `dc:language` detection: Check if the project or chapters contain language settings. If not available, do a quick regex check on the first chapter's content for high-frequency Spanish stop words (like "el", "la", "los", "y") to dynamically set `dc:language` to "es", otherwise default to "en".
-
-```
-
-Alternatively, if you want to keep the code ultra-simple and lightweight without text parsing, just tell Lovable to default it to `"es"` directly for your build:
-
-Plaintext
-
-```
-- `dc:language` tag: Set this to "es" (Spanish) to match the manuscript's language so Kindle dictionaries and fonts render correctly.
-
-```
-
-Pick the one that fits your immediate preference, add it to the plan, and tell Lovable to build it. It is going to work flawlessly on your device!
-
-Critical zip detail: `mimetype` must be the **first** file in the archive and stored uncompressed (`{ compression: "STORE" }`). `JSZip.generateAsync({ type: "blob", mimeType: "application/epub+zip" })`.
-
-### 2. `src/lib/book-export.ts`
-
-- Extend `BookExportFormat` type with `"epub"`.
-- Add an `if (format === "epub")` branch that fetches the author name, calls `buildEpubBlob`, then `saveAs(blob, \`${base}.epub)`. Emits the same` onProgress` ticks per chapter so the dialog progress bar keeps working.
-
-### 3. `src/components/projects/ExportBookDialog.tsx`
-
-Add a new entry to `FORMATS`:
-
-```text
-id: "epub"
-title: "ePub (.epub)"
-description: "Best for Kindle, Apple Books, and mobile e-readers. Reflowable text that adapts to any screen."
-icon: BookOpen   // from lucide-react
-```
-
-Place it directly above the PDF option so it reads as the recommended reader-facing format. No other UI changes — selection, progress, and the existing local-compilation reassurance copy all already handle a new format generically.
+### 2. `src/pages/ProjectDetail.tsx` — proper loading state, no false empty
+- Pull `isLoading` (alias `isChaptersLoading`) out of `useProjectChapters`.
+- Replace the `chapters.length === 0 ? <empty card> : <DndContext>…` block at line 405 with three branches:
+  1. `isChaptersLoading` → render a `ChapterRowSkeleton` list (6 rows) using the existing `@/components/ui/skeleton` primitive. Each skeleton matches the actual row height/padding (`h-14 rounded-lg`) so the layout doesn't jump.
+  2. `!isChaptersLoading && chapters.length === 0` → existing empty-state card unchanged.
+  3. Otherwise → existing DnD list unchanged.
+- Keep the skeleton component inline at the bottom of the file (small, single-use). No new files.
 
 ## Out of scope
-
-- Cover image upload (uses a text-only title page for v1).
-- EPUB validation tooling — output is hand-written to spec and tested against Apple Books / Kindle Previewer manually.
-- Server-side generation or new dependencies.
+- Pagination / virtualization for 100+ chapters (current 50-chapter case fits comfortably once `shared_content` is removed from the list payload — typical reduction is ~99% of bytes).
+- Workspace-page lazy loading — already fetches per-chapter on entry via `Workspace.tsx`.
 
 ## Files
+- `src/hooks/useProjectChapters.ts` — slim `select()`, add `ChapterListItem` type.
+- `src/pages/ProjectDetail.tsx` — branch on `isChaptersLoading`, render skeleton rows.
 
-- `src/lib/book-export-epub.ts` — new
-- `src/lib/book-export.ts` — add `"epub"` branch
-- `src/components/projects/ExportBookDialog.tsx` — add format option
+No DB, RLS, or edge-function changes.

@@ -105,6 +105,7 @@ export default function ProjectDetail() {
     useProjectMembers(projectId);
   const {
     chapters,
+    isLoading: isChaptersLoading,
     createChapter,
     updateChapterStage,
     reorderChapters,
@@ -402,7 +403,20 @@ export default function ProjectDetail() {
                 <Plus className="w-4 h-4 mr-1.5" /> Add chapter
               </Button>
             </div>
-            {chapters.length === 0 ? (
+            {isChaptersLoading ? (
+              <div className="space-y-2" aria-label="Loading chapters">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="h-14 rounded-lg border border-border bg-card flex items-center gap-3 px-4 animate-pulse"
+                  >
+                    <div className="w-4 h-4 rounded bg-muted" />
+                    <div className="flex-1 h-3 rounded bg-muted" />
+                    <div className="w-20 h-3 rounded bg-muted" />
+                  </div>
+                ))}
+              </div>
+            ) : chapters.length === 0 ? (
               <Card>
                 <CardContent className="p-6 text-center text-muted-foreground">
                   No chapters yet. Add your first chapter to start drafting.
