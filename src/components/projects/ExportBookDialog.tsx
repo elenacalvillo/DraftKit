@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Crown, Download, FileArchive, FileText, FileType2, Loader2, ShieldCheck } from "lucide-react";
+import { BookOpen, Crown, Download, FileArchive, FileText, FileType2, Loader2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -46,6 +46,13 @@ const FORMATS: FormatOption[] = [
     description:
       "One Markdown file per chapter. Perfect for Obsidian, Git workflows, or static-site publishing.",
     icon: FileType2,
+  },
+  {
+    id: "epub",
+    title: "ePub (.epub)",
+    description:
+      "Best for Kindle, Apple Books, and mobile e-readers. Reflowable text that adapts to any screen.",
+    icon: BookOpen,
   },
   {
     id: "pdf",

@@ -11,10 +11,11 @@ import {
   type BookChapterForDocx,
 } from "./html-to-docx";
 import { openPrintableBook } from "./book-export-pdf";
+import { buildEpubBlob } from "./book-export-epub";
 import { htmlToMarkdown } from "./html-to-markdown";
 import { yieldToBrowser } from "./async-yield";
 
-export type BookExportFormat = "zip-docx" | "zip-md" | "pdf" | "docx";
+export type BookExportFormat = "zip-docx" | "zip-md" | "pdf" | "docx" | "epub";
 
 interface ChapterRow {
   id: string;
@@ -119,6 +120,34 @@ export async function exportBookProject(opts: ExportBookOptions): Promise<void> 
         "Popup blocked. Allow popups for DraftKit to export PDFs, or use the Combined Word document option.",
       );
     }
+    return;
+  }
+
+  if (format === "epub") {
+    onProgress?.({ current: 0, total, label: "Building ePub…" });
+    await yieldToBrowser();
+    let author = "Unknown Author";
+    try {
+      const { data: userRes } = await supabase.auth.getUser();
+      const uid = userRes.user?.id;
+      if (uid) {
+        const { data: creator } = await supabase
+          .from("creators")
+          .select("name")
+          .eq("id", uid)
+          .maybeSingle();
+        if (creator?.name) author = creator.name;
+      }
+    } catch {
+      // non-fatal — fall back to default author label
+    }
+    const blob = await buildEpubBlob({
+      projectTitle,
+      author,
+      chapters,
+      onProgress: (current, t, label) => onProgress?.({ current, total: t, label }),
+    });
+    saveAs(blob, `${base}.epub`);
     return;
   }
 }

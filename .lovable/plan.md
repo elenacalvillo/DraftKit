@@ -1,44 +1,88 @@
-# Chapter deletion UX
+# Add ePub export for book projects
 
-## Problem
+## Why
 
-Chapters are stored as `collab_requests` rows with `is_project_workspace = true`, reusing the collab workspace UI. As a result:
+PDF exports render terribly on Kindle — fixed page size means microscopic text and pan/zoom. ePub is reflowable, so early readers get a native e-reader experience (adjustable fonts, margins, page progress). We already have the chapter assembly pipeline from the PDF/DOCX exports, so this is mostly packaging.
 
-- **No way to delete a chapter** from the Project page — the rows have move/reorder/status controls but no trash action.
-- Inside the chapter workspace, the only destructive control is **"Cancel Collab"**, which sets `status = 'cancelled'` and locks editing. For a project chapter this is confusing: it leaves an orphaned "cancelled chapter" in the project list that the user actually wants gone.
+## Approach
 
-## Plan
+Build ePub 3.0 client-side using the existing `JSZip` dependency — no new packages. An ePub is just a zip with a fixed file layout, and we already produce sanitized chapter HTML.
 
-### 1. `src/hooks/useProjectChapters.ts` — add `deleteChapter` mutation
-- New mutation `deleteChapter({ chapterId })` that does `supabase.from("collab_requests").delete().eq("id", chapterId)`.
-- RLS `Creators can delete own requests` already covers this — no schema/policy changes.
-- Optimistic cache update on `["project_chapters", projectId]`: remove the row immediately, snapshot for rollback on error.
-- Export from the hook alongside the existing mutations.
+### 1. `src/lib/book-export-epub.ts` (new)
 
-### 2. `src/pages/ProjectDetail.tsx` — per-row delete button
-- Add a `Trash2` ghost icon button at the end of each `SortableChapterRow`, visible only when `!isReadOnly` (owner), styled `text-muted-foreground hover:text-destructive`.
-- Wrap in an `AlertDialog` with copy:
-  - Title: "Delete this chapter?"
-  - Description: "This permanently removes \"{chapter title}\" and all of its drafted content. This cannot be undone."
-  - Confirm button: "Delete chapter" (destructive variant)
-- On confirm, call `deleteChapter.mutateAsync({ chapterId: c.id })`, toast success/error.
-- Renumbering happens naturally because the list re-renders with one fewer item; `chapter_order` gaps are harmless (the query orders by it, then `created_at`).
+Helper `buildEpubBlob({ projectTitle, author, chapters })` that returns a `Blob` with mime `application/epub+zip`.
 
-### 3. `src/pages/Workspace.tsx` — context-aware destructive action
-When `request.is_project_workspace === true` and viewer is owner:
-- Replace the "Cancel Collab" `AlertDialog` block (lines 974–1023) with a **"Delete Chapter"** variant:
-  - Title: "Delete this chapter?"
-  - Description: "This permanently removes this chapter and its drafted content from your project. This cannot be undone."
-  - Confirm: `supabase.from("collab_requests").delete().eq("id", request.id)`, then `navigate("/dashboard/projects/" + request.project_id)`.
-  - Skip the `send-collab-email` `collab_cancelled` invocation (no external collaborator to notify on a solo chapter).
-- Keep the existing "Cancel Collab" behavior unchanged for normal (non-chapter) collabs.
+Internal layout written into the zip:
 
-Implementation note: gate via `request.is_project_workspace` (already on the row, in `types.ts`). Use a small `isChapterWorkspace` boolean inside the existing owner-only block to swap labels/handlers without duplicating the surrounding JSX.
+```text
+mimetype                        (stored, no compression — first entry, required)
+META-INF/container.xml          (points to OEBPS/content.opf)
+OEBPS/content.opf               (package: metadata, manifest, spine)
+OEBPS/toc.ncx                   (EPUB2 nav fallback)
+OEBPS/nav.xhtml                 (EPUB3 nav doc)
+OEBPS/styles/book.css           (reflowable typography)
+OEBPS/title.xhtml               (cover/title page)
+OEBPS/chap-001.xhtml … chap-NNN.xhtml
+```
 
-## Files touched
+Per-chapter XHTML wraps the existing sanitized `shared_content` HTML in a valid `<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml">…</html>` shell with a `<h1>` chapter title and a link to `book.css`. Reuse `sanitize()` from `book-export.ts` for filenames; reuse `escapeHtml` pattern from `book-export-pdf.ts` for attribute/title escaping.
 
-- `src/hooks/useProjectChapters.ts` — new `deleteChapter` mutation with optimistic update.
-- `src/pages/ProjectDetail.tsx` — per-row trash button + confirm dialog.
-- `src/pages/Workspace.tsx` — split owner destructive action into "Delete Chapter" vs "Cancel Collab" based on `is_project_workspace`.
+CSS: serif body, generous line-height, `h1.chapter-title { page-break-before: always; }`, no fixed widths — let the reader reflow.
 
-No DB schema, RLS, or edge function changes.
+UUID for `dc:identifier` via `crypto.randomUUID()`. `dc:language` = `en` (matches existing copy). Author = current creator's display name (lookup via `supabase.from("creators").select("name").eq("id", user.id).single()` inside the orchestrator, fall back to "Unknown Author").
+
+That makes total sense. If you are writing the book in Spanish, setting the metadata tag to `"es"` is exactly what you need so that Kindles load the correct Spanish dictionary, hyphenation rules, and text-to-speech engine for your readers.
+
+Since your platform might have both English and Spanish writers, the cleanest approach is to have Lovable look at the actual content or project configuration, with a smart fallback.
+
+Here is the exact modification to drop into Section 1 of the Lovable prompt before you run it:
+
+Plaintext
+
+```
+- `dc:language` detection: Check if the project or chapters contain language settings. If not available, do a quick regex check on the first chapter's content for high-frequency Spanish stop words (like "el", "la", "los", "y") to dynamically set `dc:language` to "es", otherwise default to "en".
+
+```
+
+Alternatively, if you want to keep the code ultra-simple and lightweight without text parsing, just tell Lovable to default it to `"es"` directly for your build:
+
+Plaintext
+
+```
+- `dc:language` tag: Set this to "es" (Spanish) to match the manuscript's language so Kindle dictionaries and fonts render correctly.
+
+```
+
+Pick the one that fits your immediate preference, add it to the plan, and tell Lovable to build it. It is going to work flawlessly on your device!
+
+Critical zip detail: `mimetype` must be the **first** file in the archive and stored uncompressed (`{ compression: "STORE" }`). `JSZip.generateAsync({ type: "blob", mimeType: "application/epub+zip" })`.
+
+### 2. `src/lib/book-export.ts`
+
+- Extend `BookExportFormat` type with `"epub"`.
+- Add an `if (format === "epub")` branch that fetches the author name, calls `buildEpubBlob`, then `saveAs(blob, \`${base}.epub)`. Emits the same` onProgress` ticks per chapter so the dialog progress bar keeps working.
+
+### 3. `src/components/projects/ExportBookDialog.tsx`
+
+Add a new entry to `FORMATS`:
+
+```text
+id: "epub"
+title: "ePub (.epub)"
+description: "Best for Kindle, Apple Books, and mobile e-readers. Reflowable text that adapts to any screen."
+icon: BookOpen   // from lucide-react
+```
+
+Place it directly above the PDF option so it reads as the recommended reader-facing format. No other UI changes — selection, progress, and the existing local-compilation reassurance copy all already handle a new format generically.
+
+## Out of scope
+
+- Cover image upload (uses a text-only title page for v1).
+- EPUB validation tooling — output is hand-written to spec and tested against Apple Books / Kindle Previewer manually.
+- Server-side generation or new dependencies.
+
+## Files
+
+- `src/lib/book-export-epub.ts` — new
+- `src/lib/book-export.ts` — add `"epub"` branch
+- `src/components/projects/ExportBookDialog.tsx` — add format option
