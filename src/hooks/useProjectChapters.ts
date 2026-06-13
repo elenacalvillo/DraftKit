@@ -155,7 +155,7 @@ export function useProjectChapters(projectId: string | undefined) {
     onMutate: async (orderedIds: string[]) => {
       const key = ["project_chapters", projectId];
       await queryClient.cancelQueries({ queryKey: key });
-      const previous = queryClient.getQueryData<Chapter[]>(key);
+      const previous = queryClient.getQueryData<ChapterListItem[]>(key);
       if (previous) {
         const byId = new Map(previous.map((c) => [c.id, c]));
         const next = orderedIds
@@ -164,7 +164,7 @@ export function useProjectChapters(projectId: string | undefined) {
             return row ? { ...row, chapter_order: i + 1 } : null;
           })
           .filter((r): r is Chapter => r !== null);
-        queryClient.setQueryData<Chapter[]>(key, next);
+        queryClient.setQueryData<ChapterListItem[]>(key, next);
       }
       return { previous };
     },
@@ -207,7 +207,7 @@ export function useProjectChapters(projectId: string | undefined) {
     onMutate: async ({ aId, bId }) => {
       const key = ["project_chapters", projectId];
       await queryClient.cancelQueries({ queryKey: key });
-      const previous = queryClient.getQueryData<Chapter[]>(key);
+      const previous = queryClient.getQueryData<ChapterListItem[]>(key);
       if (previous) {
         const aIdx = previous.findIndex((c) => c.id === aId);
         const bIdx = previous.findIndex((c) => c.id === bId);
@@ -220,7 +220,7 @@ export function useProjectChapters(projectId: string | undefined) {
           next.sort(
             (x, y) => (x.chapter_order ?? 0) - (y.chapter_order ?? 0),
           );
-          queryClient.setQueryData<Chapter[]>(key, next);
+          queryClient.setQueryData<ChapterListItem[]>(key, next);
         }
       }
       return { previous };
@@ -273,9 +273,9 @@ export function useProjectChapters(projectId: string | undefined) {
     onMutate: async ({ chapterId }) => {
       const key = ["project_chapters", projectId];
       await queryClient.cancelQueries({ queryKey: key });
-      const previous = queryClient.getQueryData<Chapter[]>(key);
+      const previous = queryClient.getQueryData<ChapterListItem[]>(key);
       if (previous) {
-        queryClient.setQueryData<Chapter[]>(
+        queryClient.setQueryData<ChapterListItem[]>(
           key,
           previous.filter((c) => c.id !== chapterId),
         );
