@@ -11,10 +11,11 @@ import {
   type BookChapterForDocx,
 } from "./html-to-docx";
 import { openPrintableBook } from "./book-export-pdf";
+import { buildEpubBlob } from "./book-export-epub";
 import { htmlToMarkdown } from "./html-to-markdown";
 import { yieldToBrowser } from "./async-yield";
 
-export type BookExportFormat = "zip-docx" | "zip-md" | "pdf" | "docx";
+export type BookExportFormat = "zip-docx" | "zip-md" | "pdf" | "docx" | "epub";
 
 interface ChapterRow {
   id: string;
