@@ -439,7 +439,7 @@ export default function ProjectDetail() {
                   items={chapters.map((c) => c.id)}
                   strategy={verticalListSortingStrategy}
                 >
-                  <div className="space-y-2">
+                  <div className="space-y-4 sm:space-y-2">
                     {chapters.map((c, idx) => {
                       const stage: ChapterStage = (CHAPTER_STAGES as readonly string[]).includes(
                         c.chapter_stage ?? "",
@@ -641,7 +641,7 @@ export default function ProjectDetail() {
                                     }
                                     disabled={isReadOnly}
                                   >
-                                    <SelectTrigger className="flex-1 h-9">
+                                    <SelectTrigger className="w-[140px] h-9">
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
