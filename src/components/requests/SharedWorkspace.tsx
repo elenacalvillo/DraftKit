@@ -3,7 +3,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { useWorkspacePresence } from "@/hooks/useWorkspacePresence";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { FileText, Save, X, AlertCircle, PenLine, Lock, Download, Share2, Copy, Check, CloudOff, Loader2, Send } from "lucide-react";
+import { FileText, Save, X, AlertCircle, PenLine, Lock, Download, Share2, Copy, Check, CloudOff, Loader2, Send, MoreHorizontal } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { Checkbox } from "@/components/ui/checkbox";
