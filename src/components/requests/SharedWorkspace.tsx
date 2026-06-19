@@ -705,9 +705,9 @@ function SharedWorkspaceInner({
           <span>{editBlockedReason}</span>
         </div>
       )}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-muted/30">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
+      <div className="sticky top-12 z-30 flex items-center justify-between gap-2 px-3 sm:px-4 py-2.5 sm:py-3 border-b border-border/50 bg-muted/60 backdrop-blur supports-[backdrop-filter]:bg-muted/40">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <div className="hidden sm:flex items-center gap-2">
             <FileText className="w-4 h-4 text-primary" />
             <span className="text-sm font-medium">Shared Workspace</span>
           </div>
@@ -718,73 +718,116 @@ function SharedWorkspaceInner({
             isEditing={isEditing}
           />
         </div>
-        <div className="flex items-center gap-2">
-          {hasContent && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8"
-              onClick={handleCopy}
-            >
-              <Copy className="w-3.5 h-3.5 mr-1.5" />
-              Copy
-            </Button>
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Desktop: all secondary actions inline */}
+          <div className="hidden sm:flex items-center gap-2">
+            {hasContent && (
+              <Button variant="ghost" size="sm" className="h-8" onClick={handleCopy}>
+                <Copy className="w-3.5 h-3.5 mr-1.5" />
+                Copy
+              </Button>
+            )}
+            {hasContent && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8"
+                onClick={handlePushToSubstack}
+                data-testid="push-to-substack"
+              >
+                <Send className="w-3.5 h-3.5 mr-1.5" />
+                Push to Substack
+              </Button>
+            )}
+            {hasContent && canEdit && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8"
+                onClick={async () => {
+                  try {
+                    await exportWorkspaceHtmlToDocx(sharedContent!, partnerName ? `Drafting with ${partnerName}` : "Workspace Draft");
+                    toast.success("Draft downloaded — you just saved ~30 minutes.");
+                    trackEvent("draft_accepted", { request_id: requestId, surface: "workspace_download" });
+                  } catch {
+                    toast.error("Failed to download draft");
+                  }
+                }}
+              >
+                <Download className="w-3.5 h-3.5 mr-1.5" />
+                Download
+              </Button>
+            )}
+            {isCreator && onShareClick && !isEditing && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onShareClick}
+                className="h-8"
+                title="Share or invite collaborators"
+              >
+                <Share2 className="w-3.5 h-3.5 mr-1.5" />
+                Share
+              </Button>
+            )}
+          </div>
+
+          {/* Mobile: secondary actions collapsed into overflow menu */}
+          {(hasContent || (isCreator && onShareClick && !isEditing)) && (
+            <div className="sm:hidden">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-9 w-9 p-0" aria-label="More actions">
+                    <MoreHorizontal className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
+                  {hasContent && (
+                    <DropdownMenuItem onClick={handleCopy}>
+                      <Copy className="w-4 h-4 mr-2" />
+                      Copy
+                    </DropdownMenuItem>
+                  )}
+                  {hasContent && (
+                    <DropdownMenuItem onClick={handlePushToSubstack} data-testid="push-to-substack-mobile">
+                      <Send className="w-4 h-4 mr-2" />
+                      Push to Substack
+                    </DropdownMenuItem>
+                  )}
+                  {hasContent && canEdit && (
+                    <DropdownMenuItem
+                      onClick={async () => {
+                        try {
+                          await exportWorkspaceHtmlToDocx(sharedContent!, partnerName ? `Drafting with ${partnerName}` : "Workspace Draft");
+                          toast.success("Draft downloaded — you just saved ~30 minutes.");
+                          trackEvent("draft_accepted", { request_id: requestId, surface: "workspace_download" });
+                        } catch {
+                          toast.error("Failed to download draft");
+                        }
+                      }}
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Download
+                    </DropdownMenuItem>
+                  )}
+                  {isCreator && onShareClick && !isEditing && (
+                    <DropdownMenuItem onClick={onShareClick}>
+                      <Share2 className="w-4 h-4 mr-2" />
+                      Share
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           )}
-          {/*
-            Push to Substack — visible to ALL users regardless of plan
-            (DRAFT-003 requirement). The Pro/Free branching happens inside
-            the click handler so the button itself stays a discovery
-            surface for free users.
-          */}
-          {hasContent && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8"
-              onClick={handlePushToSubstack}
-              data-testid="push-to-substack"
-            >
-              <Send className="w-3.5 h-3.5 mr-1.5" />
-              Push to Substack
-            </Button>
-          )}
-          {hasContent && canEdit && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8"
-              onClick={async () => {
-                try {
-                  await exportWorkspaceHtmlToDocx(sharedContent!, partnerName ? `Drafting with ${partnerName}` : "Workspace Draft");
-                  toast.success("Draft downloaded — you just saved ~30 minutes.");
-                  trackEvent("draft_accepted", { request_id: requestId, surface: "workspace_download" });
-                } catch {
-                  toast.error("Failed to download draft");
-                }
-              }}
-            >
-              <Download className="w-3.5 h-3.5 mr-1.5" />
-              Download
-            </Button>
-          )}
-          {isCreator && onShareClick && !isEditing && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onShareClick}
-              className="h-8"
-              title="Share or invite collaborators"
-            >
-              <Share2 className="w-3.5 h-3.5 mr-1.5" />
-              Share
-            </Button>
-          )}
+
+          {/* Primary action — always visible */}
           {canEdit && !isEditing && (
             <Button
-              variant="ghost"
+              variant={hasContent ? "outline" : "gradient"}
               size="sm"
               onClick={handleStartEditing}
-              className="h-8"
+              className="h-9 sm:h-8"
               disabled={!!editBlockedReason}
               title={editBlockedReason || undefined}
             >
@@ -794,6 +837,7 @@ function SharedWorkspaceInner({
           )}
         </div>
       </div>
+
 
       <AnimatePresence mode="wait">
         {isEditing ? (
