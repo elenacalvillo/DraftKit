@@ -788,9 +788,10 @@ export default function Workspace() {
           )}
         </AnimatePresence>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
-          {/* Left Panel — Context Sidebar */}
-          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
+        <div className="flex flex-col-reverse gap-6 lg:grid lg:grid-cols-[280px_1fr]">
+          {/* Left Panel — Context Sidebar (renders BELOW editor on mobile) */}
+          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4 min-w-0">
+
             {/* Partner Card / Solo Project Card */}
             <div className="glass-card p-5 space-y-4">
               {isSolo ? (
