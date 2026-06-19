@@ -453,122 +453,215 @@ export default function ProjectDetail() {
                           id={c.id}
                           disabled={isReadOnly}
                         >
-                          {({ dragHandleProps }) => (
-                            <>
-                              <button
-                                {...dragHandleProps}
-                                aria-label="Drag to reorder"
-                                className="cursor-grab touch-none text-muted-foreground hover:text-foreground active:cursor-grabbing disabled:opacity-30"
-                                disabled={isReadOnly}
-                              >
-                                <GripVertical className="w-4 h-4" />
-                              </button>
-                              <div className="flex flex-col gap-0.5">
-                                <button
-                                  aria-label="Move up"
-                                  className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                                  onClick={() => handleMove(c.id, "up")}
-                                  disabled={isReadOnly || idx === 0}
-                                >
-                                  <ChevronUp className="w-4 h-4" />
-                                </button>
-                                <button
-                                  aria-label="Move down"
-                                  className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                                  onClick={() => handleMove(c.id, "down")}
-                                  disabled={isReadOnly || idx === chapters.length - 1}
-                                >
-                                  <ChevronDown className="w-4 h-4" />
-                                </button>
-                              </div>
-                              <div className="flex-1 min-w-0 group">
-                                <div className="font-medium truncate">
-                                  <EditableChapterTitle
-                                    chapterId={c.id}
-                                    title={c.message ?? "Untitled chapter"}
-                                    canEdit={!isReadOnly}
-                                    variant="row"
-                                    prefix={`${idx + 1}.`}
-                                    titleHref={`/dashboard/workspace/${c.id}`}
-                                    titleClassName="group-hover:text-primary"
-                                  />
+                          {({ dragHandleProps }) => {
+                            const deleteDialog = !isReadOnly ? (
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <button
+                                    aria-label="Delete chapter"
+                                    className="hidden sm:inline-flex text-muted-foreground hover:text-destructive transition-colors p-1"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete this chapter?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This permanently removes &ldquo;{c.message ?? "Untitled chapter"}&rdquo; and all of its drafted content. This cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                      onClick={() => handleDeleteChapter(c.id)}
+                                    >
+                                      Delete chapter
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            ) : null;
+
+                            const mobileOverflow = !isReadOnly ? (
+                              <AlertDialog>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <button
+                                      aria-label="Chapter actions"
+                                      className="sm:hidden text-muted-foreground hover:text-foreground p-2 -mr-1"
+                                    >
+                                      <MoreVertical className="w-5 h-5" />
+                                    </button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-44">
+                                    <DropdownMenuItem
+                                      onClick={() => handleMove(c.id, "up")}
+                                      disabled={idx === 0}
+                                    >
+                                      <ChevronUp className="w-4 h-4 mr-2" /> Move up
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => handleMove(c.id, "down")}
+                                      disabled={idx === chapters.length - 1}
+                                    >
+                                      <ChevronDown className="w-4 h-4 mr-2" /> Move down
+                                    </DropdownMenuItem>
+                                    <AlertDialogTrigger asChild>
+                                      <DropdownMenuItem
+                                        onSelect={(e) => e.preventDefault()}
+                                        className="text-destructive focus:text-destructive"
+                                      >
+                                        <Trash2 className="w-4 h-4 mr-2" /> Delete chapter
+                                      </DropdownMenuItem>
+                                    </AlertDialogTrigger>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete this chapter?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This permanently removes &ldquo;{c.message ?? "Untitled chapter"}&rdquo; and all of its drafted content. This cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                      onClick={() => handleDeleteChapter(c.id)}
+                                    >
+                                      Delete chapter
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            ) : null;
+
+                            return (
+                              <>
+                                <div className="flex items-center gap-2 sm:gap-3 w-full">
+                                  <button
+                                    {...dragHandleProps}
+                                    aria-label="Drag to reorder"
+                                    className="cursor-grab touch-none text-muted-foreground hover:text-foreground active:cursor-grabbing disabled:opacity-30"
+                                    disabled={isReadOnly}
+                                  >
+                                    <GripVertical className="w-4 h-4" />
+                                  </button>
+                                  <div className="hidden sm:flex flex-col gap-0.5">
+                                    <button
+                                      aria-label="Move up"
+                                      className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                                      onClick={() => handleMove(c.id, "up")}
+                                      disabled={isReadOnly || idx === 0}
+                                    >
+                                      <ChevronUp className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      aria-label="Move down"
+                                      className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                                      onClick={() => handleMove(c.id, "down")}
+                                      disabled={isReadOnly || idx === chapters.length - 1}
+                                    >
+                                      <ChevronDown className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                  <div className="flex-1 min-w-0 group">
+                                    <div className="font-medium truncate">
+                                      <EditableChapterTitle
+                                        chapterId={c.id}
+                                        title={c.message ?? "Untitled chapter"}
+                                        canEdit={!isReadOnly}
+                                        variant="row"
+                                        prefix={`${idx + 1}.`}
+                                        titleHref={`/dashboard/workspace/${c.id}`}
+                                        titleClassName="group-hover:text-primary"
+                                      />
+                                    </div>
+                                    <div className="text-xs text-muted-foreground truncate">
+                                      Writer:{" "}
+                                      {c.requester_name || (
+                                        <span className="italic">Unassigned</span>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <span
+                                    className={`hidden sm:inline-flex text-xs px-2 py-1 rounded ${STAGE_BADGE[stage]}`}
+                                  >
+                                    {CHAPTER_STAGE_LABEL[stage]}
+                                  </span>
+                                  <Select
+                                    value={stage}
+                                    onValueChange={(value) =>
+                                      handleStatusChange(
+                                        c.id,
+                                        stage,
+                                        value as ChapterStage,
+                                        hasWriter,
+                                      )
+                                    }
+                                    disabled={isReadOnly}
+                                  >
+                                    <SelectTrigger className="hidden sm:flex w-[170px]">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {CHAPTER_STAGES.map((s) => (
+                                        <SelectItem key={s} value={s}>
+                                          {CHAPTER_STAGE_LABEL[s]}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  {!hasWriter && !isReadOnly && (
+                                    <span
+                                      title="Assign a writer before advancing"
+                                      className="hidden sm:inline text-xs text-amber-700"
+                                    >
+                                      <ArrowRight className="w-3.5 h-3.5 inline mr-1" />
+                                      Assign writer
+                                    </span>
+                                  )}
+                                  {deleteDialog}
+                                  {mobileOverflow}
                                 </div>
-                                <div className="text-xs text-muted-foreground">
-                                  Writer:{" "}
-                                  {c.requester_name || (
-                                    <span className="italic">Unassigned</span>
+
+                                <div className="sm:hidden flex items-center gap-2 w-full pl-6">
+                                  <Select
+                                    value={stage}
+                                    onValueChange={(value) =>
+                                      handleStatusChange(
+                                        c.id,
+                                        stage,
+                                        value as ChapterStage,
+                                        hasWriter,
+                                      )
+                                    }
+                                    disabled={isReadOnly}
+                                  >
+                                    <SelectTrigger className="flex-1 h-9">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {CHAPTER_STAGES.map((s) => (
+                                        <SelectItem key={s} value={s}>
+                                          {CHAPTER_STAGE_LABEL[s]}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  {!hasWriter && !isReadOnly && (
+                                    <span className="text-xs text-amber-700 whitespace-nowrap">
+                                      <ArrowRight className="w-3.5 h-3.5 inline mr-1" />
+                                      Assign writer
+                                    </span>
                                   )}
                                 </div>
-                              </div>
-
-                              <span
-                                className={`text-xs px-2 py-1 rounded ${STAGE_BADGE[stage]}`}
-                              >
-                                {CHAPTER_STAGE_LABEL[stage]}
-                              </span>
-                              <Select
-                                value={stage}
-                                onValueChange={(value) =>
-                                  handleStatusChange(
-                                    c.id,
-                                    stage,
-                                    value as ChapterStage,
-                                    hasWriter,
-                                  )
-                                }
-                                disabled={isReadOnly}
-                              >
-                                <SelectTrigger className="w-[170px]">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {CHAPTER_STAGES.map((s) => (
-                                    <SelectItem key={s} value={s}>
-                                      {CHAPTER_STAGE_LABEL[s]}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              {!hasWriter && !isReadOnly && (
-                                <span
-                                  title="Assign a writer before advancing"
-                                  className="text-xs text-amber-700"
-                                >
-                                  <ArrowRight className="w-3.5 h-3.5 inline mr-1" />
-                                  Assign writer
-                                </span>
-                              )}
-                              {!isReadOnly && (
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <button
-                                      aria-label="Delete chapter"
-                                      className="text-muted-foreground hover:text-destructive transition-colors p-1"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Delete this chapter?</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        This permanently removes &ldquo;{c.message ?? "Untitled chapter"}&rdquo; and all of its drafted content. This cannot be undone.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                      <AlertDialogAction
-                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                        onClick={() => handleDeleteChapter(c.id)}
-                                      >
-                                        Delete chapter
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              )}
-                            </>
-                          )}
+                              </>
+                            );
+                          }}
                         </SortableChapterRow>
                       );
                     })}
