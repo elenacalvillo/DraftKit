@@ -878,13 +878,14 @@ function SharedWorkspaceInner({
                     </span>
                   </label>
                 )}
-                <Button variant="ghost" size="sm" onClick={handleCancel} disabled={isSaving} className="h-8 text-xs">
-                  <X className="w-3.5 h-3.5 mr-1" />
-                  Cancel
+                <Button variant="ghost" size="sm" onClick={handleCancel} disabled={isSaving} className="h-8 text-xs px-2 sm:px-3" aria-label="Cancel">
+                  <X className="w-3.5 h-3.5 sm:mr-1" />
+                  <span className="hidden sm:inline">Cancel</span>
                 </Button>
-                <Button variant="gradient" size="sm" onClick={handleSave} disabled={isSaving} className="h-8 text-xs">
-                  <Save className="w-3.5 h-3.5 mr-1" />
-                  {isSaving ? "Saving…" : "Save & Sync"}
+                <Button variant="gradient" size="sm" onClick={handleSave} disabled={isSaving} className="h-8 text-xs px-2 sm:px-3" aria-label="Save and sync">
+                  <Save className="w-3.5 h-3.5 sm:mr-1" />
+                  <span className="hidden sm:inline">{isSaving ? "Saving…" : "Save & Sync"}</span>
+                  <span className="sm:hidden">{isSaving ? "…" : "Save"}</span>
                 </Button>
               </>,
               headerPortal
