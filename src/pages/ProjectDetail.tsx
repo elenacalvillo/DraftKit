@@ -912,7 +912,7 @@ function SortableChapterRow({ id, disabled, children }: SortableChapterRowProps)
     <div
       ref={setNodeRef}
       style={style}
-      className="flex items-center gap-3 rounded-xl border border-border bg-card p-3 transition-colors hover:border-primary/40 hover:bg-accent/30"
+      className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 rounded-xl border border-border bg-card p-3 pr-2 sm:pr-3 transition-colors hover:border-primary/40 hover:bg-accent/30"
     >
       {children({ dragHandleProps: { ...attributes, ...listeners } })}
     </div>
