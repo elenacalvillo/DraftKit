@@ -91,21 +91,22 @@ export function DashboardLayout({ children, zenMode, zenTitle, zenBackPath }: Da
   if (zenMode) {
     return (
       <div className="min-h-screen gradient-bg">
-        <div className="fixed top-0 left-0 right-0 z-50 h-12 glass-card rounded-none border-x-0 border-t-0 px-4 flex items-center">
+        <div className="fixed top-0 left-0 right-0 z-50 h-12 glass-card rounded-none border-x-0 border-t-0 px-2 sm:px-4 flex items-center">
           <button
             onClick={() => navigate(zenBackPath || "/dashboard")}
-            className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors min-w-[72px]"
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors sm:min-w-[72px] shrink-0 px-2 py-1 rounded-md"
+            aria-label="Back"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span className="text-sm">Back</span>
+            <span className="text-sm hidden sm:inline">Back</span>
           </button>
           <span
-            className="flex-1 text-center text-sm font-medium truncate px-4"
+            className="flex-1 text-center text-sm font-medium truncate px-2 sm:px-4 min-w-0"
           >
             {zenTitle || "Workspace"}
           </span>
           {/* Portal target for save controls rendered by SharedWorkspace */}
-          <div id="zen-header-actions" className="flex items-center gap-3 min-w-[72px] justify-end" />
+          <div id="zen-header-actions" className="flex items-center gap-1.5 sm:gap-3 sm:min-w-[72px] justify-end shrink-0" />
         </div>
 
         <main className="min-h-screen pt-12 overflow-x-hidden">
@@ -113,7 +114,7 @@ export function DashboardLayout({ children, zenMode, zenTitle, zenBackPath }: Da
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
-            className="p-6 xl:p-10"
+            className="p-3 sm:p-6 xl:p-10"
           >
             {children}
           </motion.div>
