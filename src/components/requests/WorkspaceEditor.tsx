@@ -560,7 +560,7 @@ export function WorkspaceEditor({ content, onChange, editable, currentUserName, 
       {/* Floating Pill Toolbar -- portaled to body */}
       {editable && createPortal(
         <div
-          className="fixed bottom-8 z-[100] flex items-center gap-0.5 px-3 py-2 bg-background/80 backdrop-blur-md rounded-full shadow-xl border border-border/50"
+          className="fixed bottom-8 z-[100] flex items-center gap-0 sm:gap-0.5 px-2 py-1.5 sm:px-3 sm:py-2 bg-background/80 backdrop-blur-md rounded-full shadow-xl border border-border/50 max-w-[calc(100vw-1rem)]"
           style={bounds ? {
             left: bounds.left + bounds.width / 2,
             transform: 'translateX(-50%)',
@@ -605,120 +605,190 @@ export function WorkspaceEditor({ content, onChange, editable, currentUserName, 
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <div className="w-px h-5 bg-border/40 mx-1" />
+          <div className="hidden sm:block w-px h-5 bg-border/40 mx-1" />
 
-          {/* Text styles */}
+          {/* Text styles — Bold + Italic always visible */}
           <ToolbarButton active={editor.isActive("bold")} onClick={() => editor.chain().focus().toggleBold().run()} title="Bold">
             <Bold className="w-4 h-4" />
           </ToolbarButton>
           <ToolbarButton active={editor.isActive("italic")} onClick={() => editor.chain().focus().toggleItalic().run()} title="Italic">
             <Italic className="w-4 h-4" />
           </ToolbarButton>
-          <ToolbarButton active={editor.isActive("strike")} onClick={() => editor.chain().focus().toggleStrike().run()} title="Strikethrough">
-            <Strikethrough className="w-4 h-4" />
-          </ToolbarButton>
-          <ToolbarButton active={editor.isActive("code")} onClick={() => editor.chain().focus().toggleCode().run()} title="Inline code">
-            <Code className="w-4 h-4" />
-          </ToolbarButton>
+          <div className="hidden sm:inline-flex">
+            <ToolbarButton active={editor.isActive("strike")} onClick={() => editor.chain().focus().toggleStrike().run()} title="Strikethrough">
+              <Strikethrough className="w-4 h-4" />
+            </ToolbarButton>
+          </div>
+          <div className="hidden sm:inline-flex">
+            <ToolbarButton active={editor.isActive("code")} onClick={() => editor.chain().focus().toggleCode().run()} title="Inline code">
+              <Code className="w-4 h-4" />
+            </ToolbarButton>
+          </div>
 
-          <div className="w-px h-5 bg-border/40 mx-1" />
+          <div className="hidden sm:block w-px h-5 bg-border/40 mx-1" />
 
           {/* Code Block */}
-          <ToolbarButton active={editor.isActive("codeBlock")} onClick={() => editor.chain().focus().toggleCodeBlock().run()} title="Code block">
-            <SquareCode className="w-4 h-4" />
-          </ToolbarButton>
+          <div className="hidden sm:inline-flex">
+            <ToolbarButton active={editor.isActive("codeBlock")} onClick={() => editor.chain().focus().toggleCodeBlock().run()} title="Code block">
+              <SquareCode className="w-4 h-4" />
+            </ToolbarButton>
+          </div>
 
-          <div className="w-px h-5 bg-border/40 mx-1" />
+          <div className="hidden sm:block w-px h-5 bg-border/40 mx-1" />
 
-          {/* Link */}
+          {/* Link — always visible */}
           <ToolbarButton active={editor.isActive("link")} onClick={handleLink} title="Link">
             <LinkIcon className="w-4 h-4" />
           </ToolbarButton>
 
           {/* Highlighter */}
-          <ToolbarButton active={editor.isActive("stickyComment")} onClick={handleHighlighter} title="Add comment highlight">
-            <Highlighter className="w-4 h-4" />
-          </ToolbarButton>
-
-          {/* Image upload — only shown when a requestId is available
-              so we can scope the storage path correctly. */}
-          {canInsertImage && (
-            <ToolbarButton
-              active={false}
-              onClick={handleImageButton}
-              title={isUploading ? "Uploading image…" : "Insert image"}
-              disabled={isUploading}
-              data-testid="workspace-image-toolbar-button"
-            >
-              {isUploading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <ImagePlus className="w-4 h-4" />
-              )}
+          <div className="hidden sm:inline-flex">
+            <ToolbarButton active={editor.isActive("stickyComment")} onClick={handleHighlighter} title="Add comment highlight">
+              <Highlighter className="w-4 h-4" />
             </ToolbarButton>
+          </div>
+
+          {/* Image upload */}
+          {canInsertImage && (
+            <div className="hidden sm:inline-flex">
+              <ToolbarButton
+                active={false}
+                onClick={handleImageButton}
+                title={isUploading ? "Uploading image…" : "Insert image"}
+                disabled={isUploading}
+                data-testid="workspace-image-toolbar-button"
+              >
+                {isUploading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <ImagePlus className="w-4 h-4" />
+                )}
+              </ToolbarButton>
+            </div>
           )}
 
-          <div className="w-px h-5 bg-border/40 mx-1" />
+          <div className="hidden sm:block w-px h-5 bg-border/40 mx-1" />
 
-          {/* Lists */}
+          {/* Lists — Bullet always visible, Ordered desktop only */}
           <ToolbarButton active={editor.isActive("bulletList")} onClick={() => editor.chain().focus().toggleBulletList().run()} title="Bullet list">
             <List className="w-4 h-4" />
           </ToolbarButton>
-          <ToolbarButton active={editor.isActive("orderedList")} onClick={() => editor.chain().focus().toggleOrderedList().run()} title="Numbered list">
-            <ListOrdered className="w-4 h-4" />
-          </ToolbarButton>
+          <div className="hidden sm:inline-flex">
+            <ToolbarButton active={editor.isActive("orderedList")} onClick={() => editor.chain().focus().toggleOrderedList().run()} title="Numbered list">
+              <ListOrdered className="w-4 h-4" />
+            </ToolbarButton>
+          </div>
 
-          <div className="w-px h-5 bg-border/40 mx-1" />
+          <div className="hidden sm:block w-px h-5 bg-border/40 mx-1" />
 
           {/* Divider */}
-          <ToolbarButton active={false} onClick={() => editor.chain().focus().setHorizontalRule().run()} title="Divider (---)">
-            <Minus className="w-4 h-4" />
-          </ToolbarButton>
+          <div className="hidden sm:inline-flex">
+            <ToolbarButton active={false} onClick={() => editor.chain().focus().setHorizontalRule().run()} title="Divider (---)">
+              <Minus className="w-4 h-4" />
+            </ToolbarButton>
+          </div>
 
-          {/* Table dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                title="Table"
-                className={cn(
-                  "h-8 w-8 flex items-center justify-center rounded-md transition-all hover:scale-105",
-                  editor.isActive("table")
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+          {/* Table dropdown — desktop only */}
+          <div className="hidden sm:inline-flex">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  title="Table"
+                  className={cn(
+                    "h-8 w-8 flex items-center justify-center rounded-md transition-all hover:scale-105",
+                    editor.isActive("table")
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  )}
+                >
+                  <Table2 className="w-4 h-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[150px]">
+                <DropdownMenuItem onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}>
+                  Insert Table (3×3)
+                </DropdownMenuItem>
+                {editor.isActive("table") && (
+                  <>
+                    <DropdownMenuItem onClick={() => editor.chain().focus().addRowAfter().run()}>
+                      Add Row
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => editor.chain().focus().addColumnAfter().run()}>
+                      Add Column
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => editor.chain().focus().deleteRow().run()}>
+                      Delete Row
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => editor.chain().focus().deleteColumn().run()}>
+                      Delete Column
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => editor.chain().focus().deleteTable().run()}
+                      className="text-destructive"
+                    >
+                      Delete Table
+                    </DropdownMenuItem>
+                  </>
                 )}
-              >
-                <Table2 className="w-4 h-4" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-[150px]">
-              <DropdownMenuItem onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}>
-                Insert Table (3×3)
-              </DropdownMenuItem>
-              {editor.isActive("table") && (
-                <>
-                  <DropdownMenuItem onClick={() => editor.chain().focus().addRowAfter().run()}>
-                    Add Row
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* Mobile-only overflow menu */}
+          <div className="sm:hidden">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  title="More"
+                  className="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                >
+                  <MoreHorizontal className="w-4 h-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" side="top" className="min-w-[180px]">
+                <DropdownMenuItem onClick={() => editor.chain().focus().toggleStrike().run()}>
+                  <Strikethrough className="w-4 h-4 mr-2" /> Strikethrough
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => editor.chain().focus().toggleCode().run()}>
+                  <Code className="w-4 h-4 mr-2" /> Inline code
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => editor.chain().focus().toggleCodeBlock().run()}>
+                  <SquareCode className="w-4 h-4 mr-2" /> Code block
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleHighlighter}>
+                  <Highlighter className="w-4 h-4 mr-2" /> Highlight & comment
+                </DropdownMenuItem>
+                {canInsertImage && (
+                  <DropdownMenuItem onClick={handleImageButton} disabled={isUploading}>
+                    {isUploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ImagePlus className="w-4 h-4 mr-2" />}
+                    {isUploading ? "Uploading…" : "Insert image"}
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => editor.chain().focus().addColumnAfter().run()}>
-                    Add Column
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => editor.chain().focus().deleteRow().run()}>
-                    Delete Row
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => editor.chain().focus().deleteColumn().run()}>
-                    Delete Column
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => editor.chain().focus().deleteTable().run()}
-                    className="text-destructive"
-                  >
-                    Delete Table
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                )}
+                <DropdownMenuItem onClick={() => editor.chain().focus().toggleOrderedList().run()}>
+                  <ListOrdered className="w-4 h-4 mr-2" /> Numbered list
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => editor.chain().focus().setHorizontalRule().run()}>
+                  <Minus className="w-4 h-4 mr-2" /> Divider
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}>
+                  <Table2 className="w-4 h-4 mr-2" /> Insert table
+                </DropdownMenuItem>
+                {editor.isActive("table") && (
+                  <>
+                    <DropdownMenuItem onClick={() => editor.chain().focus().addRowAfter().run()}>Add row</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => editor.chain().focus().addColumnAfter().run()}>Add column</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => editor.chain().focus().deleteRow().run()}>Delete row</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => editor.chain().focus().deleteColumn().run()}>Delete column</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => editor.chain().focus().deleteTable().run()} className="text-destructive">
+                      Delete table
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>,
         document.body
       )}
