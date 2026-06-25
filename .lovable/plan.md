@@ -1,41 +1,28 @@
-## Goal
-Stop the floating editor toolbar from overflowing the screen on mobile. Keep desktop unchanged.
+## Problem
 
-## Approach
-On mobile (`< sm`), show only the essential formatting buttons inline, and tuck the rest behind a single "More" (`MoreHorizontal`) dropdown. On `sm+` the full toolbar renders as it does today.
+New signups fail at step 2 with "Failed to create profile." Backend analytics confirm every attempt since at least 2026-06-18 errors with:
 
-## Mobile button split
-**Always visible (mobile):**
-- Heading dropdown (H1/H2/H3)
-- Bold
-- Italic
-- Bullet list
-- Link
-- More menu (overflow)
+> Could not find the function `public.create_creator_profile(...)` in the schema cache
 
-**Inside the More menu (mobile only):**
-- Strikethrough
-- Inline code
-- Code block
-- Highlighter (sticky comment)
-- Image upload (when available)
-- Numbered list
-- Divider
-- Table (with its current submenu actions)
+The function is referenced by `src/lib/creator-profile.ts` (called from `Signup.tsx`) and a migration exists at `supabase/migrations/20260519000000_create_creator_profile_rpc.sql`, but `pg_proc` shows zero functions named `create_creator_profile`. The function is missing from the live database, so every signup hits the `rpc_unknown` branch.
 
-On `sm+`, all buttons render inline as today (no More menu).
+## Fix
 
-## Implementation
-Single file: `src/components/requests/WorkspaceEditor.tsx`
+Add a new migration that re-creates the RPC with the exact signature the frontend calls, plus its grants. Body is identical to the existing `20260519000000_create_creator_profile_rpc.sql`:
 
-1. Add a `useIsMobile`-style check (already used elsewhere in the codebase) or a simple `matchMedia('(max-width: 639px)')` hook.
-2. Wrap each currently-inline toolbar button in a class that hides it on mobile when it's in the "overflow" set: `hidden sm:inline-flex`.
-3. Add a new `MoreHorizontal` `DropdownMenu` rendered only on mobile (`sm:hidden`) containing `DropdownMenuItem`s for each overflow action, each calling the same `editor.chain()...` command as its inline button.
-4. Tighten toolbar padding on mobile: `px-2 py-1.5 gap-0` on `< sm`, current `px-3 py-2 gap-0.5` on `sm+`.
-5. Constrain the pill width so it never exceeds viewport: add `max-w-[calc(100vw-1rem)]` to the portaled container.
-6. Remove the inline vertical dividers on mobile (`hidden sm:block`) since the compact set doesn't need them.
+- `CREATE OR REPLACE FUNCTION public.create_creator_profile(_username text, _name text, _email text, _substack_url text DEFAULT NULL, _newsletter_url text DEFAULT NULL, _welcome_message text DEFAULT NULL, _join_directory_waitlist boolean DEFAULT false, _profile_image_url text DEFAULT NULL, _referred_by uuid DEFAULT NULL) RETURNS TABLE (id uuid, user_id uuid, username text, name text)` — `LANGUAGE plpgsql SECURITY DEFINER SET search_path = public`.
+- Auth guard (`auth.uid()` not null), `username_required` / `email_required` checks.
+- Orphan recovery: if a `creators` row already exists for `auth.uid()`, update in place; otherwise check username uniqueness and insert.
+- Upsert into `creator_contacts (creator_id, email)` with `ON CONFLICT (creator_id) DO UPDATE`.
+- `REVOKE ALL ... FROM PUBLIC` then `GRANT EXECUTE ... TO authenticated`.
 
 ## Out of scope
-- No changes to editor behavior, commands, sanitization, image upload pipeline, or any business logic.
-- No changes to `SharedWorkspace.tsx`, `Workspace.tsx`, or the SMART chat bubble.
-- No DB, RLS, or edge function changes.
+
+No frontend changes, no schema changes, no RLS changes. `Signup.tsx`, `creator-profile.ts`, and the analytics path stay as-is — they already handle the success and typed-error reasons correctly once the function exists.
+
+## Verification
+
+After the migration runs:
+1. `SELECT proname FROM pg_proc WHERE proname = 'create_creator_profile'` returns one row.
+2. New signup completes end-to-end in the preview.
+3. No new `creator_creation_failed` rows in `analytics_events` with `reason = rpc_unknown`.
