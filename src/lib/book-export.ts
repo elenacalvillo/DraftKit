@@ -67,7 +67,7 @@ async function fetchChapters(projectId: string): Promise<BookChapterForDocx[]> {
   const rows = (data ?? []) as ChapterRow[];
   return rows.map((r) => ({
     title: (r.message ?? "Untitled chapter").trim() || "Untitled chapter",
-    html: r.shared_content ?? "",
+    html: sanitizeChapterHtml(r.shared_content ?? ""),
   }));
 }
 
