@@ -1018,6 +1018,25 @@ export type Database = {
         }[]
       }
       can_edit_workspace: { Args: { _request_id: string }; Returns: Json }
+      create_creator_profile: {
+        Args: {
+          _email: string
+          _join_directory_waitlist?: boolean
+          _name: string
+          _newsletter_url?: string
+          _profile_image_url?: string
+          _referred_by?: string
+          _substack_url?: string
+          _username: string
+          _welcome_message?: string
+        }
+        Returns: {
+          id: string
+          name: string
+          user_id: string
+          username: string
+        }[]
+      }
       creator_has_public_profile: {
         Args: { _creator_id: string }
         Returns: boolean
