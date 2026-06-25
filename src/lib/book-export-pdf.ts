@@ -142,6 +142,7 @@ function buildPrintableHtml(projectTitle: string, chapters: BookChapterForPdf[])
 
   <script>
     (function () {
+      try { window.opener = null; } catch (e) { /* noop */ }
       function ready() {
         // Wait for images to settle before printing.
         var imgs = Array.prototype.slice.call(document.images);
@@ -181,7 +182,7 @@ export interface PrintableBookOptions {
  * was blocked.
  */
 export function openPrintableBook({ projectTitle, chapters }: PrintableBookOptions): boolean {
-  const popup = window.open("", "_blank", "width=900,height=1100,noopener=no");
+  const popup = window.open("", "_blank", "width=900,height=1100");
   if (!popup) return false;
   const html = buildPrintableHtml(projectTitle, chapters);
   popup.document.open();
