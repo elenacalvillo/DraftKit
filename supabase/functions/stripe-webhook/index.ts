@@ -41,6 +41,20 @@ serve(async (req) => {
   );
 
   try {
+    // Hard-fail if neither webhook secret is configured. Without a
+    // signing secret, ANY caller could forge subscription events and
+    // upgrade arbitrary accounts to paid tiers.
+    if (!liveWebhookSecret && !testWebhookSecret) {
+      console.error("stripe-webhook: no webhook secret configured");
+      return new Response(
+        JSON.stringify({ error: "Webhook secret not configured" }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
     const sig = req.headers.get("stripe-signature") ?? "";
     const payload = await req.text();
 
@@ -61,13 +75,13 @@ serve(async (req) => {
       } catch { /* fall through */ }
     }
     if (!event) {
-      // Dev fallback when no secret is configured at all.
-      if (!liveWebhookSecret && !testWebhookSecret) {
-        event = JSON.parse(payload) as Stripe.Event;
-        isTestEvent = event.livemode === false;
-      } else {
-        throw new Error("Invalid webhook signature");
-      }
+      return new Response(
+        JSON.stringify({ error: "Invalid webhook signature" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
     if (event.livemode === false) isTestEvent = true;
 
