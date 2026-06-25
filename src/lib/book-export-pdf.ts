@@ -142,6 +142,7 @@ function buildPrintableHtml(projectTitle: string, chapters: BookChapterForPdf[])
 
   <script>
     (function () {
+      try { window.opener = null; } catch (e) { /* noop */ }
       function ready() {
         // Wait for images to settle before printing.
         var imgs = Array.prototype.slice.call(document.images);
