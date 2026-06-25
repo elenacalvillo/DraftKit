@@ -181,7 +181,7 @@ export interface PrintableBookOptions {
  * was blocked.
  */
 export function openPrintableBook({ projectTitle, chapters }: PrintableBookOptions): boolean {
-  const popup = window.open("", "_blank", "width=900,height=1100,noopener=no");
+  const popup = window.open("", "_blank", "width=900,height=1100");
   if (!popup) return false;
   const html = buildPrintableHtml(projectTitle, chapters);
   popup.document.open();
