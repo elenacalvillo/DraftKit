@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -19,9 +20,51 @@ serve(async (req) => {
       throw new Error("RESEND_API_KEY is not configured");
     }
 
+    // Auth gate: function is invoked either from a Postgres trigger with
+    // the service-role key, or by an authenticated user syncing their OWN
+    // email. Anyone else is blocked to prevent strangers from enrolling
+    // arbitrary addresses into the Resend audience.
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const bearer = authHeader.startsWith("Bearer ")
+      ? authHeader.slice("Bearer ".length).trim()
+      : "";
+    if (!bearer) {
+      return new Response(JSON.stringify({ error: "unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const isServiceRole = bearer === SERVICE_ROLE_KEY;
+    let callerEmail: string | null = null;
+    if (!isServiceRole) {
+      const userClient = createClient(SUPABASE_URL, ANON_KEY, {
+        global: { headers: { Authorization: `Bearer ${bearer}` } },
+      });
+      const { data, error } = await userClient.auth.getUser(bearer);
+      if (error || !data?.user?.email) {
+        return new Response(JSON.stringify({ error: "unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      callerEmail = data.user.email.toLowerCase();
+    }
+
     const { email, full_name } = await req.json();
     if (!email) {
       throw new Error("email is required");
+    }
+
+    // Non-service callers can only sync their own email address.
+    if (!isServiceRole && callerEmail !== String(email).toLowerCase()) {
+      return new Response(JSON.stringify({ error: "forbidden" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Split full name at first space to get just the first name

@@ -144,6 +144,16 @@ serve(async (req: Request): Promise<Response> => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  // Restrict to scheduled cron / admin invocations only. Without this
+  // gate, any caller could trigger a mass-email blast to ghost users.
+  const cronSecret = Deno.env.get("CRON_SECRET");
+  if (!cronSecret || req.headers.get("x-internal-secret") !== cronSecret) {
+    return new Response(JSON.stringify({ error: "unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   if (!RESEND_API_KEY) {
     return new Response(
       JSON.stringify({ error: "RESEND_API_KEY not configured" }),
