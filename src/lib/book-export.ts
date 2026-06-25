@@ -4,6 +4,7 @@
  */
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
+import DOMPurify from "dompurify";
 import { supabase } from "@/integrations/supabase/client";
 import {
   chaptersToCombinedDocxBlob,
@@ -14,6 +15,27 @@ import { openPrintableBook } from "./book-export-pdf";
 import { buildEpubBlob } from "./book-export-epub";
 import { htmlToMarkdown } from "./html-to-markdown";
 import { yieldToBrowser } from "./async-yield";
+
+// Sanitise chapter HTML before writing it into export popups, docx, or
+// epub. `shared_content` can be PATCHed directly via the Supabase API by
+// any authenticated workspace participant, bypassing the Tiptap editor
+// schema — strip scripts and event handlers defensively here.
+const EXPORT_ALLOWED_TAGS = [
+  "p", "h1", "h2", "h3", "h4", "strong", "em", "s", "u", "code", "pre",
+  "a", "ul", "ol", "li", "br", "hr", "blockquote",
+  "table", "thead", "tbody", "tr", "th", "td", "span", "img",
+];
+const EXPORT_ALLOWED_ATTR = [
+  "href", "target", "rel", "colspan", "rowspan", "class", "src", "alt", "title",
+];
+
+function sanitizeChapterHtml(html: string): string {
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: EXPORT_ALLOWED_TAGS,
+    ALLOWED_ATTR: EXPORT_ALLOWED_ATTR,
+    ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|tel:|#|\/)/i,
+  });
+}
 
 export type BookExportFormat = "zip-docx" | "zip-md" | "pdf" | "docx" | "epub";
 
