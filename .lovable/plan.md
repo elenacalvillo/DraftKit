@@ -1,28 +1,43 @@
-## Problem
 
-New signups fail at step 2 with "Failed to create profile." Backend analytics confirm every attempt since at least 2026-06-18 errors with:
+## Who's affected
 
-> Could not find the function `public.create_creator_profile(...)` in the schema cache
+Pulled every `creator_creation_failed` event and joined against `creators` to see who still has no profile.
 
-The function is referenced by `src/lib/creator-profile.ts` (called from `Signup.tsx`) and a migration exists at `supabase/migrations/20260519000000_create_creator_profile_rpc.sql`, but `pg_proc` shows zero functions named `create_creator_profile`. The function is missing from the live database, so every signup hits the `rpc_unknown` branch.
+**5 users hit the bug and still have no creator profile:**
 
-## Fix
+| user_id | first fail | last fail | username attempted |
+|---|---|---|---|
+| c13c8a94… | Jun 25 11:27 | **Jun 26 10:40** | noproduct |
+| e86dd784… | Jun 26 01:58 | **Jun 26 02:02** | davidroy / davidroy25 |
+| d3aa440e… | Jun 18 20:02 | Jun 18 20:04 | lvanderlinden (Adrian) |
+| 7f55bd22… | Jun 11 04:45 | Jun 11 04:46 | — |
+| c1e0319b… | Jun 4 19:25 | Jun 4 19:28 | — |
 
-Add a new migration that re-creates the RPC with the exact signature the frontend calls, plus its grants. Body is identical to the existing `20260519000000_create_creator_profile_rpc.sql`:
+Two waves:
+1. **Original outage** (missing RPC) — 4 users, including Adrian. Got the apology email yesterday.
+2. **Regression** after the first "fix" — the restored RPC still wrote to `creators.email`, a column that no longer exists. 2 more users blocked (noproduct, davidroy) on Jun 25–26. That's why Adrian still sees the same error: my migration last turn is what actually fixes it.
 
-- `CREATE OR REPLACE FUNCTION public.create_creator_profile(_username text, _name text, _email text, _substack_url text DEFAULT NULL, _newsletter_url text DEFAULT NULL, _welcome_message text DEFAULT NULL, _join_directory_waitlist boolean DEFAULT false, _profile_image_url text DEFAULT NULL, _referred_by uuid DEFAULT NULL) RETURNS TABLE (id uuid, user_id uuid, username text, name text)` — `LANGUAGE plpgsql SECURITY DEFINER SET search_path = public`.
-- Auth guard (`auth.uid()` not null), `username_required` / `email_required` checks.
-- Orphan recovery: if a `creators` row already exists for `auth.uid()`, update in place; otherwise check username uniqueness and insert.
-- Upsert into `creator_contacts (creator_id, email)` with `ON CONFLICT (creator_id) DO UPDATE`.
-- `REVOKE ALL ... FROM PUBLIC` then `GRANT EXECUTE ... TO authenticated`.
+So **4 others are in the same boat as Adrian** right now (the 2 from wave 1 who never retried + the 2 hit by the regression).
 
-## Out of scope
+## Plan
 
-No frontend changes, no schema changes, no RLS changes. `Signup.tsx`, `creator-profile.ts`, and the analytics path stay as-is — they already handle the success and typed-error reasons correctly once the function exists.
+Send the same "it works now, try again" email Elena wrote to those 4 users:
 
-## Verification
+- c13c8a94… (noproduct) — wave 2
+- e86dd784… (davidroy) — wave 2
+- 7f55bd22… — wave 1, never retried
+- c1e0319b… — wave 1, never retried
 
-After the migration runs:
-1. `SELECT proname FROM pg_proc WHERE proname = 'create_creator_profile'` returns one row.
-2. New signup completes end-to-end in the preview.
-3. No new `creator_creation_failed` rows in `analytics_events` with `reason = rpc_unknown`.
+Adrian gets a short personal reply (separate from the bulk send) confirming the real fix shipped and asking him to retry — his last attempt was before the migration that actually removed the `email` column write.
+
+### Steps
+1. Pull the 4 email addresses from `auth.users` via a one-off SQL read (auth schema isn't exposed to psql here, so I'll use the Supabase read tool).
+2. Draft the send: reuse Elena's copy verbatim, formatted as the existing system email template (PNG Venn-ring header, Inter, dark theme accent).
+3. Send via the existing Resend integration — one-off invocation, not a new edge function. No code changes to the app.
+4. Draft Adrian's personal reply for you to send from Elena's inbox.
+
+### Out of scope
+- No app code changes. The RPC fix already shipped last turn.
+- No new tables, no new edge functions, no schema changes.
+
+Want me to proceed with the bulk send + Adrian reply, or just hand you the addresses and drafts to send manually?
