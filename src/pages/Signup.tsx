@@ -412,7 +412,33 @@ export default function Signup() {
       } catch {
         /* analytics-of-analytics is not worth a cascade */
       }
+      const subject = encodeURIComponent("Signup created but won't load");
+      const body = encodeURIComponent(
+        [
+          "Hi Elena,",
+          "",
+          "My account was created but the app couldn't load my profile.",
+          "",
+          `Username: ${newCreator.username}`,
+          `Reason code: refresh_failed`,
+          `Details: ${e instanceof Error ? e.message : String(e)}`,
+          "",
+          "Thanks!",
+        ].join("\n"),
+      );
+      toast.error("Your account was created, but we couldn't load it", {
+        description:
+          "Try refreshing the page. If it still doesn't load, email hello@draftkit.app and we'll fix it for you.",
+        duration: 15000,
+        action: {
+          label: "Email Support",
+          onClick: () => {
+            window.location.href = `mailto:hello@draftkit.app?subject=${subject}&body=${body}`;
+          },
+        },
+      });
     }
+
     setIsLoading(false);
     setCurrentStep(3);
     
