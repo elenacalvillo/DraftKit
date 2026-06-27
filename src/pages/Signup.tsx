@@ -313,19 +313,60 @@ export default function Signup() {
         reason: "rpc_unknown" as const,
         message: "",
       };
-      const reasonToMessage: Record<CreateCreatorProfileErrorReason, string> = {
-        username_taken: "Username is already taken",
-        username_required: "Please choose a username",
-        email_required: "We couldn't read your email. Please sign in again.",
-        not_authenticated: "Session expired. Please sign in again.",
-        rpc_unknown: "Failed to create profile. Please try again.",
-      };
       const reason = rpcError.reason;
-      const userMessage = reasonToMessage[reason];
-      if (reason === "username_taken" || reason === "username_required") {
-        setErrors({ username: userMessage });
+
+      // Inline field errors — user can fix these themselves.
+      if (reason === "username_taken") {
+        setErrors({ username: "Username is already taken" });
+      } else if (reason === "username_required") {
+        setErrors({ username: "Please choose a username" });
       } else {
-        toast.error(userMessage);
+        // Everything else is NOT user-fixable. Be explicit about what
+        // happened and give them a one-click way to reach Elena with
+        // the failure context already prefilled.
+        const titleByReason: Record<CreateCreatorProfileErrorReason, string> = {
+          username_taken: "",
+          username_required: "",
+          email_required: "We couldn't read your email",
+          not_authenticated: "Your session expired",
+          rpc_unknown: "We couldn't finish creating your profile",
+        };
+        const descByReason: Record<CreateCreatorProfileErrorReason, string> = {
+          username_taken: "",
+          username_required: "",
+          email_required:
+            "Your account exists but we couldn't pull your email address. Sign in again, or email hello@draftkit.app if it keeps happening.",
+          not_authenticated:
+            "Please sign in again to finish setting up your profile. If you keep getting bounced out, email hello@draftkit.app.",
+          rpc_unknown:
+            "Something on our side blocked your signup. Email hello@draftkit.app and we'll get you in within the hour.",
+        };
+        const subject = encodeURIComponent("Signup failed — need help getting in");
+        const body = encodeURIComponent(
+          [
+            "Hi Elena,",
+            "",
+            "I tried to sign up and hit an error.",
+            "",
+            `Username: ${formData.username || "(not set)"}`,
+            `Email: ${formData.email || "(not set)"}`,
+            `Reason code: ${reason}`,
+            `Details: ${rpcError.message || "(none)"}`,
+            "",
+            "Thanks!",
+          ].join("\n"),
+        );
+        const mailto = `mailto:hello@draftkit.app?subject=${subject}&body=${body}`;
+        toast.error(titleByReason[reason], {
+          description: descByReason[reason],
+          duration: 15000,
+          action: {
+            label: "Email Support",
+            onClick: () => {
+              window.location.href = mailto;
+            },
+          },
+        });
       }
       // Observability: every creator-creation failure lands in the
       // analytics_events table so we can detect regressions without
@@ -345,6 +386,7 @@ export default function Signup() {
       setIsLoading(false);
       return;
     }
+
 
     const newCreator = rpcResult.creator;
 
@@ -370,7 +412,33 @@ export default function Signup() {
       } catch {
         /* analytics-of-analytics is not worth a cascade */
       }
+      const subject = encodeURIComponent("Signup created but won't load");
+      const body = encodeURIComponent(
+        [
+          "Hi Elena,",
+          "",
+          "My account was created but the app couldn't load my profile.",
+          "",
+          `Username: ${newCreator.username}`,
+          `Reason code: refresh_failed`,
+          `Details: ${e instanceof Error ? e.message : String(e)}`,
+          "",
+          "Thanks!",
+        ].join("\n"),
+      );
+      toast.error("Your account was created, but we couldn't load it", {
+        description:
+          "Try refreshing the page. If it still doesn't load, email hello@draftkit.app and we'll fix it for you.",
+        duration: 15000,
+        action: {
+          label: "Email Support",
+          onClick: () => {
+            window.location.href = `mailto:hello@draftkit.app?subject=${subject}&body=${body}`;
+          },
+        },
+      });
     }
+
     setIsLoading(false);
     setCurrentStep(3);
     
