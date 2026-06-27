@@ -1,43 +1,35 @@
+## Goal
 
-## Who's affected
+When signup profile creation fails for any unexpected reason, tell the user exactly what happened and how to reach Support ([hello@draftkit.app](mailto:hello@draftkit.app)) instead of the current generic "Failed to create profile. Please try again." toast.
 
-Pulled every `creator_creation_failed` event and joined against `creators` to see who still has no profile.
+The known `creators.email` regression is already patched at the DB layer, so we don't add bespoke handling for it. We focus on every *other* failure path so future surprises are loud and actionable.
 
-**5 users hit the bug and still have no creator profile:**
+## Scope
 
-| user_id | first fail | last fail | username attempted |
-|---|---|---|---|
-| c13c8a94… | Jun 25 11:27 | **Jun 26 10:40** | noproduct |
-| e86dd784… | Jun 26 01:58 | **Jun 26 02:02** | davidroy / davidroy25 |
-| d3aa440e… | Jun 18 20:02 | Jun 18 20:04 | lvanderlinden (Adrian) |
-| 7f55bd22… | Jun 11 04:45 | Jun 11 04:46 | — |
-| c1e0319b… | Jun 4 19:25 | Jun 4 19:28 | — |
+Frontend only. File: `src/pages/Signup.tsx` (the `reasonToMessage` map + the `rpc_unknown` toast surface around lines 311–346). No backend, no schema, no analytics signal changes.
 
-Two waves:
-1. **Original outage** (missing RPC) — 4 users, including Adrian. Got the apology email yesterday.
-2. **Regression** after the first "fix" — the restored RPC still wrote to `creators.email`, a column that no longer exists. 2 more users blocked (noproduct, davidroy) on Jun 25–26. That's why Adrian still sees the same error: my migration last turn is what actually fixes it.
+## Changes
 
-So **4 others are in the same boat as Adrian** right now (the 2 from wave 1 who never retried + the 2 hit by the regression).
+1. Rewrite the user-facing strings in `reasonToMessage` so each one:
+  - States what went wrong in plain language.
+  - Tells the user what to do next.
+  - For anything that isn't user-fixable (`rpc_unknown`, `not_authenticated`, `email_required`), includes a "Email [hello@draftkit.app](mailto:hello@draftkit.app)" call to action with the failure reason code so support can triage fast.
+2. Switch the `rpc_unknown` surface from `toast.error(string)` to `toast.error(title, { description, duration, action })`:
+  - Title: "We couldn't finish creating your profile"
+  - Description: short reason + "Reach out to [hello@draftkit.app](mailto:hello@draftkit.app) and we'll get you in within the hour."
+  - Action button: "Email Support" → `mailto:hello@draftkit.app?subject=Signup%20failed&body=...` prefilled with the username they tried, the reason code, and the raw error message so the user doesn't have to retype anything.
+  - Longer `duration` (e.g. 15s) so it doesn't disappear before they can read it.
+3. Same treatment for the `refreshCreator failed` branch (lines 360–370): today it's silent except for `console.error`. Profile is already committed, so the copy is "Your account was created but we couldn't load it. Refresh the page, or email [hello@draftkit.app](mailto:hello@draftkit.app) if it keeps happening."
+4. Keep the existing inline `setErrors({ username })` path for `username_taken` / `username_required` exactly as-is — those are user-fixable and don't need a support hand-off.
+5. No changes to analytics. `trackEvent("creator_creation_failed", ...)` stays the same so we keep the observability we added last week.
 
-## Plan
+## Out of scope
 
-Send the same "it works now, try again" email Elena wrote to those 4 users:
+- Other error surfaces in the app (Login, Workspace save, etc.). User scoped this to the signup failure they just lived through.
+- Adding a generic "contact support" wrapper component. One-file change is enough; a shared component is premature.
+- Re-running the `create_creator_profile` RPC fix or touching the DB.
 
-- c13c8a94… (noproduct) — wave 2
-- e86dd784… (davidroy) — wave 2
-- 7f55bd22… — wave 1, never retried
-- c1e0319b… — wave 1, never retried
+## Verification
 
-Adrian gets a short personal reply (separate from the bulk send) confirming the real fix shipped and asking him to retry — his last attempt was before the migration that actually removed the `email` column write.
-
-### Steps
-1. Pull the 4 email addresses from `auth.users` via a one-off SQL read (auth schema isn't exposed to psql here, so I'll use the Supabase read tool).
-2. Draft the send: reuse Elena's copy verbatim, formatted as the existing system email template (PNG Venn-ring header, Inter, dark theme accent).
-3. Send via the existing Resend integration — one-off invocation, not a new edge function. No code changes to the app.
-4. Draft Adrian's personal reply for you to send from Elena's inbox.
-
-### Out of scope
-- No app code changes. The RPC fix already shipped last turn.
-- No new tables, no new edge functions, no schema changes.
-
-Want me to proceed with the bulk send + Adrian reply, or just hand you the addresses and drafts to send manually?
+- `bunx vitest run src/lib/__tests__/creator-profile.test.ts` to confirm the typed-error contract still holds (we're only touching copy in Signup, but worth a sanity check).
+- Manual: trigger a fake failure by temporarily throwing inside the RPC call and confirm the new toast renders with the mailto action.
