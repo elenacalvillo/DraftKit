@@ -58,7 +58,24 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 4. Look up target creator's email from creator_contacts
+    // 4. Look up target creator and require they have a public profile.
+    // Without this gate, any authenticated caller who owns any request
+    // could enumerate every creator's private contact email by iterating
+    // creatorId values against a service-role bypass of RLS.
+    const { data: creator } = await adminClient
+      .from("creators")
+      .select("user_id, username")
+      .eq("id", creatorId)
+      .maybeSingle();
+
+    if (!creator || !creator.username) {
+      return new Response(JSON.stringify({ error: "Creator not found or profile is not public" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // 5. Look up target creator's email from creator_contacts
     const { data: contact } = await adminClient
       .from("creator_contacts")
       .select("email")
@@ -72,12 +89,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 5. Look up target creator's user_id
-    const { data: creator } = await adminClient
-      .from("creators")
-      .select("user_id")
-      .eq("id", creatorId)
-      .maybeSingle();
 
     // 6. Insert into workspace_collaborators
     const { error: insertError } = await adminClient
