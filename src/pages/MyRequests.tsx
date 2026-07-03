@@ -558,6 +558,60 @@ export default function MyRequests() {
         );
         })()}
 
+        {sharedWorkspaces.length > 0 && (
+          <div className="pt-4">
+            <div className="mb-4">
+              <h2 className="text-xl font-semibold tracking-tight">Shared with me</h2>
+              <p className="text-sm text-muted-foreground">
+                Workspaces you've been invited to collaborate on
+              </p>
+            </div>
+            <div className="grid gap-3">
+              {sharedWorkspaces.map((w) => (
+                <Card key={w.request_id} className="hover:shadow-md transition-shadow">
+                  <CardContent className="flex items-center gap-4 py-4">
+                    <Avatar className="h-11 w-11">
+                      <AvatarImage
+                        src={w.host_profile_image_url ? sanitizeSubstackImageUrl(w.host_profile_image_url) : undefined}
+                      />
+                      <AvatarFallback>{w.host_name?.charAt(0) || '?'}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-medium truncate">
+                          {w.host_name || 'Workspace host'}
+                        </p>
+                        <Badge variant="outline" className="capitalize">
+                          {w.is_project_workspace ? 'Project' : (w.role || 'Collaborator')}
+                        </Badge>
+                        {w.status === 'published' && (
+                          <Badge variant="default">✨ Published</Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {w.content_last_edited_at
+                          ? `Last edited ${formatDistanceToNow(new Date(w.content_last_edited_at), { addSuffix: true })}${w.content_last_edited_by ? ` by ${w.content_last_edited_by}` : ''}`
+                          : w.joined_at
+                            ? `Joined ${formatDistanceToNow(new Date(w.joined_at), { addSuffix: true })}`
+                            : 'Invited collaborator'}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => navigate(`/dashboard/workspace/${w.request_id}`)}
+                    >
+                      <PenLine className="h-4 w-4 mr-1" />
+                      Open
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+
+
         {/* Guest Message Modal */}
         {messageModalRequest && (
           <GuestMessageModal
