@@ -147,18 +147,23 @@ export function FeedbackWidget() {
 
       if (error) throw error;
 
-      // Send email notification (fire and forget - don't block the user)
-      supabase.functions.invoke("send-feedback-notification", {
-        body: {
-          feedbackType,
-          message: message.trim(),
-          rating: rating || null,
-          email: feedbackEmail,
-          pageUrl,
-        },
-      }).catch((err) => {
-        console.error("Failed to send feedback notification:", err);
-      });
+      // Send email notification (fire and forget - don't block the user).
+      // Notification endpoint requires an authenticated user JWT, so we only
+      // fire it for signed-in feedback; anonymous feedback still lands in
+      // the user_feedback table where admins can review it.
+      if (user) {
+        supabase.functions.invoke("send-feedback-notification", {
+          body: {
+            feedbackType,
+            message: message.trim(),
+            rating: rating || null,
+            email: feedbackEmail,
+            pageUrl,
+          },
+        }).catch((err) => {
+          console.error("Failed to send feedback notification:", err);
+        });
+      }
 
       toast.success("Thank you for your feedback! 💜");
       setIsOpen(false);
