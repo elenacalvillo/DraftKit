@@ -1,54 +1,56 @@
-## Diagnosis
+## What's actually happening
 
-**Issue 1 — Elena expected the "Projects" sidebar item to appear on the shewritesai account after upgrading it to "pro".**
+**Elena's "Workspace not found"**: Not an RLS bug in this case. The DB shows Elena (`elenacalvilloalcalde@gmail.com`) IS listed as a `guest` in `workspace_collaborators` for workspace `647ecb80…`. `has_workspace_access` will pass for her. Most likely she loaded the page before her collaborator row was linked to her user_id, or before a hard refresh. No data patch or RLS change needed — a reload will resolve it. If it persists, we investigate her session/user_id linkage, not the policy.
 
-Root cause: it's a tier mismatch, not a bug.
+**Karen's dead-end**: Real product gap. Karen is a workspace guest (not a Project-tier subscriber), so the sidebar never renders a Projects entry, and `Proposals` (`MyRequests.tsx`) only queries `collab_requests` where `requester_user_id = auth.uid()`. Workspaces she was invited to via `workspace_collaborators` are invisible in her dashboard. Her only re-entry is the email link.
 
-- The DB row for `shewritesai` (creator `4c575634…`) is set to `subscription_tier = 'pro'`.
-- The sidebar "Projects" entry (`DashboardLayout.tsx`) is gated by `isProject`, which in `hasProjectAccess()` requires `subscription_tier === 'project'` — strictly. `pro` is the newsletter tier; `project` is the superset that unlocks Book Projects.
-- So the account correctly does NOT see Projects today.
+## Fix: add "Shared with me" to the Proposals page
 
-**Issue 2 — Angela (collabs@shewritesai.org feedback about "Angela lost her Google Workspace email").**
+Extend `src/pages/MyRequests.tsx` to also fetch and render workspaces the user was invited into as a collaborator. Keep it on the existing Proposals route so guests don't need a new sidebar item.
 
-- `collab_requests.6eb97d92…` shows Angela came in as a guest: `requester_email = angela@thepunchlab.com`, `requester_user_id = NULL`.
-- She never created a DraftKit account — there is nothing to "unlock". She was an off-platform guest whose email address is now dead, which is why she couldn't be invited/receive links and shared the file with Elena directly.
-- No account recovery is possible or needed. If Elena wants Angela back on the workspace with a working email, Angela signs up with her new address and Elena re-invites her; the existing `link_collaborator_on_insert` trigger will attach her to any pending invite that matches.
+### UX
 
-## Plan
+- New section header **"Shared with me"** below the existing Proposals list (or above it when the user has no proposals of their own).
+- Each row: host name + avatar, workspace title/chapter name, role badge ("Guest" or "Collaborator"), last-edited timestamp, and a primary **Open workspace** button routing to `/dashboard/workspace/{request_id}`.
+- Empty state only shown when the user has neither proposals nor shared workspaces (current empty state stays as-is otherwise).
+- Guest-only accounts (no proposals, no Project tier) still land on `/dashboard/my-requests` after login; this section makes that page useful for them.
 
-### 1. Data fix: upgrade shewritesai from `pro` → `project`
+### Data
 
-Single migration:
+Query added to `MyRequests.tsx` after the existing `fetchSentRequests`:
 
-```sql
-UPDATE public.creators
-SET subscription_tier = 'project',
-    updated_at = now()
-WHERE id = '4c575634-453d-4c92-afd4-180d3411037e';
+```
+supabase
+  .from('workspace_collaborators')
+  .select(`
+    request_id, role, joined_at,
+    collab_requests:request_id (
+      id, status, is_project_workspace, project_id, shared_content,
+      content_last_edited_at, content_last_edited_by,
+      creator:creator_id ( name, username, profile_image_url )
+    )
+  `)
+  .eq('user_id', user.id)
+  .order('joined_at', { ascending: false });
 ```
 
-After this, on the next auth refresh the sidebar picks up `isProject = true` and the "Projects" entry appears between Network and Settings, exactly as intended. No code changes required.
+Filter out rows where the parent request is `cancelled` or `declined`. De-duplicate against the user's own proposals (edge case: user is both requester and listed collaborator).
 
-Verification steps I'll run right after the migration:
-- `SELECT subscription_tier FROM creators WHERE id = '4c575634…'` → expect `project`.
-- Ask Elena to hard-refresh shewritesai; `usePro().isProject` will be `true` because `hasProjectAccess()` returns true for `tier = 'project'` with no trial cap.
+### Sidebar nudge (small)
 
-### 2. Reply to the Angela feedback
+No new sidebar item — Proposals already exists for all tiers and is where guests naturally look. We just make sure guest-only users see something meaningful there.
 
-No code change. Suggested reply for Elena to send from the feedback thread:
+## What is NOT changing
 
-> Thanks for flagging — Angela came in as an off-platform guest (her Google Workspace email was on the invite, but she never created a DraftKit account), so there's nothing locked on our side. Whenever she has a new working email, sign her back up and re-invite her from the workspace — our system will auto-link her to any pending invites tied to that address.
+- No RLS policy edits. `has_workspace_access` is correct; Elena's issue is a stale-session symptom, not a policy hole.
+- No changes to the Projects sidebar entry (still Project-tier only, per the tier hierarchy).
+- No new route, no new top-level page.
+- No data patch to add Elena as an "approved collaborator" on workspaces she isn't part of — she's the platform admin; if she needs to inspect a workspace she's not on, that's an admin tooling concern, out of scope here.
 
-### 3. Optional guardrail (only if you want it now)
+## Files touched
 
-To make the "I upgraded them but Projects didn't show up" mistake impossible in the future, we could:
+- `src/pages/MyRequests.tsx` — add "Shared with me" section, query, render, dedupe.
 
-- Add a small admin/settings toggle for "grant Project tier" so upgrading a user always sets `subscription_tier = 'project'` (or `pro`) explicitly, not by hand-editing SQL.
-- OR relabel: rename the DB value `pro` → `newsletter_pro` and `project` → `book_project` so the intent is obvious in the row.
+## Follow-up for Elena to send Karen
 
-I'd recommend deferring both; they're polish, not fixes. Say the word if you want either in this same change.
-
-## What this plan does NOT touch
-
-- No changes to `usePro`, `access.ts`, `DashboardLayout.tsx`, RLS, or any edge functions — the current gating logic is correct and matches the memory rule that Project tier is a superset of Pro.
-- No email/DNS or auth recovery changes for Angela — nothing to recover.
+"You can jump back into your chapter any time from **Proposals** in your sidebar — I just added a 'Shared with me' list there so invited workspaces show up alongside your own."
