@@ -549,7 +549,28 @@ serve(async (req) => {
 
     let requestsToProcess: { id: string; creator_id: string; collab_link: string | null; requester_collab_link: string | null; requested_date: string | null; requester_substack_url: string | null; approved_at: string | null; retro_completed_at: string | null; created_at: string }[] = [];
 
+    // User-authed callers MUST target a specific requestId they can access.
+    if (authedUserId && !requestId) {
+      return new Response(
+        JSON.stringify({ error: "requestId is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     if (requestId) {
+      if (authedUserId) {
+        const { data: hasAccess } = await supabase.rpc("has_workspace_access", {
+          _user_id: authedUserId,
+          _request_id: requestId,
+        });
+        if (!hasAccess) {
+          return new Response(
+            JSON.stringify({ error: "Forbidden" }),
+            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+      }
+
       const { data, error } = await supabase
         .from("collab_requests")
         .select("id, creator_id, collab_link, requester_collab_link, requested_date, requester_substack_url, approved_at, retro_completed_at, created_at")
