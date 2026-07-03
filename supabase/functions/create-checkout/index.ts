@@ -10,14 +10,11 @@ const corsHeaders = {
 // Production hosts that should hit LIVE Stripe.
 const LIVE_HOSTS = new Set(["draftkit.app", "www.draftkit.app", "collabstack.lovable.app"]);
 
-function isTestModeFromOrigin(origin: string | null): boolean {
-  if (!origin) return false;
-  try {
-    const host = new URL(origin).hostname;
-    return !LIVE_HOSTS.has(host);
-  } catch {
-    return false;
-  }
+// Stripe mode is fixed at deploy time via STRIPE_MODE env var so callers
+// cannot force test mode by forging the Origin header and paying $0 with
+// Stripe's public test card. Defaults to "live".
+function isTestMode(): boolean {
+  return (Deno.env.get("STRIPE_MODE") ?? "live").toLowerCase() === "test";
 }
 
 const LIVE_PRICES = {
@@ -51,7 +48,7 @@ serve(async (req) => {
     const { priceId, returnTo, plan } = await req.json();
 
     const origin = req.headers.get("origin") || "https://collabstack.lovable.app";
-    const testMode = isTestModeFromOrigin(origin);
+    const testMode = isTestMode();
 
     const stripeKey = testMode
       ? (Deno.env.get("STRIPE_TEST_SECRET_KEY") ?? Deno.env.get("STRIPE_SECRET_KEY") ?? "")

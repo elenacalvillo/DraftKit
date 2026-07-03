@@ -447,6 +447,7 @@ export type Database = {
           date_meaning: string | null
           external_links: Json
           id: string
+          is_public: boolean
           join_directory_waitlist: boolean | null
           last_nudge_sent_at: string | null
           name: string
@@ -479,6 +480,7 @@ export type Database = {
           date_meaning?: string | null
           external_links?: Json
           id?: string
+          is_public?: boolean
           join_directory_waitlist?: boolean | null
           last_nudge_sent_at?: string | null
           name: string
@@ -511,6 +513,7 @@ export type Database = {
           date_meaning?: string | null
           external_links?: Json
           id?: string
+          is_public?: boolean
           join_directory_waitlist?: boolean | null
           last_nudge_sent_at?: string | null
           name?: string

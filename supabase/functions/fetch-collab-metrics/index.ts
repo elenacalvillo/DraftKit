@@ -498,6 +498,47 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Auth: allow either a cron shared secret (bulk snapshot) OR an
+  // authenticated user JWT (per-request snapshot from the workspace UI).
+  const providedSecret = req.headers.get("x-internal-secret");
+  const expectedSecret = Deno.env.get("CRON_SECRET");
+  const hasCronSecret = !!expectedSecret && providedSecret === expectedSecret;
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const bearer = authHeader.startsWith("Bearer ")
+    ? authHeader.slice("Bearer ".length).trim()
+    : "";
+  let authedUserId: string | null = null;
+  if (!hasCronSecret) {
+    if (!bearer) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    try {
+      const userClient = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_ANON_KEY")!,
+        { global: { headers: { Authorization: `Bearer ${bearer}` } } },
+      );
+      const { data: userData, error: userErr } = await userClient.auth.getUser(bearer);
+      if (userErr || !userData?.user) {
+        return new Response(
+          JSON.stringify({ error: "Unauthorized" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      authedUserId = userData.user.id;
+    } catch {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+  }
+
+
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -508,7 +549,28 @@ serve(async (req) => {
 
     let requestsToProcess: { id: string; creator_id: string; collab_link: string | null; requester_collab_link: string | null; requested_date: string | null; requester_substack_url: string | null; approved_at: string | null; retro_completed_at: string | null; created_at: string }[] = [];
 
+    // User-authed callers MUST target a specific requestId they can access.
+    if (authedUserId && !requestId) {
+      return new Response(
+        JSON.stringify({ error: "requestId is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     if (requestId) {
+      if (authedUserId) {
+        const { data: hasAccess } = await supabase.rpc("has_workspace_access", {
+          _user_id: authedUserId,
+          _request_id: requestId,
+        });
+        if (!hasAccess) {
+          return new Response(
+            JSON.stringify({ error: "Forbidden" }),
+            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+      }
+
       const { data, error } = await supabase
         .from("collab_requests")
         .select("id, creator_id, collab_link, requester_collab_link, requested_date, requester_substack_url, approved_at, retro_completed_at, created_at")

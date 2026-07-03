@@ -7,15 +7,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const LIVE_HOSTS = new Set(["draftkit.app", "www.draftkit.app", "collabstack.lovable.app"]);
-
-function isTestModeFromOrigin(origin: string | null): boolean {
-  if (!origin) return false;
-  try {
-    return !LIVE_HOSTS.has(new URL(origin).hostname);
-  } catch {
-    return false;
-  }
+// Stripe mode is fixed at deploy time via STRIPE_MODE env var so callers
+// cannot force test mode by forging the Origin header and paying $0 with
+// Stripe's public test card. Defaults to "live".
+function isTestMode(): boolean {
+  return (Deno.env.get("STRIPE_MODE") ?? "live").toLowerCase() === "test";
 }
 
 const LIVE_PACKS: Record<string, { priceId: string; credits: number }> = {
@@ -48,7 +44,7 @@ serve(async (req) => {
     const { packId } = await req.json();
 
     const origin = req.headers.get("origin") || "https://collabstack.lovable.app";
-    const testMode = isTestModeFromOrigin(origin);
+    const testMode = isTestMode();
 
     const pack = (testMode ? TEST_PACKS : LIVE_PACKS)[String(packId)];
     if (!pack) throw new Error("Invalid pack. Use '10' or '30'.");

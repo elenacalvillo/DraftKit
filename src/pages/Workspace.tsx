@@ -517,7 +517,7 @@ export default function Workspace() {
       if (publishUrls.creatorUrl.trim()) updatePayload.collab_link = publishUrls.creatorUrl.trim();
       if (publishUrls.requesterUrl.trim()) updatePayload.requester_collab_link = publishUrls.requesterUrl.trim();
 
-      const { error: publishError } = await supabase.from("collab_requests").update(updatePayload).eq("id", requestId);
+      const { error: publishError } = await supabase.from("collab_requests").update(updatePayload as never).eq("id", requestId);
 
       if (publishError) {
         console.error("[Workspace] Failed to update status to published:", publishError);

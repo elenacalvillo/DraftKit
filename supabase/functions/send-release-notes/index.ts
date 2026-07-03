@@ -42,6 +42,14 @@ interface ReleaseNotesRequest {
   previewOnly?: boolean;
 }
 
+const escapeHtml = (value: unknown): string =>
+  String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
 const generateEmailHtml = (
   creatorName: string,
   subject: string,
@@ -52,8 +60,8 @@ const generateEmailHtml = (
       (f) => `
         <tr>
           <td style="padding: 12px 0; border-bottom: 1px solid #f0f0f0;">
-            <div style="font-weight: 600; color: #1a1a1a; margin-bottom: 4px;">${f.title}</div>
-            <div style="color: #666666; font-size: 14px;">${f.description}</div>
+            <div style="font-weight: 600; color: #1a1a1a; margin-bottom: 4px;">${escapeHtml(f.title)}</div>
+            <div style="color: #666666; font-size: 14px;">${escapeHtml(f.description)}</div>
           </td>
         </tr>
       `
@@ -85,7 +93,7 @@ const generateEmailHtml = (
               <tr>
                 <td style="padding: 40px;">
                   <p style="margin: 0 0 20px; color: #1a1a1a; font-size: 16px; line-height: 1.6;">
-                    Hi ${creatorName},
+                    Hi ${escapeHtml(creatorName)},
                   </p>
                   
                   <p style="margin: 0 0 24px; color: #1a1a1a; font-size: 16px; line-height: 1.6;">
