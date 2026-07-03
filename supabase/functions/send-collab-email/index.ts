@@ -374,7 +374,7 @@ serve(async (req: Request): Promise<Response> => {
       if (collabGuidelines) {
         playbookSection = `
           <div style="background: #fef3c7; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #f59e0b;">
-            <h3 style="margin: 0 0 12px 0; color: #92400e; font-size: 16px;">📋 ${creatorName}'s Collaboration Playbook</h3>
+            <h3 style="margin: 0 0 12px 0; color: #92400e; font-size: 16px;">📋 ${creatorNameHtml}'s Collaboration Playbook</h3>
             <p style="margin: 0 0 8px 0; color: #78350f;"><strong>Style:</strong> ${collabStyle}</p>
             <p style="margin: 0; color: #78350f; white-space: pre-line;">${collabGuidelines}</p>
           </div>
@@ -394,10 +394,10 @@ serve(async (req: Request): Promise<Response> => {
             <h1 style="margin: 0; font-size: 24px; color: #1e293b;">✨ Collaboration Approved!</h1>
           </div>
 
-          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterName},</p>
+          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterNameHtml},</p>
           
           <p style="font-size: 16px; margin-bottom: 24px;">
-            Great news! <strong>${creatorName}</strong> has approved your collaboration request${requestedDate ? ` for <strong>${formattedDate}</strong>` : ""}.
+            Great news! <strong>${creatorNameHtml}</strong> has approved your collaboration request${requestedDate ? ` for <strong>${formattedDate}</strong>` : ""}.
           </p>
 
           ${draftSection}
@@ -410,7 +410,7 @@ serve(async (req: Request): Promise<Response> => {
                style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
               Open Your Workspace →
             </a>
-            <p style="margin: 12px 0 0 0; font-size: 13px; color: #94a3b8;">Sign up or log in to start drafting with ${creatorName}</p>
+            <p style="margin: 12px 0 0 0; font-size: 13px; color: #94a3b8;">Sign up or log in to start drafting with ${creatorNameHtml}</p>
           </div>
 
           <p style="font-size: 14px; color: #64748b; margin-top: 32px;">
@@ -437,10 +437,10 @@ serve(async (req: Request): Promise<Response> => {
             <h1 style="margin: 0; font-size: 24px; color: #1e293b;">📬 Request Update</h1>
           </div>
 
-          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterName},</p>
+          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterNameHtml},</p>
           
           <p style="font-size: 16px; margin-bottom: 24px;">
-            Thank you for reaching out to <strong>${creatorName}</strong> for a collaboration. Unfortunately, they're unable to proceed with this request at this time.
+            Thank you for reaching out to <strong>${creatorNameHtml}</strong> for a collaboration. Unfortunately, they're unable to proceed with this request at this time.
           </p>
           
           <p style="font-size: 16px; margin-bottom: 24px;">
@@ -480,16 +480,16 @@ serve(async (req: Request): Promise<Response> => {
             <h1 style="margin: 0; font-size: 24px; color: #1e293b;">📨 New Collaboration Request</h1>
           </div>
 
-          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${creatorName},</p>
+          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${creatorNameHtml},</p>
           
           <p style="font-size: 16px; margin-bottom: 24px;">
-            <strong>${requesterName}</strong> wants to collaborate with you${requestedDate ? ` on <strong>${formattedDate}</strong>` : ""}!
+            <strong>${requesterNameHtml}</strong> wants to collaborate with you${requestedDate ? ` on <strong>${formattedDate}</strong>` : ""}!
           </p>
 
           ${request.message ? `
           <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #d9826b;">
             <p style="margin: 0 0 8px 0; font-weight: 600; color: #475569;">Their message:</p>
-            <p style="margin: 0; color: #1e293b; white-space: pre-line;">${request.message}</p>
+            <p style="margin: 0; color: #1e293b; white-space: pre-line;">${requestMessageHtml}</p>
           </div>
           ` : ""}
 
@@ -525,16 +525,16 @@ serve(async (req: Request): Promise<Response> => {
             <h1 style="margin: 0; font-size: 24px; color: #1e293b;">✅ Request Submitted!</h1>
           </div>
 
-          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterName},</p>
+          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterNameHtml},</p>
           
           <p style="font-size: 16px; margin-bottom: 24px;">
-            Your collaboration request with <strong>${creatorName}</strong>${requestedDate ? ` for <strong>${formattedDate}</strong>` : ""} has been successfully submitted.
+            Your collaboration request with <strong>${creatorNameHtml}</strong>${requestedDate ? ` for <strong>${formattedDate}</strong>` : ""} has been successfully submitted.
           </p>
 
           <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #d9826b;">
             <h3 style="margin: 0 0 16px 0; color: #1e293b; font-size: 16px;">📋 What happens next?</h3>
             <ol style="margin: 0; padding-left: 20px; color: #475569;">
-              <li style="margin-bottom: 8px;"><strong>${creatorName}</strong> will review your request</li>
+              <li style="margin-bottom: 8px;"><strong>${creatorNameHtml}</strong> will review your request</li>
               <li style="margin-bottom: 8px;">You'll receive an email when they respond</li>
               <li style="margin-bottom: 0;">If approved, you'll get collaboration details and next steps</li>
             </ol>
@@ -543,7 +543,7 @@ serve(async (req: Request): Promise<Response> => {
           ${request.message ? `
           <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0;">
             <p style="margin: 0 0 8px 0; font-weight: 600; color: #475569;">Your message:</p>
-            <p style="margin: 0; color: #1e293b; white-space: pre-line; font-style: italic;">"${request.message}"</p>
+            <p style="margin: 0; color: #1e293b; white-space: pre-line; font-style: italic;">"${requestMessageHtml}"</p>
           </div>
           ` : ""}
 
@@ -585,10 +585,10 @@ serve(async (req: Request): Promise<Response> => {
             <h1 style="margin: 0; font-size: 24px; color: #1e293b;">📋 Request Cancelled</h1>
           </div>
 
-          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${creatorName},</p>
+          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${creatorNameHtml},</p>
           
           <p style="font-size: 16px; margin-bottom: 24px;">
-            <strong>${requesterName}</strong> has cancelled their collaboration request${requestedDate ? ` for <strong>${formattedDate}</strong>` : ""}.
+            <strong>${requesterNameHtml}</strong> has cancelled their collaboration request${requestedDate ? ` for <strong>${formattedDate}</strong>` : ""}.
           </p>
 
           ${requestedDate ? `
@@ -630,10 +630,10 @@ serve(async (req: Request): Promise<Response> => {
             <h1 style="margin: 0; font-size: 24px; color: #1e293b;">📅 Collaboration Cancelled</h1>
           </div>
 
-          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterName},</p>
+          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterNameHtml},</p>
           
           <p style="font-size: 16px; margin-bottom: 24px;">
-            Unfortunately, <strong>${creatorName}</strong> has had to cancel your upcoming collaboration${requestedDate ? ` scheduled for <strong>${formattedDate}</strong>` : ""}.
+            Unfortunately, <strong>${creatorNameHtml}</strong> has had to cancel your upcoming collaboration${requestedDate ? ` scheduled for <strong>${formattedDate}</strong>` : ""}.
           </p>
           
           <p style="font-size: 16px; margin-bottom: 24px;">
@@ -673,20 +673,20 @@ serve(async (req: Request): Promise<Response> => {
             <h1 style="margin: 0; font-size: 24px; color: #1e293b;">💬 New Message</h1>
           </div>
 
-          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterName},</p>
+          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterNameHtml},</p>
           
           <p style="font-size: 16px; margin-bottom: 24px;">
-            <strong>${creatorName}</strong> sent you a message about your collaboration${requestedDate ? ` on <strong>${formattedDate}</strong>` : ""}:
+            <strong>${creatorNameHtml}</strong> sent you a message about your collaboration${requestedDate ? ` on <strong>${formattedDate}</strong>` : ""}:
           </p>
 
           <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #d9826b;">
-            <p style="margin: 0; color: #1e293b; white-space: pre-line; font-size: 16px;">${messageContent || ""}</p>
+            <p style="margin: 0; color: #1e293b; white-space: pre-line; font-size: 16px;">${messageContentHtml}</p>
           </div>
 
           <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
             <a href="mailto:${creatorEmail}?subject=Re: Collaboration${requestedDate ? ` on ${formattedDate}` : ""}" 
                style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
-              Reply to ${creatorName}
+              Reply to ${creatorNameHtml}
             </a>
           </div>
 
@@ -715,14 +715,14 @@ serve(async (req: Request): Promise<Response> => {
             <h1 style="margin: 0; font-size: 24px; color: #1e293b;">💬 New Message</h1>
           </div>
 
-          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${creatorName},</p>
+          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${creatorNameHtml},</p>
           
           <p style="font-size: 16px; margin-bottom: 24px;">
-            <strong>${requesterName}</strong> sent you a message about your collaboration${requestedDate ? ` on <strong>${formattedDate}</strong>` : ""}:
+            <strong>${requesterNameHtml}</strong> sent you a message about your collaboration${requestedDate ? ` on <strong>${formattedDate}</strong>` : ""}:
           </p>
 
           <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #d9826b;">
-            <p style="margin: 0; color: #1e293b; white-space: pre-line; font-size: 16px;">${messageContent || ""}</p>
+            <p style="margin: 0; color: #1e293b; white-space: pre-line; font-size: 16px;">${messageContentHtml}</p>
           </div>
 
           <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
@@ -764,12 +764,12 @@ serve(async (req: Request): Promise<Response> => {
           </div>
           
           <p style="font-size: 16px; margin-bottom: 24px;">
-            Just a friendly reminder that you have a collaboration with <strong>${requesterName}</strong> coming up on <strong>${formattedDate}</strong>!
+            Just a friendly reminder that you have a collaboration with <strong>${requesterNameHtml}</strong> coming up on <strong>${formattedDate}</strong>!
           </p>
 
           <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #d9826b;">
             <p style="margin: 0 0 8px 0; font-weight: 600; color: #475569;">Collaborator:</p>
-            <p style="margin: 0 0 16px 0; color: #1e293b;">${requesterName} (${requesterEmail})</p>
+            <p style="margin: 0 0 16px 0; color: #1e293b;">${requesterNameHtml} (${requesterEmailHtml})</p>
             <p style="margin: 0 0 8px 0; font-weight: 600; color: #475569;">Date:</p>
             <p style="margin: 0; color: #1e293b;">${formattedDate}</p>
           </div>
@@ -802,22 +802,22 @@ serve(async (req: Request): Promise<Response> => {
             <h1 style="margin: 0; font-size: 24px; color: #1e293b;">⏰ Collaboration Reminder</h1>
           </div>
 
-          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterName},</p>
+          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterNameHtml},</p>
           
           <p style="font-size: 16px; margin-bottom: 24px;">
-            Just a friendly reminder that you have a collaboration with <strong>${creatorName}</strong> coming up on <strong>${formattedDate}</strong>!
+            Just a friendly reminder that you have a collaboration with <strong>${creatorNameHtml}</strong> coming up on <strong>${formattedDate}</strong>!
           </p>
 
           <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #d9826b;">
             <p style="margin: 0 0 8px 0; font-weight: 600; color: #475569;">Creator:</p>
-            <p style="margin: 0 0 16px 0; color: #1e293b;">${creatorName}</p>
+            <p style="margin: 0 0 16px 0; color: #1e293b;">${creatorNameHtml}</p>
             <p style="margin: 0 0 8px 0; font-weight: 600; color: #475569;">Date:</p>
             <p style="margin: 0; color: #1e293b;">${formattedDate}</p>
           </div>
 
           ${collabGuidelines ? `
           <div style="background: #fef3c7; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #f59e0b;">
-            <h3 style="margin: 0 0 12px 0; color: #92400e; font-size: 16px;">📋 ${creatorName}'s Collaboration Playbook</h3>
+            <h3 style="margin: 0 0 12px 0; color: #92400e; font-size: 16px;">📋 ${creatorNameHtml}'s Collaboration Playbook</h3>
             <p style="margin: 0 0 8px 0; color: #78350f;"><strong>Style:</strong> ${collabStyle}</p>
             <p style="margin: 0; color: #78350f; white-space: pre-line;">${collabGuidelines}</p>
           </div>
@@ -826,7 +826,7 @@ serve(async (req: Request): Promise<Response> => {
           <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
             <a href="mailto:${creatorEmail}?subject=Re: Collaboration on ${formattedDate}" 
                style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
-              Contact ${creatorName}
+              Contact ${creatorNameHtml}
             </a>
           </div>
 
@@ -839,8 +839,8 @@ serve(async (req: Request): Promise<Response> => {
       `;
 
       // Send emails to both parties
-      const hostEmailSubject = `⏰ Reminder: Collaboration with ${requesterName} on ${formattedDate}`;
-      const guestEmailSubject = `⏰ Reminder: Collaboration with ${creatorName} on ${formattedDate}`;
+      const hostEmailSubject = `⏰ Reminder: Collaboration with ${requesterNameHtml} on ${formattedDate}`;
+      const guestEmailSubject = `⏰ Reminder: Collaboration with ${creatorNameHtml} on ${formattedDate}`;
 
       const emailPromises = [];
       
@@ -878,10 +878,10 @@ serve(async (req: Request): Promise<Response> => {
           ${brandHeader}
           <h1 style="margin: 0 0 24px; font-size: 24px; color: #1e293b; text-align: center;">Collaboration Type Updated</h1>
 
-          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterName},</p>
+          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterNameHtml},</p>
           
           <p style="font-size: 16px; margin-bottom: 24px;">
-            <strong>${creatorName}</strong> has updated the collaboration type for your upcoming collaboration${requestedDate ? ` on <strong>${formattedDate}</strong>` : ""}.
+            <strong>${creatorNameHtml}</strong> has updated the collaboration type for your upcoming collaboration${requestedDate ? ` on <strong>${formattedDate}</strong>` : ""}.
           </p>
 
           <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #d9826b; text-align: center;">
@@ -904,7 +904,7 @@ serve(async (req: Request): Promise<Response> => {
             <p style="margin: 0 0 16px 0; color: #475569;">Have questions about the change?</p>
             <a href="mailto:${creatorEmail}?subject=Re: Collaboration type update" 
                style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
-              Contact ${creatorName}
+              Contact ${creatorNameHtml}
             </a>
           </div>
 
@@ -933,10 +933,10 @@ serve(async (req: Request): Promise<Response> => {
           ${brandHeader}
           <h1 style="margin: 0 0 24px; font-size: 24px; color: #1e293b; text-align: center;">Collaboration Rescheduled</h1>
 
-          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterName},</p>
+          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterNameHtml},</p>
 
           <p style="font-size: 16px; margin-bottom: 24px;">
-            <strong>${creatorName}</strong> has rescheduled your collaboration to a new date.
+            <strong>${creatorNameHtml}</strong> has rescheduled your collaboration to a new date.
           </p>
 
           <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #d9826b; text-align: center;">
@@ -948,7 +948,7 @@ serve(async (req: Request): Promise<Response> => {
             <p style="margin: 0 0 16px 0; color: #475569;">Questions about the new date?</p>
             <a href="mailto:${creatorEmail}?subject=Re: Rescheduled collaboration"
                style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
-              Contact ${creatorName}
+              Contact ${creatorNameHtml}
             </a>
           </div>
 
@@ -977,10 +977,10 @@ serve(async (req: Request): Promise<Response> => {
           ${brandHeader}
           <h1 style="margin: 0 0 24px; font-size: 24px; color: #1e293b; text-align: center;">Workspace Updated</h1>
 
-          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterName},</p>
+          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterNameHtml},</p>
           
           <p style="font-size: 16px; margin-bottom: 24px;">
-            <strong>${creatorName}</strong> has made updates to the shared workspace for your collaboration${requestedDate ? ` on <strong>${formattedDate}</strong>` : ""}.
+            <strong>${creatorNameHtml}</strong> has made updates to the shared workspace for your collaboration${requestedDate ? ` on <strong>${formattedDate}</strong>` : ""}.
           </p>
 
           <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
@@ -1016,10 +1016,10 @@ serve(async (req: Request): Promise<Response> => {
           ${brandHeader}
           <h1 style="margin: 0 0 24px; font-size: 24px; color: #1e293b; text-align: center;">Workspace Updated</h1>
 
-          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${creatorName},</p>
+          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${creatorNameHtml},</p>
           
           <p style="font-size: 16px; margin-bottom: 24px;">
-            <strong>${requesterName}</strong> has made updates to the shared workspace for your collaboration${requestedDate ? ` on <strong>${formattedDate}</strong>` : ""}.
+            <strong>${requesterNameHtml}</strong> has made updates to the shared workspace for your collaboration${requestedDate ? ` on <strong>${formattedDate}</strong>` : ""}.
           </p>
 
           <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
@@ -1065,10 +1065,10 @@ serve(async (req: Request): Promise<Response> => {
             <h1 style="margin: 0; font-size: 24px; color: #1e293b;">🎉 Collaboration Published!</h1>
           </div>
 
-          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterName},</p>
+          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterNameHtml},</p>
 
           <p style="font-size: 16px; margin-bottom: 24px;">
-            Great news — <strong>${creatorName}</strong> has marked your collaboration as officially published! 🚀
+            Great news — <strong>${creatorNameHtml}</strong> has marked your collaboration as officially published! 🚀
           </p>
 
           <p style="font-size: 16px; margin-bottom: 24px; color: #475569;">
@@ -1123,7 +1123,7 @@ serve(async (req: Request): Promise<Response> => {
           <p style="font-size: 16px; margin-bottom: 24px;">Hi there,</p>
           
           <p style="font-size: 16px; margin-bottom: 24px;">
-            <strong>${creatorName}</strong> has invited you to join a collaboration workspace on DraftKit — a shared space where writers draft together asynchronously.
+            <strong>${creatorNameHtml}</strong> has invited you to join a collaboration workspace on DraftKit — a shared space where writers draft together asynchronously.
           </p>
 
           <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #d9826b;">
