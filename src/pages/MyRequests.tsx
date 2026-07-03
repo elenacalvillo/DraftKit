@@ -64,10 +64,25 @@ interface SuggestedCreator {
   bio: string | null;
 }
 
+interface SharedWorkspace {
+  request_id: string;
+  role: string | null;
+  joined_at: string | null;
+  status: string;
+  is_project_workspace: boolean;
+  project_id: string | null;
+  content_last_edited_at: string | null;
+  content_last_edited_by: string | null;
+  host_name: string | null;
+  host_username: string | null;
+  host_profile_image_url: string | null;
+}
+
 export default function MyRequests() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [requests, setRequests] = useState<SentRequest[]>([]);
+  const [sharedWorkspaces, setSharedWorkspaces] = useState<SharedWorkspace[]>([]);
   const [loading, setLoading] = useState(true);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [messageModalRequest, setMessageModalRequest] = useState<SentRequest | null>(null);
@@ -77,9 +92,70 @@ export default function MyRequests() {
   useEffect(() => {
     if (user) {
       fetchSentRequests();
+      fetchSharedWorkspaces();
       fetchSuggestedCreators();
     }
   }, [user]);
+
+  const fetchSharedWorkspaces = async () => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from('workspace_collaborators')
+        .select('request_id, role, joined_at')
+        .eq('user_id', user.id)
+        .order('joined_at', { ascending: false });
+
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        setSharedWorkspaces([]);
+        return;
+      }
+
+      const ids = data.map((r) => r.request_id);
+      const { data: reqs } = await supabase
+        .from('collab_requests')
+        .select('id, creator_id, status, is_project_workspace, project_id, content_last_edited_at, content_last_edited_by, requester_user_id')
+        .in('id', ids);
+
+      const byId = new Map((reqs || []).map((r) => [r.id, r]));
+
+      const creatorIds = Array.from(new Set((reqs || []).map((r) => r.creator_id)));
+      const { data: hosts } = await supabase
+        .from('public_creator_profiles')
+        .select('id, name, username, profile_image_url')
+        .in('id', creatorIds);
+      const hostById = new Map((hosts || []).map((h) => [h.id, h]));
+
+      const rows: SharedWorkspace[] = data
+        .map((wc) => {
+          const req = byId.get(wc.request_id);
+          if (!req) return null;
+          if (req.status === 'cancelled' || req.status === 'declined') return null;
+          // If user is already the requester, they'll see it in the proposals list
+          if (req.requester_user_id === user.id) return null;
+          const host = hostById.get(req.creator_id);
+          return {
+            request_id: wc.request_id,
+            role: wc.role,
+            joined_at: wc.joined_at,
+            status: req.status,
+            is_project_workspace: req.is_project_workspace,
+            project_id: req.project_id,
+            content_last_edited_at: req.content_last_edited_at,
+            content_last_edited_by: req.content_last_edited_by,
+            host_name: host?.name ?? null,
+            host_username: host?.username ?? null,
+            host_profile_image_url: host?.profile_image_url ?? null,
+          } as SharedWorkspace;
+        })
+        .filter((r): r is SharedWorkspace => r !== null);
+
+      setSharedWorkspaces(rows);
+    } catch (err) {
+      console.error('Error fetching shared workspaces:', err);
+    }
+  };
 
   const fetchSuggestedCreators = async () => {
     try {
