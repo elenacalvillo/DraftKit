@@ -93,7 +93,7 @@ const generateEmailHtml = (
               <tr>
                 <td style="padding: 40px;">
                   <p style="margin: 0 0 20px; color: #1a1a1a; font-size: 16px; line-height: 1.6;">
-                    Hi ${creatorName},
+                    Hi ${escapeHtml(creatorName)},
                   </p>
                   
                   <p style="margin: 0 0 24px; color: #1a1a1a; font-size: 16px; line-height: 1.6;">
