@@ -1,56 +1,36 @@
-## What's actually happening
 
-**Elena's "Workspace not found"**: Not an RLS bug in this case. The DB shows Elena (`elenacalvilloalcalde@gmail.com`) IS listed as a `guest` in `workspace_collaborators` for workspace `647ecb80…`. `has_workspace_access` will pass for her. Most likely she loaded the page before her collaborator row was linked to her user_id, or before a hard refresh. No data patch or RLS change needed — a reload will resolve it. If it persists, we investigate her session/user_id linkage, not the policy.
+## The bug
 
-**Karen's dead-end**: Real product gap. Karen is a workspace guest (not a Project-tier subscriber), so the sidebar never renders a Projects entry, and `Proposals` (`MyRequests.tsx`) only queries `collab_requests` where `requester_user_id = auth.uid()`. Workspaces she was invited to via `workspace_collaborators` are invisible in her dashboard. Her only re-entry is the email link.
+`src/components/requests/WorkspaceEditor.tsx` (lines 329-363) runs `hasStructuralMarkdown` on the clipboard's `text/plain` fallback. When users paste from Substack, Google Docs, Notion, Gmail, or another browser tab, the clipboard carries BOTH:
 
-## Fix: add "Shared with me" to the Proposals page
+- `text/html` — the real rich content (headings, bold, links, lists)
+- `text/plain` — a degraded ASCII copy that almost always contains `- `, `* `, `1. `, or `> ` lines
 
-Extend `src/pages/MyRequests.tsx` to also fetch and render workspaces the user was invited into as a collaborator. Keep it on the existing Proposals route so guests don't need a new sidebar item.
+Our handler sees the plain-text markers, calls `preventDefault()`, throws away the rich HTML entirely, and runs `markdownToSanitizedHtml` on the ASCII fallback. Result: pastes come in mangled or empty and users think paste is broken.
 
-### UX
+## Fix
 
-- New section header **"Shared with me"** below the existing Proposals list (or above it when the user has no proposals of their own).
-- Each row: host name + avatar, workspace title/chapter name, role badge ("Guest" or "Collaborator"), last-edited timestamp, and a primary **Open workspace** button routing to `/dashboard/workspace/{request_id}`.
-- Empty state only shown when the user has neither proposals nor shared workspaces (current empty state stays as-is otherwise).
-- Guest-only accounts (no proposals, no Project tier) still land on `/dashboard/my-requests` after login; this section makes that page useful for them.
+Only run the markdown conversion path when the clipboard is genuinely plain text (no `text/html` payload). If `text/html` exists, let Tiptap's built-in HTML paste pipeline handle it — that path is already sanitized by the DOMPurify allow-list at save time and by Tiptap's schema on insertion.
 
-### Data
+### Change in `src/components/requests/WorkspaceEditor.tsx` (handlePaste, ~lines 329-363)
 
-Query added to `MyRequests.tsx` after the existing `fetchSentRequests`:
+1. Image branch stays unchanged (first priority).
+2. Before invoking `hasStructuralMarkdown`, read `event.clipboardData?.getData("text/html")`. If it is non-empty, `return false` and let Tiptap handle the rich paste normally.
+3. Only when `text/html` is empty AND `text/plain` matches `hasStructuralMarkdown`, convert via `markdownToSanitizedHtml` (existing behavior for genuine markdown pastes from a plain-text editor, terminal, or `.md` file).
+4. Remove the noisy `console.log("--- RAW PASTE INTERCEPTED ---")` and `!!! FORCING MARKDOWN CONVERSION !!!` debug logs — they were left in from debugging.
 
-```
-supabase
-  .from('workspace_collaborators')
-  .select(`
-    request_id, role, joined_at,
-    collab_requests:request_id (
-      id, status, is_project_workspace, project_id, shared_content,
-      content_last_edited_at, content_last_edited_by,
-      creator:creator_id ( name, username, profile_image_url )
-    )
-  `)
-  .eq('user_id', user.id)
-  .order('joined_at', { ascending: false });
-```
+### Not changing
 
-Filter out rows where the parent request is `cancelled` or `declined`. De-duplicate against the user's own proposals (edge case: user is both requester and listed collaborator).
+- The image-file paste/drop guard (base64 protection).
+- `markdown-paste.ts` helpers or the `DOMPurify` allow-list.
+- Any RLS, edge function, or storage logic.
 
-### Sidebar nudge (small)
+### Verification
 
-No new sidebar item — Proposals already exists for all tiers and is where guests naturally look. We just make sure guest-only users see something meaningful there.
-
-## What is NOT changing
-
-- No RLS policy edits. `has_workspace_access` is correct; Elena's issue is a stale-session symptom, not a policy hole.
-- No changes to the Projects sidebar entry (still Project-tier only, per the tier hierarchy).
-- No new route, no new top-level page.
-- No data patch to add Elena as an "approved collaborator" on workspaces she isn't part of — she's the platform admin; if she needs to inspect a workspace she's not on, that's an admin tooling concern, out of scope here.
-
-## Files touched
-
-- `src/pages/MyRequests.tsx` — add "Shared with me" section, query, render, dedupe.
-
-## Follow-up for Elena to send Karen
-
-"You can jump back into your chapter any time from **Proposals** in your sidebar — I just added a 'Shared with me' list there so invited workspaces show up alongside your own."
+- Manual paste tests once implemented:
+  - Paste plain prose → appears as text (was already working, must still work).
+  - Paste a Substack article → rich HTML preserved (currently broken).
+  - Paste a Google Docs bulleted list → list preserved (currently broken).
+  - Paste raw markdown from a `.md` file / terminal (no HTML clip) → still converts to formatted HTML.
+  - Paste an image from clipboard → still routes through the workspace upload pipeline.
+- Existing unit tests in `src/lib/__tests__/` continue to pass; add no new tests unless the diff warrants it.

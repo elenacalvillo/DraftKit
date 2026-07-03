@@ -336,29 +336,34 @@ export function WorkspaceEditor({ content, onChange, editable, currentUserName, 
           return true;
         }
 
-        // 2. Markdown detection on text/plain.
-        const text = event.clipboardData?.getData("text/plain") ?? "";
-        console.log("--- RAW PASTE INTERCEPTED ---", {
-          hasText: !!text,
-          textLen: text.length,
-        });
+        // 2. If the clipboard carries rich HTML (Substack, Google Docs,
+        //    Notion, Gmail, another browser tab), let Tiptap's built-in
+        //    HTML paste pipeline handle it. The text/plain fallback that
+        //    ships alongside almost always contains list markers ("- ",
+        //    "1. ") that would false-positive our markdown detector and
+        //    destroy the real formatting.
+        const html = event.clipboardData?.getData("text/html") ?? "";
+        if (html.trim()) {
+          return false;
+        }
 
+        // 3. Genuine plain-text paste (no HTML clip) — only then run
+        //    markdown detection so users pasting from a .md file or
+        //    terminal still get formatted output.
+        const text = event.clipboardData?.getData("text/plain") ?? "";
         if (text && hasStructuralMarkdown(text)) {
-          console.log("!!! FORCING MARKDOWN CONVERSION !!!", {
-            preview: text.slice(0, 80),
-          });
           event.preventDefault();
-          const html = markdownToSanitizedHtml(text);
+          const converted = markdownToSanitizedHtml(text);
           const ed = editorRef.current;
-          if (ed && html && html.trim()) {
-            ed.chain().focus().insertContent(html, {
+          if (ed && converted && converted.trim()) {
+            ed.chain().focus().insertContent(converted, {
               parseOptions: { preserveWhitespace: false },
             }).run();
           }
-          return true; // kill the event chain
+          return true;
         }
 
-        // 3. Not markdown, not an image — let Tiptap handle it.
+        // 4. Plain prose — let Tiptap handle it normally.
         return false;
       },
     },
