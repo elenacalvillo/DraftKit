@@ -44,7 +44,7 @@ serve(async (req) => {
     const { packId } = await req.json();
 
     const origin = req.headers.get("origin") || "https://collabstack.lovable.app";
-    const testMode = isTestModeFromOrigin(origin);
+    const testMode = isTestMode();
 
     const pack = (testMode ? TEST_PACKS : LIVE_PACKS)[String(packId)];
     if (!pack) throw new Error("Invalid pack. Use '10' or '30'.");
