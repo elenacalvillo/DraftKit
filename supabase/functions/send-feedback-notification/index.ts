@@ -155,16 +155,39 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Auth: require shared secret to prevent unauthenticated abuse (cron-only endpoint)
-  const providedSecret = req.headers.get("x-internal-secret");
-  const expectedSecret = Deno.env.get("CRON_SECRET");
-  if (!expectedSecret || providedSecret !== expectedSecret) {
-    console.warn("unauthorized invocation blocked");
+  // Auth: require a valid Supabase user JWT so anonymous callers can't
+  // flood the admin inbox with arbitrary notification emails.
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const bearer = authHeader.startsWith("Bearer ")
+    ? authHeader.slice("Bearer ".length).trim()
+    : "";
+  if (!bearer) {
     return new Response(
       JSON.stringify({ error: "Unauthorized" }),
       { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
+  try {
+    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2.49.1");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const userClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: `Bearer ${bearer}` } },
+    });
+    const { data: userData, error: userErr } = await userClient.auth.getUser(bearer);
+    if (userErr || !userData?.user) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+  } catch (_err) {
+    return new Response(
+      JSON.stringify({ error: "Unauthorized" }),
+      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
 
 
   try {
