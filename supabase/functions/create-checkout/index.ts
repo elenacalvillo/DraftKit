@@ -48,7 +48,7 @@ serve(async (req) => {
     const { priceId, returnTo, plan } = await req.json();
 
     const origin = req.headers.get("origin") || "https://collabstack.lovable.app";
-    const testMode = isTestModeFromOrigin(origin);
+    const testMode = isTestMode();
 
     const stripeKey = testMode
       ? (Deno.env.get("STRIPE_TEST_SECRET_KEY") ?? Deno.env.get("STRIPE_SECRET_KEY") ?? "")
