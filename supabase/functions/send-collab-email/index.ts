@@ -13,6 +13,17 @@ const RESEND_FROM = Deno.env.get("RESEND_FROM") || "DraftKit Notifications <noti
 
 const LOGO_URL = "https://cbgchxesngdsvkevbqwh.supabase.co/storage/v1/object/public/email-assets/draftkit-logo.png?v=1";
 
+// Escape user-controlled values before interpolating into HTML email templates
+// to prevent HTML injection / phishing content in delivered emails.
+function escapeHtml(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 const brandHeader = `
           <div style="text-align: center; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid #f1f5f9;">
             <img src="${LOGO_URL}" alt="DraftKit" width="48" height="48" style="display: block; margin: 0 auto 12px;" />
