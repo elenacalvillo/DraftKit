@@ -498,16 +498,45 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Auth: require shared secret to prevent unauthenticated abuse (cron-only endpoint)
+  // Auth: allow either a cron shared secret (bulk snapshot) OR an
+  // authenticated user JWT (per-request snapshot from the workspace UI).
   const providedSecret = req.headers.get("x-internal-secret");
   const expectedSecret = Deno.env.get("CRON_SECRET");
-  if (!expectedSecret || providedSecret !== expectedSecret) {
-    console.warn("unauthorized invocation blocked");
-    return new Response(
-      JSON.stringify({ error: "Unauthorized" }),
-      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+  const hasCronSecret = !!expectedSecret && providedSecret === expectedSecret;
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const bearer = authHeader.startsWith("Bearer ")
+    ? authHeader.slice("Bearer ".length).trim()
+    : "";
+  let authedUserId: string | null = null;
+  if (!hasCronSecret) {
+    if (!bearer) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    try {
+      const userClient = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_ANON_KEY")!,
+        { global: { headers: { Authorization: `Bearer ${bearer}` } } },
+      );
+      const { data: userData, error: userErr } = await userClient.auth.getUser(bearer);
+      if (userErr || !userData?.user) {
+        return new Response(
+          JSON.stringify({ error: "Unauthorized" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      authedUserId = userData.user.id;
+    } catch {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
   }
+
 
 
   try {
