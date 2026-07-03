@@ -266,6 +266,16 @@ serve(async (req: Request): Promise<Response> => {
     const collabGuidelines = request.creators?.collab_guidelines;
     const aiDraft = request.ai_draft as CollabDraft | null;
 
+    // HTML-escaped copies of user-controlled fields for safe interpolation
+    // into email templates. Raw values are kept above for plain-text uses
+    // (subjects, analytics, normalization) where HTML escaping is unwanted.
+    const creatorNameHtml = escapeHtml(creatorName);
+    const requesterNameHtml = escapeHtml(requesterName ?? "");
+    const requesterEmailHtml = escapeHtml(requesterEmail ?? "");
+    const requestMessageHtml = escapeHtml(request.message ?? "");
+    const messageContentHtml = escapeHtml(messageContent ?? "");
+
+
     // --- SOLO WORKSPACE DETECTION ---
     // A row is "effectively solo" when is_solo is set, or when both sides
     // resolve to the same user, or when the names collapse to the same
