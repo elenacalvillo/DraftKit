@@ -247,11 +247,11 @@ export default function Workspace() {
       // directly via existing RLS policies.
       const { data: ctx } = await supabase
         .from("collab_requests")
-        .select("project_id, is_project_workspace")
+        .select("project_id, is_project_workspace, chapter_order")
         .eq("id", requestId!)
         .maybeSingle();
       if (ctx) {
-        resolvedData = { ...resolvedData, project_id: ctx.project_id, is_project_workspace: ctx.is_project_workspace };
+        resolvedData = { ...resolvedData, project_id: ctx.project_id, is_project_workspace: ctx.is_project_workspace, chapter_order: ctx.chapter_order } as any;
       }
 
       setRequest(resolvedData as WorkspaceRequest);
