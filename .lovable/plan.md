@@ -1,84 +1,47 @@
-## The real problem
+# Chapter Navigator in the Workspace Header
 
-SheWritesAI is already a **paying Project-tier** subscriber (`creators.subscription_tier = 'project'`).
+Give project chapters a book-like navigation control inside the zen workspace so you can flow from chapter to chapter without bouncing back to the Project view.
 
-But the Postgres function `get_host_capacity` — the source of truth for the "At Capacity" screen on `draftkit.app/<username>` — only recognizes `subscription_tier = 'pro'` as Pro. Project tier is invisible to it, so:
+## What you'll see
 
-- She's counted against the Free 3-credit host cap.
-- Once 3 approved/published collabs exist, every new incoming booking (like Hollie's) is blocked with "At Capacity".
-- Every other Project-tier host on the platform has the same silent block.
+Right next to the existing `Drafting: <Chapter Title>` in the top header, a compact navigator appears — only when the current workspace is a **project chapter** (i.e. `is_project_workspace = true` and `project_id` is set). Solo drafts and collab workspaces are unchanged.
 
-The app-side `hasProAccess()` treats `'pro'` and `'project'` as equivalent. The DB function is out of sync.
+Layout in the header, left to right:
 
-## Fix
-
-Migration to replace `get_host_capacity` so `is_pro` returns true when ANY of:
-
-- `user_roles` has role `'pro'` for the creator's user (Founding Member / VIP grants), OR
-- `creators.subscription_tier IN ('pro', 'project')`, OR
-- `creators.trial_ends_at > NOW()`.
-
-No other logic changes. `base_limit`, `referral_bonus`, and `used` stay identical. Signature, return shape, `SECURITY DEFINER`, and `search_path` unchanged.
-
-### Migration SQL
-
-```sql
-CREATE OR REPLACE FUNCTION public.get_host_capacity(_creator_id uuid)
-RETURNS jsonb
-LANGUAGE sql
-STABLE SECURITY DEFINER
-SET search_path TO 'public'
-AS $function$
-  SELECT jsonb_build_object(
-    'base_limit', 3,
-    'referral_bonus', (
-      SELECT count(*)::int FROM referral_credits
-      WHERE referrer_user_id = (SELECT user_id FROM creators WHERE id = _creator_id)
-    ),
-    'used', (
-      SELECT count(*)::int FROM collab_requests
-      WHERE creator_id = _creator_id
-        AND status IN ('approved', 'published')
-        AND is_project_workspace = false
-    ),
-    'is_pro', (
-      EXISTS (
-        SELECT 1 FROM user_roles
-        WHERE user_id = (SELECT user_id FROM creators WHERE id = _creator_id)
-          AND role = 'pro'
-      )
-      OR EXISTS (
-        SELECT 1 FROM creators
-        WHERE id = _creator_id
-          AND subscription_tier IN ('pro', 'project')
-      )
-      OR EXISTS (
-        SELECT 1 FROM creators
-        WHERE id = _creator_id
-          AND trial_ends_at > NOW()
-      )
-    )
-  )
-$function$;
+```text
+[‹]  Drafting:  Ch. 3 — Lo que el fuego despierta ▾  [ ✎ ]  [›]
 ```
 
-## Verification
+- **‹ / › chevrons** — jump to the previous / next chapter in `chapter_order`. Disabled (greyed) at the ends of the book. Tooltip shows the target title ("Next: Ch. 4 — La Laguna").
+- **Title dropdown** — clicking the title (or the small ▾ next to it) opens a popover listing every sibling chapter, ordered by `chapter_order`, with:
+  - Chapter number + title (truncated)
+  - Small stage badge (Draft / Editing / Ready…)
+  - The current chapter highlighted, scrolled into view on open
+  - Selecting a chapter navigates to its workspace
+- **Pencil (rename)** — the existing `EditableChapterTitle` behaviour is preserved. Renaming still works inline; the dropdown only opens from the ▾ affordance / chevron area, not from clicking into the title text while editing.
+- **Keyboard shortcuts** — `Alt + ←` / `Alt + →` navigate prev/next chapter (ignored while typing in the editor / inputs). No shortcut for the picker to avoid clashing with the editor.
 
-1. Run the migration.
-2. Query the RPC for her creator id and confirm `is_pro = true`:
-   `SELECT public.get_host_capacity('4c575634-453d-4c92-afd4-180d3411037e');`
-3. Hollie can immediately reload `draftkit.app/shewritesai` — the "At Capacity" screen is gone.
+Save-state handling: navigation uses the same guard as the existing "Back" button — if there are unsaved edits, we prompt before switching, so nothing is lost mid-chapter.
 
-## Not doing
+## Where it lives
 
-- **No frontend change.** `PublicBooking.tsx` and `usePro` already interpret `cap.is_pro` correctly.
-- **No comping / user_roles grant.** She's already paying for Project tier.
-- **No credit-cap bump.** The cap is correct for Free; the bug is misidentifying her tier.
+- New component: `src/components/projects/ChapterNavigator.tsx`
+  - Props: `projectId`, `currentChapterId`, `onNavigate(chapterId)` (optional; defaults to `navigate('/dashboard/workspace/{id}')`).
+  - Uses the existing `useProjectChapters(projectId)` hook — the query is already cached and lightweight (metadata-only columns), so opening the workspace won't refetch heavy content.
+  - Renders nothing while loading or if there's only one chapter.
 
-## What to tell Karen / Hollie
+- `src/pages/Workspace.tsx`
+  - In the `zenTitle` block, when `request.is_project_workspace && request.project_id`, render:
+    - `‹` button
+    - `EditableChapterTitle` with a `prefix` like `Ch. {order}.` (already supported) plus a new adjacent ▾ trigger that opens the `ChapterNavigator` popover
+    - `›` button
+  - Solo (non-project) drafts keep today's exact header.
+  - Reuse the existing unsaved-changes confirmation before calling `navigate(...)`.
 
-Once the fix ships: "Fixed — SheWritesAI's booking page is open again. Hollie can submit her guest post request now."
+- `src/components/layout/DashboardLayout.tsx` — no structural change; `zenTitle` already accepts arbitrary React, so the navigator sits inside it naturally. On mobile the chevrons stay visible (icon-only, 32px hit target); the title truncates as it already does.
 
-## Follow-up worth considering (out of scope for this change)
+## Non-goals (kept out on purpose)
 
-Grep the DB and edge functions for other places comparing `subscription_tier = 'pro'` literally; any of them will drop Project-tier users. Worth a scan in a separate task.
+- No changes to the Project detail list, reordering, or the chapter schema.
+- No prefetching of chapter content — navigation still loads the target workspace fresh, same as today.
+- No changes to collab (multi-writer) workspaces — they aren't part of a book pipeline.
