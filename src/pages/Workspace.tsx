@@ -60,6 +60,7 @@ import { CollabDraft } from "@/lib/storage";
 import { CollabImpactCard } from "@/components/requests/CollabImpactCard";
 import { InviteCollaboratorModal } from "@/components/requests/InviteCollaboratorModal";
 import { EditableChapterTitle } from "@/components/projects/EditableChapterTitle";
+import { ChapterNavigator } from "@/components/projects/ChapterNavigator";
 import { parseDateString, cn, sanitizeSubstackImageUrl } from "@/lib/utils";
 import { extractSubstackUsername, normalizeSubstackUrl } from "@/lib/substack-url";
 import { toast } from "sonner";
