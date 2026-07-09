@@ -60,6 +60,7 @@ import { CollabDraft } from "@/lib/storage";
 import { CollabImpactCard } from "@/components/requests/CollabImpactCard";
 import { InviteCollaboratorModal } from "@/components/requests/InviteCollaboratorModal";
 import { EditableChapterTitle } from "@/components/projects/EditableChapterTitle";
+import { ChapterNavigator } from "@/components/projects/ChapterNavigator";
 import { parseDateString, cn, sanitizeSubstackImageUrl } from "@/lib/utils";
 import { extractSubstackUsername, normalizeSubstackUrl } from "@/lib/substack-url";
 import { toast } from "sonner";
@@ -246,11 +247,11 @@ export default function Workspace() {
       // directly via existing RLS policies.
       const { data: ctx } = await supabase
         .from("collab_requests")
-        .select("project_id, is_project_workspace")
+        .select("project_id, is_project_workspace, chapter_order")
         .eq("id", requestId!)
         .maybeSingle();
       if (ctx) {
-        resolvedData = { ...resolvedData, project_id: ctx.project_id, is_project_workspace: ctx.is_project_workspace };
+        resolvedData = { ...resolvedData, project_id: ctx.project_id, is_project_workspace: ctx.is_project_workspace, chapter_order: ctx.chapter_order } as any;
       }
 
       setRequest(resolvedData as WorkspaceRequest);
@@ -588,14 +589,25 @@ export default function Workspace() {
       zenTitle={
         isSolo ? (
           <span className="inline-flex items-center gap-1.5 min-w-0 justify-center">
-            <span className="text-muted-foreground shrink-0">Drafting:</span>
+            <span className="text-muted-foreground shrink-0 hidden sm:inline">Drafting:</span>
             <EditableChapterTitle
               chapterId={request.id}
               title={request.message || "Untitled Project"}
               canEdit={isCreator || request.requester_user_id === user?.id}
               variant="header"
+              prefix={
+                request.is_project_workspace && (request as any).chapter_order
+                  ? `Ch. ${(request as any).chapter_order}.`
+                  : undefined
+              }
               onSaved={(t) => setRequest((prev) => (prev ? { ...prev, message: t } : prev))}
             />
+            {request.is_project_workspace && request.project_id && (
+              <ChapterNavigator
+                projectId={request.project_id}
+                currentChapterId={request.id}
+              />
+            )}
           </span>
         ) : (
           `Drafting with ${partnerName}`
