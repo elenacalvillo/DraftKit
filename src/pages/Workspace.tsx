@@ -588,14 +588,25 @@ export default function Workspace() {
       zenTitle={
         isSolo ? (
           <span className="inline-flex items-center gap-1.5 min-w-0 justify-center">
-            <span className="text-muted-foreground shrink-0">Drafting:</span>
+            <span className="text-muted-foreground shrink-0 hidden sm:inline">Drafting:</span>
             <EditableChapterTitle
               chapterId={request.id}
               title={request.message || "Untitled Project"}
               canEdit={isCreator || request.requester_user_id === user?.id}
               variant="header"
+              prefix={
+                request.is_project_workspace && (request as any).chapter_order
+                  ? `Ch. ${(request as any).chapter_order}.`
+                  : undefined
+              }
               onSaved={(t) => setRequest((prev) => (prev ? { ...prev, message: t } : prev))}
             />
+            {request.is_project_workspace && request.project_id && (
+              <ChapterNavigator
+                projectId={request.project_id}
+                currentChapterId={request.id}
+              />
+            )}
           </span>
         ) : (
           `Drafting with ${partnerName}`
