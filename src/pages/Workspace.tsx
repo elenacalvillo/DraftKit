@@ -428,6 +428,16 @@ export default function Workspace() {
       ? request?.requester_profile_image_url
       : creatorInfo?.profile_image_url;
 
+  // Position-based chapter number, matching the project detail list.
+  const { chapters: projectChapters } = useProjectChapters(
+    request?.is_project_workspace ? request?.project_id ?? undefined : undefined,
+  );
+  const chapterPosition = (() => {
+    if (!request?.is_project_workspace || !request?.project_id) return null;
+    const idx = projectChapters.findIndex((c) => c.id === request.id);
+    return idx >= 0 ? idx + 1 : null;
+  })();
+
   if (authLoading || loading) {
     return (
       <DashboardLayout>
