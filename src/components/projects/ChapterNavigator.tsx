@@ -167,7 +167,7 @@ export function ChapterNavigator({
           </TooltipTrigger>
           {next && (
             <TooltipContent side="bottom">
-              Next: {next.chapter_order ?? "?"}. {next.message}
+              Next: {nextPos}. {next.message}
             </TooltipContent>
           )}
         </Tooltip>
