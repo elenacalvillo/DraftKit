@@ -21,10 +21,11 @@ export interface MetricLegend {
 const LEGENDS = {
   // ---------- Dashboard (per-user) ----------
   ship_rate: {
-    definition: "Share of your collab requests that turned into published work.",
-    formula: "published requests ÷ eligible requests × 100 (eligible = not pending / declined / expired)",
+    definition: "Share of your finished collabs that shipped as published work.",
+    formula: "published ÷ closed × 100 (closed = published + declined + cancelled; in-progress collabs are excluded)",
     source: "collab_requests.status",
   },
+
   published_collabs: {
     definition: "Unique audiences you've shipped a collab with.",
     formula: "count of distinct requester_substack_url where status = 'published'",
