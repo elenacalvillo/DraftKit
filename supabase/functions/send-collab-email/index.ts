@@ -137,7 +137,7 @@ serve(async (req: Request): Promise<Response> => {
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    const { type, requestId, messageContent, newCollabType, newDate, inviteeEmail }: EmailRequest = await req.json();
+    const { type, requestId, messageContent, newCollabType, newDate, inviteeEmail, senderEmail }: EmailRequest = await req.json();
 
     if (!type || !requestId) {
       return new Response(
