@@ -74,7 +74,8 @@ export function GuestMessageModal({
         body: { 
           type: 'new_message_from_guest', 
           requestId,
-          messageContent: message.trim()
+          messageContent: message.trim(),
+          senderEmail,
         }
       }).catch(err => console.error('Failed to send message email:', err));
 

@@ -1,33 +1,51 @@
 ## Diagnosis
 
-The mini chapter list in the workspace and the project detail list disagree because they label chapters using **different sources**:
+Karen's book-project workspaces are created as **solo** requests: `creator_id === requester_user_id` (both are Karen). Blessing is attached via `workspace_collaborators`, not as the `requester`.
 
-- `src/pages/ProjectDetail.tsx` (line 577) labels each row by its **position** in the sorted list: `${idx + 1}.`
-- `src/components/projects/ChapterNavigator.tsx` (line 136) and `src/pages/Workspace.tsx` (line 600) label by the raw `**chapter_order**` column.
+The messaging pipeline was built for the classic 2-party model (host ↔ guest) and never learned about `workspace_collaborators`:
 
-For most projects these match. But one of your books (project `6932ab4c…`, 76 chapters) has `chapter_order` running up to **85** — 9 gaps left behind by prior deletions/reorders. So:
+1. `SendMessageModal` (host view) writes the message with `sender_type='creator'`, then calls `send-collab-email` with `type: 'new_message'`.
+2. `send-collab-email` hard-codes the recipient for `new_message` to `request.requester_email` — which on a solo/project workspace **is Karen's own email**.
+3. Result: Karen sends → Karen receives. Blessing (the actual collaborator) is never notified. From Karen's inbox it looks "backwards" because every message she sends comes back to her.
 
-- ProjectDetail shows Chapters 1..76 with no gaps.
-- Workspace header shows e.g. "Ch. 9" while the same chapter is Chapter 8 in the project view.
-- The mini navigator dropdown skips numbers (9, 11, 14…) making it look like chapters are missing when they are actually all there.
+The same shape breaks the reverse path when Blessing (collaborator, not requester) sends: `GuestMessageModal` writes `sender_type='requester'`, and `new_message_from_guest` correctly emails the creator (Karen) — that half happens to work, but it is coincidental and would still fail on any workspace with multiple collaborators.
 
-Count is fine (all 76 chapters render); only the labels are misaligned.
+The in-app conversation panel itself is fine — it decides "You vs Partner" from `sender_type`, so Karen sees her own messages as "You". The **bug is in recipient fan-out**, not in the UI.
 
 ## Fix
 
-Make position the single source of truth for the label everywhere. `chapter_order` stays the sort key and DB field, but the visible number always comes from the sorted position.
+Make the messaging pipeline collaborator-aware. Route by workspace participants, not by the requester/creator pair.
 
-1. `ChapterNavigator.tsx`
-  - Compute `position = i + 1` from the sorted list and use it in the dropdown row, prev tooltip, and next tooltip. Drop the `chapter_order ?? i + 1` pattern.
-2. `Workspace.tsx` header (line 599–601)
-  - Replace `Ch. ${chapter_order}.` with the position derived from `useProjectChapters(projectId)` — look up the current chapter's index and render `Ch. ${idx + 1}.`. Guard on `is_project_workspace` and hide the prefix while the chapter list is still loading (avoid a flash of the wrong number).
-3. DONT RUN ANY DATABASE CLEANUP
+### 1. `supabase/functions/send-collab-email/index.ts`
 
-No DB migration, no RLS changes, no data loss. Purely a display alignment.
+For `new_message` and `new_message_from_guest`:
 
-## Files touched
+- Load `workspace_collaborators` for the request (email + user_id → resolve email via `creators` / `auth.users` as we already do elsewhere).
+- Build the participant set: `creator_email`, `requester_email`, all collaborator emails.
+- Accept a new optional `senderEmail` in the request body (passed from the modals). If absent, fall back to today's behaviour so other call sites keep working.
+- Compute `recipients = unique(participants) - senderEmail`. If the sender is the creator on a solo workspace, this correctly drops Karen and keeps Blessing.
+- Send one email per recipient (loop `sendEmail([r], …)`) so each person gets a properly-addressed message and Resend logs stay clean. Keep the existing dedupe guard, but key it on `(request_id, type, to_email)` so fan-out isn't collapsed into a single "duplicate".
+- Subject/body stay the same; only the recipient list changes.
 
-- `src/components/projects/ChapterNavigator.tsx`
-- `src/pages/Workspace.tsx`
+### 2. `src/components/requests/SendMessageModal.tsx` and `GuestMessageModal.tsx`
 
-Ready to implement on approval.
+Pass `senderEmail` in the `functions.invoke('send-collab-email', …)` payload so the function can exclude the sender from the fan-out. `SendMessageModal` already has `creatorEmail`; `GuestMessageModal` already has `senderEmail`.
+
+No UI changes.
+
+### 3. Conversation panel — leave as-is
+
+`WorkspaceConversation` correctly renders sender labels from `sender_type`. Not touching it avoids regressions for classic 2-party collabs.
+
+### 4. Regression coverage
+
+Add a lightweight Deno test under `supabase/functions/send-collab-email/` that stubs the DB layer and asserts:
+
+- Solo workspace + 1 collaborator + creator sends → recipient list = `[collaborator]`, not `[creator]`.
+- Classic 2-party workspace + creator sends → recipient list = `[requester]` (unchanged behaviour).
+- Collaborator sends on a solo workspace → recipient list = `[creator]`.
+
+## Out of scope
+
+- Redesigning the messaging UI for N-party workspaces (thread avatars, per-recipient reply, etc.) — separate follow-up.
+- Backfilling missed emails from before this fix (I can send a one-shot nudge to Karen/Blessing if you want, but not part of this plan).

@@ -83,6 +83,9 @@ interface EmailRequest {
   newCollabType?: string;
   newDate?: string;
   inviteeEmail?: string;
+  // Sender email for messaging fan-out. When set, the sender is excluded
+  // from recipient list (prevents self-emails on solo/project workspaces).
+  senderEmail?: string;
 }
 
 interface CollabDraft {
@@ -134,7 +137,7 @@ serve(async (req: Request): Promise<Response> => {
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    const { type, requestId, messageContent, newCollabType, newDate, inviteeEmail }: EmailRequest = await req.json();
+    const { type, requestId, messageContent, newCollabType, newDate, inviteeEmail, senderEmail }: EmailRequest = await req.json();
 
     if (!type || !requestId) {
       return new Response(
@@ -1160,12 +1163,63 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    if (!toEmail) {
-      console.error("Missing recipient email for", type, "request", requestId);
-      return new Response(
-        JSON.stringify({ error: "Missing recipient email" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    // --- MESSAGING FAN-OUT ---
+    // For workspace messages we can't just email the "other side" of the
+    // classic host/guest pair — project-linked workspaces are often solo
+    // (creator === requester) with real recipients living in
+    // workspace_collaborators. Build the full participant list and drop
+    // the sender so nobody receives their own message.
+    const normEmail = (e: string | null | undefined) =>
+      (e ?? "").trim().toLowerCase();
+
+    let recipients: string[] = [toEmail];
+
+    if (type === "new_message" || type === "new_message_from_guest") {
+      const pool = new Set<string>();
+      const add = (e: string | null | undefined) => {
+        const n = normEmail(e);
+        if (!n) return;
+        pool.add(n);
+      };
+
+      add(creatorEmail);
+      add(requesterEmail);
+
+      // Pull workspace collaborator emails (explicit + user_id lookup).
+      const { data: collabRows } = await supabase
+        .from("workspace_collaborators")
+        .select("email, user_id")
+        .eq("request_id", requestId);
+
+      for (const row of collabRows ?? []) {
+        if (row.email) add(row.email);
+      }
+
+      const collabUserIds = (collabRows ?? [])
+        .map((r) => r.user_id)
+        .filter((v): v is string => !!v);
+
+      if (collabUserIds.length) {
+        const { data: collabCreators } = await supabase
+          .from("creators")
+          .select("id, user_id, creator_contacts ( email )")
+          .in("user_id", collabUserIds);
+        for (const c of collabCreators ?? []) {
+          add(extractCreatorEmail(c));
+        }
+      }
+
+      if (senderEmail) pool.delete(normEmail(senderEmail));
+
+      recipients = Array.from(pool);
+
+      if (recipients.length === 0) {
+        console.log(`No recipients for ${type} after excluding sender ${senderEmail}`);
+        return new Response(
+          JSON.stringify({ skipped: true, reason: "NO_RECIPIENTS_AFTER_SENDER_EXCLUSION" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // --- DUPLICATE EMAIL GUARDRAIL ---
@@ -1187,29 +1241,6 @@ serve(async (req: Request): Promise<Response> => {
       "workspace_invite"
     ];
 
-    if (DEDUP_TYPES.includes(type)) {
-      const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-      
-      const { data: recentSend } = await supabase
-        .from("email_events")
-        .select("id")
-        .eq("request_id", requestId)
-        .eq("type", type)
-        .eq("to_email", toEmail)
-        .gte("created_at", twoMinutesAgo)
-        .limit(1)
-        .maybeSingle();
-
-      if (recentSend) {
-        console.log(`Duplicate email skipped (${type}) - already sent within 2 minutes`);
-        return new Response(
-          JSON.stringify({ skipped: true, reason: "DUPLICATE_GUARD" }),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-    }
-    // --- END DUPLICATE GUARDRAIL ---
-
     // Send the email
     // Determine reply-to based on email type
     const replyToMap: Record<string, string | undefined> = {
@@ -1230,20 +1261,45 @@ serve(async (req: Request): Promise<Response> => {
     };
     const replyTo = replyToMap[type];
 
-    const emailResponse = await sendEmail([toEmail], emailSubject, emailHtml, replyTo);
+    const results: Array<{ to: string; id?: string; skipped?: boolean }> = [];
+    const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
 
-    // Log successful send to email_events
-    if (!emailResponse.skipped) {
-      await supabase.from("email_events").insert({
-        request_id: requestId,
-        type,
-        to_email: toEmail,
-        provider_id: emailResponse.id || null,
-        status: "sent"
-      });
+    for (const to of recipients) {
+      if (DEDUP_TYPES.includes(type)) {
+        const { data: recentSend } = await supabase
+          .from("email_events")
+          .select("id")
+          .eq("request_id", requestId)
+          .eq("type", type)
+          .eq("to_email", to)
+          .gte("created_at", twoMinutesAgo)
+          .limit(1)
+          .maybeSingle();
+
+        if (recentSend) {
+          console.log(`Duplicate email skipped (${type} → ${to})`);
+          results.push({ to, skipped: true });
+          continue;
+        }
+      }
+
+      const emailResponse = await sendEmail([to], emailSubject, emailHtml, replyTo);
+
+      if (!emailResponse.skipped) {
+        await supabase.from("email_events").insert({
+          request_id: requestId,
+          type,
+          to_email: to,
+          provider_id: emailResponse.id || null,
+          status: "sent"
+        });
+      }
+
+      results.push({ to, id: emailResponse.id, skipped: !!emailResponse.skipped });
     }
 
-    console.log(`Email sent successfully (${type}):`, emailResponse);
+    const emailResponse = results[0] ?? { skipped: true };
+    console.log(`Email sent (${type}) →`, results.map((r) => r.to).join(", "));
 
     return new Response(
       JSON.stringify({ success: true, emailId: emailResponse.id }),
