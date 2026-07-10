@@ -36,13 +36,15 @@ export function ChapterNavigator({
   const { chapters, isLoading } = useProjectChapters(projectId);
   const [open, setOpen] = useState(false);
 
-  const { currentIdx, prev, next, current } = useMemo(() => {
+  const { currentIdx, prev, next, prevPos, nextPos } = useMemo(() => {
     const idx = chapters.findIndex((c) => c.id === currentChapterId);
     return {
       currentIdx: idx,
       current: idx >= 0 ? chapters[idx] : null,
       prev: idx > 0 ? chapters[idx - 1] : null,
       next: idx >= 0 && idx < chapters.length - 1 ? chapters[idx + 1] : null,
+      prevPos: idx > 0 ? idx : null,
+      nextPos: idx >= 0 && idx < chapters.length - 1 ? idx + 2 : null,
     };
   }, [chapters, currentChapterId]);
 
