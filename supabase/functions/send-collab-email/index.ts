@@ -83,6 +83,9 @@ interface EmailRequest {
   newCollabType?: string;
   newDate?: string;
   inviteeEmail?: string;
+  // Sender email for messaging fan-out. When set, the sender is excluded
+  // from recipient list (prevents self-emails on solo/project workspaces).
+  senderEmail?: string;
 }
 
 interface CollabDraft {
