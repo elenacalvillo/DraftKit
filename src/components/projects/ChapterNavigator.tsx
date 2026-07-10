@@ -98,7 +98,7 @@ export function ChapterNavigator({
           </TooltipTrigger>
           {prev && (
             <TooltipContent side="bottom">
-              Previous: {prev.chapter_order ?? "?"}. {prev.message}
+              Previous: {prevPos}. {prev.message}
             </TooltipContent>
           )}
         </Tooltip>
