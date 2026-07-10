@@ -135,7 +135,7 @@ export function ChapterNavigator({
                   )}
                 >
                   <span className="text-xs text-muted-foreground w-6 shrink-0 tabular-nums">
-                    {c.chapter_order ?? i + 1}.
+                    {i + 1}.
                   </span>
                   <span className="truncate flex-1 min-w-0">
                     {c.message || "Untitled"}
