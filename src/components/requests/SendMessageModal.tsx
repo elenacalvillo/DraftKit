@@ -63,7 +63,8 @@ export function SendMessageModal({
         body: { 
           type: 'new_message', 
           requestId,
-          messageContent: message.trim()
+          messageContent: message.trim(),
+          senderEmail: creatorEmail,
         }
       }).catch(err => console.error('Failed to send message email:', err));
 
