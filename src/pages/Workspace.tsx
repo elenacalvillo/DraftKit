@@ -607,9 +607,7 @@ export default function Workspace() {
               canEdit={isCreator || request.requester_user_id === user?.id}
               variant="header"
               prefix={
-                request.is_project_workspace && (request as any).chapter_order
-                  ? `Ch. ${(request as any).chapter_order}.`
-                  : undefined
+                chapterPosition ? `Ch. ${chapterPosition}.` : undefined
               }
               onSaved={(t) => setRequest((prev) => (prev ? { ...prev, message: t } : prev))}
             />
