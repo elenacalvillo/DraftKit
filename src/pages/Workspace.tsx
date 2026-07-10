@@ -61,6 +61,7 @@ import { CollabImpactCard } from "@/components/requests/CollabImpactCard";
 import { InviteCollaboratorModal } from "@/components/requests/InviteCollaboratorModal";
 import { EditableChapterTitle } from "@/components/projects/EditableChapterTitle";
 import { ChapterNavigator } from "@/components/projects/ChapterNavigator";
+import { useProjectChapters } from "@/hooks/useProjectChapters";
 import { parseDateString, cn, sanitizeSubstackImageUrl } from "@/lib/utils";
 import { extractSubstackUsername, normalizeSubstackUrl } from "@/lib/substack-url";
 import { toast } from "sonner";
@@ -427,6 +428,16 @@ export default function Workspace() {
       ? request?.requester_profile_image_url
       : creatorInfo?.profile_image_url;
 
+  // Position-based chapter number, matching the project detail list.
+  const { chapters: projectChapters } = useProjectChapters(
+    request?.is_project_workspace ? request?.project_id ?? undefined : undefined,
+  );
+  const chapterPosition = (() => {
+    if (!request?.is_project_workspace || !request?.project_id) return null;
+    const idx = projectChapters.findIndex((c) => c.id === request.id);
+    return idx >= 0 ? idx + 1 : null;
+  })();
+
   if (authLoading || loading) {
     return (
       <DashboardLayout>
@@ -596,9 +607,7 @@ export default function Workspace() {
               canEdit={isCreator || request.requester_user_id === user?.id}
               variant="header"
               prefix={
-                request.is_project_workspace && (request as any).chapter_order
-                  ? `Ch. ${(request as any).chapter_order}.`
-                  : undefined
+                chapterPosition ? `Ch. ${chapterPosition}.` : undefined
               }
               onSaved={(t) => setRequest((prev) => (prev ? { ...prev, message: t } : prev))}
             />

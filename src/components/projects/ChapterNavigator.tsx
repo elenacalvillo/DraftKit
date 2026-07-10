@@ -36,13 +36,15 @@ export function ChapterNavigator({
   const { chapters, isLoading } = useProjectChapters(projectId);
   const [open, setOpen] = useState(false);
 
-  const { currentIdx, prev, next, current } = useMemo(() => {
+  const { currentIdx, prev, next, prevPos, nextPos } = useMemo(() => {
     const idx = chapters.findIndex((c) => c.id === currentChapterId);
     return {
       currentIdx: idx,
       current: idx >= 0 ? chapters[idx] : null,
       prev: idx > 0 ? chapters[idx - 1] : null,
       next: idx >= 0 && idx < chapters.length - 1 ? chapters[idx + 1] : null,
+      prevPos: idx > 0 ? idx : null,
+      nextPos: idx >= 0 && idx < chapters.length - 1 ? idx + 2 : null,
     };
   }, [chapters, currentChapterId]);
 
@@ -96,7 +98,7 @@ export function ChapterNavigator({
           </TooltipTrigger>
           {prev && (
             <TooltipContent side="bottom">
-              Previous: {prev.chapter_order ?? "?"}. {prev.message}
+              Previous: {prevPos}. {prev.message}
             </TooltipContent>
           )}
         </Tooltip>
@@ -133,7 +135,7 @@ export function ChapterNavigator({
                   )}
                 >
                   <span className="text-xs text-muted-foreground w-6 shrink-0 tabular-nums">
-                    {c.chapter_order ?? i + 1}.
+                    {i + 1}.
                   </span>
                   <span className="truncate flex-1 min-w-0">
                     {c.message || "Untitled"}
@@ -165,7 +167,7 @@ export function ChapterNavigator({
           </TooltipTrigger>
           {next && (
             <TooltipContent side="bottom">
-              Next: {next.chapter_order ?? "?"}. {next.message}
+              Next: {nextPos}. {next.message}
             </TooltipContent>
           )}
         </Tooltip>
