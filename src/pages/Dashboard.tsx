@@ -168,11 +168,15 @@ export default function Dashboard() {
 
   const pendingCount = requests.filter((r) => r.status === "pending").length;
 
-  // Ship Rate: published / (non-pending, non-cancelled)
-  const eligibleRequests = requests.filter((r) => r.status !== "pending" && r.status !== "cancelled");
+  // Ship Rate: published / closed loops (published + declined + cancelled)
+  // In-progress (pending, approved, etc.) is excluded so a healthy pipeline
+  // doesn't tank the number.
+  const closedRequests = requests.filter(
+    (r) => r.status === "published" || r.status === "declined" || r.status === "cancelled",
+  );
   const publishedRequests = requests.filter((r) => r.status === "published");
   const shipRate =
-    eligibleRequests.length > 0 ? Math.round((publishedRequests.length / eligibleRequests.length) * 100) : null;
+    closedRequests.length > 0 ? Math.round((publishedRequests.length / closedRequests.length) * 100) : null;
   const shipRateDisplay = shipRate === null ? "—" : `${shipRate}%`;
 
   // Published Collabs: unique requester_substack_url from published requests
@@ -196,15 +200,16 @@ export default function Dashboard() {
       icon: TrendingUp,
       label: "Ship Rate",
       legendId: "ship_rate" as const,
-      subLabel: "Requests turned into published work",
+      subLabel: "Share of finished collabs you published",
       value: shipRateDisplay,
       isEmpty: shipRate === null || shipRate === 0,
-      emptyTip: "Approve and publish your first collab to track your closing rate",
+      emptyTip: "Publish or close your first collab to start tracking your ship rate",
       iconClassName: "text-primary",
       bgClassName: "bg-primary/10",
       iconStyle: undefined as React.CSSProperties | undefined,
       bgStyle: undefined as React.CSSProperties | undefined,
     },
+
     {
       icon: Globe,
       label: "Published Collabs",
