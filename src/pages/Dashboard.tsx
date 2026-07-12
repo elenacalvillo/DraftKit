@@ -20,6 +20,7 @@ import { SharedWorkspaceCard } from "@/components/requests/SharedWorkspaceCard";
 import { useAuth } from "@/hooks/useAuth";
 import { usePro } from "@/hooks/usePro";
 import { useCollaboratorWorkspaces } from "@/hooks/useCollaboratorWorkspaces";
+import { useMyWorkspaces } from "@/hooks/useMyWorkspaces";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import type { Json } from "@/integrations/supabase/types";
@@ -50,6 +51,7 @@ export default function Dashboard() {
   const { user, creator, loading } = useAuth();
   const { isPro, canHostMore } = usePro();
   const { workspaces: sharedWorkspaces, isLoading: sharedWorkspacesLoading } = useCollaboratorWorkspaces();
+  const { workspaces: allWorkspaces } = useMyWorkspaces();
   const { trackEvent } = useAnalytics();
   const [availability, setAvailability] = useState<string[]>([]);
   const [requests, setRequests] = useState<CollabRequest[]>([]);
@@ -75,12 +77,11 @@ export default function Dashboard() {
     const highlightId = searchParams.get("highlight");
 
     if (openTarget === "requests") {
-      // Build the target URL with highlight param if present
+      // Legacy deep-link support: emails still point to /dashboard/requests.
+      // Send them to the unified Collaborations hub.
       const targetUrl = highlightId
-        ? `/dashboard/requests?highlight=${encodeURIComponent(highlightId)}`
-        : "/dashboard/requests";
-
-      // Use replace to avoid back-button confusion
+        ? `/dashboard/collaborations?highlight=${encodeURIComponent(highlightId)}`
+        : "/dashboard/collaborations";
       navigate(targetUrl, { replace: true });
       return;
     }
