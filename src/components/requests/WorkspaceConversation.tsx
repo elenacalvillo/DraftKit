@@ -6,10 +6,18 @@ import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { useAuth } from "@/hooks/useAuth";
 
+interface Participant {
+  email?: string | null;
+  display_name: string;
+}
+
 interface WorkspaceConversationProps {
   requestId: string;
+  /** Legacy fallback used only when a message row is missing sender_email. */
   currentUserIsCreator: boolean;
   refreshKey?: number;
+  /** Known workspace participants for resolving sender display names. */
+  participants?: Participant[];
 }
 
 interface Message {
@@ -24,13 +32,12 @@ function WorkspaceConversationInner({
   requestId,
   currentUserIsCreator,
   refreshKey = 0,
+  participants = [],
 }: WorkspaceConversationProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const { user, loading: authLoading } = useAuth();
 
   const { data: messages = [], isLoading } = useQuery({
-    // Include user.id in the key so the query refetches once auth resolves —
-    // prevents serving a stale empty array fetched before the JWT was attached.
     queryKey: ["workspace-messages", requestId, user?.id, refreshKey],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -42,8 +49,6 @@ function WorkspaceConversationInner({
       if (error) throw error;
       return (data || []) as Message[];
     },
-    // Only run once we have an authenticated session. Without this gate the
-    // query can fire as `anon`, RLS evaluates auth.uid()=NULL, and returns [].
     enabled: !!user && !!requestId && !authLoading,
   });
 
@@ -77,12 +82,26 @@ function WorkspaceConversationInner({
     );
   }
 
+  const currentEmail = user?.email?.toLowerCase() || null;
+  const participantMap = new Map<string, string>();
+  for (const p of participants) {
+    if (p.email) participantMap.set(p.email.toLowerCase(), p.display_name);
+  }
+
   return (
     <div className="space-y-3 overflow-y-auto max-h-[320px] pr-1 scrollbar-thin">
       {messages.map((msg) => {
-        const isMe =
-          (currentUserIsCreator && msg.sender_type === "creator") ||
-          (!currentUserIsCreator && msg.sender_type === "requester");
+        const senderEmail = msg.sender_email?.toLowerCase() || null;
+        // Identity-first: match sender_email to the current user. Fall back
+        // to the legacy sender_type flag only if the row has no email.
+        const isMe = senderEmail
+          ? senderEmail === currentEmail
+          : (currentUserIsCreator && msg.sender_type === "creator") ||
+            (!currentUserIsCreator && msg.sender_type === "requester");
+
+        const senderName =
+          (senderEmail && participantMap.get(senderEmail)) ||
+          (msg.sender_type === "creator" ? "Host" : "Partner");
 
         const timeAgo = msg.created_at
           ? formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })
@@ -91,7 +110,7 @@ function WorkspaceConversationInner({
         return (
           <div key={msg.id} className="flex flex-col gap-0.5">
             <span className="text-[10px] text-muted-foreground font-medium px-1">
-              {isMe ? "You" : "Partner"} · {timeAgo}
+              {isMe ? "You" : senderName} · {timeAgo}
             </span>
             <div
               className={cn(
@@ -111,9 +130,6 @@ function WorkspaceConversationInner({
   );
 }
 
-// Memoized export — keeps the conversation panel from re-rendering on every
-// editor keystroke / parent state change. The query inside is already gated by
-// `enabled: !!user` so it won't fire as anon, but memo eliminates the wasted
-// React render cycles that were amplifying the storm.
 export const WorkspaceConversation = memo(WorkspaceConversationInner);
+
 
