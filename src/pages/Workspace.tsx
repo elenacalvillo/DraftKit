@@ -1295,6 +1295,15 @@ export default function Workspace() {
                 requestId={request.id}
                 currentUserIsCreator={isCreator}
                 refreshKey={msgRefreshKey}
+                participants={[
+                  ...(creatorInfo?.name
+                    ? [{ email: (creatorInfo as any)?.email as string | undefined, display_name: creatorInfo.name }]
+                    : []),
+                  ...(!isSolo && request.requester_email
+                    ? [{ email: request.requester_email, display_name: request.requester_name || "Guest" }]
+                    : []),
+                  ...visibleCollaborators.map((c) => ({ email: c.email, display_name: c.display_name })),
+                ]}
               />
             </div>
           </motion.div>
