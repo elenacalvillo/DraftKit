@@ -213,11 +213,12 @@ serve(async (req: Request): Promise<Response> => {
       }
 
       const retroUrl = `${baseUrl}/retro/${request.id}`;
+      const workspaceUrl = `${baseUrl}/dashboard/workspace/${request.id}`;
 
       // Send to requester
       if (requesterEmail) {
         try {
-          const html = buildRetrospectiveEmail(requesterName, creatorName, formattedDate, retroUrl);
+          const html = buildRetrospectiveEmail(requesterName, creatorName, formattedDate, retroUrl, workspaceUrl);
           const result = await sendEmail([requesterEmail], `🎉 How did your collaboration with ${creatorName} go?`, html);
 
           await supabase.from("email_events").insert({
@@ -236,7 +237,7 @@ serve(async (req: Request): Promise<Response> => {
       // Send to creator
       if (creatorEmail) {
         try {
-          const html = buildRetrospectiveEmail(creatorName, requesterName, formattedDate, retroUrl);
+          const html = buildRetrospectiveEmail(creatorName, requesterName, formattedDate, retroUrl, workspaceUrl);
           const result = await sendEmail([creatorEmail], `🎉 How did your collaboration with ${requesterName} go?`, html);
 
           await supabase.from("email_events").insert({
