@@ -339,10 +339,21 @@ serve(async (req: Request): Promise<Response> => {
     const baseUrl = Deno.env.get("SITE_URL") || "https://draftkit.app";
     const bookingUrl = `${baseUrl}/${creatorUsername}`;
     
-    // Helper to build safe deep-link URLs that work around server-side routing
-    // Uses /dashboard?open=requests&highlight=... format which the client then redirects
-    const buildDashboardRequestLink = (reqId: string) =>
-      `${baseUrl}/dashboard?open=requests&highlight=${encodeURIComponent(reqId)}`;
+    // Deep-link helpers — always land users on the exact workspace, or on
+    // the correct tab of the unified Collaborations hub as a fallback.
+    const workspaceUrl = (reqId: string) =>
+      `${baseUrl}/dashboard/workspace/${encodeURIComponent(reqId)}`;
+    const collabHubUrl = (
+      tab: "needs_response" | "active" | "published" | "archived",
+      reqId?: string,
+    ) =>
+      `${baseUrl}/dashboard/collaborations?tab=${tab}${
+        reqId ? `&highlight=${encodeURIComponent(reqId)}` : ""
+      }`;
+    // Signup with a next= redirect so invited/pre-auth users land on the
+    // right workspace after creating their account.
+    const signupWithNext = (nextPath: string) =>
+      `${baseUrl}/signup?next=${encodeURIComponent(nextPath)}`;
 
     let emailSubject = "";
     let emailHtml = "";
