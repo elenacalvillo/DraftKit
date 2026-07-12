@@ -52,7 +52,8 @@
     --glass-border: hsl(35 18% 88% / 0.5);
     --glass-shadow: 0 8px 32px hsl(8 30% 30% / 0.1);
 
-    --available: 168 45% 32% --booked: 8 65% 65%;
+    --available: 168 45% 32%;
+    --booked: 8 65% 65%;
     --blocked: 35 10% 70%;
 
     --sidebar-background: 0 0% 100%;
