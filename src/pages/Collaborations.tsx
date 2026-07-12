@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import { ArrowLeft, BookMarked, Inbox, PenLine, Send, Users, Sparkles } from "lucide-react";
@@ -55,16 +55,24 @@ function activityLine(w: MyWorkspace): string {
   return `Created ${formatDistanceToNow(new Date(w.created_at), { addSuffix: true })}`;
 }
 
-function WorkspaceRow({ w }: { w: MyWorkspace }) {
+function WorkspaceRow({ w, highlighted }: { w: MyWorkspace; highlighted?: boolean }) {
   const navigate = useNavigate();
+  const ref = useRef<HTMLDivElement | null>(null);
   const avatarUrl = w.role_in_workspace === "host"
     ? w.requester_profile_image_url
     : w.host_profile_image_url;
   const avatarFallback = (w.role_in_workspace === "host" ? w.requester_name : w.host_name)?.charAt(0) || "?";
   const title = workspaceTitle(w);
 
+  useEffect(() => {
+    if (highlighted && ref.current) {
+      ref.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [highlighted]);
+
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card ref={ref} className={cn("hover:shadow-md transition-shadow", highlighted && "ring-2 ring-primary")}>
+
       <CardContent className="flex items-center gap-4 py-4">
         <Avatar className="h-11 w-11">
           <AvatarImage src={avatarUrl ? sanitizeSubstackImageUrl(avatarUrl) : undefined} />
