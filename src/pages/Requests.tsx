@@ -412,6 +412,7 @@ export default function Requests() {
     { value: "declined", label: "Declined", count: requests.filter((r) => r.status === "declined").length },
     { value: "cancelled", label: "Cancelled", count: requests.filter((r) => r.status === "cancelled").length },
   ];
+  const hasVisibleSharedWorkspaces = sharedWorkspaces.length > 0 && resolvedTab === "all";
 
   if (loading || (!creator && sharedWorkspacesLoading)) {
     return (
@@ -555,7 +556,7 @@ export default function Requests() {
         </motion.div>
 
         {/* Request cards */}
-        {sharedWorkspaces.length > 0 && resolvedTab === "all" && (
+        {hasVisibleSharedWorkspaces && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -575,7 +576,7 @@ export default function Requests() {
 
         {/* Request cards */}
         <AnimatePresence mode="popLayout">
-          {mappedRequests.length === 0 ? (
+          {mappedRequests.length === 0 && !hasVisibleSharedWorkspaces ? (
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}

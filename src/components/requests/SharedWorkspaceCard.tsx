@@ -30,9 +30,8 @@ export function SharedWorkspaceCard({ workspace, compact = false }: SharedWorksp
       ? `Joined ${formatDistanceToNow(new Date(workspace.joined_at), { addSuffix: true })}`
       : "Invited collaborator";
 
-  return (
-    <Card className="hover:shadow-md transition-shadow">
-      <CardContent className={compact ? "flex items-center gap-3 py-3" : "flex items-center gap-4 py-4"}>
+  const content = (
+    <CardContent className={compact ? "flex items-center gap-3 p-3" : "flex items-center gap-4 py-4"}>
         <Avatar className={compact ? "h-10 w-10" : "h-11 w-11"}>
           <AvatarImage
             src={
@@ -64,7 +63,16 @@ export function SharedWorkspaceCard({ workspace, compact = false }: SharedWorksp
             Open Workspace
           </Button>
         )}
-      </CardContent>
+    </CardContent>
+  );
+
+  if (compact) {
+    return <div className="rounded-xl hover:bg-muted/50 transition-colors">{content}</div>;
+  }
+
+  return (
+    <Card className="hover:shadow-md transition-shadow">
+      {content}
     </Card>
   );
 }
