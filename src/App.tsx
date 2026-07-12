@@ -17,12 +17,12 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Availability from "./pages/Availability";
-import Requests from "./pages/Requests";
+
 import Settings from "./pages/Settings";
 import PublicBooking from "./pages/PublicBooking";
 import Demo from "./pages/Demo";
 import AdminAnalytics from "./pages/AdminAnalytics";
-import MyRequests from "./pages/MyRequests";
+
 import Transparency from "./pages/Transparency";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import NotFound from "./pages/NotFound";
