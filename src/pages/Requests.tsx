@@ -5,12 +5,14 @@ import { Inbox, ArrowLeft, Compass } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { RequestCard } from "@/components/requests/RequestCard";
+import { SharedWorkspaceCard } from "@/components/requests/SharedWorkspaceCard";
 import { CollabDraft } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { usePro } from "@/hooks/usePro";
 import { useActiveCollabs } from "@/hooks/useActiveCollabs";
+import { useCollaboratorWorkspaces } from "@/hooks/useCollaboratorWorkspaces";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -45,6 +47,7 @@ export default function Requests() {
   const { trackEvent } = useAnalytics();
   const { isPro } = usePro();
   const { activeCount, canApprove, refetch: refetchActiveCollabs } = useActiveCollabs();
+  const { workspaces: sharedWorkspaces, isLoading: sharedWorkspacesLoading } = useCollaboratorWorkspaces();
   const [requests, setRequests] = useState<DbCollabRequest[]>([]);
   const [activeTab, setActiveTab] = useState<FilterTab | null>(null);
   const [tabInitialized, setTabInitialized] = useState(false);
@@ -409,8 +412,9 @@ export default function Requests() {
     { value: "declined", label: "Declined", count: requests.filter((r) => r.status === "declined").length },
     { value: "cancelled", label: "Cancelled", count: requests.filter((r) => r.status === "cancelled").length },
   ];
+  const hasVisibleSharedWorkspaces = sharedWorkspaces.length > 0 && resolvedTab === "all";
 
-  if (!creator) {
+  if (loading || (!creator && sharedWorkspacesLoading)) {
     return (
       <DashboardLayout>
         <div className="max-w-4xl mx-auto space-y-6 animate-pulse">
@@ -422,6 +426,43 @@ export default function Requests() {
               <div key={i} className="h-40 bg-muted rounded-xl" />
             ))}
           </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!creator) {
+    return (
+      <DashboardLayout>
+        <div className="max-w-4xl mx-auto space-y-6">
+          <Link
+            to="/dashboard"
+            className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to Dashboard</span>
+          </Link>
+
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Your Collabs</h1>
+            <p className="text-muted-foreground">Workspaces you've been invited to collaborate on</p>
+          </div>
+
+          {sharedWorkspaces.length === 0 ? (
+            <div className="glass-card p-16 text-center">
+              <Inbox className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold mb-2">No collabs yet</h3>
+              <p className="text-muted-foreground max-w-sm mx-auto">
+                When someone invites you to a workspace, it will appear here.
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {sharedWorkspaces.map((workspace) => (
+                <SharedWorkspaceCard key={workspace.request_id} workspace={workspace} />
+              ))}
+            </div>
+          )}
         </div>
       </DashboardLayout>
     );
@@ -515,8 +556,27 @@ export default function Requests() {
         </motion.div>
 
         {/* Request cards */}
+        {hasVisibleSharedWorkspaces && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8 space-y-3"
+          >
+            <div>
+              <h2 className="text-xl font-semibold">Shared with me</h2>
+              <p className="text-sm text-muted-foreground">Project chapters and workspaces you've been invited into</p>
+            </div>
+            <div className="grid gap-3">
+              {sharedWorkspaces.map((workspace) => (
+                <SharedWorkspaceCard key={workspace.request_id} workspace={workspace} />
+              ))}
+            </div>
+          </motion.div>
+        )}
+
+        {/* Request cards */}
         <AnimatePresence mode="popLayout">
-          {mappedRequests.length === 0 ? (
+          {mappedRequests.length === 0 && !hasVisibleSharedWorkspaces ? (
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}

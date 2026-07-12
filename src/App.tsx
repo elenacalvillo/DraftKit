@@ -76,9 +76,9 @@ const App = () => (
             <Route path="/refund-policy" element={<RefundPolicy />} />
             <Route path="/demo" element={<Demo />} />
             <Route path="/api/v1/agent-info" element={<AgentInfo />} />
-            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/dashboard" element={<ProtectedRoute requireCreator={false}><Dashboard /></ProtectedRoute>} />
             <Route path="/dashboard/availability" element={<ProtectedRoute><Availability /></ProtectedRoute>} />
-            <Route path="/dashboard/requests" element={<ProtectedRoute><Requests /></ProtectedRoute>} />
+            <Route path="/dashboard/requests" element={<ProtectedRoute requireCreator={false}><Requests /></ProtectedRoute>} />
             <Route path="/dashboard/my-requests" element={<ProtectedRoute requireCreator={false}><MyRequests /></ProtectedRoute>} />
             <Route path="/dashboard/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="/dashboard/subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />

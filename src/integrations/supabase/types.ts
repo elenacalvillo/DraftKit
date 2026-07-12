@@ -1131,6 +1131,25 @@ export type Database = {
         Args: { _request_id: string; _user_id: string }
         Returns: boolean
       }
+      list_my_collaborator_workspaces: {
+        Args: never
+        Returns: {
+          chapter_order: number
+          chapter_title: string
+          content_last_edited_at: string
+          content_last_edited_by: string
+          host_name: string
+          host_profile_image_url: string
+          host_username: string
+          is_project_workspace: boolean
+          joined_at: string
+          project_id: string
+          project_title: string
+          request_id: string
+          role: string
+          status: string
+        }[]
+      }
       normalize_email: { Args: { _email: string }; Returns: string }
       save_workspace_content: {
         Args: {

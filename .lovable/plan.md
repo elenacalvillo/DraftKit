@@ -1,56 +1,33 @@
-## Problem
+## What is happening
 
-On book-project chapter workspaces the room is created as *solo* (`creator_id === requester_user_id`, both = Karen). The UI still treats `requester_*` as "the partner", so Karen sees herself in three places:
+Blessing is not seeing Karen's chapter because book project chapter invitations live in `workspace_collaborators`, while the normal Collabs page only lists classic incoming collab rows. The app already added a small `Shared with me` area under Proposals, but that is easy to miss and likely not where Blessing is looking. There is also a risk that a logged-in invited user without a creator profile gets pushed through signup/profile completion instead of landing on the workspace list.
 
-1. **Writer's Room sidebar** — Owner row + a duplicate row (from the collaborators list rendering Karen's own auth entry, or requester fallback) instead of Blessing.
-2. **Conversation feed** — her own messages are labeled "Partner" because the label is derived from `sender_type` (`creator` vs `requester`) rather than the actual sender.
-3. **Send Message modal + success toast** — title/toast pull `request.requester_name` (Karen's brand), not the invited collaborator's name.
+## Plan
 
-The backend fanout was already fixed last turn — emails do reach Blessing — but the frontend copy lies.
+1. **Make invited chapter workspaces visible where users expect them**
+   - Add invited `workspace_collaborators` rows to the Collabs experience for non-host collaborators.
+   - Show book chapter workspaces as normal actionable cards, with a clear `Project` or `Chapter` badge and an `Open Workspace` button.
+   - Keep host-owned project chapters out of the classic Collabs list so Karen's host view stays clean.
 
-## Fix
+2. **Keep the Proposals fallback, but make it clearer**
+   - Keep `Shared with me`, since it already helps collaborator-only users.
+   - Improve the label/copy so it reads as invited workspaces, not sent proposals.
+   - Ensure project chapter rows show the host/project context and direct workspace link.
 
-### 1. `src/components/requests/WorkspaceConversation.tsx`
-Replace the `currentUserIsCreator` + `sender_type` heuristic with an identity check.
+3. **Fix auth routing for invited collaborators**
+   - Allow `/dashboard/requests`, `/dashboard/my-requests`, and `/dashboard/workspace/:id` to be valid post-login destinations for invited collaborators who may not have a creator profile.
+   - Prevent the app from forcing them into creator onboarding when they are just trying to access an invited chapter.
 
-- Accept `currentUserEmail` (already indirectly available via `useAuth`).
-- Compute `isMe = msg.sender_email?.toLowerCase() === user.email?.toLowerCase()`.
-- Keep `currentUserIsCreator` as fallback only when `sender_email` is missing on legacy rows.
-- Label: `isMe ? "You" : senderDisplayName ?? "Partner"`. Resolve `senderDisplayName` by matching `sender_email` against the creator email, requester email, or a passed-in collaborator map (small prop `participantsByEmail`).
+4. **Use backend access safely**
+   - Do not broaden public access.
+   - Fetch only the collaborator's own invitation rows and workspace rows they already have access to.
+   - Preserve the existing workspace access helper as the source of truth.
 
-### 2. `src/pages/Workspace.tsx` — Writer's Room sidebar
-- Compute an `effectiveIsSolo` flag using `isEffectivelySolo` from `src/lib/workspace-participants.ts` (already exists) so project/chapter rooms collapse to a single Owner row.
-- Owner row: append a `"You"` badge when `user.id === request.creator_id`.
-- Filter the `collaborators.map` to drop any entry whose `user_id === request.creator_id` OR whose email matches the creator email — that removes the duplicate "Me/Joined" row that shows on solo rooms where the host also appears as a collaborator.
-- For each remaining collaborator row, when `c.user_id === user.id` show a `"You"` badge; otherwise leave the existing display name (Blessing) untouched.
-- Pass the enriched `collaborators` list down to `WorkspaceConversation` as `participantsByEmail` so bubbles above Blessing's messages read "Blessing" instead of "Partner".
+5. **Validate the flow**
+   - Check the logged-in collaborator route behavior.
+   - Confirm an invited project chapter appears from the Collabs page and opens the correct workspace.
 
-### 3. Send Message modal + toast
-Pick the *right* recipient name on solo/project rooms.
+## Technical notes
 
-- In `Workspace.tsx`, derive `messageRecipientName`:
-  - If `effectiveIsSolo` and at least one collaborator exists → first collaborator's `display_name`.
-  - Else → `request.requester_name` (existing behavior for classic 2-party collabs).
-- Pass this into `SendMessageModal` as a renamed prop `recipientName` (keep `requesterEmail` for legacy fanout, but the email arg is no longer used for routing since the edge function fans out server-side).
-- Update `SendMessageModal.tsx`:
-  - Rename `requesterName` → `recipientName` in the interface (single call site, safe rename).
-  - Modal title: `Message {recipientName}`.
-  - Success toast: `Message sent to {recipientName}!`.
-- `GuestMessageModal.tsx` already uses `creatorName` correctly for the non-host side — no change needed there beyond confirming the title source.
-
-### 4. Guest-side symmetry (Blessing's view)
-When Blessing opens the chapter as a collaborator, `isGuestView` is true and `GuestMessageModal` shows `creatorName={creatorInfo?.name}` — that's Karen's brand, which is correct for her. No change.
-
-## Out of scope
-- Backend recipient fanout (already fixed).
-- Renaming `sender_type` values in the DB — we treat them as legacy and rely on `sender_email` for identity.
-
-## Files touched
-- `src/pages/Workspace.tsx` (sidebar filtering, recipient name derivation, prop wiring)
-- `src/components/requests/WorkspaceConversation.tsx` (identity-based labels, participants map)
-- `src/components/requests/SendMessageModal.tsx` (prop rename, title/toast copy)
-
-## Verification
-- Solo project chapter as host with 1 invited collab: sidebar shows Owner (You) + Blessing; modal title "Message Blessing"; toast "Message sent to Blessing"; own bubbles read "You", Blessing's read "Blessing".
-- Classic 2-party collab (non-solo): no visible change — still "Message {requester_name}", "You" / "{requester_name}" bubbles.
-- Blessing's guest view: modal still says "Message {Karen's brand}", her own bubbles read "You".
+- Likely files: `src/pages/Requests.tsx`, `src/pages/MyRequests.tsx`, `src/pages/Login.tsx`, possibly `src/components/requests/RequestCard.tsx` if the card cannot represent invited workspace rows cleanly.
+- Backend migration is only needed if the current row-level rules block a collaborator from reading the minimal workspace metadata needed for their own invitation list. If needed, it will stay narrow and authenticated only.

@@ -16,8 +16,10 @@ import {
 import { toast } from "sonner";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { CollabCalendar } from "@/components/calendar/CollabCalendar";
+import { SharedWorkspaceCard } from "@/components/requests/SharedWorkspaceCard";
 import { useAuth } from "@/hooks/useAuth";
 import { usePro } from "@/hooks/usePro";
+import { useCollaboratorWorkspaces } from "@/hooks/useCollaboratorWorkspaces";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import type { Json } from "@/integrations/supabase/types";
@@ -47,6 +49,7 @@ export default function Dashboard() {
   const [searchParams] = useSearchParams();
   const { user, creator, loading } = useAuth();
   const { isPro, canHostMore } = usePro();
+  const { workspaces: sharedWorkspaces, isLoading: sharedWorkspacesLoading } = useCollaboratorWorkspaces();
   const { trackEvent } = useAnalytics();
   const [availability, setAvailability] = useState<string[]>([]);
   const [requests, setRequests] = useState<CollabRequest[]>([]);
@@ -238,7 +241,7 @@ export default function Dashboard() {
     },
   ];
 
-  if (!creator) {
+  if (loading || (!creator && sharedWorkspacesLoading)) {
     return (
       <DashboardLayout>
         <div className="max-w-6xl mx-auto space-y-6 animate-pulse">
@@ -250,6 +253,35 @@ export default function Dashboard() {
             ))}
           </div>
           <div className="h-96 bg-muted rounded-xl mt-6" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!creator) {
+    return (
+      <DashboardLayout>
+        <div className="max-w-4xl mx-auto space-y-6">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Your Collabs</h1>
+            <p className="text-muted-foreground">Workspaces you've been invited to collaborate on</p>
+          </div>
+
+          {sharedWorkspaces.length === 0 ? (
+            <div className="glass-card p-12 text-center">
+              <MessageSquare className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+              <p className="text-muted-foreground">No collabs yet</p>
+              <p className="text-sm text-muted-foreground/70 mt-1">
+                Invited project chapters and workspaces will appear here.
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {sharedWorkspaces.map((workspace) => (
+                <SharedWorkspaceCard key={workspace.request_id} workspace={workspace} />
+              ))}
+            </div>
+          )}
         </div>
       </DashboardLayout>
     );
@@ -520,14 +552,15 @@ export default function Dashboard() {
             </div>
 
             <div className="glass-card p-4 space-y-4">
-              {requests.length === 0 ? (
+              {requests.length === 0 && sharedWorkspaces.length === 0 ? (
                 <div className="text-center py-10">
                   <MessageSquare className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
                   <p className="text-muted-foreground">No collabs yet</p>
                   <p className="text-sm text-muted-foreground/70 mt-1">Share your link to start receiving proposals</p>
                 </div>
               ) : (
-                [...requests]
+                <>
+                {[...requests]
                   .sort((a, b) => {
                     const priority = (s: string) => (s === "pending" ? 0 : s === "approved" ? 1 : 2);
                     const pa = priority(a.status);
@@ -578,7 +611,11 @@ export default function Dashboard() {
                         </span>
                       </motion.div>
                     );
-                  })
+                  })}
+                  {sharedWorkspaces.slice(0, Math.max(0, 5 - requests.length)).map((workspace) => (
+                    <SharedWorkspaceCard key={workspace.request_id} workspace={workspace} compact />
+                  ))}
+                </>
               )}
             </div>
           </motion.div>

@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { GuestMessageModal } from '@/components/requests/GuestMessageModal';
 import { CollabImpactCard } from '@/components/requests/CollabImpactCard';
+import { SharedWorkspaceCard } from '@/components/requests/SharedWorkspaceCard';
 
 interface SentRequest {
   id: string;
@@ -71,6 +72,9 @@ interface SharedWorkspace {
   status: string;
   is_project_workspace: boolean;
   project_id: string | null;
+  project_title: string | null;
+  chapter_title: string | null;
+  chapter_order: number | null;
   content_last_edited_at: string | null;
   content_last_edited_by: string | null;
   host_name: string | null;
@@ -100,58 +104,14 @@ export default function MyRequests() {
   const fetchSharedWorkspaces = async () => {
     if (!user) return;
     try {
-      const { data, error } = await supabase
-        .from('workspace_collaborators')
-        .select('request_id, role, joined_at')
-        .eq('user_id', user.id)
-        .order('joined_at', { ascending: false });
+      const { data, error } = await supabase.rpc('list_my_collaborator_workspaces');
 
       if (error) throw error;
       if (!data || data.length === 0) {
         setSharedWorkspaces([]);
         return;
       }
-
-      const ids = data.map((r) => r.request_id);
-      const { data: reqs } = await supabase
-        .from('collab_requests')
-        .select('id, creator_id, status, is_project_workspace, project_id, content_last_edited_at, content_last_edited_by, requester_user_id')
-        .in('id', ids);
-
-      const byId = new Map((reqs || []).map((r) => [r.id, r]));
-
-      const creatorIds = Array.from(new Set((reqs || []).map((r) => r.creator_id)));
-      const { data: hosts } = await supabase
-        .from('public_creator_profiles')
-        .select('id, name, username, profile_image_url')
-        .in('id', creatorIds);
-      const hostById = new Map((hosts || []).map((h) => [h.id, h]));
-
-      const rows: SharedWorkspace[] = data
-        .map((wc) => {
-          const req = byId.get(wc.request_id);
-          if (!req) return null;
-          if (req.status === 'cancelled' || req.status === 'declined') return null;
-          // If user is already the requester, they'll see it in the proposals list
-          if (req.requester_user_id === user.id) return null;
-          const host = hostById.get(req.creator_id);
-          return {
-            request_id: wc.request_id,
-            role: wc.role,
-            joined_at: wc.joined_at,
-            status: req.status,
-            is_project_workspace: req.is_project_workspace,
-            project_id: req.project_id,
-            content_last_edited_at: req.content_last_edited_at,
-            content_last_edited_by: req.content_last_edited_by,
-            host_name: host?.name ?? null,
-            host_username: host?.username ?? null,
-            host_profile_image_url: host?.profile_image_url ?? null,
-          } as SharedWorkspace;
-        })
-        .filter((r): r is SharedWorkspace => r !== null);
-
-      setSharedWorkspaces(rows);
+      setSharedWorkspaces(data as SharedWorkspace[]);
     } catch (err) {
       console.error('Error fetching shared workspaces:', err);
     }
@@ -568,43 +528,7 @@ export default function MyRequests() {
             </div>
             <div className="grid gap-3">
               {sharedWorkspaces.map((w) => (
-                <Card key={w.request_id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="flex items-center gap-4 py-4">
-                    <Avatar className="h-11 w-11">
-                      <AvatarImage
-                        src={w.host_profile_image_url ? sanitizeSubstackImageUrl(w.host_profile_image_url) : undefined}
-                      />
-                      <AvatarFallback>{w.host_name?.charAt(0) || '?'}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-medium truncate">
-                          {w.host_name || 'Workspace host'}
-                        </p>
-                        <Badge variant="outline" className="capitalize">
-                          {w.is_project_workspace ? 'Project' : (w.role || 'Collaborator')}
-                        </Badge>
-                        {w.status === 'published' && (
-                          <Badge variant="default">✨ Published</Badge>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {w.content_last_edited_at
-                          ? `Last edited ${formatDistanceToNow(new Date(w.content_last_edited_at), { addSuffix: true })}${w.content_last_edited_by ? ` by ${w.content_last_edited_by}` : ''}`
-                          : w.joined_at
-                            ? `Joined ${formatDistanceToNow(new Date(w.joined_at), { addSuffix: true })}`
-                            : 'Invited collaborator'}
-                      </p>
-                    </div>
-                    <Button
-                      size="sm"
-                      onClick={() => navigate(`/dashboard/workspace/${w.request_id}`)}
-                    >
-                      <PenLine className="h-4 w-4 mr-1" />
-                      Open
-                    </Button>
-                  </CardContent>
-                </Card>
+                <SharedWorkspaceCard key={w.request_id} workspace={w} />
               ))}
             </div>
           </div>
