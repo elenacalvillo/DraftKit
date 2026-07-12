@@ -42,8 +42,7 @@ const useIsDesktop = () => {
 const baseNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
   { icon: Calendar, label: "Availability", path: "/dashboard/availability" },
-  { icon: MessageSquare, label: "Collabs", path: "/dashboard/requests" },
-  { icon: Send, label: "Proposals", path: "/dashboard/my-requests" },
+  { icon: MessageSquare, label: "Collaborations", path: "/dashboard/collaborations" },
   { icon: Sparkles, label: "Network", path: "/dashboard/discovery" },
   { icon: Settings, label: "Settings", path: "/dashboard/settings" },
   { icon: Crown, label: "Membership", path: "/dashboard/subscription" },
@@ -64,13 +63,13 @@ export function DashboardLayout({ children, zenMode, zenTitle, zenBackPath }: Da
   const { isPro, isProject } = usePro();
   const isDesktop = useIsDesktop();
 
-  // Project tier users see a separate "Projects" entry above
-  // Settings — kept visually distinct from the newsletter Collabs.
+  // Project tier users see a separate "Projects" entry above Settings —
+  // premium umbrella for book-level outline & chapter management.
   const navItems = isProject
     ? [
-        ...baseNavItems.slice(0, 5),
+        ...baseNavItems.slice(0, 4),
         { icon: BookMarked, label: "Projects", path: "/dashboard/projects" },
-        ...baseNavItems.slice(5),
+        ...baseNavItems.slice(4),
       ]
     : baseNavItems;
 
