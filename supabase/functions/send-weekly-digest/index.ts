@@ -196,8 +196,8 @@ function buildEmailHtml(digest: DigestOutput): string {
               <table role="presentation" cellspacing="0" cellpadding="0" style="margin: 32px 0;">
                 <tr>
                   <td style="border-radius: 8px; background: linear-gradient(135deg, #d9826b 0%, #c9946d 100%);">
-                    <a href="https://draftkit.app/dashboard" target="_blank" style="display: inline-block; padding: 14px 32px; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px;">
-                      Open Your Writer's Room →
+                    <a href="https://draftkit.app/dashboard/collaborations" target="_blank" style="display: inline-block; padding: 14px 32px; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 16px;">
+                      Open Your Collaborations →
                     </a>
                   </td>
                 </tr>
