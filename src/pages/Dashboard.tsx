@@ -552,8 +552,8 @@ export default function Dashboard() {
               )}
             </div>
 
-            <div className="glass-card p-4 space-y-4">
-              {requests.length === 0 && sharedWorkspaces.length === 0 ? (
+            <div className="glass-card p-4 space-y-2">
+              {allWorkspaces.length === 0 ? (
                 <div className="text-center py-10">
                   <MessageSquare className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
                   <p className="text-muted-foreground">No collabs yet</p>
@@ -561,61 +561,75 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <>
-                {[...requests]
-                  .sort((a, b) => {
-                    const priority = (s: string) => (s === "pending" ? 0 : s === "approved" ? 1 : 2);
-                    const pa = priority(a.status);
-                    const pb = priority(b.status);
-                    if (pa !== pb) return pa - pb;
-                    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-                  })
-                  .slice(0, 5)
-                  .map((request) => {
-                    const targetTab =
-                      request.status === "pending" ? "pending" : request.status === "approved" ? "approved" : "";
-                    const targetUrl = targetTab ? `/dashboard/requests?tab=${targetTab}` : "/dashboard/requests";
-                    return (
-                      <motion.div
-                        key={request.id}
-                        whileHover={{ x: 4 }}
-                        className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors cursor-pointer"
-                        onClick={() => navigate(targetUrl)}
-                      >
-                        {request.requester_profile_image_url && !imageErrors.has(request.id) ? (
-                          <img
-                            src={sanitizeSubstackImageUrl(request.requester_profile_image_url)}
-                            alt={request.requester_name}
-                            className="w-10 h-10 rounded-full object-cover"
-                            onError={() => handleImageError(request.id)}
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center text-primary-foreground font-semibold text-sm">
-                            {request.requester_name.charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">{request.requester_name}</p>
-                          <p className="text-sm text-muted-foreground truncate">
-                            {request.requested_date ? parseDateString(request.requested_date)?.toLocaleDateString() : 'No date set'}
-                          </p>
-                        </div>
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs capitalize ${
-                            request.status === "pending"
-                              ? "bg-accent/10 text-accent"
-                              : request.status === "approved"
-                                ? "bg-success/10 text-success"
-                                : "bg-destructive/10 text-destructive"
-                          }`}
+                  {[...allWorkspaces]
+                    .sort((a, b) => {
+                      const priority = (s: string) => (s === "pending" ? 0 : s === "approved" ? 1 : 2);
+                      const pa = priority(a.status);
+                      const pb = priority(b.status);
+                      if (pa !== pb) return pa - pb;
+                      const at = new Date(a.content_last_edited_at || a.approved_at || a.created_at).getTime();
+                      const bt = new Date(b.content_last_edited_at || b.approved_at || b.created_at).getTime();
+                      return bt - at;
+                    })
+                    .slice(0, 6)
+                    .map((w) => {
+                      const displayName = w.is_project_workspace
+                        ? (w.message || "Untitled chapter")
+                        : w.role_in_workspace === "host"
+                          ? (w.requester_name || "Guest")
+                          : (w.host_name || "Creator");
+                      const sub = w.is_project_workspace
+                        ? [w.project_title, w.chapter_order ? `Ch. ${w.chapter_order}` : null].filter(Boolean).join(" · ")
+                        : w.requested_date
+                          ? parseDateString(w.requested_date)?.toLocaleDateString()
+                          : "No date set";
+                      const avatarUrl = w.role_in_workspace === "host"
+                        ? w.requester_profile_image_url
+                        : w.host_profile_image_url;
+                      return (
+                        <motion.div
+                          key={w.request_id}
+                          whileHover={{ x: 4 }}
+                          className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors cursor-pointer"
+                          onClick={() => navigate(`/dashboard/workspace/${w.request_id}`)}
                         >
-                          {request.status}
-                        </span>
-                      </motion.div>
-                    );
-                  })}
-                  {sharedWorkspaces.slice(0, Math.max(0, 5 - requests.length)).map((workspace) => (
-                    <SharedWorkspaceCard key={workspace.request_id} workspace={workspace} compact />
-                  ))}
+                          {avatarUrl && !imageErrors.has(w.request_id) ? (
+                            <img
+                              src={sanitizeSubstackImageUrl(avatarUrl)}
+                              alt={displayName}
+                              className="w-10 h-10 rounded-full object-cover"
+                              onError={() => handleImageError(w.request_id)}
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center text-primary-foreground font-semibold text-sm">
+                              {displayName.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">{displayName}</p>
+                            <p className="text-sm text-muted-foreground truncate">{sub}</p>
+                          </div>
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs capitalize ${
+                              w.status === "pending"
+                                ? "bg-accent/10 text-accent"
+                                : w.status === "approved"
+                                  ? "bg-success/10 text-success"
+                                  : w.status === "published"
+                                    ? "bg-primary/10 text-primary"
+                                    : "bg-muted text-muted-foreground"
+                            }`}
+                          >
+                            {w.is_project_workspace ? "Chapter" : w.status}
+                          </span>
+                        </motion.div>
+                      );
+                    })}
+                  <div className="pt-2 text-center">
+                    <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard/collaborations")}>
+                      View all collaborations
+                    </Button>
+                  </div>
                 </>
               )}
             </div>
