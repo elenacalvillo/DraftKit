@@ -69,7 +69,9 @@ export default function Login() {
     // stuck on the login screen waiting for one.
     const isWorkspaceOrGuestPath =
       !!from &&
-      (from.startsWith("/dashboard/workspace/") ||
+      (from === "/dashboard" ||
+        from.startsWith("/dashboard/requests") ||
+        from.startsWith("/dashboard/workspace/") ||
         from.startsWith("/dashboard/my-requests") ||
         from.startsWith("/retro/") ||
         from.startsWith("/view/"));
