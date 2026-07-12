@@ -392,9 +392,7 @@ export default function Workspace() {
 
   const backPath = request?.is_project_workspace && request?.project_id
     ? `/dashboard/projects/${request.project_id}`
-    : isCreator
-      ? "/dashboard/requests"
-      : "/dashboard/my-requests";
+    : "/dashboard/collaborations";
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return null;
@@ -1080,7 +1078,7 @@ export default function Workspace() {
                                     body: { type: "collab_cancelled", requestId: request.id },
                                   })
                                   .catch((err) => console.error("Failed to send cancellation email:", err));
-                                navigate(isCreator ? "/dashboard/requests" : "/dashboard/my-requests");
+                                navigate("/dashboard/collaborations");
                               }
                             } catch (err) {
                               console.error("Error on destructive action:", err);
