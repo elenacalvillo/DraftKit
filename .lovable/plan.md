@@ -1,51 +1,56 @@
-## Diagnosis
+## Problem
 
-Karen's book-project workspaces are created as **solo** requests: `creator_id === requester_user_id` (both are Karen). Blessing is attached via `workspace_collaborators`, not as the `requester`.
+On book-project chapter workspaces the room is created as *solo* (`creator_id === requester_user_id`, both = Karen). The UI still treats `requester_*` as "the partner", so Karen sees herself in three places:
 
-The messaging pipeline was built for the classic 2-party model (host ↔ guest) and never learned about `workspace_collaborators`:
+1. **Writer's Room sidebar** — Owner row + a duplicate row (from the collaborators list rendering Karen's own auth entry, or requester fallback) instead of Blessing.
+2. **Conversation feed** — her own messages are labeled "Partner" because the label is derived from `sender_type` (`creator` vs `requester`) rather than the actual sender.
+3. **Send Message modal + success toast** — title/toast pull `request.requester_name` (Karen's brand), not the invited collaborator's name.
 
-1. `SendMessageModal` (host view) writes the message with `sender_type='creator'`, then calls `send-collab-email` with `type: 'new_message'`.
-2. `send-collab-email` hard-codes the recipient for `new_message` to `request.requester_email` — which on a solo/project workspace **is Karen's own email**.
-3. Result: Karen sends → Karen receives. Blessing (the actual collaborator) is never notified. From Karen's inbox it looks "backwards" because every message she sends comes back to her.
-
-The same shape breaks the reverse path when Blessing (collaborator, not requester) sends: `GuestMessageModal` writes `sender_type='requester'`, and `new_message_from_guest` correctly emails the creator (Karen) — that half happens to work, but it is coincidental and would still fail on any workspace with multiple collaborators.
-
-The in-app conversation panel itself is fine — it decides "You vs Partner" from `sender_type`, so Karen sees her own messages as "You". The **bug is in recipient fan-out**, not in the UI.
+The backend fanout was already fixed last turn — emails do reach Blessing — but the frontend copy lies.
 
 ## Fix
 
-Make the messaging pipeline collaborator-aware. Route by workspace participants, not by the requester/creator pair.
+### 1. `src/components/requests/WorkspaceConversation.tsx`
+Replace the `currentUserIsCreator` + `sender_type` heuristic with an identity check.
 
-### 1. `supabase/functions/send-collab-email/index.ts`
+- Accept `currentUserEmail` (already indirectly available via `useAuth`).
+- Compute `isMe = msg.sender_email?.toLowerCase() === user.email?.toLowerCase()`.
+- Keep `currentUserIsCreator` as fallback only when `sender_email` is missing on legacy rows.
+- Label: `isMe ? "You" : senderDisplayName ?? "Partner"`. Resolve `senderDisplayName` by matching `sender_email` against the creator email, requester email, or a passed-in collaborator map (small prop `participantsByEmail`).
 
-For `new_message` and `new_message_from_guest`:
+### 2. `src/pages/Workspace.tsx` — Writer's Room sidebar
+- Compute an `effectiveIsSolo` flag using `isEffectivelySolo` from `src/lib/workspace-participants.ts` (already exists) so project/chapter rooms collapse to a single Owner row.
+- Owner row: append a `"You"` badge when `user.id === request.creator_id`.
+- Filter the `collaborators.map` to drop any entry whose `user_id === request.creator_id` OR whose email matches the creator email — that removes the duplicate "Me/Joined" row that shows on solo rooms where the host also appears as a collaborator.
+- For each remaining collaborator row, when `c.user_id === user.id` show a `"You"` badge; otherwise leave the existing display name (Blessing) untouched.
+- Pass the enriched `collaborators` list down to `WorkspaceConversation` as `participantsByEmail` so bubbles above Blessing's messages read "Blessing" instead of "Partner".
 
-- Load `workspace_collaborators` for the request (email + user_id → resolve email via `creators` / `auth.users` as we already do elsewhere).
-- Build the participant set: `creator_email`, `requester_email`, all collaborator emails.
-- Accept a new optional `senderEmail` in the request body (passed from the modals). If absent, fall back to today's behaviour so other call sites keep working.
-- Compute `recipients = unique(participants) - senderEmail`. If the sender is the creator on a solo workspace, this correctly drops Karen and keeps Blessing.
-- Send one email per recipient (loop `sendEmail([r], …)`) so each person gets a properly-addressed message and Resend logs stay clean. Keep the existing dedupe guard, but key it on `(request_id, type, to_email)` so fan-out isn't collapsed into a single "duplicate".
-- Subject/body stay the same; only the recipient list changes.
+### 3. Send Message modal + toast
+Pick the *right* recipient name on solo/project rooms.
 
-### 2. `src/components/requests/SendMessageModal.tsx` and `GuestMessageModal.tsx`
+- In `Workspace.tsx`, derive `messageRecipientName`:
+  - If `effectiveIsSolo` and at least one collaborator exists → first collaborator's `display_name`.
+  - Else → `request.requester_name` (existing behavior for classic 2-party collabs).
+- Pass this into `SendMessageModal` as a renamed prop `recipientName` (keep `requesterEmail` for legacy fanout, but the email arg is no longer used for routing since the edge function fans out server-side).
+- Update `SendMessageModal.tsx`:
+  - Rename `requesterName` → `recipientName` in the interface (single call site, safe rename).
+  - Modal title: `Message {recipientName}`.
+  - Success toast: `Message sent to {recipientName}!`.
+- `GuestMessageModal.tsx` already uses `creatorName` correctly for the non-host side — no change needed there beyond confirming the title source.
 
-Pass `senderEmail` in the `functions.invoke('send-collab-email', …)` payload so the function can exclude the sender from the fan-out. `SendMessageModal` already has `creatorEmail`; `GuestMessageModal` already has `senderEmail`.
-
-No UI changes.
-
-### 3. Conversation panel — leave as-is
-
-`WorkspaceConversation` correctly renders sender labels from `sender_type`. Not touching it avoids regressions for classic 2-party collabs.
-
-### 4. Regression coverage
-
-Add a lightweight Deno test under `supabase/functions/send-collab-email/` that stubs the DB layer and asserts:
-
-- Solo workspace + 1 collaborator + creator sends → recipient list = `[collaborator]`, not `[creator]`.
-- Classic 2-party workspace + creator sends → recipient list = `[requester]` (unchanged behaviour).
-- Collaborator sends on a solo workspace → recipient list = `[creator]`.
+### 4. Guest-side symmetry (Blessing's view)
+When Blessing opens the chapter as a collaborator, `isGuestView` is true and `GuestMessageModal` shows `creatorName={creatorInfo?.name}` — that's Karen's brand, which is correct for her. No change.
 
 ## Out of scope
+- Backend recipient fanout (already fixed).
+- Renaming `sender_type` values in the DB — we treat them as legacy and rely on `sender_email` for identity.
 
-- Redesigning the messaging UI for N-party workspaces (thread avatars, per-recipient reply, etc.) — separate follow-up.
-- Backfilling missed emails from before this fix (I can send a one-shot nudge to Karen/Blessing if you want, but not part of this plan).
+## Files touched
+- `src/pages/Workspace.tsx` (sidebar filtering, recipient name derivation, prop wiring)
+- `src/components/requests/WorkspaceConversation.tsx` (identity-based labels, participants map)
+- `src/components/requests/SendMessageModal.tsx` (prop rename, title/toast copy)
+
+## Verification
+- Solo project chapter as host with 1 invited collab: sidebar shows Owner (You) + Blessing; modal title "Message Blessing"; toast "Message sent to Blessing"; own bubbles read "You", Blessing's read "Blessing".
+- Classic 2-party collab (non-solo): no visible change — still "Message {requester_name}", "You" / "{requester_name}" bubbles.
+- Blessing's guest view: modal still says "Message {Karen's brand}", her own bubbles read "You".
