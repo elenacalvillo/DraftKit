@@ -71,8 +71,9 @@ export default function Login() {
       !!from &&
       (from === "/dashboard" ||
         from.startsWith("/dashboard/requests") ||
-        from.startsWith("/dashboard/workspace/") ||
         from.startsWith("/dashboard/my-requests") ||
+        from.startsWith("/dashboard/collaborations") ||
+        from.startsWith("/dashboard/workspace/") ||
         from.startsWith("/retro/") ||
         from.startsWith("/view/"));
     if (isWorkspaceOrGuestPath) {
