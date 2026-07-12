@@ -37,7 +37,7 @@ async function sendEmail(to: string[], subject: string, html: string) {
   return await response.json();
 }
 
-function buildRetrospectiveEmail(recipientName: string, partnerName: string, collabDate: string, retroUrl: string): string {
+function buildRetrospectiveEmail(recipientName: string, partnerName: string, collabDate: string, retroUrl: string, workspaceUrl: string): string {
   const starStyle = `display:inline-block;width:40px;height:40px;line-height:40px;text-align:center;font-size:24px;text-decoration:none;margin:0 2px;border-radius:8px;`;
   const activeStarStyle = `${starStyle}background:#fffbeb;border:1px solid #fbbf24;`;
   const defaultStarStyle = `${starStyle}background:#f8fafc;border:1px solid #e2e8f0;`;
@@ -84,6 +84,10 @@ function buildRetrospectiveEmail(recipientName: string, partnerName: string, col
           Share Your Experience
         </a>
       </div>
+
+      <p style="text-align: center; margin: 8px 0 24px 0; font-size: 13px; color: #94a3b8;">
+        Prefer to review the draft first? <a href="${workspaceUrl}" style="color: #d9826b; text-decoration: none;">Open the workspace →</a>
+      </p>
 
       <div style="background: #ecfdf5; border-radius: 12px; padding: 16px 24px; margin: 24px 0; border-left: 4px solid #10b981;">
         <p style="margin: 0; color: #065f46; font-size: 14px;">
@@ -209,11 +213,12 @@ serve(async (req: Request): Promise<Response> => {
       }
 
       const retroUrl = `${baseUrl}/retro/${request.id}`;
+      const workspaceUrl = `${baseUrl}/dashboard/workspace/${request.id}`;
 
       // Send to requester
       if (requesterEmail) {
         try {
-          const html = buildRetrospectiveEmail(requesterName, creatorName, formattedDate, retroUrl);
+          const html = buildRetrospectiveEmail(requesterName, creatorName, formattedDate, retroUrl, workspaceUrl);
           const result = await sendEmail([requesterEmail], `🎉 How did your collaboration with ${creatorName} go?`, html);
 
           await supabase.from("email_events").insert({
@@ -232,7 +237,7 @@ serve(async (req: Request): Promise<Response> => {
       // Send to creator
       if (creatorEmail) {
         try {
-          const html = buildRetrospectiveEmail(creatorName, requesterName, formattedDate, retroUrl);
+          const html = buildRetrospectiveEmail(creatorName, requesterName, formattedDate, retroUrl, workspaceUrl);
           const result = await sendEmail([creatorEmail], `🎉 How did your collaboration with ${requesterName} go?`, html);
 
           await supabase.from("email_events").insert({

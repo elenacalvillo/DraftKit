@@ -339,10 +339,21 @@ serve(async (req: Request): Promise<Response> => {
     const baseUrl = Deno.env.get("SITE_URL") || "https://draftkit.app";
     const bookingUrl = `${baseUrl}/${creatorUsername}`;
     
-    // Helper to build safe deep-link URLs that work around server-side routing
-    // Uses /dashboard?open=requests&highlight=... format which the client then redirects
-    const buildDashboardRequestLink = (reqId: string) =>
-      `${baseUrl}/dashboard?open=requests&highlight=${encodeURIComponent(reqId)}`;
+    // Deep-link helpers — always land users on the exact workspace, or on
+    // the correct tab of the unified Collaborations hub as a fallback.
+    const workspaceUrl = (reqId: string) =>
+      `${baseUrl}/dashboard/workspace/${encodeURIComponent(reqId)}`;
+    const collabHubUrl = (
+      tab: "needs_response" | "active" | "published" | "archived",
+      reqId?: string,
+    ) =>
+      `${baseUrl}/dashboard/collaborations?tab=${tab}${
+        reqId ? `&highlight=${encodeURIComponent(reqId)}` : ""
+      }`;
+    // Signup with a next= redirect so invited/pre-auth users land on the
+    // right workspace after creating their account.
+    const signupWithNext = (nextPath: string) =>
+      `${baseUrl}/signup?next=${encodeURIComponent(nextPath)}`;
 
     let emailSubject = "";
     let emailHtml = "";
@@ -409,7 +420,7 @@ serve(async (req: Request): Promise<Response> => {
 
           <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
             <p style="margin: 0 0 16px 0; color: #475569;">Ready to start drafting?</p>
-            <a href="https://collabstack.lovable.app/dashboard/my-requests" 
+            <a href="${workspaceUrl(requestId)}" 
                style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
               Open Your Workspace →
             </a>
@@ -497,7 +508,7 @@ serve(async (req: Request): Promise<Response> => {
           ` : ""}
 
           <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
-            <a href="${buildDashboardRequestLink(requestId)}" 
+            <a href="${collabHubUrl("needs_response", requestId)}" 
                style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
               View Request
             </a>
@@ -603,7 +614,7 @@ serve(async (req: Request): Promise<Response> => {
           ` : ""}
 
           <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
-            <a href="${buildDashboardRequestLink(requestId)}" 
+            <a href="${collabHubUrl("archived", requestId)}" 
                style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
               View All Requests
             </a>
@@ -687,10 +698,11 @@ serve(async (req: Request): Promise<Response> => {
           </div>
 
           <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
-            <a href="mailto:${creatorEmail}?subject=Re: Collaboration${requestedDate ? ` on ${formattedDate}` : ""}" 
+            <a href="${workspaceUrl(requestId)}" 
                style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
-              Reply to ${creatorNameHtml}
+              Open Workspace & Reply
             </a>
+            <p style="margin: 12px 0 0 0; font-size: 13px; color: #94a3b8;">Replies inside the workspace keep everything in one place.</p>
           </div>
 
           <p style="font-size: 14px; color: #64748b; margin-top: 32px;">
@@ -729,9 +741,9 @@ serve(async (req: Request): Promise<Response> => {
           </div>
 
           <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
-            <a href="${buildDashboardRequestLink(requestId)}" 
+            <a href="${workspaceUrl(requestId)}" 
                style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
-              View Request & Reply
+              Open Workspace & Reply
             </a>
           </div>
 
@@ -778,9 +790,9 @@ serve(async (req: Request): Promise<Response> => {
           </div>
 
           <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
-            <a href="${buildDashboardRequestLink(requestId)}" 
+            <a href="${workspaceUrl(requestId)}" 
                style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
-              View Details
+              Open Workspace
             </a>
           </div>
 
@@ -827,9 +839,9 @@ serve(async (req: Request): Promise<Response> => {
           ` : ""}
 
           <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
-            <a href="mailto:${creatorEmail}?subject=Re: Collaboration on ${formattedDate}" 
+            <a href="${workspaceUrl(requestId)}" 
                style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
-              Contact ${creatorNameHtml}
+              Open Workspace
             </a>
           </div>
 
@@ -905,9 +917,9 @@ serve(async (req: Request): Promise<Response> => {
 
           <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
             <p style="margin: 0 0 16px 0; color: #475569;">Have questions about the change?</p>
-            <a href="mailto:${creatorEmail}?subject=Re: Collaboration type update" 
+            <a href="${workspaceUrl(requestId)}" 
                style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
-              Contact ${creatorNameHtml}
+              Open Workspace
             </a>
           </div>
 
@@ -949,9 +961,9 @@ serve(async (req: Request): Promise<Response> => {
 
           <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
             <p style="margin: 0 0 16px 0; color: #475569;">Questions about the new date?</p>
-            <a href="mailto:${creatorEmail}?subject=Re: Rescheduled collaboration"
+            <a href="${workspaceUrl(requestId)}"
                style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
-              Contact ${creatorNameHtml}
+              Open Workspace
             </a>
           </div>
 

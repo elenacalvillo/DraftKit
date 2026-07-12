@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import { ArrowLeft, BookMarked, Inbox, PenLine, Send, Users, Sparkles } from "lucide-react";
@@ -55,16 +55,24 @@ function activityLine(w: MyWorkspace): string {
   return `Created ${formatDistanceToNow(new Date(w.created_at), { addSuffix: true })}`;
 }
 
-function WorkspaceRow({ w }: { w: MyWorkspace }) {
+function WorkspaceRow({ w, highlighted }: { w: MyWorkspace; highlighted?: boolean }) {
   const navigate = useNavigate();
+  const ref = useRef<HTMLDivElement | null>(null);
   const avatarUrl = w.role_in_workspace === "host"
     ? w.requester_profile_image_url
     : w.host_profile_image_url;
   const avatarFallback = (w.role_in_workspace === "host" ? w.requester_name : w.host_name)?.charAt(0) || "?";
   const title = workspaceTitle(w);
 
+  useEffect(() => {
+    if (highlighted && ref.current) {
+      ref.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [highlighted]);
+
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card ref={ref} className={cn("hover:shadow-md transition-shadow", highlighted && "ring-2 ring-primary")}>
+
       <CardContent className="flex items-center gap-4 py-4">
         <Avatar className="h-11 w-11">
           <AvatarImage src={avatarUrl ? sanitizeSubstackImageUrl(avatarUrl) : undefined} />
@@ -110,6 +118,7 @@ export default function Collaborations() {
   const { workspaces, isLoading } = useMyWorkspaces();
 
   const tabParam = searchParams.get("tab") as Bucket | null;
+  const highlightId = searchParams.get("highlight");
   const [tab, setTab] = useState<Bucket>(tabParam ?? "active");
 
   const buckets = useMemo(() => {
@@ -124,6 +133,25 @@ export default function Collaborations() {
     }
     return groups;
   }, [workspaces]);
+
+  // Sync tab with URL when navigating in from email deep-links.
+  useEffect(() => {
+    if (tabParam && tabParam !== tab) setTab(tabParam);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabParam]);
+
+  // If the highlighted workspace lives in a different bucket than the current
+  // tab, jump to the bucket that contains it so the row is actually visible.
+  useEffect(() => {
+    if (!highlightId) return;
+    for (const b of ["needs_response", "active", "published", "archived"] as Bucket[]) {
+      if (buckets[b].some((w) => w.request_id === highlightId)) {
+        if (b !== tab) setTab(b);
+        break;
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightId, buckets]);
 
   const handleTabChange = (value: string) => {
     const next = value as Bucket;
@@ -214,7 +242,7 @@ export default function Collaborations() {
           </div>
         ) : (
           <div className="grid gap-3">
-            {active.map((w) => <WorkspaceRow key={w.request_id} w={w} />)}
+            {active.map((w) => <WorkspaceRow key={w.request_id} w={w} highlighted={w.request_id === highlightId} />)}
           </div>
         )}
       </div>
