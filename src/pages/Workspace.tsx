@@ -71,6 +71,7 @@ import {
   isInvitedCollaborator as deriveIsInvitedCollaborator,
   getMessagePartnerLabel,
 } from "@/lib/workspace-roles";
+import { isEffectivelySolo } from "@/lib/workspace-participants";
 
 interface WorkspaceRequest {
   id: string;
