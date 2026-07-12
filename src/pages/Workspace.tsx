@@ -1191,6 +1191,9 @@ export default function Workspace() {
                                 </AvatarFallback>
                               </Avatar>
                               <span className="truncate text-muted-foreground flex-1">{displayName}</span>
+                              {isMe && (
+                                <span className="text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded">You</span>
+                              )}
                               {c.joined_at ? (
                                 <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                                   Joined
