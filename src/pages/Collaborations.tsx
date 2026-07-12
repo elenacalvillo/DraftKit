@@ -121,6 +121,19 @@ export default function Collaborations() {
   const highlightId = searchParams.get("highlight");
   const [tab, setTab] = useState<Bucket>(tabParam ?? "active");
 
+  const buckets = useMemo(() => {
+    const groups: Record<Bucket, MyWorkspace[]> = {
+      needs_response: [],
+      active: [],
+      published: [],
+      archived: [],
+    };
+    for (const w of workspaces) {
+      groups[bucketWorkspace(w)].push(w);
+    }
+    return groups;
+  }, [workspaces]);
+
   // Sync tab with URL when navigating in from email deep-links.
   useEffect(() => {
     if (tabParam && tabParam !== tab) setTab(tabParam);
@@ -139,19 +152,6 @@ export default function Collaborations() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highlightId, buckets]);
-
-  const buckets = useMemo(() => {
-    const groups: Record<Bucket, MyWorkspace[]> = {
-      needs_response: [],
-      active: [],
-      published: [],
-      archived: [],
-    };
-    for (const w of workspaces) {
-      groups[bucketWorkspace(w)].push(w);
-    }
-    return groups;
-  }, [workspaces]);
 
   const handleTabChange = (value: string) => {
     const next = value as Bucket;
