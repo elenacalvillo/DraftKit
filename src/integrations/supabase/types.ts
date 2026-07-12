@@ -1150,6 +1150,38 @@ export type Database = {
           status: string
         }[]
       }
+      list_my_workspaces: {
+        Args: never
+        Returns: {
+          approved_at: string
+          chapter_order: number
+          chapter_title: string
+          collab_link: string
+          content_last_edited_at: string
+          content_last_edited_by: string
+          created_at: string
+          hidden_by_creator: boolean
+          hidden_by_requester: boolean
+          host_creator_id: string
+          host_name: string
+          host_profile_image_url: string
+          host_username: string
+          is_project_workspace: boolean
+          is_solo: boolean
+          joined_at: string
+          message: string
+          project_id: string
+          project_title: string
+          request_id: string
+          requested_date: string
+          requester_email: string
+          requester_name: string
+          requester_profile_image_url: string
+          requester_user_id: string
+          role_in_workspace: string
+          status: string
+        }[]
+      }
       normalize_email: { Args: { _email: string }; Returns: string }
       save_workspace_content: {
         Args: {
