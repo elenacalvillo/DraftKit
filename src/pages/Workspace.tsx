@@ -407,8 +407,16 @@ export default function Workspace() {
     });
   };
 
-  // Solo workspace detection
-  const isSolo = !!(request as any)?.is_solo;
+  // Solo workspace detection — a room is *effectively* solo when the flag
+  // is set OR the creator and requester resolve to the same identity (which
+  // is the shape of every book-project chapter room).
+  const isSolo = isEffectivelySolo({
+    isSolo: !!(request as any)?.is_solo,
+    creatorUserId: request?.creator_id,
+    requesterUserId: (request as any)?.requester_user_id,
+    creatorName: creatorInfo?.name,
+    requesterName: request?.requester_name,
+  });
 
   // Third user type: invited collaborators (from workspace_collaborators)
   // are neither the creator nor the original requester. They get the same
@@ -420,11 +428,32 @@ export default function Workspace() {
   const isOwnerView = isCreator;
   const isGuestView = isGuest || isInvitedCollaborator;
 
+  // Hide the current user + the creator from the collaborator list — on solo
+  // rooms Karen is both, so the raw list produced a duplicate "Me" row.
+  const visibleCollaborators = collaborators.filter((c) => {
+    if (c.user_id && c.user_id === request?.creator_id) return false;
+    return true;
+  });
+
+  // On solo/project rooms the "partner" is the invited collaborator, not the
+  // requester (who is the host herself). Fall back to requester_name for
+  // classic two-party collabs.
+  const messageRecipientName =
+    (isSolo && visibleCollaborators.length > 0
+      ? visibleCollaborators[0].display_name
+      : null) ||
+    (isCreator ? request?.requester_name : creatorInfo?.name) ||
+    "Partner";
+
   // The partner — the "other person" in the collab
-  const partnerName = isSolo ? null : isCreator ? request?.requester_name : creatorInfo?.name || "Creator";
+  const partnerName = isSolo
+    ? visibleCollaborators[0]?.display_name || null
+    : isCreator
+      ? request?.requester_name
+      : creatorInfo?.name || "Creator";
   const partnerSubstackUrl = isSolo ? null : isCreator ? request?.requester_substack_url : creatorInfo?.substack_url;
   const partnerProfileImage = isSolo
-    ? null
+    ? visibleCollaborators[0]?.profile_image_url || null
     : isCreator
       ? request?.requester_profile_image_url
       : creatorInfo?.profile_image_url;
