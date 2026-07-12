@@ -1,49 +1,39 @@
-## Problem
+## Plan
 
-`list_my_workspaces()` includes every chapter where the user is the project owner, so solo, unshared book chapters flood Collaborations (200+ rows for Elena's Verloren manuscript). Collaborations should only surface *shared* spaces.
+Rewrite `list_my_workspaces()` so **book project chapters** are hidden from Collaborations/Dashboard unless they are actually shared, while every other workspace type (classic guest post Collabs, non-project solo drafts, Proposals) keeps working exactly as today.
 
-## Fix
+### The rule (applied once, globally)
 
-Filter the `project_owner` branch of `list_my_workspaces()` so a project chapter only appears when at least one *other* participant exists on it.
+A row is included in the result if:
 
-### SQL change (single migration)
+- `is_project_workspace = false` — always show. Classic Collabs, Proposals, and non-project solo drafts pass through unchanged.
+- **OR** `is_project_workspace = true` **AND** at least one of these is true:
+  - a row exists in `workspace_collaborators` for this `request_id` where `user_id` is not the current user (a linked collaborator who isn't me), OR
+  - a row exists in `workspace_collaborators` for this `request_id` with `user_id IS NULL AND email IS NOT NULL` (a pending email invite — the chapter has been shared out), OR
+  - `collab_requests.requester_user_id` is not null and not the current user (someone else is the requester on this chapter).
 
-In the `base` CTE's `project_owner` UNION arm, keep the row only if it has an external participant:
+This closes the requester-branch leak: even if the current user is the requester on their own solo project chapter, that chapter is a project chapter with no external participant, so it's hidden.
 
-```sql
--- Project owner: only when the chapter is actually shared
-SELECT cr.id, 'project_owner'::text, NULL::timestamp with time zone
-FROM public.collab_requests cr
-JOIN public.projects p ON p.id = cr.project_id
-JOIN public.creators c ON c.id = p.creator_id
-WHERE cr.is_project_workspace = true
-  AND c.user_id = (SELECT uid FROM me)
-  AND cr.hidden_by_creator = false
-  AND (
-    -- Someone else was invited as a collaborator
-    EXISTS (
-      SELECT 1 FROM public.workspace_collaborators wc
-      WHERE wc.request_id = cr.id
-        AND (wc.user_id IS NULL OR wc.user_id <> (SELECT uid FROM me))
-    )
-    -- Or a different user is the requester (self-assigned to someone else)
-    OR (cr.requester_user_id IS NOT NULL AND cr.requester_user_id <> (SELECT uid FROM me))
-  )
-```
+### Migration changes to `public.list_my_workspaces()`
 
-The `host` and `requester` arms are unchanged: classic collabs, solo drafts the user explicitly created in the workspace flow, and invited chapters continue to appear. Only the "I own the project and I'm alone on this chapter" case is suppressed.
+1. Remove the per-branch project filtering added last turn on the `host` and `project_owner` arms — that partial fix is what let the `requester` arm leak.
+2. Keep the four `UNION` arms (`host`, `requester`, `collaborator`, `project_owner`) simple: each just says "the user matches this role".
+3. After the dedupe step, apply the global rule above once in the final `WHERE`, using real subqueries against `workspace_collaborators` and the row's `requester_user_id`.
+4. Preserve everything else: return columns, role priority, `ORDER BY` on last edit.
 
-### What stays where
+No other function, no schema change, no frontend change. `useMyWorkspaces()`, `Collaborations.tsx`, and Dashboard read from this RPC and will pick up the fix automatically.
 
-- **Solo book chapters (no invitees)** → visible in `/dashboard/projects/:id` only. Hidden from Collaborations and Dashboard recent feed.
-- **Shared book chapters** → still surface in Collaborations with the `Project` badge.
-- **Classic solo drafts** (`is_solo=true`, non-project) → unchanged; still show in Collaborations because that's their only home.
+### Verification after the migration runs
 
-### Files touched
+Using `supabase--read_query` while impersonating your session pattern:
 
-- New migration: tweak `public.list_my_workspaces()` (function body only, no schema change).
-- No frontend or hook changes required — `useMyWorkspaces` and `Collaborations.tsx` keep working as-is.
+- Count of `is_project_workspace = true` rows returned by `list_my_workspaces()` for Elena should equal only the chapters that have an external collaborator or a non-self requester. Expected: drops from ~200 to a small number.
+- Rows with `is_project_workspace = false` returned count should be unchanged (classic Collabs and non-project solo drafts still visible).
+- Karen's self-assigned project chapters (project owner + self requester + no invitees) should not appear.
+- A test chapter with a pending email invite in `workspace_collaborators` should appear.
 
-### Verification
+### Out of scope
 
-After migration: as Elena, `/dashboard/collaborations` Active tab should drop from ~200 to just the classic collabs + book chapters that actually have another writer on them. Karen's self-assigned chapters (where she's both project owner and requester) stay hidden until she invites someone — which matches the "Collaborations = shared spaces" definition.
+- No changes to Projects pages — solo chapters keep living in `/dashboard/projects/:id`.
+- No changes to `list_my_collaborator_workspaces()` or any other RPC.
+- No UI copy changes; the Project badge and role badges stay as-is for the chapters that do surface.
