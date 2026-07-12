@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { FeedbackWidget } from "@/components/feedback/FeedbackWidget";
 import { TrackingNotice } from "@/components/privacy/TrackingNotice";
@@ -36,6 +36,7 @@ import RefundPolicy from "./pages/RefundPolicy";
 import PublicWorkspaceView from "./pages/PublicWorkspaceView";
 import Projects from "./pages/Projects";
 import ProjectDetail from "./pages/ProjectDetail";
+import Collaborations from "./pages/Collaborations";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -78,8 +79,10 @@ const App = () => (
             <Route path="/api/v1/agent-info" element={<AgentInfo />} />
             <Route path="/dashboard" element={<ProtectedRoute requireCreator={false}><Dashboard /></ProtectedRoute>} />
             <Route path="/dashboard/availability" element={<ProtectedRoute><Availability /></ProtectedRoute>} />
-            <Route path="/dashboard/requests" element={<ProtectedRoute requireCreator={false}><Requests /></ProtectedRoute>} />
-            <Route path="/dashboard/my-requests" element={<ProtectedRoute requireCreator={false}><MyRequests /></ProtectedRoute>} />
+            <Route path="/dashboard/collaborations" element={<ProtectedRoute requireCreator={false}><Collaborations /></ProtectedRoute>} />
+            {/* Legacy routes redirect to the unified hub — keep bookmarks & email CTAs working */}
+            <Route path="/dashboard/requests" element={<Navigate to="/dashboard/collaborations" replace />} />
+            <Route path="/dashboard/my-requests" element={<Navigate to="/dashboard/collaborations" replace />} />
             <Route path="/dashboard/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="/dashboard/subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
             <Route path="/dashboard/discovery" element={<ProtectedRoute><Discovery /></ProtectedRoute>} />
