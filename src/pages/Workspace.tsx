@@ -1384,7 +1384,7 @@ export default function Workspace() {
             open={showMessageModal}
             onOpenChange={setShowMessageModal}
             requestId={request.id}
-            requesterName={request.requester_name}
+            requesterName={messageRecipientName}
             requesterEmail={request.requester_email}
             creatorEmail={user?.email || ""}
             onMessageSent={handleMessageSent}
