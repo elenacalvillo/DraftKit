@@ -118,7 +118,27 @@ export default function Collaborations() {
   const { workspaces, isLoading } = useMyWorkspaces();
 
   const tabParam = searchParams.get("tab") as Bucket | null;
+  const highlightId = searchParams.get("highlight");
   const [tab, setTab] = useState<Bucket>(tabParam ?? "active");
+
+  // Sync tab with URL when navigating in from email deep-links.
+  useEffect(() => {
+    if (tabParam && tabParam !== tab) setTab(tabParam);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabParam]);
+
+  // If the highlighted workspace lives in a different bucket than the current
+  // tab, jump to the bucket that contains it so the row is actually visible.
+  useEffect(() => {
+    if (!highlightId) return;
+    for (const b of ["needs_response", "active", "published", "archived"] as Bucket[]) {
+      if (buckets[b].some((w) => w.request_id === highlightId)) {
+        if (b !== tab) setTab(b);
+        break;
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightId, buckets]);
 
   const buckets = useMemo(() => {
     const groups: Record<Bucket, MyWorkspace[]> = {
@@ -222,7 +242,7 @@ export default function Collaborations() {
           </div>
         ) : (
           <div className="grid gap-3">
-            {active.map((w) => <WorkspaceRow key={w.request_id} w={w} />)}
+            {active.map((w) => <WorkspaceRow key={w.request_id} w={w} highlighted={w.request_id === highlightId} />)}
           </div>
         )}
       </div>
