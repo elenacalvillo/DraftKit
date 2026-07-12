@@ -30,7 +30,10 @@
     --accent: 190 38% 42%;
     --accent-foreground: 192 45% 22%;
 
-    --destructive: 0 84% 60%;
+    --success: 168 50% 20%;
+    --success-foreground: 0 0% 100%;
+
+    --destructive: 350 55% 44%;
     --destructive-foreground: 0 0% 100%;
 
     --border: 35 18% 88%;
@@ -48,9 +51,6 @@
     --glass-bg: hsl(0 0% 100% / 0.85);
     --glass-border: hsl(35 18% 88% / 0.5);
     --glass-shadow: 0 8px 32px hsl(8 30% 30% / 0.1);
-
-    --success: 152 69% 45%;
-    --success-foreground: 0 0% 100%;
 
     --available: 152 60% 50%;
     --booked: 8 65% 65%;
