@@ -1138,6 +1138,9 @@ export default function Workspace() {
                       </Avatar>
                       <span className="truncate">{creatorInfo?.name}</span>
                       <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Owner</span>
+                      {isCreator && (
+                        <span className="text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded">You</span>
+                      )}
                     </div>
                     {/* Original requester — hide for solo workspaces (same person as owner) */}
                     {!isSolo && (
@@ -1158,7 +1161,8 @@ export default function Workspace() {
                       </div>
                     )}
                     {/* Invited collaborators */}
-                    {collaborators.map((c) => {
+                    {visibleCollaborators.map((c) => {
+                      const isMe = !!c.user_id && c.user_id === user?.id;
                       const displayName = c.display_name;
                       const tooltipText = c.user_id
                         ? c.username
