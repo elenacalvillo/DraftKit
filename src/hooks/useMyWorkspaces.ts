@@ -32,6 +32,8 @@ export interface MyWorkspace {
   joined_at: string | null;
   hidden_by_creator: boolean;
   hidden_by_requester: boolean;
+  last_message_at: string | null;
+  unread_message_count: number;
 }
 
 export function useMyWorkspaces() {
