@@ -324,6 +324,18 @@ export default function ProjectDetail() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-bold">{project.title}</h1>
+                {!isReadOnly && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => setShowEditProject(true)}
+                    title="Edit project"
+                    aria-label="Edit project"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+                )}
                 {isReadOnly && (
                   <Badge variant="secondary">
                     <Lock className="w-3 h-3 mr-1" /> Archived (read-only)
