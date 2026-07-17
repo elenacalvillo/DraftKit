@@ -1,29 +1,37 @@
 ## Problem
 
-In workspace `647ecb80-…`, Elena (a guest / invited collaborator) sees the sidebar say "Message Elena" and the partner card shows herself. The sidebar also shows "SOLO DRAFT" even though the room has 3 external collaborators. Same class of bug causes hosts to occasionally see themselves as their own partner and messages to loop back.
+Karen can't rename a book project. There's no UI to edit `projects.title` or `projects.description` after creation.
 
-## Root cause (in `src/pages/Workspace.tsx`)
+## Fix
 
-1. `visibleCollaborators` filters with `c.user_id === request?.creator_id`. But `creator_id` is `creators.id`, while `c.user_id` is an `auth.uid()`. The comparison is always false, so nobody is ever filtered out.
-2. The current viewer is never filtered out of `visibleCollaborators`, so `visibleCollaborators[0]` can be the viewer themselves.
-3. When `isSolo` is true, `partnerName = visibleCollaborators[0]?.display_name` unconditionally. A guest opening a solo-flagged project chapter that has collaborators picks themselves (or another random collaborator) instead of the host.
-4. The sidebar "Solo Draft" card renders whenever `isSolo`, even if the room has real collaborators — so it labels active shared rooms as solo.
+Add an inline "Edit project" affordance available to the project owner in two places, backed by an existing update path.
 
-## Fix (frontend only, `src/pages/Workspace.tsx`)
+### Backend
 
-1. Replace the `visibleCollaborators` filter: drop any row where `c.user_id === user.id` or `c.email === user.email` (case-insensitive). This removes the current viewer regardless of role.
-2. Rewrite partner resolution:
-   - Host viewing → partner is first `visibleCollaborators` entry, else `request.requester_name` (only when not solo).
-   - Guest/collaborator viewing → partner is `creatorInfo.name` (the host), with the host's substack URL and profile image.
-   - No suitable partner → `null` (button falls back to "Message Partner").
-3. Apply the same rule to `partnerSubstackUrl`, `partnerProfileImage`, and `messageRecipientName`.
-4. Sidebar card: only render the "Solo Draft / Invite collaborators when you're ready" block when `isSolo && collaborators.length === 0`. Otherwise render the partner card (works for both host and guest viewers thanks to the new resolution above).
+- `projects` table already has `title` and `description`, RLS restricts writes to the owning creator. No schema change needed.
+- Add `useUpdateProject` mutation in `src/hooks/useProjects.ts` that updates `title` (required, trimmed, non-empty) and `description` (nullable) by `id`, then invalidates `["projects"]` and `["project", id]`.
 
-No backend, RPC, or schema changes. No behavioral change to the message send pipeline itself — fixing partner resolution automatically fixes the "sending to myself" symptom because the modal reads `partnerName` / `messageRecipientName`.
+### Frontend
 
-## Verification
+1. `src/pages/ProjectDetail.tsx` (primary entry point Karen uses):
+   - Add a small pencil icon next to the project title in the header.
+   - Clicking opens an "Edit project" dialog (reuses the same form shape as the create dialog: Title + Description).
+   - On submit → call `useUpdateProject`, toast success, close dialog. Title updates in-place via query invalidation.
+   - Only visible to the project owner (already the only role that can reach this page for their own project).
 
-- Load workspace `647ecb80-…` as Elena → sidebar shows Karen / She Writes AI as partner, "Message Karen", no "Solo Draft" label.
-- Load same workspace as Karen → sidebar shows Elena (or the next non-host collaborator) as partner.
-- Load a genuinely solo project chapter with zero collaborators → sidebar still shows the "Solo Draft" label.
-- Load a classic two-party collab → unchanged behavior.
+2. `src/pages/Projects.tsx`:
+   - Add the same pencil icon on each active project row (next to Archive) so users can rename without opening the project.
+   - Reuses the same edit dialog component.
+
+3. Extract the edit form into `src/components/projects/EditProjectDialog.tsx` so both pages share it (mirrors the pattern of `MoveChapterDialog`, `ExportBookDialog`).
+
+### Validation
+
+- Title required, trimmed, max length matches current create form.
+- Show inline error if empty; disable Save while pending.
+- Error toast with message on failure (e.g. RLS rejection).
+
+### Out of scope
+
+- No archive/unarchive changes.
+- No cover image, slug, or visibility fields — Karen only asked for rename. Description is included because it's already in the create form and trivial to reuse.
