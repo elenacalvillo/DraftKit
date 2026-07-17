@@ -84,6 +84,7 @@ import { useProject, useToggleProjectArchive } from "@/hooks/useProjects";
 import { useProjectMembers } from "@/hooks/useProjectMembers";
 import { useProjectChapters } from "@/hooks/useProjectChapters";
 import { useProjectBroadcasts } from "@/hooks/useProjectBroadcasts";
+import { EditProjectDialog } from "@/components/projects/EditProjectDialog";
 import {
   CHAPTER_STAGES,
   CHAPTER_STAGE_LABEL,
