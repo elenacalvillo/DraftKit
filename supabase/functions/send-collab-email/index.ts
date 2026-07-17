@@ -1330,7 +1330,7 @@ serve(async (req: Request): Promise<Response> => {
       }
 
 
-      const emailResponse = await sendEmail([to], emailSubject, emailHtml, replyTo);
+      const emailResponse = await sendEmail([to], emailSubject, emailHtml, replyTo, fromName);
 
       if (!emailResponse.skipped) {
         await supabase.from("email_events").insert({
