@@ -1214,9 +1214,9 @@ export type Database = {
       move_chapter_to_project: {
         Args: { _chapter_id: string; _target_project_id: string }
         Returns: {
-          chapter_order: number
-          id: string
-          project_id: string
+          moved_chapter_id: string
+          moved_chapter_order: number
+          moved_project_id: string
         }[]
       }
       normalize_email: { Args: { _email: string }; Returns: string }
