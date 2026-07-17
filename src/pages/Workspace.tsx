@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
@@ -25,6 +26,7 @@ import {
   Users,
   AlertCircle,
   User,
+  FolderInput,
 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
@@ -61,6 +63,7 @@ import { CollabImpactCard } from "@/components/requests/CollabImpactCard";
 import { InviteCollaboratorModal } from "@/components/requests/InviteCollaboratorModal";
 import { EditableChapterTitle } from "@/components/projects/EditableChapterTitle";
 import { ChapterNavigator } from "@/components/projects/ChapterNavigator";
+import { MoveChapterDialog } from "@/components/projects/MoveChapterDialog";
 import { useProjectChapters } from "@/hooks/useProjectChapters";
 import { parseDateString, cn, sanitizeSubstackImageUrl } from "@/lib/utils";
 import { extractSubstackUsername, normalizeSubstackUrl } from "@/lib/substack-url";
@@ -107,6 +110,7 @@ interface CreatorInfo {
 export default function Workspace() {
   const { requestId } = useParams<{ requestId: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user, creator, loading: authLoading } = useAuth();
   const { isPro, canHostMore } = usePro();
   const { trackEvent } = useAnalytics();
@@ -131,6 +135,7 @@ export default function Workspace() {
   const [showReschedulePicker, setShowReschedulePicker] = useState(false);
   const [bookedDates, setBookedDates] = useState<string[]>([]);
   const [msgRefreshKey, setMsgRefreshKey] = useState(0);
+  const [showMoveChapter, setShowMoveChapter] = useState(false);
   const [retroDismissed, setRetroDismissed] = useState(
     () => localStorage.getItem(`retro-dismissed-${requestId}`) === "true",
   );
@@ -195,6 +200,15 @@ export default function Workspace() {
       fetchRequest();
     }
   }, [user, requestId]);
+
+  // Mark this workspace as read for the current user so the unread badge
+  // on Collaborations / Dashboard clears the next time they view the feed.
+  useEffect(() => {
+    if (!user?.id || !requestId) return;
+    supabase.rpc("mark_workspace_read", { _request_id: requestId }).then(() => {
+      queryClient.invalidateQueries({ queryKey: ["my_workspaces"] });
+    });
+  }, [user?.id, requestId, queryClient]);
 
   // Fetch sibling booked dates for reschedule conflict prevention
   useEffect(() => {
@@ -644,6 +658,16 @@ export default function Workspace() {
                 projectId={request.project_id}
                 currentChapterId={request.id}
               />
+            )}
+            {request.is_project_workspace && request.project_id && isCreator && (
+              <button
+                onClick={() => setShowMoveChapter(true)}
+                className="ml-1 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                title="Move this chapter to another project"
+              >
+                <FolderInput className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Move</span>
+              </button>
             )}
           </span>
         ) : (
@@ -1401,6 +1425,19 @@ export default function Workspace() {
           // get_workspace_request RPC) can also send the first message.
           senderEmail={user?.email || request.requester_email || null}
           onMessageSent={handleMessageSent}
+        />
+      )}
+      {request?.is_project_workspace && request?.project_id && isCreator && (
+        <MoveChapterDialog
+          chapterId={request.id}
+          chapterTitle={request.message || "Untitled chapter"}
+          currentProjectId={request.project_id}
+          open={showMoveChapter}
+          onOpenChange={setShowMoveChapter}
+          onMoved={(targetProjectId) => {
+            // Redirect out of the stale project URL to avoid 404 state.
+            navigate(`/dashboard/projects/${targetProjectId}`);
+          }}
         />
       )}
     </DashboardLayout>

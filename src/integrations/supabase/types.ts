@@ -916,6 +916,32 @@ export type Database = {
           },
         ]
       }
+      workspace_reads: {
+        Row: {
+          last_read_at: string
+          request_id: string
+          user_id: string
+        }
+        Insert: {
+          last_read_at?: string
+          request_id: string
+          user_id: string
+        }
+        Update: {
+          last_read_at?: string
+          request_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_reads_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "collab_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       public_booked_dates: {
@@ -1169,6 +1195,7 @@ export type Database = {
           is_project_workspace: boolean
           is_solo: boolean
           joined_at: string
+          last_message_at: string
           message: string
           project_id: string
           project_title: string
@@ -1180,6 +1207,16 @@ export type Database = {
           requester_user_id: string
           role_in_workspace: string
           status: string
+          unread_message_count: number
+        }[]
+      }
+      mark_workspace_read: { Args: { _request_id: string }; Returns: undefined }
+      move_chapter_to_project: {
+        Args: { _chapter_id: string; _target_project_id: string }
+        Returns: {
+          chapter_order: number
+          id: string
+          project_id: string
         }[]
       }
       normalize_email: { Args: { _email: string }; Returns: string }

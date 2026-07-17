@@ -18,6 +18,7 @@ import {
   GripVertical,
   MoreVertical,
   Trash2,
+  FolderInput,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -94,6 +95,7 @@ import {
 import { ProjectUpgradePrompt } from "@/components/projects/ProjectUpgradePrompt";
 import { ExportBookDialog } from "@/components/projects/ExportBookDialog";
 import { EditableChapterTitle } from "@/components/projects/EditableChapterTitle";
+import { MoveChapterDialog } from "@/components/projects/MoveChapterDialog";
 
 const STAGE_BADGE: Record<ChapterStage, string> = {
   draft: "bg-slate-200 text-slate-800",
@@ -134,6 +136,7 @@ export default function ProjectDetail() {
     from: ChapterStage;
     to: ChapterStage;
   } | null>(null);
+  const [moveChapter, setMoveChapter] = useState<{ id: string; title: string } | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -377,6 +380,16 @@ export default function ProjectDetail() {
           projectTitle={project.title}
         />
 
+        {moveChapter && (
+          <MoveChapterDialog
+            chapterId={moveChapter.id}
+            chapterTitle={moveChapter.title}
+            currentProjectId={project.id}
+            open={!!moveChapter}
+            onOpenChange={(o) => !o && setMoveChapter(null)}
+          />
+        )}
+
         <Tabs defaultValue="chapters">
           <TabsList>
             <TabsTrigger value="chapters">Chapters</TabsTrigger>
@@ -508,6 +521,13 @@ export default function ProjectDetail() {
                                     >
                                       <ChevronDown className="w-4 h-4 mr-2" /> Move down
                                     </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() =>
+                                        setMoveChapter({ id: c.id, title: c.message ?? "Untitled chapter" })
+                                      }
+                                    >
+                                      <FolderInput className="w-4 h-4 mr-2" /> Move to project…
+                                    </DropdownMenuItem>
                                     <AlertDialogTrigger asChild>
                                       <DropdownMenuItem
                                         onSelect={(e) => e.preventDefault()}
@@ -623,6 +643,18 @@ export default function ProjectDetail() {
                                       <ArrowRight className="w-3.5 h-3.5 inline mr-1" />
                                       Assign writer
                                     </span>
+                                  )}
+                                  {!isReadOnly && (
+                                    <button
+                                      aria-label="Move to another project"
+                                      title="Move to another project"
+                                      className="hidden sm:inline-flex text-muted-foreground hover:text-primary transition-colors p-1"
+                                      onClick={() =>
+                                        setMoveChapter({ id: c.id, title: c.message ?? "Untitled chapter" })
+                                      }
+                                    >
+                                      <FolderInput className="w-4 h-4" />
+                                    </button>
                                   )}
                                   {deleteDialog}
                                   {mobileOverflow}

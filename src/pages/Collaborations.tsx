@@ -96,6 +96,11 @@ function WorkspaceRow({ w, highlighted }: { w: MyWorkspace; highlighted?: boolea
             <Badge variant="secondary" className="shrink-0">
               {ROLE_LABEL[w.role_in_workspace]}
             </Badge>
+            {w.unread_message_count > 0 && (
+              <Badge className="shrink-0 bg-primary/90 hover:bg-primary text-primary-foreground">
+                {w.unread_message_count} new
+              </Badge>
+            )}
             {w.status === "published" && <Badge className="shrink-0">Published</Badge>}
             {w.status === "pending" && <Badge variant="destructive" className="shrink-0">Pending</Badge>}
           </div>
