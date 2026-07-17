@@ -108,6 +108,7 @@ interface CreatorInfo {
 export default function Workspace() {
   const { requestId } = useParams<{ requestId: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user, creator, loading: authLoading } = useAuth();
   const { isPro, canHostMore } = usePro();
   const { trackEvent } = useAnalytics();
