@@ -45,6 +45,7 @@ export default function Projects() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [titleError, setTitleError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Project | null>(null);
   const [showPrimer, setShowPrimer] = useState(
     () => typeof window !== "undefined" && localStorage.getItem("projects-primer-dismissed") !== "true",
   );
