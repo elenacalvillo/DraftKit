@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { Archive, ArchiveRestore, BookMarked, BookOpen, Plus, X } from "lucide-react";
+import { EditProjectDialog } from "@/components/projects/EditProjectDialog";
+import type { Project } from "@/hooks/useProjects";
+import { Archive, ArchiveRestore, BookMarked, BookOpen, Pencil, Plus, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -43,6 +45,7 @@ export default function Projects() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [titleError, setTitleError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Project | null>(null);
   const [showPrimer, setShowPrimer] = useState(
     () => typeof window !== "undefined" && localStorage.getItem("projects-primer-dismissed") !== "true",
   );
@@ -190,13 +193,23 @@ export default function Projects() {
                       </p>
                     )}
                   </Link>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleToggleArchive(p.id, true)}
-                  >
-                    <Archive className="w-4 h-4 mr-1.5" /> Archive
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setEditing(p)}
+                      title="Edit project"
+                    >
+                      <Pencil className="w-4 h-4 mr-1.5" /> Edit
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleToggleArchive(p.id, true)}
+                    >
+                      <Archive className="w-4 h-4 mr-1.5" /> Archive
+                    </Button>
+                  </div>
                 </motion.div>
               ))}
             </div>
@@ -247,7 +260,14 @@ export default function Projects() {
         )}
       </div>
 
+      <EditProjectDialog
+        open={!!editing}
+        onOpenChange={(o) => !o && setEditing(null)}
+        project={editing ? { id: editing.id, title: editing.title, description: editing.description } : null}
+      />
+
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
+
         <DialogContent>
           <form onSubmit={handleSubmit}>
             <DialogHeader>

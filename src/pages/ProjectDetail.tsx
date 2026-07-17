@@ -19,6 +19,7 @@ import {
   MoreVertical,
   Trash2,
   FolderInput,
+  Pencil,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -83,6 +84,7 @@ import { useProject, useToggleProjectArchive } from "@/hooks/useProjects";
 import { useProjectMembers } from "@/hooks/useProjectMembers";
 import { useProjectChapters } from "@/hooks/useProjectChapters";
 import { useProjectBroadcasts } from "@/hooks/useProjectBroadcasts";
+import { EditProjectDialog } from "@/components/projects/EditProjectDialog";
 import {
   CHAPTER_STAGES,
   CHAPTER_STAGE_LABEL,
@@ -137,6 +139,7 @@ export default function ProjectDetail() {
     to: ChapterStage;
   } | null>(null);
   const [moveChapter, setMoveChapter] = useState<{ id: string; title: string } | null>(null);
+  const [showEditProject, setShowEditProject] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -321,6 +324,18 @@ export default function ProjectDetail() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-bold">{project.title}</h1>
+                {!isReadOnly && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => setShowEditProject(true)}
+                    title="Edit project"
+                    aria-label="Edit project"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+                )}
                 {isReadOnly && (
                   <Badge variant="secondary">
                     <Lock className="w-3 h-3 mr-1" /> Archived (read-only)
@@ -389,6 +404,12 @@ export default function ProjectDetail() {
             onOpenChange={(o) => !o && setMoveChapter(null)}
           />
         )}
+
+        <EditProjectDialog
+          open={showEditProject}
+          onOpenChange={setShowEditProject}
+          project={{ id: project.id, title: project.title, description: project.description }}
+        />
 
         <Tabs defaultValue="chapters">
           <TabsList>
