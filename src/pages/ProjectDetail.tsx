@@ -139,6 +139,7 @@ export default function ProjectDetail() {
     to: ChapterStage;
   } | null>(null);
   const [moveChapter, setMoveChapter] = useState<{ id: string; title: string } | null>(null);
+  const [showEditProject, setShowEditProject] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
