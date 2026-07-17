@@ -659,6 +659,16 @@ export default function Workspace() {
                 currentChapterId={request.id}
               />
             )}
+            {request.is_project_workspace && request.project_id && isCreator && (
+              <button
+                onClick={() => setShowMoveChapter(true)}
+                className="ml-1 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                title="Move this chapter to another project"
+              >
+                <FolderInput className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Move</span>
+              </button>
+            )}
           </span>
         ) : (
           `Drafting with ${partnerName}`
