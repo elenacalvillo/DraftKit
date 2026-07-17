@@ -863,7 +863,7 @@ export default function Workspace() {
 
             {/* Partner Card / Solo Project Card */}
             <div className="glass-card p-5 space-y-4">
-              {isSolo ? (
+              {isSolo && collaborators.length === 0 ? (
                 <div>
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Solo Draft</p>
                   <h3 className="font-semibold text-lg">{request.message || "Untitled Project"}</h3>
