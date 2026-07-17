@@ -260,7 +260,14 @@ export default function Projects() {
         )}
       </div>
 
+      <EditProjectDialog
+        open={!!editing}
+        onOpenChange={(o) => !o && setEditing(null)}
+        project={editing ? { id: editing.id, title: editing.title, description: editing.description } : null}
+      />
+
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
+
         <DialogContent>
           <form onSubmit={handleSubmit}>
             <DialogHeader>
