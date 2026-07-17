@@ -511,6 +511,13 @@ export default function ProjectDetail() {
                                     >
                                       <ChevronDown className="w-4 h-4 mr-2" /> Move down
                                     </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() =>
+                                        setMoveChapter({ id: c.id, title: c.message ?? "Untitled chapter" })
+                                      }
+                                    >
+                                      <FolderInput className="w-4 h-4 mr-2" /> Move to project…
+                                    </DropdownMenuItem>
                                     <AlertDialogTrigger asChild>
                                       <DropdownMenuItem
                                         onSelect={(e) => e.preventDefault()}
