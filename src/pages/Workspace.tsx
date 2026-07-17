@@ -1427,6 +1427,19 @@ export default function Workspace() {
           onMessageSent={handleMessageSent}
         />
       )}
+      {request?.is_project_workspace && request?.project_id && isCreator && (
+        <MoveChapterDialog
+          chapterId={request.id}
+          chapterTitle={request.message || "Untitled chapter"}
+          currentProjectId={request.project_id}
+          open={showMoveChapter}
+          onOpenChange={setShowMoveChapter}
+          onMoved={(targetProjectId) => {
+            // Redirect out of the stale project URL to avoid 404 state.
+            navigate(`/dashboard/projects/${targetProjectId}`);
+          }}
+        />
+      )}
     </DashboardLayout>
   );
 }
