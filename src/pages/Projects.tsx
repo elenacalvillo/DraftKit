@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { EditProjectDialog } from "@/components/projects/EditProjectDialog";
 import type { Project } from "@/hooks/useProjects";
-import { Archive, ArchiveRestore, BookMarked, BookOpen, Plus, X } from "lucide-react";
+import { Archive, ArchiveRestore, BookMarked, BookOpen, Pencil, Plus, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
