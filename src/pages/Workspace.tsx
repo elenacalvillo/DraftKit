@@ -440,35 +440,31 @@ export default function Workspace() {
   const isOwnerView = isCreator;
   const isGuestView = isGuest || isInvitedCollaborator;
 
-  // Hide the current user + the creator from the collaborator list — on solo
-  // rooms Karen is both, so the raw list produced a duplicate "Me" row.
+  // Hide the current viewer from the collaborator list — we never want to
+  // show the logged-in user as their own "partner".
+  const currentUserEmail = user?.email?.toLowerCase() || null;
   const visibleCollaborators = collaborators.filter((c) => {
-    if (c.user_id && c.user_id === request?.creator_id) return false;
+    if (user?.id && c.user_id && c.user_id === user.id) return false;
+    if (currentUserEmail && c.email && c.email.toLowerCase() === currentUserEmail) return false;
     return true;
   });
 
-  // On solo/project rooms the "partner" is the invited collaborator, not the
-  // requester (who is the host herself). Fall back to requester_name for
-  // classic two-party collabs.
-  const messageRecipientName =
-    (isSolo && visibleCollaborators.length > 0
-      ? visibleCollaborators[0].display_name
-      : null) ||
-    (isCreator ? request?.requester_name : creatorInfo?.name) ||
-    "Partner";
+  // Partner resolution:
+  //  - Host viewing → first invited collaborator, else the classic requester.
+  //  - Guest/collaborator viewing → the host (creatorInfo).
+  //  - Truly solo → null (button falls back to "Message Partner").
+  const guestCandidate = visibleCollaborators[0];
+  const partnerName = isCreator
+    ? guestCandidate?.display_name || (!isSolo ? request?.requester_name : null) || null
+    : creatorInfo?.name || null;
+  const partnerSubstackUrl = isCreator
+    ? (!isSolo ? request?.requester_substack_url : null)
+    : creatorInfo?.substack_url;
+  const partnerProfileImage = isCreator
+    ? guestCandidate?.profile_image_url || (!isSolo ? request?.requester_profile_image_url : null) || null
+    : creatorInfo?.profile_image_url;
 
-  // The partner — the "other person" in the collab
-  const partnerName = isSolo
-    ? visibleCollaborators[0]?.display_name || null
-    : isCreator
-      ? request?.requester_name
-      : creatorInfo?.name || "Creator";
-  const partnerSubstackUrl = isSolo ? null : isCreator ? request?.requester_substack_url : creatorInfo?.substack_url;
-  const partnerProfileImage = isSolo
-    ? visibleCollaborators[0]?.profile_image_url || null
-    : isCreator
-      ? request?.requester_profile_image_url
-      : creatorInfo?.profile_image_url;
+  const messageRecipientName = partnerName || "Partner";
 
   // Position-based chapter number, matching the project detail list.
   const { chapters: projectChapters } = useProjectChapters(
