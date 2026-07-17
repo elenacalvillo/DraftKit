@@ -1292,6 +1292,21 @@ serve(async (req: Request): Promise<Response> => {
     };
     const replyTo = replyToMap[type];
 
+    // "Human relay" From-header for user-triggered types. Domain stays
+    // draftkit.app; only the display name changes, so SPF/DKIM/DMARC stay
+    // aligned but strict inbound filters see the standard "<Name> via X"
+    // pattern instead of a domain/body mismatch.
+    const fromNameMap: Record<string, string | undefined> = {
+      new_message: creatorName,
+      new_message_from_guest: requesterName,
+      workspace_updated_by_creator: creatorName,
+      workspace_updated_by_guest: requesterName,
+      workspace_invite: creatorName,
+      collab_type_changed: creatorName,
+      collab_rescheduled: creatorName,
+    };
+    const fromName = fromNameMap[type];
+
     const results: Array<{ to: string; id?: string; skipped?: boolean }> = [];
     const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
 
@@ -1313,6 +1328,7 @@ serve(async (req: Request): Promise<Response> => {
           continue;
         }
       }
+
 
       const emailResponse = await sendEmail([to], emailSubject, emailHtml, replyTo);
 
