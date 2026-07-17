@@ -125,3 +125,38 @@ export function useToggleProjectArchive() {
     },
   });
 }
+
+export function useUpdateProject() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      title,
+      description,
+    }: {
+      id: string;
+      title: string;
+      description?: string | null;
+    }) => {
+      if (!title.trim()) throw new Error("Project title is required");
+      const update: TablesUpdate<"projects"> = {
+        title: title.trim(),
+        description: description?.trim() || null,
+      };
+      const { data, error } = await supabase
+        .from("projects")
+        .update(update)
+        .eq("id", id)
+        .select("*")
+        .single();
+      if (error) throw error;
+      return data as Project;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: ["project", data.id] });
+    },
+  });
+}
+
