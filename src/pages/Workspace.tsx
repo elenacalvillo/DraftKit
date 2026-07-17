@@ -63,6 +63,7 @@ import { CollabImpactCard } from "@/components/requests/CollabImpactCard";
 import { InviteCollaboratorModal } from "@/components/requests/InviteCollaboratorModal";
 import { EditableChapterTitle } from "@/components/projects/EditableChapterTitle";
 import { ChapterNavigator } from "@/components/projects/ChapterNavigator";
+import { MoveChapterDialog } from "@/components/projects/MoveChapterDialog";
 import { useProjectChapters } from "@/hooks/useProjectChapters";
 import { parseDateString, cn, sanitizeSubstackImageUrl } from "@/lib/utils";
 import { extractSubstackUsername, normalizeSubstackUrl } from "@/lib/substack-url";
