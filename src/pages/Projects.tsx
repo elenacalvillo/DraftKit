@@ -193,13 +193,23 @@ export default function Projects() {
                       </p>
                     )}
                   </Link>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleToggleArchive(p.id, true)}
-                  >
-                    <Archive className="w-4 h-4 mr-1.5" /> Archive
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setEditing(p)}
+                      title="Edit project"
+                    >
+                      <Pencil className="w-4 h-4 mr-1.5" /> Edit
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleToggleArchive(p.id, true)}
+                    >
+                      <Archive className="w-4 h-4 mr-1.5" /> Archive
+                    </Button>
+                  </div>
                 </motion.div>
               ))}
             </div>
