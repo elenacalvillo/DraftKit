@@ -26,6 +26,7 @@ import {
   Users,
   AlertCircle,
   User,
+  FolderInput,
 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
