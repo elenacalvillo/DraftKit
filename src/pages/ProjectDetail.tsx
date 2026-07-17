@@ -18,6 +18,7 @@ import {
   GripVertical,
   MoreVertical,
   Trash2,
+  FolderInput,
 } from "lucide-react";
 import {
   DropdownMenu,
