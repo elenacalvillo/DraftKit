@@ -19,6 +19,7 @@ import {
   MoreVertical,
   Trash2,
   FolderInput,
+  Pencil,
 } from "lucide-react";
 import {
   DropdownMenu,
