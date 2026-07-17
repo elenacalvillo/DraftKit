@@ -634,6 +634,18 @@ export default function ProjectDetail() {
                                       Assign writer
                                     </span>
                                   )}
+                                  {!isReadOnly && (
+                                    <button
+                                      aria-label="Move to another project"
+                                      title="Move to another project"
+                                      className="hidden sm:inline-flex text-muted-foreground hover:text-primary transition-colors p-1"
+                                      onClick={() =>
+                                        setMoveChapter({ id: c.id, title: c.message ?? "Untitled chapter" })
+                                      }
+                                    >
+                                      <FolderInput className="w-4 h-4" />
+                                    </button>
+                                  )}
                                   {deleteDialog}
                                   {mobileOverflow}
                                 </div>
