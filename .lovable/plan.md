@@ -1,37 +1,18 @@
 ## Problem
 
-Karen can't rename a book project. There's no UI to edit `projects.title` or `projects.description` after creation.
+Karen sees `column reference "id" is ambiguous` when moving a chapter. The `move_chapter_to_project` RPC declares `RETURNS TABLE(id uuid, project_id uuid, chapter_order integer)`. In PL/pgSQL, `RETURNS TABLE` column names are in scope as OUT parameters throughout the function body, so `WHERE id = _chapter_id` and the `UPDATE ... WHERE id = _chapter_id` collide with the OUT `id`, and `chapter_order = chapter_order - 1` collides with the OUT `chapter_order`. Postgres raises "column reference 'id' is ambiguous".
 
 ## Fix
 
-Add an inline "Edit project" affordance available to the project owner in two places, backed by an existing update path.
+Ship a single migration replacing `public.move_chapter_to_project` with:
 
-### Backend
+- Rename the OUT columns so they can't shadow table columns: `RETURNS TABLE(moved_chapter_id uuid, moved_project_id uuid, moved_chapter_order integer)`.
+- Alias `public.collab_requests` in every statement (`cr`) and fully qualify every column (`cr.id`, `cr.project_id`, `cr.chapter_order`, `cr.is_project_workspace`) — including the two `UPDATE`s and the final `RETURN QUERY`.
+- Keep all existing behavior: auth check, ownership check on both projects via `is_project_owner`, append to end of destination, re-index the source, same error codes.
 
-- `projects` table already has `title` and `description`, RLS restricts writes to the owning creator. No schema change needed.
-- Add `useUpdateProject` mutation in `src/hooks/useProjects.ts` that updates `title` (required, trimmed, non-empty) and `description` (nullable) by `id`, then invalidates `["projects"]` and `["project", id]`.
+No frontend changes needed — `MoveChapterDialog` only checks `error` from the RPC and doesn't read the returned columns.
 
-### Frontend
+## Validation
 
-1. `src/pages/ProjectDetail.tsx` (primary entry point Karen uses):
-   - Add a small pencil icon next to the project title in the header.
-   - Clicking opens an "Edit project" dialog (reuses the same form shape as the create dialog: Title + Description).
-   - On submit → call `useUpdateProject`, toast success, close dialog. Title updates in-place via query invalidation.
-   - Only visible to the project owner (already the only role that can reach this page for their own project).
-
-2. `src/pages/Projects.tsx`:
-   - Add the same pencil icon on each active project row (next to Archive) so users can rename without opening the project.
-   - Reuses the same edit dialog component.
-
-3. Extract the edit form into `src/components/projects/EditProjectDialog.tsx` so both pages share it (mirrors the pattern of `MoveChapterDialog`, `ExportBookDialog`).
-
-### Validation
-
-- Title required, trimmed, max length matches current create form.
-- Show inline error if empty; disable Save while pending.
-- Error toast with message on failure (e.g. RLS rejection).
-
-### Out of scope
-
-- No archive/unarchive changes.
-- No cover image, slug, or visibility fields — Karen only asked for rename. Description is included because it's already in the create form and trivial to reuse.
+- After migration, re-run Karen's move: no ambiguity error, chapter appears at end of destination project, source project re-numbers correctly.
+- Confirm `SELECT * FROM public.move_chapter_to_project('<chapter>','<target>')` returns one row with the new order.
