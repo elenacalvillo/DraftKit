@@ -405,6 +405,12 @@ export default function ProjectDetail() {
           />
         )}
 
+        <EditProjectDialog
+          open={showEditProject}
+          onOpenChange={setShowEditProject}
+          project={{ id: project.id, title: project.title, description: project.description }}
+        />
+
         <Tabs defaultValue="chapters">
           <TabsList>
             <TabsTrigger value="chapters">Chapters</TabsTrigger>
