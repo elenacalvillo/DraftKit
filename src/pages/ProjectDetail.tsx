@@ -380,6 +380,16 @@ export default function ProjectDetail() {
           projectTitle={project.title}
         />
 
+        {moveChapter && (
+          <MoveChapterDialog
+            chapterId={moveChapter.id}
+            chapterTitle={moveChapter.title}
+            currentProjectId={project.id}
+            open={!!moveChapter}
+            onOpenChange={(o) => !o && setMoveChapter(null)}
+          />
+        )}
+
         <Tabs defaultValue="chapters">
           <TabsList>
             <TabsTrigger value="chapters">Chapters</TabsTrigger>
