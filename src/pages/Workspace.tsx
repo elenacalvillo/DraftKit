@@ -198,6 +198,15 @@ export default function Workspace() {
     }
   }, [user, requestId]);
 
+  // Mark this workspace as read for the current user so the unread badge
+  // on Collaborations / Dashboard clears the next time they view the feed.
+  useEffect(() => {
+    if (!user?.id || !requestId) return;
+    supabase.rpc("mark_workspace_read", { _request_id: requestId }).then(() => {
+      queryClient.invalidateQueries({ queryKey: ["my_workspaces"] });
+    });
+  }, [user?.id, requestId, queryClient]);
+
   // Fetch sibling booked dates for reschedule conflict prevention
   useEffect(() => {
     if (!request?.creator_id || !requestId) return;
