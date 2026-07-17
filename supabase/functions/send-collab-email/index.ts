@@ -31,7 +31,25 @@ const brandHeader = `
             <p style="margin: 4px 0 0; font-size: 12px; color: #94a3b8; letter-spacing: 0.5px;">The engine for creators who ship together</p>
           </div>`;
 
-async function sendEmail(to: string[], subject: string, html: string, replyTo?: string) {
+// Build a spoof-safe "From" header. Domain always stays draftkit.app so SPF,
+// DKIM and DMARC on our verified domain stay aligned. When we know the human
+// who triggered the send (a message, invite, workspace update), we prepend
+// "<Name> via DraftKit" — the same relay pattern Google Groups, Substack and
+// Notion use — so strict inbound filters don't flag the mismatch between the
+// From domain and the human named in the body.
+function buildFromHeader(fromName?: string | null): string {
+  const clean = (fromName ?? "").replace(/[<>"\r\n]/g, "").trim();
+  if (!clean) return RESEND_FROM;
+  return `${clean} via DraftKit <notifications@draftkit.app>`;
+}
+
+async function sendEmail(
+  to: string[],
+  subject: string,
+  html: string,
+  replyTo?: string,
+  fromName?: string | null,
+) {
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -39,13 +57,14 @@ async function sendEmail(to: string[], subject: string, html: string, replyTo?: 
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: RESEND_FROM,
+      from: buildFromHeader(fromName),
       reply_to: replyTo || "hello@draftkit.app",
       to,
       subject,
       html,
     }),
   });
+
   
   if (!response.ok) {
     const errorText = await response.text();
@@ -1273,6 +1292,21 @@ serve(async (req: Request): Promise<Response> => {
     };
     const replyTo = replyToMap[type];
 
+    // "Human relay" From-header for user-triggered types. Domain stays
+    // draftkit.app; only the display name changes, so SPF/DKIM/DMARC stay
+    // aligned but strict inbound filters see the standard "<Name> via X"
+    // pattern instead of a domain/body mismatch.
+    const fromNameMap: Record<string, string | undefined> = {
+      new_message: creatorName,
+      new_message_from_guest: requesterName,
+      workspace_updated_by_creator: creatorName,
+      workspace_updated_by_guest: requesterName,
+      workspace_invite: creatorName,
+      collab_type_changed: creatorName,
+      collab_rescheduled: creatorName,
+    };
+    const fromName = fromNameMap[type];
+
     const results: Array<{ to: string; id?: string; skipped?: boolean }> = [];
     const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
 
@@ -1295,7 +1329,8 @@ serve(async (req: Request): Promise<Response> => {
         }
       }
 
-      const emailResponse = await sendEmail([to], emailSubject, emailHtml, replyTo);
+
+      const emailResponse = await sendEmail([to], emailSubject, emailHtml, replyTo, fromName);
 
       if (!emailResponse.skipped) {
         await supabase.from("email_events").insert({
