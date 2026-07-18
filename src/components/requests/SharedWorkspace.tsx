@@ -871,7 +871,11 @@ function SharedWorkspaceInner({
             <div className="flex items-center gap-2 px-4 py-2.5 bg-accent/10 border-b border-accent/20 text-sm text-accent-foreground">
               <AlertCircle className="w-4 h-4 text-accent flex-shrink-0" />
               <span>
-                You are currently editing. Remember to <strong>Save & Sync</strong> so others can see your changes.
+                {isCommentMode ? (
+                  <>You're in <strong>review mode</strong>. Select any text and use the highlighter to leave a comment. Prose changes are locked.</>
+                ) : (
+                  <>You are currently editing. Remember to <strong>Save & Sync</strong> so others can see your changes.</>
+                )}
               </span>
             </div>
 
