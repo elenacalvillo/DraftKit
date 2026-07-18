@@ -1362,6 +1362,21 @@ export default function Workspace() {
               isCreator={isCreator}
               editingSessions={(request as any).editing_sessions || []}
               onShareClick={isCreator ? () => setShowInviteModal(true) : undefined}
+              mode={workspaceMode}
+              headerExtras={
+                request.is_project_workspace ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8"
+                    onClick={() => setShowHistory(true)}
+                    title="Version history"
+                  >
+                    <Clock className="w-3.5 h-3.5 sm:mr-1.5" />
+                    <span className="hidden sm:inline">History</span>
+                  </Button>
+                ) : null
+              }
               onContentSaved={(content, editedBy, editedAt) => {
                 setRequest((prev) =>
                   prev
