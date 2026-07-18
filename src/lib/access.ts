@@ -161,3 +161,49 @@ export function roleLabel(role: ProjectMemberRole | string): string {
       return role;
   }
 }
+
+/** One-line description of what each project role can actually do.
+ *  Source of truth: project_member_role + project_member_can_access_chapter
+ *  in the book_projects_rls migration. */
+export const PROJECT_MEMBER_ROLE_DESCRIPTIONS: Record<ProjectMemberRole, string> = {
+  admin:
+    "Full project control: rename, manage members, create or delete chapters, and edit every chapter.",
+  chapter_writer:
+    "Can open and edit only the chapters they've been assigned to. Other chapters stay hidden.",
+  peer_reviewer:
+    "Can review and edit only the specific chapters they've been assigned to. Other chapters stay hidden.",
+  cross_chapter_reviewer:
+    "Can open and edit every chapter in the project, but can't manage members or settings.",
+};
+
+/** Who each role is a fit for — used as helper copy in the role picker. */
+export const PROJECT_MEMBER_ROLE_BEST_FOR: Record<ProjectMemberRole, string> = {
+  admin: "A co-author or managing editor running the project with you.",
+  chapter_writer: "A contributor writing one specific chapter.",
+  peer_reviewer: "A beta reader giving feedback on one chapter.",
+  cross_chapter_reviewer: "A developmental editor who needs to see the whole manuscript.",
+};
+
+/** Short suffix shown next to a member's role on their row. */
+export function roleAccessSummary(role: ProjectMemberRole | string): string {
+  switch (role) {
+    case "admin":
+      return "full project control";
+    case "chapter_writer":
+      return "edits assigned chapters only";
+    case "peer_reviewer":
+      return "reviews assigned chapters only";
+    case "cross_chapter_reviewer":
+      return "edits every chapter";
+    default:
+      return "";
+  }
+}
+
+/** Longer definition for tooltips / reference popovers. */
+export function roleDescription(role: ProjectMemberRole | string): string {
+  if (role in PROJECT_MEMBER_ROLE_DESCRIPTIONS) {
+    return PROJECT_MEMBER_ROLE_DESCRIPTIONS[role as ProjectMemberRole];
+  }
+  return "";
+}
