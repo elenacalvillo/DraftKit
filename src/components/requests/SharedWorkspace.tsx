@@ -833,6 +833,8 @@ function SharedWorkspaceInner({
             </div>
           )}
 
+          {headerExtras}
+
           {/* Primary action — always visible */}
           {canEdit && !isEditing && (
             <Button
@@ -844,11 +846,16 @@ function SharedWorkspaceInner({
               title={editBlockedReason || undefined}
             >
               <PenLine className="w-3.5 h-3.5 mr-1.5" />
-              {hasContent ? "Edit Draft" : "Start Writing"}
+              {isCommentMode
+                ? "Add comments"
+                : hasContent
+                  ? "Edit Draft"
+                  : "Start Writing"}
             </Button>
           )}
         </div>
       </div>
+
 
 
       <AnimatePresence mode="wait">
