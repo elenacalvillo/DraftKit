@@ -237,19 +237,18 @@ export function WorkspaceEditor({ content, onChange, editable, currentUserName, 
     return new Plugin({
       props: {
         handlePaste(view, event) {
+          // Only treat as an image paste when the clipboard is IMAGE-ONLY.
+          // Google Docs/Word/Notion attach a PNG screenshot beside the real
+          // text/html — preferring the image there loses the user's content.
+          if (clipboardHasText(event.clipboardData)) {
+            return false;
+          }
           const file = findImageInDataTransfer(event.clipboardData);
           if (file) {
             event.preventDefault();
-            // Insert at the current selection head.
             insertImageFileRef.current(file, view.state.selection.from);
             return true;
           }
-
-          // NOTE: Markdown paste handling lives in the top-level
-          // `editorProps.handlePaste` defined on useEditor below.
-          // That handler wins before this plugin runs, so we only
-          // need to keep the image-file guard here as a safety net
-          // for any path that reaches the plugin chain directly.
           return false;
         },
         handleDrop(view, event) {
