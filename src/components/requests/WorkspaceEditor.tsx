@@ -126,6 +126,21 @@ function dataTransferHasAnyFile(dt: DataTransfer | null | undefined): boolean {
   return false;
 }
 
+/**
+ * True when the clipboard carries usable text (HTML or non-empty plain text).
+ * Google Docs, Word, Notion, Pages, etc. attach a rendered PNG screenshot
+ * ALONGSIDE the real text/html payload. When both are present we must prefer
+ * the text — otherwise the user loses editable content and gets an image.
+ */
+function clipboardHasText(dt: DataTransfer | null | undefined): boolean {
+  if (!dt) return false;
+  const html = dt.getData?.("text/html") ?? "";
+  if (html.trim()) return true;
+  const text = dt.getData?.("text/plain") ?? "";
+  if (text.trim()) return true;
+  return false;
+}
+
 export function WorkspaceEditor({ content, onChange, editable, currentUserName, requestId, mode = "edit" }: WorkspaceEditorProps) {
   const isCommentMode = mode === "comment";
   // Track in-progress uploads so we can (a) show a loading indicator,
@@ -222,19 +237,18 @@ export function WorkspaceEditor({ content, onChange, editable, currentUserName, 
     return new Plugin({
       props: {
         handlePaste(view, event) {
+          // Only treat as an image paste when the clipboard is IMAGE-ONLY.
+          // Google Docs/Word/Notion attach a PNG screenshot beside the real
+          // text/html — preferring the image there loses the user's content.
+          if (clipboardHasText(event.clipboardData)) {
+            return false;
+          }
           const file = findImageInDataTransfer(event.clipboardData);
           if (file) {
             event.preventDefault();
-            // Insert at the current selection head.
             insertImageFileRef.current(file, view.state.selection.from);
             return true;
           }
-
-          // NOTE: Markdown paste handling lives in the top-level
-          // `editorProps.handlePaste` defined on useEditor below.
-          // That handler wins before this plugin runs, so we only
-          // need to keep the image-file guard here as a safety net
-          // for any path that reaches the plugin chain directly.
           return false;
         },
         handleDrop(view, event) {
@@ -362,24 +376,26 @@ export function WorkspaceEditor({ content, onChange, editable, currentUserName, 
           return true;
         }
 
-        // 1. Image files first — preserve the existing workspace
-        //    upload pipeline (no base64, scoped to requestId).
-        const imageFile = findImageInDataTransfer(event.clipboardData);
-        if (imageFile) {
-          event.preventDefault();
-          insertImageFileRef.current(imageFile, view.state.selection.from);
-          return true;
-        }
-
-        // 2. If the clipboard carries rich HTML (Substack, Google Docs,
-        //    Notion, Gmail, another browser tab), let Tiptap's built-in
-        //    HTML paste pipeline handle it. The text/plain fallback that
-        //    ships alongside almost always contains list markers ("- ",
-        //    "1. ") that would false-positive our markdown detector and
-        //    destroy the real formatting.
+        // 1. Rich HTML wins over everything. Google Docs, Word, Notion,
+        //    Pages, Substack and Gmail all attach a rendered PNG screenshot
+        //    of the selection ALONGSIDE the real text/html. If we grabbed
+        //    the image first the user would lose their editable prose —
+        //    the exact bug Blessing reported. Let Tiptap's HTML pipeline
+        //    handle it.
         const html = event.clipboardData?.getData("text/html") ?? "";
         if (html.trim()) {
           return false;
+        }
+
+        // 2. Image-only paste (screenshot, image copied from a browser or
+        //    Finder). No text payload, so uploading the image is the
+        //    correct behaviour. Route through the workspace-images
+        //    pipeline (no base64, scoped to requestId).
+        const imageFile = findImageInDataTransfer(event.clipboardData);
+        if (imageFile && !clipboardHasText(event.clipboardData)) {
+          event.preventDefault();
+          insertImageFileRef.current(imageFile, view.state.selection.from);
+          return true;
         }
 
         // 3. Genuine plain-text paste (no HTML clip) — only then run
