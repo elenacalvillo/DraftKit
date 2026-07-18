@@ -597,8 +597,34 @@ export function WorkspaceEditor({ content, onChange, editable, currentUserName, 
           document.body
         )}
 
-      {/* Floating Pill Toolbar -- portaled to body */}
-      {editable && createPortal(
+      {/* Floating Pill Toolbar -- portaled to body. In comment mode we
+          render a tiny "Highlight & comment" pill instead of the full
+          formatting toolbar since reviewers can't change the prose. */}
+      {editable && isCommentMode && createPortal(
+        <div
+          className="fixed bottom-8 z-[100] flex items-center gap-1 px-3 py-2 bg-background/80 backdrop-blur-md rounded-full shadow-xl border border-border/50 max-w-[calc(100vw-1rem)]"
+          style={bounds ? {
+            left: bounds.left + bounds.width / 2,
+            transform: 'translateX(-50%)',
+          } : {
+            left: '50%',
+            transform: 'translateX(-50%)',
+          }}
+        >
+          <span className="text-[11px] uppercase tracking-wider text-muted-foreground px-2">
+            Review mode
+          </span>
+          <ToolbarButton
+            active={editor.isActive("stickyComment")}
+            onClick={handleHighlighter}
+            title="Highlight & comment"
+          >
+            <Highlighter className="w-4 h-4" />
+          </ToolbarButton>
+        </div>,
+        document.body
+      )}
+      {editable && !isCommentMode && createPortal(
         <div
           className="fixed bottom-8 z-[100] flex items-center gap-0 sm:gap-0.5 px-2 py-1.5 sm:px-3 sm:py-2 bg-background/80 backdrop-blur-md rounded-full shadow-xl border border-border/50 max-w-[calc(100vw-1rem)]"
           style={bounds ? {
