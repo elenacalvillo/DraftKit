@@ -126,6 +126,21 @@ function dataTransferHasAnyFile(dt: DataTransfer | null | undefined): boolean {
   return false;
 }
 
+/**
+ * True when the clipboard carries usable text (HTML or non-empty plain text).
+ * Google Docs, Word, Notion, Pages, etc. attach a rendered PNG screenshot
+ * ALONGSIDE the real text/html payload. When both are present we must prefer
+ * the text — otherwise the user loses editable content and gets an image.
+ */
+function clipboardHasText(dt: DataTransfer | null | undefined): boolean {
+  if (!dt) return false;
+  const html = dt.getData?.("text/html") ?? "";
+  if (html.trim()) return true;
+  const text = dt.getData?.("text/plain") ?? "";
+  if (text.trim()) return true;
+  return false;
+}
+
 export function WorkspaceEditor({ content, onChange, editable, currentUserName, requestId, mode = "edit" }: WorkspaceEditorProps) {
   const isCommentMode = mode === "comment";
   // Track in-progress uploads so we can (a) show a loading indicator,
