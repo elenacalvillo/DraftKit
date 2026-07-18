@@ -480,6 +480,20 @@ export default function Workspace() {
     return idx >= 0 ? idx + 1 : null;
   })();
 
+  // Project member role → decides comment-only reviewer mode.
+  const projectRoleQuery = useProjectMemberRole(
+    request?.is_project_workspace ? request?.project_id ?? null : null,
+    user?.id ?? null,
+  );
+  const projectRole = projectRoleQuery.data ?? null;
+  const workspaceMode: "edit" | "comment" =
+    request?.is_project_workspace && isCommentOnlyRole(projectRole ?? undefined)
+      ? "comment"
+      : "edit";
+  const canRestoreHistory = isCreator || projectRole === "admin" || projectRole === "owner";
+
+
+
   if (authLoading || loading) {
     return (
       <DashboardLayout>
