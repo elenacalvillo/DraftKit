@@ -126,7 +126,8 @@ function dataTransferHasAnyFile(dt: DataTransfer | null | undefined): boolean {
   return false;
 }
 
-export function WorkspaceEditor({ content, onChange, editable, currentUserName, requestId }: WorkspaceEditorProps) {
+export function WorkspaceEditor({ content, onChange, editable, currentUserName, requestId, mode = "edit" }: WorkspaceEditorProps) {
+  const isCommentMode = mode === "comment";
   // Track in-progress uploads so we can (a) show a loading indicator,
   // (b) block the editor from being edited mid-upload to prevent the
   // user from typing into the spot the URL is about to land in.
