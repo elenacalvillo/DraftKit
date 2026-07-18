@@ -63,6 +63,14 @@ interface WorkspaceEditorProps {
    * handling is disabled.
    */
   requestId?: string;
+  /**
+   * `edit` (default) — full formatting toolbar and free typing.
+   * `comment` — reviewer mode. The prose is locked and the user can
+   * only add / update sticky highlight comments. The mode is enforced
+   * server-side too (see save_workspace_content) so bypassing the UI
+   * still fails safely.
+   */
+  mode?: "edit" | "comment";
 }
 
 // Accepted file types — exposed as a constant so it appears in BOTH
