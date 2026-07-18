@@ -71,6 +71,11 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -89,9 +94,12 @@ import {
   CHAPTER_STAGES,
   CHAPTER_STAGE_LABEL,
   PROJECT_MEMBER_ROLES,
+  PROJECT_MEMBER_ROLE_BEST_FOR,
   type ChapterStage,
   type ProjectMemberRole,
   isValidChapterStageTransition,
+  roleAccessSummary,
+  roleDescription,
   roleLabel,
 } from "@/lib/access";
 import { ProjectUpgradePrompt } from "@/components/projects/ProjectUpgradePrompt";
@@ -727,12 +735,39 @@ export default function ProjectDetail() {
 
           {/* Members tab */}
           <TabsContent value="members" className="pt-4">
-            <p className="text-sm text-muted-foreground mb-4">
-              Manage project access. Invite editors, co-authors, or beta readers and assign roles to control who can view or edit your manuscript.
-            </p>
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <p className="text-sm text-muted-foreground">
+                Manage project access. Invite editors, co-authors, or beta readers and assign roles to control who can view or edit your manuscript.
+              </p>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="sm" className="shrink-0 gap-1.5">
+                    <Info className="w-4 h-4" />
+                    What do roles do?
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-[340px] p-4 space-y-3">
+                  <p className="text-sm font-medium">Project roles</p>
+                  {PROJECT_MEMBER_ROLES.map((r) => (
+                    <div key={r} className="space-y-0.5">
+                      <div className="text-sm font-medium">{roleLabel(r)}</div>
+                      <div className="text-xs text-muted-foreground leading-relaxed">
+                        {roleDescription(r)}
+                      </div>
+                      <div className="text-xs text-muted-foreground/80 italic">
+                        Best for: {PROJECT_MEMBER_ROLE_BEST_FOR[r]}
+                      </div>
+                    </div>
+                  ))}
+                  <p className="text-xs text-muted-foreground/70 pt-1 border-t border-border">
+                    Owner (you) always has full control and can't be reassigned here.
+                  </p>
+                </PopoverContent>
+              </Popover>
+            </div>
             <Card>
               <CardContent className="p-4 space-y-4">
-                <div className="grid gap-2 md:grid-cols-[1fr_180px_auto]">
+                <div className="grid gap-2 md:grid-cols-[1fr_200px_auto]">
                   <Input
                     type="email"
                     placeholder="Invite by email"
@@ -748,10 +783,15 @@ export default function ProjectDetail() {
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="max-w-[340px]">
                       {PROJECT_MEMBER_ROLES.map((r) => (
-                        <SelectItem key={r} value={r}>
-                          {roleLabel(r)}
+                        <SelectItem key={r} value={r} className="py-2">
+                          <div className="space-y-0.5">
+                            <div className="font-medium">{roleLabel(r)}</div>
+                            <div className="text-xs text-muted-foreground leading-snug whitespace-normal">
+                              {roleDescription(r)}
+                            </div>
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -776,6 +816,9 @@ export default function ProjectDetail() {
                             {m.email}
                           </div>
                           <div className="text-xs text-muted-foreground">
+                            {roleLabel(m.role)} · {roleAccessSummary(m.role)}
+                          </div>
+                          <div className="text-xs text-muted-foreground/70">
                             {m.joined_at ? "Joined" : "Pending invitation"}
                           </div>
                         </div>
@@ -792,10 +835,15 @@ export default function ProjectDetail() {
                           <SelectTrigger className="w-[170px]">
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="max-w-[340px]">
                             {PROJECT_MEMBER_ROLES.map((r) => (
-                              <SelectItem key={r} value={r}>
-                                {roleLabel(r)}
+                              <SelectItem key={r} value={r} className="py-2">
+                                <div className="space-y-0.5">
+                                  <div className="font-medium">{roleLabel(r)}</div>
+                                  <div className="text-xs text-muted-foreground leading-snug whitespace-normal">
+                                    {roleDescription(r)}
+                                  </div>
+                                </div>
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -815,6 +863,7 @@ export default function ProjectDetail() {
               </CardContent>
             </Card>
           </TabsContent>
+
 
           {/* Broadcast tab */}
           <TabsContent value="broadcast" className="pt-4">
