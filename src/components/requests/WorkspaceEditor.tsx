@@ -326,16 +326,42 @@ export function WorkspaceEditor({ content, onChange, editable, currentUserName, 
           "workspace-prose min-h-[300px] px-5 py-4 focus:outline-none font-sans text-[15px] leading-[1.6] break-words",
         style: "overflow-wrap: break-word; word-break: break-word",
       },
+      // In comment-only reviewer mode we keep the editor "editable"
+      // (so selection + focus still work for placing a highlight) but
+      // reject any keystroke that would mutate the prose. Only
+      // selection/navigation keys and copy-shortcuts get through.
+      handleKeyDown: (_view, event) => {
+        if (!isCommentMode) return false;
+        const nav = new Set([
+          "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
+          "Home", "End", "PageUp", "PageDown", "Shift", "Meta", "Control", "Alt",
+          "Escape", "Tab",
+        ]);
+        if (nav.has(event.key)) return false;
+        if ((event.metaKey || event.ctrlKey) && ["a", "c", "A", "C"].includes(event.key)) {
+          return false;
+        }
+        event.preventDefault();
+        return true;
+      },
+      handleDrop: (_view, event) => {
+        if (isCommentMode) {
+          event.preventDefault();
+          return true;
+        }
+        return false;
+      },
       // ============================================================
       // PRIORITY KILL SWITCH — top-level handlePaste.
-      // Defined directly on editorProps so it wins BEFORE any
-      // extension's ProseMirror plugin and BEFORE the browser's
-      // default paste behaviour. If text/plain looks like markdown,
-      // we preventDefault, insert sanitized HTML, and return true to
-      // terminate the event chain so raw `#` / `---` characters can
-      // never leak through.
       // ============================================================
       handlePaste: (view, event) => {
+        // Reviewer mode: never let a paste mutate the prose.
+        if (isCommentMode) {
+          event.preventDefault();
+          toast.error("Reviewers can only add highlight comments, not paste new text.");
+          return true;
+        }
+
         // 1. Image files first — preserve the existing workspace
         //    upload pipeline (no base64, scoped to requestId).
         const imageFile = findImageInDataTransfer(event.clipboardData);
