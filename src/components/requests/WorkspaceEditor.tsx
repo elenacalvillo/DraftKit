@@ -376,24 +376,26 @@ export function WorkspaceEditor({ content, onChange, editable, currentUserName, 
           return true;
         }
 
-        // 1. Image files first — preserve the existing workspace
-        //    upload pipeline (no base64, scoped to requestId).
-        const imageFile = findImageInDataTransfer(event.clipboardData);
-        if (imageFile) {
-          event.preventDefault();
-          insertImageFileRef.current(imageFile, view.state.selection.from);
-          return true;
-        }
-
-        // 2. If the clipboard carries rich HTML (Substack, Google Docs,
-        //    Notion, Gmail, another browser tab), let Tiptap's built-in
-        //    HTML paste pipeline handle it. The text/plain fallback that
-        //    ships alongside almost always contains list markers ("- ",
-        //    "1. ") that would false-positive our markdown detector and
-        //    destroy the real formatting.
+        // 1. Rich HTML wins over everything. Google Docs, Word, Notion,
+        //    Pages, Substack and Gmail all attach a rendered PNG screenshot
+        //    of the selection ALONGSIDE the real text/html. If we grabbed
+        //    the image first the user would lose their editable prose —
+        //    the exact bug Blessing reported. Let Tiptap's HTML pipeline
+        //    handle it.
         const html = event.clipboardData?.getData("text/html") ?? "";
         if (html.trim()) {
           return false;
+        }
+
+        // 2. Image-only paste (screenshot, image copied from a browser or
+        //    Finder). No text payload, so uploading the image is the
+        //    correct behaviour. Route through the workspace-images
+        //    pipeline (no base64, scoped to requestId).
+        const imageFile = findImageInDataTransfer(event.clipboardData);
+        if (imageFile && !clipboardHasText(event.clipboardData)) {
+          event.preventDefault();
+          insertImageFileRef.current(imageFile, view.state.selection.from);
+          return true;
         }
 
         // 3. Genuine plain-text paste (no HTML clip) — only then run
