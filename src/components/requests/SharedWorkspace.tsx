@@ -874,6 +874,7 @@ function SharedWorkspaceInner({
               editable={true}
               currentUserName={currentUserName}
               requestId={requestId}
+              mode={mode}
             />
 
             {/* Zen header portal: Save & Notify */}
