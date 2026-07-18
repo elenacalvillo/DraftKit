@@ -64,7 +64,10 @@ import { InviteCollaboratorModal } from "@/components/requests/InviteCollaborato
 import { EditableChapterTitle } from "@/components/projects/EditableChapterTitle";
 import { ChapterNavigator } from "@/components/projects/ChapterNavigator";
 import { MoveChapterDialog } from "@/components/projects/MoveChapterDialog";
+import { ChapterHistoryDrawer } from "@/components/projects/ChapterHistoryDrawer";
 import { useProjectChapters } from "@/hooks/useProjectChapters";
+import { useProjectMemberRole } from "@/hooks/useProjectMemberRole";
+import { isCommentOnlyRole } from "@/lib/access";
 import { parseDateString, cn, sanitizeSubstackImageUrl } from "@/lib/utils";
 import { extractSubstackUsername, normalizeSubstackUrl } from "@/lib/substack-url";
 import { toast } from "sonner";
