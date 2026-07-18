@@ -46,6 +46,12 @@ describe("parseSaveError — guest-side save regression guard", () => {
     expect(r.friendly).toContain("boom 42");
   });
 
+  it("does not silently swallow Postgres 42702 ambiguous-column failures (regression: version-history rollout)", () => {
+    const r = parseSaveError(new Error('column reference "id" is ambiguous'));
+    expect(r.reason).toBe("unknown");
+    expect(r.friendly).toContain("ambiguous");
+  });
+
   it("handles non-Error inputs without throwing", () => {
     expect(parseSaveError("not_a_participant").reason).toBe("not_a_participant");
     expect(parseSaveError(null).reason).toBe("unknown");
