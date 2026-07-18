@@ -201,7 +201,10 @@ function SharedWorkspaceInner({
   isCreator,
   editingSessions = [],
   onShareClick,
+  mode = "edit",
+  headerExtras,
 }: SharedWorkspaceProps) {
+  const isCommentMode = mode === "comment";
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(sharedContent || "");
   const [isSaving, setIsSaving] = useState(false);
