@@ -683,6 +683,11 @@ export default function Workspace() {
                 <span className="hidden sm:inline">Move</span>
               </button>
             )}
+            {workspaceMode === "comment" && (
+              <Badge variant="secondary" className="ml-1 gap-1 border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300">
+                Reviewing
+              </Badge>
+            )}
           </span>
         ) : (
           `Drafting with ${partnerName}`
