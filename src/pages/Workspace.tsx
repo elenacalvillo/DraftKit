@@ -139,6 +139,7 @@ export default function Workspace() {
   const [bookedDates, setBookedDates] = useState<string[]>([]);
   const [msgRefreshKey, setMsgRefreshKey] = useState(0);
   const [showMoveChapter, setShowMoveChapter] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [retroDismissed, setRetroDismissed] = useState(
     () => localStorage.getItem(`retro-dismissed-${requestId}`) === "true",
   );
