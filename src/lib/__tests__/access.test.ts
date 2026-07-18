@@ -174,3 +174,19 @@ describe("role labels", () => {
     expect(roleLabel("custom" as unknown as "admin")).toBe("custom");
   });
 });
+
+describe("role descriptions", () => {
+  it("has a non-empty description and best-for entry for every role", () => {
+    for (const r of PROJECT_MEMBER_ROLES) {
+      expect(PROJECT_MEMBER_ROLE_DESCRIPTIONS[r]?.length ?? 0).toBeGreaterThan(10);
+      expect(PROJECT_MEMBER_ROLE_BEST_FOR[r]?.length ?? 0).toBeGreaterThan(5);
+      expect(roleDescription(r).length).toBeGreaterThan(10);
+      expect(roleAccessSummary(r).length).toBeGreaterThan(0);
+    }
+  });
+
+  it("returns empty strings for unknown roles", () => {
+    expect(roleDescription("unknown")).toBe("");
+    expect(roleAccessSummary("unknown")).toBe("");
+  });
+});
