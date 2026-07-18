@@ -5,6 +5,8 @@ import {
   CHAPTER_STAGES,
   MAX_IMAGE_BYTES,
   PROJECT_MEMBER_ROLES,
+  PROJECT_MEMBER_ROLE_BEST_FOR,
+  PROJECT_MEMBER_ROLE_DESCRIPTIONS,
   STORAGE_CAP_BYTES,
   STORAGE_CAP_REACHED_MESSAGE,
   canCreateAnotherProject,
@@ -15,6 +17,8 @@ import {
   isAcceptedImageMime,
   isValidChapterStageTransition,
   normalizeTier,
+  roleAccessSummary,
+  roleDescription,
   roleLabel,
 } from "../access";
 
