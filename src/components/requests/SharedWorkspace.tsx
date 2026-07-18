@@ -86,6 +86,15 @@ interface SharedWorkspaceProps {
   isCreator?: boolean;
   editingSessions?: EditingSession[];
   onShareClick?: () => void;
+  /**
+   * `edit` (default) — normal drafting. `comment` — reviewer mode:
+   * editor mounts read-only for prose but lets the user drop sticky
+   * highlight comments. Buttons and copy adapt so it never looks like
+   * the user is about to overwrite the draft.
+   */
+  mode?: "edit" | "comment";
+  /** Optional slot for a "History" button in the workspace header. */
+  headerExtras?: React.ReactNode;
 }
 
 // Local recovery draft key per workspace — preserves unsynced edits if a save
