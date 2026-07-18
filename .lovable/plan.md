@@ -1,38 +1,84 @@
-# Explain Project Roles in the UI
 
-Karen (and other project owners) can assign 4 roles when inviting collaborators to a book project, but the UI never explains what each one actually does. Today it's just a dropdown of labels ("Admin", "Chapter Writer", "Peer Reviewer", "Cross-chapter Reviewer") with zero context — so people guess, or ask.
+# Comment-only reviewers + chapter version history
 
-## The definitions (source of truth: `project_member_role` + `project_member_can_access_chapter` in `20260502120100_book_projects_rls.sql`)
+Two additive changes so authors keep control of their words and reviewers still contribute meaningfully — without turning DraftKit into Google Docs.
 
-| Role | What they can do | Best for |
-|---|---|---|
-| **Admin** | Full control of the project: rename it, add/remove members, change roles, create and delete chapters, edit any chapter, publish. Same powers as the owner except transferring ownership. | A co-author or trusted managing editor you want to run the project alongside you. |
-| **Chapter Writer** | Can open and edit **only the chapters they've been assigned to**. Can't see or edit other chapters, can't invite people, can't change project settings. | Contributors writing one specific chapter (guest authors, ghostwriters). |
-| **Peer Reviewer** | Can open and comment/edit **only the specific chapters they've been assigned to review**. Same scope limits as Chapter Writer — everything else in the project stays hidden. | A beta reader or fellow writer giving feedback on one chapter at a time. |
-| **Cross-chapter Reviewer** | Can open and edit **every chapter in the project**, but can't manage members or project settings. | A developmental editor or continuity reader who needs to see the whole manuscript to catch inconsistencies. |
+## Part 1 — Comment-only reviewer mode
 
-Owner is not a member role — it's whoever created the project and can't be reassigned from this UI.
+**Roles affected:** `peer_reviewer` and `cross_chapter_reviewer`. `admin` and `chapter_writer` keep full edit rights unchanged.
 
-## What to build
+**What reviewers can do:** open the chapter, read it, select text, and add / edit / delete their own sticky highlight comments (the `StickyComment` mark we already ship).
+**What they can't do:** type, delete, paste, format, insert images, or otherwise mutate `shared_content` prose.
 
-1. **Single source of truth for role copy** — add a `PROJECT_MEMBER_ROLE_DESCRIPTIONS` map in `src/lib/access.ts` next to the existing `roleLabel()` helper. One short sentence per role, matching the table above. Reuse everywhere so we never fork the wording.
+### Frontend (`src/components/requests/WorkspaceEditor.tsx` + `src/pages/Workspace.tsx`)
+- Resolve the viewer's project role (already available via `useProjectMembers` on project workspaces). Add a `mode: "edit" | "comment"` prop to `WorkspaceEditor`.
+- In `comment` mode:
+  - Mount Tiptap with `editable: true` but wire an `editorProps.handleKeyDown` / `handleTextInput` / `handlePaste` that blocks everything **except** the sticky-comment commands.
+  - Hide the formatting floating toolbar; keep only the "Add comment" affordance on selection.
+  - Replace the "Save" / autosave path with a comment-only save that sends the updated `shared_content` (which now differs only by comment marks) through the existing save RPC.
+  - Show a small banner: "Review mode — you can comment, not edit."
+- Sidebar / header badge: "Reviewing" pill next to the viewer's name so it's obvious.
 
-2. **Explain roles inside the Invite / Manage Members panel** (`src/pages/ProjectDetail.tsx`, around the members section at line ~731):
-   - In the role `<Select>` used for both **inviting a new member** and **changing an existing member's role**, render each `SelectItem` with the label on top and a small muted description underneath (same pattern shadcn uses for rich select items). So the dropdown itself teaches what each option means.
-   - Next to the "Members" section heading, add a `MetricInfo`-style ⓘ button (reuse the existing `Tooltip` primitive — no need to extend `MetricInfo` which is analytics-specific) that opens a popover listing all four roles with their one-line descriptions. This gives a full reference without needing to open the dropdown.
+### Backend guardrail (defense in depth)
+- Add a SECURITY DEFINER helper `public.is_comment_only_reviewer(_user_id, _request_id)` that returns true when the viewer's project_members role is peer_reviewer or cross_chapter_reviewer for the chapter's project.
+- Extend `save_workspace_content` (or a new sibling `save_workspace_comments_only`) so that when the caller is comment-only, we diff old vs new `shared_content` and reject the write if anything outside `<span class="dk-highlight">` attributes changed. Simple approach: strip all `dk-highlight` spans from both old and new HTML and require the stripped strings to be byte-identical.
+- No RLS policy changes needed — access already flows through project role checks.
 
-3. **Show the description on the member row** — under each member's name in the members list, show `roleLabel(role)` (already there) plus a very short suffix like "· can edit assigned chapters only" so the owner sees at a glance what access each person actually has, without opening the dropdown.
+## Part 2 — Chapter version history
 
-No backend or schema changes — RLS already enforces all of this correctly. This is a pure frontend clarity pass.
+Session-level snapshots, not per-keystroke. Fixes the "what if someone messes up my chapter" fear across all roles.
+
+### Schema (single migration)
+```sql
+CREATE TABLE public.chapter_revisions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  request_id uuid NOT NULL REFERENCES public.collab_requests(id) ON DELETE CASCADE,
+  shared_content text,
+  editor_name text,
+  editor_user_id uuid,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX chapter_revisions_request_created_idx
+  ON public.chapter_revisions (request_id, created_at DESC);
+
+GRANT SELECT, INSERT ON public.chapter_revisions TO authenticated;
+GRANT ALL ON public.chapter_revisions TO service_role;
+ALTER TABLE public.chapter_revisions ENABLE ROW LEVEL SECURITY;
+
+-- Read: anyone with workspace access
+CREATE POLICY "revisions readable by workspace participants"
+  ON public.chapter_revisions FOR SELECT TO authenticated
+  USING (public.has_workspace_access(auth.uid(), request_id));
+-- Write: only via SECURITY DEFINER RPC (no direct INSERT policy)
+```
+
+### Snapshot logic
+- Modify `save_workspace_content` to also insert a row into `chapter_revisions` **when** the new content differs from the last snapshot for that request AND the last snapshot is older than 2 minutes (dedupe rapid autosaves into one revision per editing session).
+- Retention: keep the latest 30 revisions per chapter. Prune inline in the same RPC (`DELETE ... WHERE id NOT IN (SELECT id ... ORDER BY created_at DESC LIMIT 30)`). Cheap, bounded, no cron needed.
+
+### UI
+- New component `src/components/projects/ChapterHistoryDrawer.tsx`, opened from a "History" button in the workspace header (visible to anyone with workspace access; **restore action visible only to admins/chapter_writers**, not comment-only reviewers).
+- Drawer shows a list: `{editor_name} · {relative time}`. Click a revision → right-side preview renders sanitized HTML. Two buttons: **Restore this version** (writes it back via `save_workspace_content`, which itself snapshots the pre-restore state so restores are also reversible) and **Diff vs current** (uses `diff` npm package with a simple HTML-safe word-level renderer).
+- Add `diff` (or reuse if present) — tiny dependency, no server component.
 
 ## Files touched
 
-- `src/lib/access.ts` — add `PROJECT_MEMBER_ROLE_DESCRIPTIONS` + a helper `roleDescription(role)`.
-- `src/pages/ProjectDetail.tsx` — enrich the role `<Select>` items, add the ⓘ roles-reference popover on the Members section, add the description suffix on each member row.
-- `src/lib/__tests__/access.test.ts` — add a small test that every `PROJECT_MEMBER_ROLES` entry has a matching label and description (prevents future drift).
+- `supabase/migrations/<new>_chapter_revisions_and_comment_only.sql` — table + grants + policies + `save_workspace_content` update + `is_comment_only_reviewer` helper + comment-only diff guard.
+- `src/components/requests/WorkspaceEditor.tsx` — `mode` prop, keydown/paste guards in comment mode, hide format toolbar.
+- `src/pages/Workspace.tsx` — resolve project role → pick mode, render "Reviewing" badge + banner + History button.
+- `src/components/projects/ChapterHistoryDrawer.tsx` — new drawer, list + preview + restore + diff.
+- `src/hooks/useChapterRevisions.ts` — new hook (`list`, `restore`).
+- `src/lib/access.ts` — helper `isCommentOnlyRole(role)`; update role description copy for Peer/Cross-chapter Reviewer to say "read + comment only".
+- `src/lib/__tests__/access.test.ts` — cover `isCommentOnlyRole`.
 
-## Out of scope
+## Out of scope (explicit)
 
-- Renaming roles or changing permissions.
-- Adding a new role (e.g. read-only "Viewer") — happy to plan that separately if you want it.
-- Surfacing role descriptions on the guest's side (they don't pick their own role); can add later if useful.
+- Real-time cursors or CRDT-style character-level attribution.
+- Per-user branching / suggested edits (Option #2). Easy follow-up if reviewers ask for it.
+- Comment threads / replies on highlights — current single-comment model stays.
+- Rich diff (moves, formatting). Word-level text diff only.
+
+## Risk notes
+
+- The "strip comment marks and compare" diff guard must handle whitespace and attribute-order variance from Tiptap serialization. Mitigate by normalizing both sides through the same DOMPurify config before comparing.
+- 30-revision cap × ~50 chapters × ~50KB average HTML ≈ 75 MB per prolific project — well inside our storage budget, but worth watching in analytics.
