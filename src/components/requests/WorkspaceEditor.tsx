@@ -63,6 +63,14 @@ interface WorkspaceEditorProps {
    * handling is disabled.
    */
   requestId?: string;
+  /**
+   * `edit` (default) — full formatting toolbar and free typing.
+   * `comment` — reviewer mode. The prose is locked and the user can
+   * only add / update sticky highlight comments. The mode is enforced
+   * server-side too (see save_workspace_content) so bypassing the UI
+   * still fails safely.
+   */
+  mode?: "edit" | "comment";
 }
 
 // Accepted file types — exposed as a constant so it appears in BOTH
@@ -118,7 +126,8 @@ function dataTransferHasAnyFile(dt: DataTransfer | null | undefined): boolean {
   return false;
 }
 
-export function WorkspaceEditor({ content, onChange, editable, currentUserName, requestId }: WorkspaceEditorProps) {
+export function WorkspaceEditor({ content, onChange, editable, currentUserName, requestId, mode = "edit" }: WorkspaceEditorProps) {
+  const isCommentMode = mode === "comment";
   // Track in-progress uploads so we can (a) show a loading indicator,
   // (b) block the editor from being edited mid-upload to prevent the
   // user from typing into the spot the URL is about to land in.
@@ -317,16 +326,42 @@ export function WorkspaceEditor({ content, onChange, editable, currentUserName, 
           "workspace-prose min-h-[300px] px-5 py-4 focus:outline-none font-sans text-[15px] leading-[1.6] break-words",
         style: "overflow-wrap: break-word; word-break: break-word",
       },
+      // In comment-only reviewer mode we keep the editor "editable"
+      // (so selection + focus still work for placing a highlight) but
+      // reject any keystroke that would mutate the prose. Only
+      // selection/navigation keys and copy-shortcuts get through.
+      handleKeyDown: (_view, event) => {
+        if (!isCommentMode) return false;
+        const nav = new Set([
+          "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
+          "Home", "End", "PageUp", "PageDown", "Shift", "Meta", "Control", "Alt",
+          "Escape", "Tab",
+        ]);
+        if (nav.has(event.key)) return false;
+        if ((event.metaKey || event.ctrlKey) && ["a", "c", "A", "C"].includes(event.key)) {
+          return false;
+        }
+        event.preventDefault();
+        return true;
+      },
+      handleDrop: (_view, event) => {
+        if (isCommentMode) {
+          event.preventDefault();
+          return true;
+        }
+        return false;
+      },
       // ============================================================
       // PRIORITY KILL SWITCH — top-level handlePaste.
-      // Defined directly on editorProps so it wins BEFORE any
-      // extension's ProseMirror plugin and BEFORE the browser's
-      // default paste behaviour. If text/plain looks like markdown,
-      // we preventDefault, insert sanitized HTML, and return true to
-      // terminate the event chain so raw `#` / `---` characters can
-      // never leak through.
       // ============================================================
       handlePaste: (view, event) => {
+        // Reviewer mode: never let a paste mutate the prose.
+        if (isCommentMode) {
+          event.preventDefault();
+          toast.error("Reviewers can only add highlight comments, not paste new text.");
+          return true;
+        }
+
         // 1. Image files first — preserve the existing workspace
         //    upload pipeline (no base64, scoped to requestId).
         const imageFile = findImageInDataTransfer(event.clipboardData);
@@ -562,8 +597,34 @@ export function WorkspaceEditor({ content, onChange, editable, currentUserName, 
           document.body
         )}
 
-      {/* Floating Pill Toolbar -- portaled to body */}
-      {editable && createPortal(
+      {/* Floating Pill Toolbar -- portaled to body. In comment mode we
+          render a tiny "Highlight & comment" pill instead of the full
+          formatting toolbar since reviewers can't change the prose. */}
+      {editable && isCommentMode && createPortal(
+        <div
+          className="fixed bottom-8 z-[100] flex items-center gap-1 px-3 py-2 bg-background/80 backdrop-blur-md rounded-full shadow-xl border border-border/50 max-w-[calc(100vw-1rem)]"
+          style={bounds ? {
+            left: bounds.left + bounds.width / 2,
+            transform: 'translateX(-50%)',
+          } : {
+            left: '50%',
+            transform: 'translateX(-50%)',
+          }}
+        >
+          <span className="text-[11px] uppercase tracking-wider text-muted-foreground px-2">
+            Review mode
+          </span>
+          <ToolbarButton
+            active={editor.isActive("stickyComment")}
+            onClick={handleHighlighter}
+            title="Highlight & comment"
+          >
+            <Highlighter className="w-4 h-4" />
+          </ToolbarButton>
+        </div>,
+        document.body
+      )}
+      {editable && !isCommentMode && createPortal(
         <div
           className="fixed bottom-8 z-[100] flex items-center gap-0 sm:gap-0.5 px-2 py-1.5 sm:px-3 sm:py-2 bg-background/80 backdrop-blur-md rounded-full shadow-xl border border-border/50 max-w-[calc(100vw-1rem)]"
           style={bounds ? {

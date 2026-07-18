@@ -207,3 +207,12 @@ export function roleDescription(role: ProjectMemberRole | string): string {
   }
   return "";
 }
+
+/** True when the given project role is restricted to leaving comments
+ *  and cannot modify the underlying prose. Kept in one place so the
+ *  editor, header badge, and backend guard cannot drift. */
+export function isCommentOnlyRole(
+  role: ProjectMemberRole | string | null | undefined,
+): boolean {
+  return role === "peer_reviewer" || role === "cross_chapter_reviewer";
+}

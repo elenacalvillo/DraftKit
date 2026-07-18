@@ -89,6 +89,41 @@ export type Database = {
           },
         ]
       }
+      chapter_revisions: {
+        Row: {
+          created_at: string
+          editor_name: string | null
+          editor_user_id: string | null
+          id: string
+          request_id: string
+          shared_content: string | null
+        }
+        Insert: {
+          created_at?: string
+          editor_name?: string | null
+          editor_user_id?: string | null
+          id?: string
+          request_id: string
+          shared_content?: string | null
+        }
+        Update: {
+          created_at?: string
+          editor_name?: string | null
+          editor_user_id?: string | null
+          id?: string
+          request_id?: string
+          shared_content?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chapter_revisions_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "collab_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       collab_metrics: {
         Row: {
           created_at: string
@@ -1039,6 +1074,7 @@ export type Database = {
       }
     }
     Functions: {
+      _normalize_for_comment_diff: { Args: { _html: string }; Returns: string }
       bump_nudge_count: {
         Args: { _creator_id: string }
         Returns: {
@@ -1144,6 +1180,10 @@ export type Database = {
         Returns: undefined
       }
       is_collab_participant: { Args: { _user_id: string }; Returns: boolean }
+      is_comment_only_reviewer: {
+        Args: { _request_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_pro_user: { Args: { _user_id: string }; Returns: boolean }
       is_project_member: {
         Args: { _project_id: string; _user_id: string }
@@ -1220,6 +1260,15 @@ export type Database = {
         }[]
       }
       normalize_email: { Args: { _email: string }; Returns: string }
+      restore_chapter_revision: {
+        Args: { _revision_id: string }
+        Returns: {
+          content_last_edited_at: string
+          content_last_edited_by: string
+          id: string
+          shared_content: string
+        }[]
+      }
       save_workspace_content: {
         Args: {
           _content: string

@@ -86,6 +86,15 @@ interface SharedWorkspaceProps {
   isCreator?: boolean;
   editingSessions?: EditingSession[];
   onShareClick?: () => void;
+  /**
+   * `edit` (default) — normal drafting. `comment` — reviewer mode:
+   * editor mounts read-only for prose but lets the user drop sticky
+   * highlight comments. Buttons and copy adapt so it never looks like
+   * the user is about to overwrite the draft.
+   */
+  mode?: "edit" | "comment";
+  /** Optional slot for a "History" button in the workspace header. */
+  headerExtras?: React.ReactNode;
 }
 
 // Local recovery draft key per workspace — preserves unsynced edits if a save
@@ -192,7 +201,10 @@ function SharedWorkspaceInner({
   isCreator,
   editingSessions = [],
   onShareClick,
+  mode = "edit",
+  headerExtras,
 }: SharedWorkspaceProps) {
+  const isCommentMode = mode === "comment";
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(sharedContent || "");
   const [isSaving, setIsSaving] = useState(false);
@@ -821,6 +833,8 @@ function SharedWorkspaceInner({
             </div>
           )}
 
+          {headerExtras}
+
           {/* Primary action — always visible */}
           {canEdit && !isEditing && (
             <Button
@@ -832,11 +846,16 @@ function SharedWorkspaceInner({
               title={editBlockedReason || undefined}
             >
               <PenLine className="w-3.5 h-3.5 mr-1.5" />
-              {hasContent ? "Edit Draft" : "Start Writing"}
+              {isCommentMode
+                ? "Add comments"
+                : hasContent
+                  ? "Edit Draft"
+                  : "Start Writing"}
             </Button>
           )}
         </div>
       </div>
+
 
 
       <AnimatePresence mode="wait">
@@ -852,7 +871,11 @@ function SharedWorkspaceInner({
             <div className="flex items-center gap-2 px-4 py-2.5 bg-accent/10 border-b border-accent/20 text-sm text-accent-foreground">
               <AlertCircle className="w-4 h-4 text-accent flex-shrink-0" />
               <span>
-                You are currently editing. Remember to <strong>Save & Sync</strong> so others can see your changes.
+                {isCommentMode ? (
+                  <>You're in <strong>review mode</strong>. Select any text and use the highlighter to leave a comment. Prose changes are locked.</>
+                ) : (
+                  <>You are currently editing. Remember to <strong>Save & Sync</strong> so others can see your changes.</>
+                )}
               </span>
             </div>
 
@@ -862,6 +885,7 @@ function SharedWorkspaceInner({
               editable={true}
               currentUserName={currentUserName}
               requestId={requestId}
+              mode={mode}
             />
 
             {/* Zen header portal: Save & Notify */}

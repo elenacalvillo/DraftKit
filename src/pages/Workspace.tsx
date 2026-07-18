@@ -64,7 +64,10 @@ import { InviteCollaboratorModal } from "@/components/requests/InviteCollaborato
 import { EditableChapterTitle } from "@/components/projects/EditableChapterTitle";
 import { ChapterNavigator } from "@/components/projects/ChapterNavigator";
 import { MoveChapterDialog } from "@/components/projects/MoveChapterDialog";
+import { ChapterHistoryDrawer } from "@/components/projects/ChapterHistoryDrawer";
 import { useProjectChapters } from "@/hooks/useProjectChapters";
+import { useProjectMemberRole } from "@/hooks/useProjectMemberRole";
+import { isCommentOnlyRole } from "@/lib/access";
 import { parseDateString, cn, sanitizeSubstackImageUrl } from "@/lib/utils";
 import { extractSubstackUsername, normalizeSubstackUrl } from "@/lib/substack-url";
 import { toast } from "sonner";
@@ -136,6 +139,7 @@ export default function Workspace() {
   const [bookedDates, setBookedDates] = useState<string[]>([]);
   const [msgRefreshKey, setMsgRefreshKey] = useState(0);
   const [showMoveChapter, setShowMoveChapter] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [retroDismissed, setRetroDismissed] = useState(
     () => localStorage.getItem(`retro-dismissed-${requestId}`) === "true",
   );
@@ -476,6 +480,20 @@ export default function Workspace() {
     return idx >= 0 ? idx + 1 : null;
   })();
 
+  // Project member role → decides comment-only reviewer mode.
+  const projectRoleQuery = useProjectMemberRole(
+    request?.is_project_workspace ? request?.project_id ?? null : null,
+    user?.id ?? null,
+  );
+  const projectRole = projectRoleQuery.data ?? null;
+  const workspaceMode: "edit" | "comment" =
+    request?.is_project_workspace && isCommentOnlyRole(projectRole ?? undefined)
+      ? "comment"
+      : "edit";
+  const canRestoreHistory = isCreator || projectRole === "admin" || projectRole === "owner";
+
+
+
   if (authLoading || loading) {
     return (
       <DashboardLayout>
@@ -664,6 +682,11 @@ export default function Workspace() {
                 <FolderInput className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Move</span>
               </button>
+            )}
+            {workspaceMode === "comment" && (
+              <Badge variant="secondary" className="ml-1 gap-1 border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300">
+                Reviewing
+              </Badge>
             )}
           </span>
         ) : (
@@ -1344,6 +1367,21 @@ export default function Workspace() {
               isCreator={isCreator}
               editingSessions={(request as any).editing_sessions || []}
               onShareClick={isCreator ? () => setShowInviteModal(true) : undefined}
+              mode={workspaceMode}
+              headerExtras={
+                request.is_project_workspace ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8"
+                    onClick={() => setShowHistory(true)}
+                    title="Version history"
+                  >
+                    <Clock className="w-3.5 h-3.5 sm:mr-1.5" />
+                    <span className="hidden sm:inline">History</span>
+                  </Button>
+                ) : null
+              }
               onContentSaved={(content, editedBy, editedAt) => {
                 setRequest((prev) =>
                   prev
@@ -1433,6 +1471,19 @@ export default function Workspace() {
           onMoved={(targetProjectId) => {
             // Redirect out of the stale project URL to avoid 404 state.
             navigate(`/dashboard/projects/${targetProjectId}`);
+          }}
+        />
+      )}
+      {request?.is_project_workspace && (
+        <ChapterHistoryDrawer
+          open={showHistory}
+          onOpenChange={setShowHistory}
+          requestId={request.id}
+          canRestore={canRestoreHistory}
+          onRestored={() => {
+            // Refresh the chapter row so the restored content shows up.
+            queryClient.invalidateQueries({ queryKey: ["project_chapters", request.project_id] });
+            window.location.reload();
           }}
         />
       )}
