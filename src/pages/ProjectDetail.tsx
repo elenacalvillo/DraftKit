@@ -89,9 +89,12 @@ import {
   CHAPTER_STAGES,
   CHAPTER_STAGE_LABEL,
   PROJECT_MEMBER_ROLES,
+  PROJECT_MEMBER_ROLE_BEST_FOR,
   type ChapterStage,
   type ProjectMemberRole,
   isValidChapterStageTransition,
+  roleAccessSummary,
+  roleDescription,
   roleLabel,
 } from "@/lib/access";
 import { ProjectUpgradePrompt } from "@/components/projects/ProjectUpgradePrompt";
