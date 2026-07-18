@@ -1469,6 +1469,19 @@ export default function Workspace() {
           }}
         />
       )}
+      {request?.is_project_workspace && (
+        <ChapterHistoryDrawer
+          open={showHistory}
+          onOpenChange={setShowHistory}
+          requestId={request.id}
+          canRestore={canRestoreHistory}
+          onRestored={() => {
+            // Refresh the chapter row so the restored content shows up.
+            queryClient.invalidateQueries({ queryKey: ["project_chapters", request.project_id] });
+            window.location.reload();
+          }}
+        />
+      )}
     </DashboardLayout>
   );
 }
