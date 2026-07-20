@@ -1,43 +1,68 @@
-## Bug confirmed
+# Collaborators can't open pitched workspaces — plan
 
-In `src/components/requests/WorkspaceEditor.tsx`, the top-level `handlePaste` (and the ProseMirror plugin's `handlePaste`) both check for an image file in `clipboardData` **before** checking for `text/html`. When a user copies from Google Docs, the clipboard contains:
+## What the users are hitting
 
-- `text/html` — the real formatted document
-- `text/plain` — plain fallback
-- `image/png` — a rendered screenshot of the selection (Google Docs always attaches this)
+Verified in the database: `collab_requests` currently has SELECT policies for only two audiences —
 
-Because we look for an image first, we upload the screenshot and discard the HTML. This is exactly what Blessing hit.
+- `Creators view own requests` → the host (creator_id)
+- `Requesters can view their own requests` → the pitcher (requester_user_id)
+
+There is **no SELECT policy for invited collaborators** listed in `workspace_collaborators`. The recent security pass added an UPDATE policy for them ("Collaborators can edit shared workspace content") but never restored the matching SELECT policy.
+
+Effect: when Karen invites a third person (or when a co-writer is invited to a project workspace) that person can see the row in the Collaborations hub (because `list_my_collaborator_workspaces` is SECURITY DEFINER and bypasses RLS), but the moment they click into `/workspace/:id`, `Workspace.tsx` runs `supabase.from("collab_requests").select(...)` directly — RLS returns 0 rows — and the page shows "workspace not found / access denied". That matches the "hard time accessing pitched collaborations" report.
+
+Pitchers themselves are still fine (their own SELECT policy is intact). The regression is scoped to invited collaborators and project members who reach a workspace through an invite rather than by being the host or the original requester.
 
 ## Fix
 
-Reorder the paste priority so image insertion only happens when the clipboard is **image-only** (no usable text payload). Drag-and-drop and the toolbar image button stay unchanged — they remain the explicit paths for inserting an image.
+Add one focused SELECT policy on `collab_requests`, mirroring the existing UPDATE policy for collaborators, plus the equivalent for project members so project-workspace invitees don't hit the same wall.
 
-### Changes to `src/components/requests/WorkspaceEditor.tsx`
+New migration:
 
-1. Add a small helper `clipboardHasText(dt)` returning true when either `text/html` or a non-empty `text/plain` is present.
-2. In the top-level `editorProps.handlePaste`:
-   - Keep reviewer-mode guard as step 0.
-   - New step 1: if `text/html` is present and non-empty → `return false` (let Tiptap's HTML pipeline run). This wins over the image branch.
-   - Step 2: if an image file is in the clipboard **and** there is no text/html and no meaningful text/plain → run the existing `insertImageFileRef` upload path.
-   - Step 3: plain-text markdown detection (unchanged).
-   - Step 4: fall through (unchanged).
-3. In the ProseMirror plugin's `handlePaste` (the safety-net layer):
-   - Same guard: only treat as an image paste when the clipboard has no text payload. Otherwise return `false` so Tiptap handles the HTML/text normally.
-4. `handleDrop` in the plugin is **unchanged** — drag-and-drop of an image file is still an explicit image insert, matching the ticket's requirement.
+```sql
+-- Invited workspace collaborators can read the collab_request they were added to
+CREATE POLICY "Collaborators can view shared workspaces"
+ON public.collab_requests
+FOR SELECT
+TO authenticated
+USING (
+  id IN (
+    SELECT wc.request_id
+    FROM public.workspace_collaborators wc
+    WHERE wc.user_id = auth.uid()
+  )
+);
 
-### Result
+-- Project members can read every chapter workspace inside their project
+CREATE POLICY "Project members can view project workspaces"
+ON public.collab_requests
+FOR SELECT
+TO authenticated
+USING (
+  is_project_workspace = true
+  AND project_id IS NOT NULL
+  AND project_id IN (
+    SELECT pm.project_id
+    FROM public.project_members pm
+    WHERE pm.user_id = auth.uid()
+  )
+);
+```
 
-- Paste from Google Docs → HTML lands, formatted, editable. Screenshot is ignored.
-- Paste from Substack / Notion / Gmail → unchanged (already HTML-first now, but this makes it explicit).
-- Copy an image from Preview / a browser and paste → still uploads as an image (clipboard is image-only).
-- Screenshot to clipboard + Cmd+V → still uploads (image-only).
-- Drag-drop an image file → still uploads.
-- Toolbar image button → still uploads.
+Both policies are read-only, scoped by explicit `auth.uid()` membership rows, and cannot leak requests outside the caller's own invites (they satisfy the Realtime Isolation rule — no `USING true`).
 
-### Verification
+No GRANT changes needed; `collab_requests` already grants SELECT to `authenticated`.
 
-- Manually paste a Google Docs selection into the workspace editor in the preview and confirm formatted text appears (no image node).
-- Paste a Finder-copied PNG and confirm it still uploads via the workspace-images pipeline.
-- Existing paste tests under `src/components/requests/__tests__` (if any cover the editor) still pass; add a lightweight unit test around a `clipboardHasText`-style helper if we extract it.
+## Verification
 
-No schema, RLS, or edge function changes. Purely frontend paste-priority reorder.
+1. Migration applies cleanly (`supabase--migration`).
+2. `pg_policies` shows the two new SELECT policies alongside the existing ones.
+3. Regression: as a signed-in collaborator (not host, not requester), `select id from collab_requests where id = <shared workspace id>` returns the row. As a random signed-in user with no membership, it still returns nothing.
+4. Manually load `/workspace/:id` in the preview as an invited collaborator — page renders instead of the "not found" state.
+5. Add a small SQL regression test asserting each new policy's `USING` clause exists, so a future security pass can't silently remove it again.
+
+## Out of scope
+
+- No changes to write paths, edge functions, or the `has_workspace_access` helper.
+- No changes to the requester/host SELECT policies.
+- Public/anonymous access is untouched — both new policies are `TO authenticated`.
