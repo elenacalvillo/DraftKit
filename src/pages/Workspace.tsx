@@ -524,14 +524,101 @@ export default function Workspace() {
   }
 
   if (request.status !== "approved" && request.status !== "published") {
+    const isPending = request.status === "pending";
+    const canHostRespond = isPending && isCreator;
+
+    const handleHostApprove = async () => {
+      try {
+        await approveCollabRequest({
+          requestId: request.id,
+          creatorId: request.creator_id,
+          requestedDate: request.requested_date,
+        });
+        toast.success(`Approved ${request.requester_name || "collab"}`);
+        await queryClient.invalidateQueries({ queryKey: ["my_workspaces"] });
+        // Reload the workspace now that it's approved.
+        window.location.reload();
+      } catch (err) {
+        console.error(err);
+        toast.error("Failed to approve. Try again.");
+      }
+    };
+
+    const handleHostDecline = async () => {
+      try {
+        await declineCollabRequest(request.id);
+        toast.info(`Declined ${request.requester_name || "collab"}`);
+        await queryClient.invalidateQueries({ queryKey: ["my_workspaces"] });
+        navigate(backPath);
+      } catch (err) {
+        console.error(err);
+        toast.error("Failed to decline. Try again.");
+      }
+    };
+
     return (
       <DashboardLayout>
-        <div className="max-w-6xl mx-auto text-center py-20">
-          <h2 className="text-2xl font-bold mb-2">Workspace unavailable</h2>
-          <p className="text-muted-foreground mb-6">The workspace is only available for approved collaborations.</p>
-          <Button variant="outline" onClick={() => navigate(backPath)}>
-            Back to Collabs
-          </Button>
+        <div className="max-w-2xl mx-auto py-16 space-y-6">
+          {canHostRespond ? (
+            <>
+              <div className="text-center">
+                <Badge variant="destructive" className="mb-3">Pending your response</Badge>
+                <h2 className="text-2xl font-bold mb-2">Approve this pitch first</h2>
+                <p className="text-muted-foreground">
+                  The workspace opens once you approve. {request.requester_name || "The guest"} will be notified either way.
+                </p>
+              </div>
+
+              <div className="glass-card p-6 space-y-3">
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-12 w-12">
+                    <AvatarImage
+                      src={
+                        request.requester_profile_image_url
+                          ? sanitizeSubstackImageUrl(request.requester_profile_image_url)
+                          : undefined
+                      }
+                    />
+                    <AvatarFallback>{(request.requester_name || "?").charAt(0)}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <p className="font-semibold truncate">{request.requester_name || "Guest"}</p>
+                    {request.requester_email && (
+                      <p className="text-sm text-muted-foreground truncate">{request.requester_email}</p>
+                    )}
+                  </div>
+                </div>
+                {request.message && (
+                  <p className="text-sm whitespace-pre-wrap border-l-2 border-primary/40 pl-3 text-muted-foreground">
+                    {request.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button variant="gradient" className="flex-1" onClick={handleHostApprove}>
+                  <Check className="w-4 h-4 mr-2" />
+                  Approve & open workspace
+                </Button>
+                <Button variant="outline" className="flex-1" onClick={handleHostDecline}>
+                  <X className="w-4 h-4 mr-2" />
+                  Decline
+                </Button>
+              </div>
+            </>
+          ) : (
+            <div className="text-center">
+              <h2 className="text-2xl font-bold mb-2">Workspace unavailable</h2>
+              <p className="text-muted-foreground mb-6">
+                {isPending
+                  ? "This pitch hasn't been approved by the host yet. You'll get an email as soon as it is."
+                  : "The workspace is only available for approved collaborations."}
+              </p>
+              <Button variant="outline" onClick={() => navigate(backPath)}>
+                Back to Collabs
+              </Button>
+            </div>
+          )}
         </div>
       </DashboardLayout>
     );
