@@ -311,7 +311,9 @@ export default function Collaborations() {
               {tab === "archived" && "Nothing archived"}
             </h3>
             <p className="text-muted-foreground max-w-sm mx-auto">
-              {tab === "active"
+              {tab === "needs_response"
+                ? "Incoming pitches from other creators land here for you to approve or decline."
+                : tab === "active"
                 ? "Approved collabs, sent pitches, and book chapters you're writing will appear here."
                 : "This bucket is empty."}
             </p>
