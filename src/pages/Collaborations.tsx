@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
-import { ArrowLeft, BookMarked, Inbox, PenLine, Send, Users, Sparkles } from "lucide-react";
+import { ArrowLeft, BookMarked, Inbox, PenLine, Send, Users, Sparkles, Check, X } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +13,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { sanitizeSubstackImageUrl, cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useMyWorkspaces, bucketWorkspace, type MyWorkspace, type WorkspaceRole } from "@/hooks/useMyWorkspaces";
+import { useActiveCollabs } from "@/hooks/useActiveCollabs";
+import { approveCollabRequest, declineCollabRequest } from "@/lib/collab-actions";
 
 type Bucket = "needs_response" | "active" | "published" | "archived";
 
