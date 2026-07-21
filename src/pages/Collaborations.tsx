@@ -318,7 +318,16 @@ export default function Collaborations() {
           </div>
         ) : (
           <div className="grid gap-3">
-            {active.map((w) => <WorkspaceRow key={w.request_id} w={w} highlighted={w.request_id === highlightId} />)}
+            {active.map((w) => (
+              <WorkspaceRow
+                key={w.request_id}
+                w={w}
+                highlighted={w.request_id === highlightId}
+                onApprove={handleApprove}
+                onDecline={handleDecline}
+                busy={busyId === w.request_id}
+              />
+            ))}
           </div>
         )}
       </div>
