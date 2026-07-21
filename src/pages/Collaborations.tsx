@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
-import { ArrowLeft, BookMarked, Inbox, PenLine, Send, Users, Sparkles } from "lucide-react";
+import { ArrowLeft, BookMarked, Inbox, PenLine, Send, Users, Sparkles, Check, X } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +13,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { sanitizeSubstackImageUrl, cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useMyWorkspaces, bucketWorkspace, type MyWorkspace, type WorkspaceRole } from "@/hooks/useMyWorkspaces";
+import { useActiveCollabs } from "@/hooks/useActiveCollabs";
+import { approveCollabRequest, declineCollabRequest } from "@/lib/collab-actions";
 
 type Bucket = "needs_response" | "active" | "published" | "archived";
 
@@ -55,7 +59,19 @@ function activityLine(w: MyWorkspace): string {
   return `Created ${formatDistanceToNow(new Date(w.created_at), { addSuffix: true })}`;
 }
 
-function WorkspaceRow({ w, highlighted }: { w: MyWorkspace; highlighted?: boolean }) {
+function WorkspaceRow({
+  w,
+  highlighted,
+  onApprove,
+  onDecline,
+  busy,
+}: {
+  w: MyWorkspace;
+  highlighted?: boolean;
+  onApprove?: (w: MyWorkspace) => void;
+  onDecline?: (w: MyWorkspace) => void;
+  busy?: boolean;
+}) {
   const navigate = useNavigate();
   const ref = useRef<HTMLDivElement | null>(null);
   const avatarUrl = w.role_in_workspace === "host"
@@ -63,6 +79,7 @@ function WorkspaceRow({ w, highlighted }: { w: MyWorkspace; highlighted?: boolea
     : w.host_profile_image_url;
   const avatarFallback = (w.role_in_workspace === "host" ? w.requester_name : w.host_name)?.charAt(0) || "?";
   const title = workspaceTitle(w);
+  const isHostPending = w.status === "pending" && w.role_in_workspace === "host";
 
   useEffect(() => {
     if (highlighted && ref.current) {
@@ -73,44 +90,59 @@ function WorkspaceRow({ w, highlighted }: { w: MyWorkspace; highlighted?: boolea
   return (
     <Card ref={ref} className={cn("hover:shadow-md transition-shadow", highlighted && "ring-2 ring-primary")}>
 
-      <CardContent className="flex items-center gap-4 py-4">
-        <Avatar className="h-11 w-11">
-          <AvatarImage src={avatarUrl ? sanitizeSubstackImageUrl(avatarUrl) : undefined} />
-          <AvatarFallback>{avatarFallback}</AvatarFallback>
-        </Avatar>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 min-w-0 flex-wrap">
-            <p className="font-medium truncate">{title}</p>
-            {w.is_project_workspace && (
-              <Badge variant="outline" className="shrink-0 gap-1">
-                <BookMarked className="h-3 w-3" />
-                Project
+      <CardContent className="flex flex-col sm:flex-row sm:items-center gap-4 py-4">
+        <div className="flex items-start gap-4 flex-1 min-w-0">
+          <Avatar className="h-11 w-11 shrink-0">
+            <AvatarImage src={avatarUrl ? sanitizeSubstackImageUrl(avatarUrl) : undefined} />
+            <AvatarFallback>{avatarFallback}</AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 min-w-0 flex-wrap">
+              <p className="font-medium truncate">{title}</p>
+              {w.is_project_workspace && (
+                <Badge variant="outline" className="shrink-0 gap-1">
+                  <BookMarked className="h-3 w-3" />
+                  Project
+                </Badge>
+              )}
+              {w.is_solo && !w.is_project_workspace && (
+                <Badge variant="outline" className="shrink-0 gap-1">
+                  <Sparkles className="h-3 w-3" />
+                  Solo
+                </Badge>
+              )}
+              <Badge variant="secondary" className="shrink-0">
+                {ROLE_LABEL[w.role_in_workspace]}
               </Badge>
-            )}
-            {w.is_solo && !w.is_project_workspace && (
-              <Badge variant="outline" className="shrink-0 gap-1">
-                <Sparkles className="h-3 w-3" />
-                Solo
-              </Badge>
-            )}
-            <Badge variant="secondary" className="shrink-0">
-              {ROLE_LABEL[w.role_in_workspace]}
-            </Badge>
-            {w.unread_message_count > 0 && (
-              <Badge className="shrink-0 bg-primary/90 hover:bg-primary text-primary-foreground">
-                {w.unread_message_count} new
-              </Badge>
-            )}
-            {w.status === "published" && <Badge className="shrink-0">Published</Badge>}
-            {w.status === "pending" && <Badge variant="destructive" className="shrink-0">Pending</Badge>}
+              {w.unread_message_count > 0 && (
+                <Badge className="shrink-0 bg-primary/90 hover:bg-primary text-primary-foreground">
+                  {w.unread_message_count} new
+                </Badge>
+              )}
+              {w.status === "published" && <Badge className="shrink-0">Published</Badge>}
+              {w.status === "pending" && <Badge variant="destructive" className="shrink-0">Pending</Badge>}
+            </div>
+            <p className="text-sm text-muted-foreground truncate">{counterpartLine(w)}</p>
+            <p className="text-xs text-muted-foreground truncate">{activityLine(w)}</p>
           </div>
-          <p className="text-sm text-muted-foreground truncate">{counterpartLine(w)}</p>
-          <p className="text-xs text-muted-foreground truncate">{activityLine(w)}</p>
         </div>
-        <Button size="sm" onClick={() => navigate(`/dashboard/workspace/${w.request_id}`)}>
-          <PenLine className="h-4 w-4 mr-1" />
-          Open
-        </Button>
+        {isHostPending ? (
+          <div className="flex gap-2 sm:shrink-0">
+            <Button size="sm" variant="gradient" disabled={busy} onClick={() => onApprove?.(w)}>
+              <Check className="h-4 w-4 mr-1" />
+              Approve
+            </Button>
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => onDecline?.(w)}>
+              <X className="h-4 w-4 mr-1" />
+              Decline
+            </Button>
+          </div>
+        ) : (
+          <Button size="sm" className="sm:shrink-0" onClick={() => navigate(`/dashboard/workspace/${w.request_id}`)}>
+            <PenLine className="h-4 w-4 mr-1" />
+            Open
+          </Button>
+        )}
       </CardContent>
     </Card>
   );
@@ -121,6 +153,45 @@ export default function Collaborations() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { workspaces, isLoading } = useMyWorkspaces();
+  const { refetch: refetchActiveCollabs } = useActiveCollabs();
+  const queryClient = useQueryClient();
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const handleApprove = async (w: MyWorkspace) => {
+    setBusyId(w.request_id);
+    try {
+      await approveCollabRequest({
+        requestId: w.request_id,
+        creatorId: w.host_creator_id,
+        requestedDate: w.requested_date,
+      });
+      toast.success(`Approved ${w.requester_name || "collab"}`, {
+        description: "They've been notified. Open the workspace to start drafting.",
+      });
+      await queryClient.invalidateQueries({ queryKey: ["my_workspaces", user?.id] });
+      refetchActiveCollabs();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to approve. Try again or contact support.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleDecline = async (w: MyWorkspace) => {
+    setBusyId(w.request_id);
+    try {
+      await declineCollabRequest(w.request_id);
+      toast.info(`Declined ${w.requester_name || "collab"}`);
+      await queryClient.invalidateQueries({ queryKey: ["my_workspaces", user?.id] });
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to decline. Try again or contact support.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
 
   const tabParam = searchParams.get("tab") as Bucket | null;
   const highlightId = searchParams.get("highlight");
@@ -240,14 +311,25 @@ export default function Collaborations() {
               {tab === "archived" && "Nothing archived"}
             </h3>
             <p className="text-muted-foreground max-w-sm mx-auto">
-              {tab === "active"
+              {tab === "needs_response"
+                ? "Incoming pitches from other creators land here for you to approve or decline."
+                : tab === "active"
                 ? "Approved collabs, sent pitches, and book chapters you're writing will appear here."
                 : "This bucket is empty."}
             </p>
           </div>
         ) : (
           <div className="grid gap-3">
-            {active.map((w) => <WorkspaceRow key={w.request_id} w={w} highlighted={w.request_id === highlightId} />)}
+            {active.map((w) => (
+              <WorkspaceRow
+                key={w.request_id}
+                w={w}
+                highlighted={w.request_id === highlightId}
+                onApprove={handleApprove}
+                onDecline={handleDecline}
+                busy={busyId === w.request_id}
+              />
+            ))}
           </div>
         )}
       </div>

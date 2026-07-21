@@ -1,68 +1,44 @@
-# Collaborators can't open pitched workspaces — plan
+## What Karen is seeing
 
-## What the users are hitting
+The new **Collaborations** hub (`src/pages/Collaborations.tsx`) renders every workspace — including pending pitches where she is the host — as a single row with only an **Open** button. When she clicks Open, the Workspace page correctly refuses to load ("only approved writers…"). So the host has no path to approve/decline from the new UI.
 
-Verified in the database: `collab_requests` currently has SELECT policies for only two audiences —
-
-- `Creators view own requests` → the host (creator_id)
-- `Requesters can view their own requests` → the pitcher (requester_user_id)
-
-There is **no SELECT policy for invited collaborators** listed in `workspace_collaborators`. The recent security pass added an UPDATE policy for them ("Collaborators can edit shared workspace content") but never restored the matching SELECT policy.
-
-Effect: when Karen invites a third person (or when a co-writer is invited to a project workspace) that person can see the row in the Collaborations hub (because `list_my_collaborator_workspaces` is SECURITY DEFINER and bypasses RLS), but the moment they click into `/workspace/:id`, `Workspace.tsx` runs `supabase.from("collab_requests").select(...)` directly — RLS returns 0 rows — and the page shows "workspace not found / access denied". That matches the "hard time accessing pitched collaborations" report.
-
-Pitchers themselves are still fine (their own SELECT policy is intact). The regression is scoped to invited collaborators and project members who reach a workspace through an invite rather than by being the host or the original requester.
+Root cause: `WorkspaceRow` shows the same "Open" CTA for all statuses. The old `RequestCard` still has Approve/Decline logic, but it isn't wired into the Collaborations page for host + `status === "pending"` rows.
 
 ## Fix
 
-Add one focused SELECT policy on `collab_requests`, mirroring the existing UPDATE policy for collaborators, plus the equivalent for project members so project-workspace invitees don't hit the same wall.
+Add host-side approve/decline directly into the Collaborations hub, and make the Workspace page gracefully offer approval when a host lands on a still-pending pitch.
 
-New migration:
+### 1. Inline actions on pending host rows (`src/pages/Collaborations.tsx`)
 
-```sql
--- Invited workspace collaborators can read the collab_request they were added to
-CREATE POLICY "Collaborators can view shared workspaces"
-ON public.collab_requests
-FOR SELECT
-TO authenticated
-USING (
-  id IN (
-    SELECT wc.request_id
-    FROM public.workspace_collaborators wc
-    WHERE wc.user_id = auth.uid()
-  )
-);
+In `WorkspaceRow`, when `w.status === "pending"` AND `w.role_in_workspace === "host"`:
 
--- Project members can read every chapter workspace inside their project
-CREATE POLICY "Project members can view project workspaces"
-ON public.collab_requests
-FOR SELECT
-TO authenticated
-USING (
-  is_project_workspace = true
-  AND project_id IS NOT NULL
-  AND project_id IN (
-    SELECT pm.project_id
-    FROM public.project_members pm
-    WHERE pm.user_id = auth.uid()
-  )
-);
-```
+- Replace the single **Open** button with a compact action group: `Approve` (gradient) + `Decline` (outline) + a small overflow to `Open workspace` (preview only).
+- Wire the buttons to a new small hook `useRespondToPitch` (or reuse existing mutation logic pulled from `src/pages/Requests.tsx` `handleApprove` / `handleDecline`) that:
+  - Updates `collab_requests.status` (+ `approved_at` on approve).
+  - Removes the date from `availability.available_dates` on approve; leaves it on decline.
+  - Invokes `send-collab-email` with `request_approved` / `request_declined`.
+  - Invalidates the `["my_workspaces", userId]` query and `useActiveCollabs` so counts refresh.
+- Respect capacity: read `useActiveCollabs().canApprove` and disable Approve with the "Limit Reached" label when false (matches existing `RequestCard` behavior).
+- For non-host pending rows (requester side / invited collaborator on a pending pitch) keep the current "Open" behavior — they can't approve.
 
-Both policies are read-only, scoped by explicit `auth.uid()` membership rows, and cannot leak requests outside the caller's own invites (they satisfy the Realtime Isolation rule — no `USING true`).
+### 2. Host recovery inside the Workspace page (`src/pages/Workspace.tsx`)
 
-No GRANT changes needed; `collab_requests` already grants SELECT to `authenticated`.
+If the host opens a pending workspace today they hit the "only approved writers" block. Add a lightweight branch: when the current user is the host and `status === "pending"`, render an approval prompt card (pitch summary + Approve / Decline buttons) instead of the generic access-denied screen. Same mutation as step 1. Non-hosts keep today's message.
 
-## Verification
+### 3. Small polish
 
-1. Migration applies cleanly (`supabase--migration`).
-2. `pg_policies` shows the two new SELECT policies alongside the existing ones.
-3. Regression: as a signed-in collaborator (not host, not requester), `select id from collab_requests where id = <shared workspace id>` returns the row. As a random signed-in user with no membership, it still returns nothing.
-4. Manually load `/workspace/:id` in the preview as an invited collaborator — page renders instead of the "not found" state.
-5. Add a small SQL regression test asserting each new policy's `USING` clause exists, so a future security pass can't silently remove it again.
+- Move the shared approve/decline logic into `src/lib/collab-actions.ts` (pure functions taking `{ supabase, requestId, creatorId, request }`) so `Requests.tsx`, `Collaborations.tsx`, and `Workspace.tsx` all use the same code path — no drift.
+- Update the "Needs response" empty-state copy to hint that pending pitches from other creators land here.
 
 ## Out of scope
 
-- No changes to write paths, edge functions, or the `has_workspace_access` helper.
-- No changes to the requester/host SELECT policies.
-- Public/anonymous access is untouched — both new policies are `TO authenticated`.
+- No database or RLS changes — RPCs and policies are already correct; this is purely a frontend regression from the hub redesign.
+- Email templates unchanged.
+- `SharedWorkspaceCard` (project chapters "Shared with me") unchanged — those are never pending pitches.
+
+## Verification
+
+- As host with a pending pitch: open `/dashboard/collaborations?tab=needs_response`, see Approve/Decline inline, click Approve → row moves to Active, guest gets approval email, availability date is removed.
+- As host clicking the workspace deep-link on a still-pending pitch: see the new approval prompt instead of "not found".
+- As requester viewing their own pending pitch: still sees Open only (no approve button).
+- Capacity-limited free user sees "Limit Reached" instead of Approve.
