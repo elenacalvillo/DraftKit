@@ -153,6 +153,45 @@ export default function Collaborations() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { workspaces, isLoading } = useMyWorkspaces();
+  const { refetch: refetchActiveCollabs } = useActiveCollabs();
+  const queryClient = useQueryClient();
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const handleApprove = async (w: MyWorkspace) => {
+    setBusyId(w.request_id);
+    try {
+      await approveCollabRequest({
+        requestId: w.request_id,
+        creatorId: w.host_creator_id,
+        requestedDate: w.requested_date,
+      });
+      toast.success(`Approved ${w.requester_name || "collab"}`, {
+        description: "They've been notified. Open the workspace to start drafting.",
+      });
+      await queryClient.invalidateQueries({ queryKey: ["my_workspaces", user?.id] });
+      refetchActiveCollabs();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to approve. Try again or contact support.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleDecline = async (w: MyWorkspace) => {
+    setBusyId(w.request_id);
+    try {
+      await declineCollabRequest(w.request_id);
+      toast.info(`Declined ${w.requester_name || "collab"}`);
+      await queryClient.invalidateQueries({ queryKey: ["my_workspaces", user?.id] });
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to decline. Try again or contact support.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
 
   const tabParam = searchParams.get("tab") as Bucket | null;
   const highlightId = searchParams.get("highlight");
