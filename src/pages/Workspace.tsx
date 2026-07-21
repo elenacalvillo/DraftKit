@@ -78,6 +78,7 @@ import {
   getMessagePartnerLabel,
 } from "@/lib/workspace-roles";
 import { isEffectivelySolo } from "@/lib/workspace-participants";
+import { approveCollabRequest, declineCollabRequest } from "@/lib/collab-actions";
 
 interface WorkspaceRequest {
   id: string;
