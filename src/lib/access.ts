@@ -76,12 +76,12 @@ export function hasProjectAccess(creator: TierLike | null | undefined): boolean 
 }
 
 /**
- * Returns true if the creator has at least one project slot left.
- * A creator who has not yet hit ACTIVE_PROJECT_LIMIT may create a
- * new project. This matches the DB-level safety net.
+/**
+ * Project-tier subscribers can create unlimited active projects.
+ * Kept for API compatibility with existing callers.
  */
-export function canCreateAnotherProject(activeCount: number): boolean {
-  return activeCount < ACTIVE_PROJECT_LIMIT;
+export function canCreateAnotherProject(_activeCount: number): boolean {
+  return true;
 }
 
 /**
