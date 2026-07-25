@@ -111,14 +111,10 @@ describe("hasProjectAccess", () => {
 });
 
 describe("project limits", () => {
-  it("allows creation while under the active limit", () => {
+  it("allows unlimited active projects for Project-tier subscribers", () => {
     expect(canCreateAnotherProject(0)).toBe(true);
-    expect(canCreateAnotherProject(2)).toBe(true);
-  });
-
-  it("blocks at exactly the active limit", () => {
-    expect(canCreateAnotherProject(3)).toBe(false);
-    expect(canCreateAnotherProject(7)).toBe(false);
+    expect(canCreateAnotherProject(3)).toBe(true);
+    expect(canCreateAnotherProject(999)).toBe(true);
   });
 });
 
