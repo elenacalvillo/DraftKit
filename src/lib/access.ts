@@ -12,7 +12,9 @@
 
 export type SubscriptionTier = "free" | "pro" | "project";
 
-export const ACTIVE_PROJECT_LIMIT = 3;
+/** No active project cap for Project-tier subscribers. Kept as a
+ *  named export (set to Infinity) so callers can still import it. */
+export const ACTIVE_PROJECT_LIMIT = Number.POSITIVE_INFINITY;
 export const STORAGE_CAP_BYTES = 1_073_741_824; // 1 GB
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
 export const ACCEPTED_IMAGE_MIME_TYPES = [
@@ -22,8 +24,7 @@ export const ACCEPTED_IMAGE_MIME_TYPES = [
   "image/gif",
 ] as const;
 
-export const ACTIVE_PROJECT_LIMIT_MESSAGE =
-  "You have 3 active projects. Archive one to create a new project, or upgrade for unlimited projects.";
+export const ACTIVE_PROJECT_LIMIT_MESSAGE = "";
 
 export const STORAGE_CAP_REACHED_MESSAGE =
   "You've reached your 1GB storage limit. Delete unused images to free up space.";
