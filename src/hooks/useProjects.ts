@@ -1,11 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
-import {
-  ACTIVE_PROJECT_LIMIT,
-  ACTIVE_PROJECT_LIMIT_MESSAGE,
-  canCreateAnotherProject,
-} from "@/lib/access";
+import { canCreateAnotherProject } from "@/lib/access";
 import type { Tables, TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 
 export type Project = Tables<"projects">;
