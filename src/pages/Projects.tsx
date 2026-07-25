@@ -116,28 +116,17 @@ export default function Projects() {
             <div>
               <h1 className="text-2xl font-bold">Book Projects</h1>
               <p className="text-sm text-muted-foreground">
-                {activeCount}/{activeLimit} active project
-                {activeCount === 1 ? "" : "s"}
+                {activeCount} active project{activeCount === 1 ? "" : "s"}
               </p>
             </div>
           </div>
-          <Button
-            onClick={handleNewProject}
-            disabled={!canCreate}
-            title={!canCreate ? activeLimitMessage : undefined}
-          >
+          <Button onClick={handleNewProject}>
             <Plus className="w-4 h-4 mr-2" />
             New Project
           </Button>
         </div>
 
-        {!canCreate && (
-          <Card className="mb-6 border-amber-500/30 bg-amber-50/40">
-            <CardContent className="p-4 text-sm text-amber-900">
-              {activeLimitMessage}
-            </CardContent>
-          </Card>
-        )}
+
         {showPrimer && (
           <div className="mb-6 rounded-xl border border-border bg-card p-4 flex items-start gap-3">
             <BookOpen className="w-5 h-5 text-primary mt-0.5 shrink-0" />
