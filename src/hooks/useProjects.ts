@@ -50,8 +50,6 @@ export function useProjects() {
     archivedProjects,
     activeCount,
     canCreate: canCreateAnotherProject(activeCount),
-    activeLimit: ACTIVE_PROJECT_LIMIT,
-    activeLimitMessage: ACTIVE_PROJECT_LIMIT_MESSAGE,
     isLoading: projectsQuery.isLoading,
     error: projectsQuery.error,
     refetch: projectsQuery.refetch,
