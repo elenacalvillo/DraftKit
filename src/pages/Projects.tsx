@@ -230,8 +230,6 @@ export default function Projects() {
                     variant="ghost"
                     size="sm"
                     onClick={() => handleToggleArchive(p.id, false)}
-                    disabled={!canCreate}
-                    title={!canCreate ? activeLimitMessage : undefined}
                   >
                     <ArchiveRestore className="w-4 h-4 mr-1.5" /> Unarchive
                   </Button>
