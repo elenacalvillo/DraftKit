@@ -24,7 +24,8 @@ import {
 
 describe("access constants", () => {
   it("encodes the documented public limits", () => {
-    expect(ACTIVE_PROJECT_LIMIT).toBe(3);
+    expect(ACTIVE_PROJECT_LIMIT).toBe(Number.POSITIVE_INFINITY);
+    expect(ACTIVE_PROJECT_LIMIT_MESSAGE).toBe("");
     expect(STORAGE_CAP_BYTES).toBe(1_073_741_824);
     expect(MAX_IMAGE_BYTES).toBe(10 * 1024 * 1024);
     expect(PROJECT_MEMBER_ROLES).toEqual([
@@ -42,9 +43,6 @@ describe("access constants", () => {
   });
 
   it("uses the exact ticket copy strings", () => {
-    expect(ACTIVE_PROJECT_LIMIT_MESSAGE).toBe(
-      "You have 3 active projects. Archive one to create a new project, or upgrade for unlimited projects.",
-    );
     expect(STORAGE_CAP_REACHED_MESSAGE).toBe(
       "You've reached your 1GB storage limit. Delete unused images to free up space.",
     );
@@ -113,14 +111,10 @@ describe("hasProjectAccess", () => {
 });
 
 describe("project limits", () => {
-  it("allows creation while under the active limit", () => {
+  it("allows unlimited active projects for Project-tier subscribers", () => {
     expect(canCreateAnotherProject(0)).toBe(true);
-    expect(canCreateAnotherProject(2)).toBe(true);
-  });
-
-  it("blocks at exactly the active limit", () => {
-    expect(canCreateAnotherProject(3)).toBe(false);
-    expect(canCreateAnotherProject(7)).toBe(false);
+    expect(canCreateAnotherProject(3)).toBe(true);
+    expect(canCreateAnotherProject(999)).toBe(true);
   });
 });
 
