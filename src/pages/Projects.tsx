@@ -34,9 +34,6 @@ export default function Projects() {
     activeProjects,
     archivedProjects,
     activeCount,
-    canCreate,
-    activeLimit,
-    activeLimitMessage,
     isLoading,
   } = useProjects();
   const createProject = useCreateProject();
@@ -55,10 +52,6 @@ export default function Projects() {
   };
 
   const handleNewProject = () => {
-    if (!canCreate) {
-      toast.error(activeLimitMessage);
-      return;
-    }
     setShowCreate(true);
   };
 
