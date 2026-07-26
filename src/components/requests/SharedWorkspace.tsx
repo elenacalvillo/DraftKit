@@ -719,7 +719,7 @@ function SharedWorkspaceInner({
       )}
       <div className="sticky top-12 z-30 flex flex-col border-b border-border/50 bg-muted/60 backdrop-blur supports-[backdrop-filter]:bg-muted/40">
         {/* Row 1 — Actions */}
-        <div className="flex items-center justify-end gap-1.5 sm:gap-2 px-3 sm:px-4 pt-2 sm:pt-2.5">
+        <div className="flex items-center justify-end gap-1.5 sm:gap-2 px-3 sm:px-4 pt-1.5">
           {/* Desktop: all secondary actions inline */}
           <div className="hidden sm:flex items-center gap-2">
             {hasContent && (
