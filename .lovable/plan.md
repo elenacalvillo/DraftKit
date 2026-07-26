@@ -1,38 +1,36 @@
-## Remove the 3 active projects cap
+# Split the Shared Workspace header bar
 
-### Frontend
+The sticky header in `src/components/requests/SharedWorkspace.tsx` (around lines 720-857) currently jams the "Shared Workspace" label, save status pill, Copy / Push to Substack / Download / Share / History buttons and the Edit Draft primary CTA into a single horizontal row. On narrower widths (like the screenshot) the save status wraps under the label and the action labels crash into each other — completely unreadable.
 
-**`src/lib/access.ts`**
-- Keep `ACTIVE_PROJECT_LIMIT` exported but set to `Infinity` (preserves the import surface for tests/hooks without churn), or remove entirely and update callers. Preference: remove.
-- `canCreateAnotherProject(activeCount)` → always returns `true`.
-- Remove `ACTIVE_PROJECT_LIMIT_MESSAGE` (no longer surfaced).
+## Change
 
-**`src/hooks/useProjects.ts`**
-- Drop `activeLimit` and `activeLimitMessage` from the returned object.
-- `canCreate` stays for API compatibility but is always `true`.
+Split that single flex row into a two-row stack inside the same sticky container:
 
-**`src/pages/Projects.tsx`**
-- Header subtitle: `"{activeCount} active project{activeCount === 1 ? "" : "s"}"` (no `/limit` ratio).
-- Remove the amber "at limit" `Card`.
-- Remove `disabled` + `title` tooltip on the **New Project** button.
-- Remove `disabled` + `title` tooltip on the **Unarchive** button.
-- Drop the `toast.error(activeLimitMessage)` guard in `handleNewProject`.
+- **Row 1 — Actions (top)**
+  - Right-aligned on desktop, full-width on mobile.
+  - Contains: desktop inline action buttons (Copy, Push to Substack, Download, Share), the mobile overflow `DropdownMenu`, `headerExtras` slot (History button), and the primary Edit Draft / Start Writing / Add comments CTA.
+  - Keep exact button components, handlers, icons, `data-testid`s, and gating conditions (`hasContent`, `canEdit`, `isCreator`, `isEditing`, etc.) unchanged.
 
-**`src/lib/__tests__/access.test.ts`**
-- Remove/update the two assertions that pin `ACTIVE_PROJECT_LIMIT === 3` and the message string.
-- Add an assertion that `canCreateAnotherProject(999) === true`.
+- **Row 2 — Info (bottom)**
+  - Contains the `FileText` icon + "Shared Workspace" label and the `SaveStatusPill`.
+  - Save status renders inline on one line without wrapping since the row is no longer competing with 5 buttons for space.
+  - Slightly muted / smaller visual weight (e.g. `text-xs text-muted-foreground` on the label wrapper, pill unchanged) since actions become the visual anchor.
 
-### Database
+## Layout details
 
-A trigger `trg_enforce_active_project_limit` on `public.projects` (backed by `public.enforce_active_project_limit()`) rejects inserts once a creator has 3 active projects. Without dropping this, the frontend change would surface a Postgres error to users trying to create the 4th project.
+- Outer sticky wrapper keeps `sticky top-12 z-30 border-b border-border/50 bg-muted/60 backdrop-blur ...` but drops `flex items-center justify-between` and becomes a vertical stack (`flex flex-col`).
+- Row 1: `flex items-center justify-end gap-1.5 sm:gap-2 px-3 sm:px-4 pt-2 sm:pt-2.5`.
+- Row 2: `flex items-center gap-2 sm:gap-3 px-3 sm:px-4 pb-2 sm:pb-2.5 pt-1 min-w-0` — save pill can now truncate/relative-time cleanly.
+- On mobile, keep the "Shared Workspace" label hidden (as today with `hidden sm:flex`) so row 2 is just the save pill; row 1 stays compact with overflow menu + primary CTA.
 
-Migration (schema-only, no data changes):
-```sql
-DROP TRIGGER IF EXISTS trg_enforce_active_project_limit ON public.projects;
-DROP FUNCTION IF EXISTS public.enforce_active_project_limit();
-```
+## Out of scope
 
-### Verification
-- Typecheck.
-- Run `access.test.ts`.
-- Manually confirm creating a 4th active project succeeds after approval.
+- No changes to save logic, edit gating, push-to-substack behavior, history drawer, or any handler.
+- No changes to `Workspace.tsx` or `headerExtras` contents.
+- Purely a presentation refactor inside the existing sticky header block (~lines 720-857).
+
+## Verification
+
+- Visual check at ~900px width (matches the screenshot) and at mobile width: actions row on top, save status readable on its own line below.
+- Editing, copy, push-to-substack, download, share, history, and Edit Draft all continue to work.
+- Typecheck passes.
