@@ -3,7 +3,22 @@ import { useAuth } from "@/hooks/useAuth";
 import { useWorkspacePresence } from "@/hooks/useWorkspacePresence";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { FileText, Save, X, AlertCircle, PenLine, Lock, Download, Share2, Copy, Check, CloudOff, Loader2, Send, MoreHorizontal } from "lucide-react";
+import {
+  FileText,
+  Save,
+  X,
+  AlertCircle,
+  PenLine,
+  Lock,
+  Download,
+  Share2,
+  Copy,
+  Check,
+  CloudOff,
+  Loader2,
+  Send,
+  MoreHorizontal,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,8 +61,44 @@ import { resolveSubstackPublishUrl } from "@/lib/substack-url";
 // with only `src` and `alt`; the upload pipeline guarantees every src is
 // a Supabase Storage public URL. We additionally strip any data: URI img
 // tags as a defence-in-depth step before sanitising.
-const ALLOWED_TAGS = ["p", "h1", "h2", "h3", "strong", "em", "s", "code", "pre", "a", "ul", "ol", "li", "br", "hr", "table", "thead", "tbody", "tr", "th", "td", "span", "img"];
-const ALLOWED_ATTR = ["href", "target", "rel", "src", "alt", "colspan", "rowspan", "colwidth", "class", "data-comment", "data-author"];
+const ALLOWED_TAGS = [
+  "p",
+  "h1",
+  "h2",
+  "h3",
+  "strong",
+  "em",
+  "s",
+  "code",
+  "pre",
+  "a",
+  "ul",
+  "ol",
+  "li",
+  "br",
+  "hr",
+  "table",
+  "thead",
+  "tbody",
+  "tr",
+  "th",
+  "td",
+  "span",
+  "img",
+];
+const ALLOWED_ATTR = [
+  "href",
+  "target",
+  "rel",
+  "src",
+  "alt",
+  "colspan",
+  "rowspan",
+  "colwidth",
+  "class",
+  "data-comment",
+  "data-author",
+];
 
 // The destination Substack composer URL is resolved per-user from
 // creator.newsletter_url (preferred) → creator.substack_url → generic
@@ -433,11 +484,11 @@ function SharedWorkspaceInner({
           setIsEditing(false);
           toast.success("Draft saved & synced");
           if (notifyPartner && partnerName) {
-            const emailType = isCreator
-              ? "workspace_updated_by_creator"
-              : "workspace_updated_by_guest";
+            const emailType = isCreator ? "workspace_updated_by_creator" : "workspace_updated_by_guest";
             try {
-              const { data: { session } } = await supabase.auth.getSession();
+              const {
+                data: { session },
+              } = await supabase.auth.getSession();
               if (session) {
                 supabase.functions.invoke("send-collab-email", {
                   body: { type: emailType, requestId },
@@ -506,10 +557,7 @@ function SharedWorkspaceInner({
     ],
   );
 
-  const handleSave = useCallback(
-    () => performSave({ isAuto: false, closeOnSuccess: true }),
-    [performSave],
-  );
+  const handleSave = useCallback(() => performSave({ isAuto: false, closeOnSuccess: true }), [performSave]);
 
   // Auto-save: debounced 3s after the last keystroke. Same RPC, same error
   // path, but silent on success and rate-limited on failure toasts.
@@ -548,7 +596,6 @@ function SharedWorkspaceInner({
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [isEditing, editContent]);
-
 
   const navigate = useNavigate();
 
@@ -618,10 +665,7 @@ function SharedWorkspaceInner({
     //   newsletter_url (required, validated) → substack_url (optional) →
     //   generic substack.com/publish fallback. No new DB column or input
     //   modal — both fields already live on the creator profile.
-    const targetUrl = resolveSubstackPublishUrl(
-      creator?.newsletter_url,
-      creator?.substack_url,
-    );
+    const targetUrl = resolveSubstackPublishUrl(creator?.newsletter_url, creator?.substack_url);
 
     // If the rich Clipboard API isn't available (non-HTTPS, certain
     // browsers) bail to the manual-copy fallback dialog rather than
@@ -644,7 +688,11 @@ function SharedWorkspaceInner({
       if (!wrote) {
         // Clipboard write failed — close the tab we just opened and surface
         // the manual fallback so the user can still complete the export.
-        try { popup?.close(); } catch { /* cross-origin close may throw */ }
+        try {
+          popup?.close();
+        } catch {
+          /* cross-origin close may throw */
+        }
         toast.error("Clipboard access denied. Use the manual Copy fallback below.");
         setSubstackFallbackHtml(cleaned);
         return;
@@ -653,29 +701,29 @@ function SharedWorkspaceInner({
       if (!popup || popup.closed) {
         // Pop-up blocked. Clipboard succeeded though, so give the user a
         // clickable toast to open Substack themselves — no Ghost Copy risk.
-        toast.success(
-          "Draft copied! Click to open Substack and paste (Cmd+V / Ctrl+V).",
-          {
-            duration: Infinity,
-            action: {
-              label: "Open Substack",
-              onClick: () => window.open(targetUrl, "_blank", "noopener,noreferrer"),
-            },
+        toast.success("Draft copied! Click to open Substack and paste (Cmd+V / Ctrl+V).", {
+          duration: Infinity,
+          action: {
+            label: "Open Substack",
+            onClick: () => window.open(targetUrl, "_blank", "noopener,noreferrer"),
           },
-        );
+        });
       } else {
         // Persistent toast — no auto-dismiss because the user's next move
         // is to switch tabs.
-        toast.success(
-          "Draft copied! Switch to the new tab and press Cmd+V (Ctrl+V on Windows) to paste.",
-          { duration: Infinity },
-        );
+        toast.success("Draft copied! Switch to the new tab and press Cmd+V (Ctrl+V on Windows) to paste.", {
+          duration: Infinity,
+        });
       }
 
       trackEvent("push_to_substack_success", { request_id: requestId });
     } catch (err) {
       console.error("Push to Substack failed:", err);
-      try { popup?.close(); } catch { /* noop */ }
+      try {
+        popup?.close();
+      } catch {
+        /* noop */
+      }
       toast.error("Clipboard access denied. Please use the manual 'Copy' fallback.");
       setSubstackFallbackHtml(cleaned);
     }
@@ -685,7 +733,8 @@ function SharedWorkspaceInner({
 
   // Count words from HTML content
   const wordCount = editContent
-    ? new DOMParser().parseFromString(editContent, "text/html").body.textContent?.split(/\s+/).filter(Boolean).length || 0
+    ? new DOMParser().parseFromString(editContent, "text/html").body.textContent?.split(/\s+/).filter(Boolean).length ||
+      0
     : 0;
 
   return (
@@ -717,9 +766,9 @@ function SharedWorkspaceInner({
           <span>{editBlockedReason}</span>
         </div>
       )}
-      <div className="sticky top-12 z-30 flex flex-col border-b border-border/50 bg-muted/60 backdrop-blur supports-[backdrop-filter]:bg-muted/40">
+      <div className="sticky top-0 z-30 flex flex-col border-b border-border/50 bg-muted/60 backdrop-blur supports-[backdrop-filter]:bg-muted/40">
         {/* Row 1 — Actions */}
-        <div className="flex items-center justify-end gap-1.5 sm:gap-2 px-3 sm:px-4 pt-1.5">
+        <div className="flex items-center justify-end gap-1.5 sm:gap-2 px-3 sm:px-4 pt-3">
           {/* Desktop: all secondary actions inline */}
           <div className="hidden sm:flex items-center gap-2">
             {hasContent && (
@@ -747,7 +796,10 @@ function SharedWorkspaceInner({
                 className="h-8"
                 onClick={async () => {
                   try {
-                    await exportWorkspaceHtmlToDocx(sharedContent!, partnerName ? `Drafting with ${partnerName}` : "Workspace Draft");
+                    await exportWorkspaceHtmlToDocx(
+                      sharedContent!,
+                      partnerName ? `Drafting with ${partnerName}` : "Workspace Draft",
+                    );
                     toast.success("Draft downloaded — you just saved ~30 minutes.");
                     trackEvent("draft_accepted", { request_id: requestId, surface: "workspace_download" });
                   } catch {
@@ -799,7 +851,10 @@ function SharedWorkspaceInner({
                     <DropdownMenuItem
                       onClick={async () => {
                         try {
-                          await exportWorkspaceHtmlToDocx(sharedContent!, partnerName ? `Drafting with ${partnerName}` : "Workspace Draft");
+                          await exportWorkspaceHtmlToDocx(
+                            sharedContent!,
+                            partnerName ? `Drafting with ${partnerName}` : "Workspace Draft",
+                          );
                           toast.success("Draft downloaded — you just saved ~30 minutes.");
                           trackEvent("draft_accepted", { request_id: requestId, surface: "workspace_download" });
                         } catch {
@@ -835,11 +890,7 @@ function SharedWorkspaceInner({
               title={editBlockedReason || undefined}
             >
               <PenLine className="w-3.5 h-3.5 mr-1.5" />
-              {isCommentMode
-                ? "Add comments"
-                : hasContent
-                  ? "Edit Draft"
-                  : "Start Writing"}
+              {isCommentMode ? "Add comments" : hasContent ? "Edit Draft" : "Start Writing"}
             </Button>
           )}
         </div>
@@ -859,8 +910,6 @@ function SharedWorkspaceInner({
         </div>
       </div>
 
-
-
       <AnimatePresence mode="wait">
         {isEditing ? (
           <motion.div
@@ -875,9 +924,14 @@ function SharedWorkspaceInner({
               <AlertCircle className="w-4 h-4 text-accent flex-shrink-0" />
               <span>
                 {isCommentMode ? (
-                  <>You're in <strong>review mode</strong>. Select any text and use the highlighter to leave a comment. Prose changes are locked.</>
+                  <>
+                    You're in <strong>review mode</strong>. Select any text and use the highlighter to leave a comment.
+                    Prose changes are locked.
+                  </>
                 ) : (
-                  <>You are currently editing. Remember to <strong>Save & Sync</strong> so others can see your changes.</>
+                  <>
+                    You are currently editing. Remember to <strong>Save & Sync</strong> so others can see your changes.
+                  </>
                 )}
               </span>
             </div>
@@ -892,48 +946,53 @@ function SharedWorkspaceInner({
             />
 
             {/* Zen header portal: Save & Notify */}
-            {headerPortal && createPortal(
-              <>
-                {partnerName && (
-                  <label className="hidden sm:flex items-center gap-1.5 cursor-pointer">
-                    <Checkbox
-                      checked={notifyPartner}
-                      onCheckedChange={(v) => setNotifyPartner(v === true)}
-                    />
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">
-                      Notify {partnerName.split(" ")[0]}
-                    </span>
-                  </label>
-                )}
-                <Button variant="ghost" size="sm" onClick={handleCancel} disabled={isSaving} className="h-8 text-xs px-2 sm:px-3" aria-label="Cancel">
-                  <X className="w-3.5 h-3.5 sm:mr-1" />
-                  <span className="hidden sm:inline">Cancel</span>
-                </Button>
-                <Button variant="gradient" size="sm" onClick={handleSave} disabled={isSaving} className="h-8 text-xs px-2 sm:px-3" aria-label="Save and sync">
-                  <Save className="w-3.5 h-3.5 sm:mr-1" />
-                  <span className="hidden sm:inline">{isSaving ? "Saving…" : "Save & Sync"}</span>
-                  <span className="sm:hidden">{isSaving ? "…" : "Save"}</span>
-                </Button>
-              </>,
-              headerPortal
-            )}
+            {headerPortal &&
+              createPortal(
+                <>
+                  {partnerName && (
+                    <label className="hidden sm:flex items-center gap-1.5 cursor-pointer">
+                      <Checkbox checked={notifyPartner} onCheckedChange={(v) => setNotifyPartner(v === true)} />
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        Notify {partnerName.split(" ")[0]}
+                      </span>
+                    </label>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCancel}
+                    disabled={isSaving}
+                    className="h-8 text-xs px-2 sm:px-3"
+                    aria-label="Cancel"
+                  >
+                    <X className="w-3.5 h-3.5 sm:mr-1" />
+                    <span className="hidden sm:inline">Cancel</span>
+                  </Button>
+                  <Button
+                    variant="gradient"
+                    size="sm"
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className="h-8 text-xs px-2 sm:px-3"
+                    aria-label="Save and sync"
+                  >
+                    <Save className="w-3.5 h-3.5 sm:mr-1" />
+                    <span className="hidden sm:inline">{isSaving ? "Saving…" : "Save & Sync"}</span>
+                    <span className="sm:hidden">{isSaving ? "…" : "Save"}</span>
+                  </Button>
+                </>,
+                headerPortal,
+              )}
 
             {/* Bottom bar: word count + cancel */}
             <div className="flex items-center justify-between px-4 py-3 border-t border-border/50 bg-muted/20 flex-wrap gap-2">
               <div className="flex items-center gap-3">
-                <span className="text-xs text-muted-foreground">
-                  {wordCount > 0 ? `${wordCount} words` : ""}
-                </span>
+                <span className="text-xs text-muted-foreground">{wordCount > 0 ? `${wordCount} words` : ""}</span>
                 {/* Mobile fallback for notify */}
                 {partnerName && (
                   <label className="flex sm:hidden items-center gap-2 cursor-pointer">
-                    <Checkbox
-                      checked={notifyPartner}
-                      onCheckedChange={(v) => setNotifyPartner(v === true)}
-                    />
-                    <span className="text-xs text-muted-foreground">
-                      Notify {partnerName.split(" ")[0]}
-                    </span>
+                    <Checkbox checked={notifyPartner} onCheckedChange={(v) => setNotifyPartner(v === true)} />
+                    <span className="text-xs text-muted-foreground">Notify {partnerName.split(" ")[0]}</span>
                   </label>
                 )}
               </div>
@@ -951,18 +1010,13 @@ function SharedWorkspaceInner({
             </div>
           </motion.div>
         ) : (
-          <motion.div
-            key="view"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
+          <motion.div key="view" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             {hasContent ? (
               <div className="relative">
                 <div
                   className={cn(
                     "workspace-prose px-5 py-4 min-h-[120px] font-sans text-[15px] leading-[1.6] overflow-hidden break-words",
-                    !canEdit && "cursor-pointer"
+                    !canEdit && "cursor-pointer",
                   )}
                   dangerouslySetInnerHTML={{ __html: sanitize(sharedContent!) }}
                   onClick={!canEdit ? handleUpgradeClick : undefined}
@@ -994,10 +1048,7 @@ function SharedWorkspaceInner({
       {/* Free-user gate for Push to Substack (DRAFT-003). Inline modal so the
           user does NOT lose their workspace context — that constraint is
           explicit in the ticket. */}
-      <PushToSubstackUpgradeModal
-        open={showSubstackUpgrade}
-        onOpenChange={setShowSubstackUpgrade}
-      />
+      <PushToSubstackUpgradeModal open={showSubstackUpgrade} onOpenChange={setShowSubstackUpgrade} />
 
       {/* Manual-copy fallback for Push to Substack when the rich Clipboard
           API is unavailable (DRAFT-002). We pre-select the cleaned HTML so
@@ -1012,9 +1063,8 @@ function SharedWorkspaceInner({
           <DialogHeader>
             <DialogTitle>Copy your draft manually</DialogTitle>
             <DialogDescription>
-              Your browser blocked the automatic copy. Select all the text
-              below (Cmd+A / Ctrl+A), copy it (Cmd+C / Ctrl+C), then paste it
-              into Substack.
+              Your browser blocked the automatic copy. Select all the text below (Cmd+A / Ctrl+A), copy it (Cmd+C /
+              Ctrl+C), then paste it into Substack.
             </DialogDescription>
           </DialogHeader>
           <Textarea
@@ -1024,20 +1074,14 @@ function SharedWorkspaceInner({
             onFocus={(e) => e.currentTarget.select()}
           />
           <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => setSubstackFallbackHtml(null)}
-            >
+            <Button variant="ghost" onClick={() => setSubstackFallbackHtml(null)}>
               Close
             </Button>
             <Button
               variant="gradient"
               onClick={() => {
                 window.open(
-                  resolveSubstackPublishUrl(
-                    creator?.newsletter_url,
-                    creator?.substack_url,
-                  ),
+                  resolveSubstackPublishUrl(creator?.newsletter_url, creator?.substack_url),
                   "_blank",
                   "noopener,noreferrer",
                 );
