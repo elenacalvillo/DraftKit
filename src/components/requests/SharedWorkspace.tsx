@@ -845,7 +845,7 @@ function SharedWorkspaceInner({
         </div>
 
         {/* Row 2 — Info */}
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0 px-3 sm:px-4 pb-2 sm:pb-2.5 pt-1.5">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 px-3 sm:px-4 pb-1.5 pt-0.5">
           <div className="hidden sm:flex items-center gap-1.5 text-muted-foreground">
             <FileText className="w-3.5 h-3.5 text-primary" />
             <span className="text-xs font-medium">Shared Workspace</span>
