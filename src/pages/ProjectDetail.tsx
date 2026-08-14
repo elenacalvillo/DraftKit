@@ -5,6 +5,7 @@ import {
   ArrowRight,
   Archive,
   ArchiveRestore,
+  BookImage,
   BookMarked,
   ChevronUp,
   ChevronDown,
@@ -90,6 +91,7 @@ import { useProjectMembers } from "@/hooks/useProjectMembers";
 import { useProjectChapters } from "@/hooks/useProjectChapters";
 import { useProjectBroadcasts } from "@/hooks/useProjectBroadcasts";
 import { EditProjectDialog } from "@/components/projects/EditProjectDialog";
+import { BookDetailsDialog } from "@/components/projects/BookDetailsDialog";
 import {
   CHAPTER_STAGES,
   CHAPTER_STAGE_LABEL,
@@ -148,6 +150,7 @@ export default function ProjectDetail() {
   } | null>(null);
   const [moveChapter, setMoveChapter] = useState<{ id: string; title: string } | null>(null);
   const [showEditProject, setShowEditProject] = useState(false);
+  const [showBookDetails, setShowBookDetails] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -358,6 +361,15 @@ export default function ProjectDetail() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {isProject && !isReadOnly && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowBookDetails(true)}
+              >
+                <BookImage className="w-4 h-4 mr-1.5" /> Book details
+              </Button>
+            )}
             {isProject && (
               <Button
                 variant="outline"
@@ -401,6 +413,28 @@ export default function ProjectDetail() {
           onOpenChange={setShowExportDialog}
           projectId={project.id}
           projectTitle={project.title}
+          hasCover={!!project.cover_image_path}
+          onEditBookDetails={() => {
+            setShowExportDialog(false);
+            setShowBookDetails(true);
+          }}
+        />
+
+        <BookDetailsDialog
+          open={showBookDetails}
+          onOpenChange={setShowBookDetails}
+          project={{
+            id: project.id,
+            title: project.title,
+            author_name: project.author_name,
+            subtitle: project.subtitle,
+            book_description: project.book_description,
+            isbn: project.isbn,
+            language: project.language,
+            cover_image_path: project.cover_image_path,
+            cover_image_mime: project.cover_image_mime,
+            cover_image_bytes: project.cover_image_bytes,
+          }}
         />
 
         {moveChapter && (
