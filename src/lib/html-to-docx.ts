@@ -487,17 +487,43 @@ export interface BookChapterForDocx {
   html: string;
 }
 
+export interface DocxCover {
+  bytes: ArrayBuffer;
+  /** Rendered size in points, already aspect-corrected by the caller. */
+  width: number;
+  height: number;
+  type: "jpg" | "png";
+}
+
 /** Render multiple chapters as one combined .docx with title page + page breaks. */
 export async function chaptersToCombinedDocxBlob(
   projectTitle: string,
   chapters: BookChapterForDocx[],
   onProgress?: ChapterProgressFn,
+  cover?: DocxCover | null,
 ): Promise<Blob> {
   const children: DocxBlock[] = [];
   const total = chapters.length;
 
   onProgress?.({ current: 0, total, label: "Preparing title page…" });
   await yieldToBrowser();
+
+  // Cover page.
+  if (cover) {
+    children.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [
+          new ImageRun({
+            data: cover.bytes,
+            type: cover.type,
+            transformation: { width: cover.width, height: cover.height },
+          }),
+        ],
+      }),
+      new Paragraph({ children: [new PageBreak()] }),
+    );
+  }
 
   // Title page.
   children.push(
@@ -523,6 +549,7 @@ export async function chaptersToCombinedDocxBlob(
     }),
     new Paragraph({ children: [new PageBreak()] }),
   );
+
 
   // Table of contents (manual list — no fields, works everywhere).
   children.push(
