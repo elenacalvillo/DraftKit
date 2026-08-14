@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BookOpen, Crown, Download, FileArchive, FileText, FileType2, Loader2, ShieldCheck } from "lucide-react";
+import { BookImage, BookOpen, Crown, Download, FileArchive, FileText, FileType2, Loader2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -23,6 +23,9 @@ interface ExportBookDialogProps {
   onOpenChange: (open: boolean) => void;
   projectId: string;
   projectTitle: string;
+  /** True when the project has a cover uploaded in Book details. */
+  hasCover?: boolean;
+  onEditBookDetails?: () => void;
 }
 
 interface FormatOption {
@@ -75,6 +78,8 @@ export function ExportBookDialog({
   onOpenChange,
   projectId,
   projectTitle,
+  hasCover = false,
+  onEditBookDetails,
 }: ExportBookDialogProps) {
   const { trackEvent } = useAnalytics();
   const [selected, setSelected] = useState<BookExportFormat>("zip-docx");
@@ -160,6 +165,51 @@ export function ExportBookDialog({
             );
           })}
         </div>
+
+        {(selected === "epub" || selected === "pdf" || selected === "docx") && (
+          <div
+            className={cn(
+              "flex items-start gap-2 rounded-md border px-3 py-2",
+              hasCover
+                ? "border-emerald-600/40 bg-emerald-500/5"
+                : "border-border bg-muted/30",
+            )}
+          >
+            <BookImage
+              className={cn(
+                "w-4 h-4 mt-0.5 shrink-0",
+                hasCover ? "text-emerald-600" : "text-muted-foreground",
+              )}
+            />
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              {hasCover ? (
+                <>
+                  <span className="font-medium text-foreground">
+                    Cover embedded for Kindle and Apple Books.
+                  </span>{" "}
+                  Your cover is written into the file metadata, so the thumbnail shows up straight
+                  after Send-to-Kindle. No Calibre needed.
+                </>
+              ) : (
+                <>
+                  <span className="font-medium text-foreground">No cover yet.</span>{" "}
+                  Add one in Book details and it gets embedded in the file metadata so Kindle shows
+                  your thumbnail.{" "}
+                  {onEditBookDetails && (
+                    <button
+                      type="button"
+                      onClick={onEditBookDetails}
+                      disabled={busy}
+                      className="underline font-medium text-foreground disabled:opacity-50"
+                    >
+                      Add cover
+                    </button>
+                  )}
+                </>
+              )}
+            </p>
+          </div>
+        )}
 
         <div className="flex items-start gap-2 rounded-md border border-border bg-muted/30 px-3 py-2">
           <ShieldCheck className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
