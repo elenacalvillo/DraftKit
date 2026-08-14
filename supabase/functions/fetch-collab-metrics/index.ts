@@ -500,9 +500,7 @@ serve(async (req) => {
 
   // Auth: allow either a cron shared secret (bulk snapshot) OR an
   // authenticated user JWT (per-request snapshot from the workspace UI).
-  const providedSecret = req.headers.get("x-internal-secret");
-  const expectedSecret = Deno.env.get("CRON_SECRET");
-  const hasCronSecret = !!expectedSecret && providedSecret === expectedSecret;
+  const hasCronSecret = isValidCronSecret(req);
   const authHeader = req.headers.get("Authorization") ?? "";
   const bearer = authHeader.startsWith("Bearer ")
     ? authHeader.slice("Bearer ".length).trim()

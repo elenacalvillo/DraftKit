@@ -110,9 +110,7 @@ serve(async (req: Request): Promise<Response> => {
   }
 
   // Auth: require shared secret to prevent unauthenticated abuse (cron-only endpoint)
-  const providedSecret = req.headers.get("x-internal-secret");
-  const expectedSecret = Deno.env.get("CRON_SECRET");
-  if (!expectedSecret || providedSecret !== expectedSecret) {
+  if (!isValidCronSecret(req)) {
     console.warn("unauthorized invocation blocked");
     return new Response(
       JSON.stringify({ error: "Unauthorized" }),
