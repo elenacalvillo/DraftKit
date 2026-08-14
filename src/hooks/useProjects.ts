@@ -175,6 +175,11 @@ export function useUpdateBookMetadata() {
       const update: TablesUpdate<"projects"> = {};
       (Object.keys(fields) as Array<keyof typeof fields>).forEach((key) => {
         const value = fields[key];
+        if (key === "language") {
+          const lang = typeof value === "string" ? value.trim() : "";
+          if (lang) (update as Record<string, unknown>).language = lang;
+          return;
+        }
         if (value !== undefined) {
           (update as Record<string, unknown>)[key as string] =
             typeof value === "string" ? value.trim() || null : value;
