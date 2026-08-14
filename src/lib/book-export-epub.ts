@@ -1,6 +1,11 @@
 /**
  * Reflowable ePub 3.0 export built client-side with JSZip.
  * Works on Kindle, Apple Books, and other e-readers.
+ *
+ * Covers are embedded into the package metadata (both the EPUB 3
+ * `properties="cover-image"` manifest flag and the legacy
+ * `<meta name="cover">` tag Kindle still relies on) so Send-to-Kindle
+ * renders the thumbnail with no Calibre round-trip.
  */
 import JSZip from "jszip";
 
@@ -9,11 +14,20 @@ export interface EpubChapter {
   html: string;
 }
 
+export interface EpubCover {
+  bytes: ArrayBuffer;
+  mime: string;
+}
+
 export interface BuildEpubOptions {
   projectTitle: string;
   author: string;
   chapters: EpubChapter[];
   language?: string;
+  subtitle?: string | null;
+  description?: string | null;
+  isbn?: string | null;
+  cover?: EpubCover | null;
   onProgress?: (current: number, total: number, label: string) => void;
 }
 
@@ -28,6 +42,10 @@ function escapeXml(s: string): string {
 
 function pad(n: number, width = 3): string {
   return String(n).padStart(width, "0");
+}
+
+export function coverExtension(mime: string): string {
+  return mime === "image/png" ? "png" : "jpg";
 }
 
 /**
@@ -66,7 +84,25 @@ function chapterXhtml(title: string, bodyHtml: string): string {
 </html>`;
 }
 
-function titleXhtml(projectTitle: string, author: string): string {
+function coverXhtml(projectTitle: string, ext: string): string {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+<head>
+  <meta charset="utf-8"/>
+  <title>Cover</title>
+  <meta name="viewport" content="width=device-width, height=device-height"/>
+  <link rel="stylesheet" type="text/css" href="styles/book.css"/>
+</head>
+<body epub:type="cover">
+  <div class="cover-page">
+    <img src="images/cover.${ext}" alt="${escapeXml(projectTitle)} cover"/>
+  </div>
+</body>
+</html>`;
+}
+
+function titleXhtml(projectTitle: string, author: string, subtitle?: string | null): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml">
@@ -78,7 +114,7 @@ function titleXhtml(projectTitle: string, author: string): string {
 <body>
   <section class="title-page">
     <h1 class="book-title">${escapeXml(projectTitle)}</h1>
-    <p class="book-author">${escapeXml(author)}</p>
+${subtitle ? `    <p class="book-subtitle">${escapeXml(subtitle)}</p>\n` : ""}    <p class="book-author">${escapeXml(author)}</p>
   </section>
 </body>
 </html>`;
@@ -131,13 +167,31 @@ ${points}
 </ncx>`;
 }
 
-function contentOpf(
-  projectTitle: string,
-  author: string,
-  language: string,
-  uuid: string,
-  chapters: EpubChapter[],
-): string {
+interface OpfOptions {
+  projectTitle: string;
+  author: string;
+  language: string;
+  uuid: string;
+  chapters: EpubChapter[];
+  coverMime?: string | null;
+  subtitle?: string | null;
+  description?: string | null;
+  isbn?: string | null;
+}
+
+export function contentOpf(opts: OpfOptions): string {
+  const {
+    projectTitle,
+    author,
+    language,
+    uuid,
+    chapters,
+    coverMime,
+    subtitle,
+    description,
+    isbn,
+  } = opts;
+
   const manifestItems = chapters
     .map(
       (_c, i) =>
@@ -149,24 +203,42 @@ function contentOpf(
     .join("\n");
   const modified = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
 
+  const ext = coverMime ? coverExtension(coverMime) : "jpg";
+  // Legacy meta tag: Send-to-Kindle still reads this one.
+  const coverMeta = coverMime ? `    <meta name="cover" content="cover-image"/>\n` : "";
+  const coverManifest = coverMime
+    ? `    <item id="cover-image" href="images/cover.${ext}" media-type="${escapeXml(coverMime)}" properties="cover-image"/>
+    <item id="cover" href="cover.xhtml" media-type="application/xhtml+xml"/>\n`
+    : "";
+  const coverSpine = coverMime ? `    <itemref idref="cover" linear="no"/>\n` : "";
+  const subtitleMeta = subtitle
+    ? `    <meta property="belongs-to-collection">${escapeXml(subtitle)}</meta>\n`
+    : "";
+  const descriptionMeta = description
+    ? `    <dc:description>${escapeXml(description)}</dc:description>\n`
+    : "";
+  const isbnMeta = isbn
+    ? `    <dc:identifier id="isbn">urn:isbn:${escapeXml(isbn)}</dc:identifier>\n`
+    : "";
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid" xml:lang="${escapeXml(language)}">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
     <dc:identifier id="bookid">urn:uuid:${escapeXml(uuid)}</dc:identifier>
-    <dc:title>${escapeXml(projectTitle)}</dc:title>
-    <dc:creator>${escapeXml(author)}</dc:creator>
+${isbnMeta}    <dc:title>${escapeXml(projectTitle)}</dc:title>
+${subtitleMeta}    <dc:creator>${escapeXml(author)}</dc:creator>
     <dc:language>${escapeXml(language)}</dc:language>
-    <meta property="dcterms:modified">${modified}</meta>
+${descriptionMeta}${coverMeta}    <meta property="dcterms:modified">${modified}</meta>
   </metadata>
   <manifest>
     <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
     <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
     <item id="css" href="styles/book.css" media-type="text/css"/>
-    <item id="title" href="title.xhtml" media-type="application/xhtml+xml"/>
+${coverManifest}    <item id="title" href="title.xhtml" media-type="application/xhtml+xml"/>
 ${manifestItems}
   </manifest>
   <spine toc="ncx">
-    <itemref idref="title"/>
+${coverSpine}    <itemref idref="title"/>
     <itemref idref="nav"/>
 ${spineItems}
   </spine>
@@ -202,7 +274,10 @@ th { background: #f1f5f9; text-align: left; font-weight: 600; }
 hr { border: 0; border-top: 1px solid #cbd5e1; margin: 1.4em 0; }
 .title-page { text-align: center; padding: 25% 1em 0; }
 .title-page .book-title { font-size: 2.2em; margin-bottom: 0.4em; }
+.title-page .book-subtitle { font-size: 1.2em; color: #444; margin: 0 0 0.8em; text-indent: 0; }
 .title-page .book-author { font-style: italic; color: #555; }
+.cover-page { margin: 0; padding: 0; text-align: center; page-break-after: always; }
+.cover-page img { max-width: 100%; max-height: 100%; height: auto; }
 `;
 
 function uuid(): string {
@@ -221,7 +296,17 @@ function uuid(): string {
 }
 
 export async function buildEpubBlob(opts: BuildEpubOptions): Promise<Blob> {
-  const { projectTitle, author, chapters, language = "en", onProgress } = opts;
+  const {
+    projectTitle,
+    author,
+    chapters,
+    language = "en",
+    subtitle,
+    description,
+    isbn,
+    cover,
+    onProgress,
+  } = opts;
   const id = uuid();
   const zip = new JSZip();
 
@@ -231,10 +316,30 @@ export async function buildEpubBlob(opts: BuildEpubOptions): Promise<Blob> {
 
   const oebps = zip.folder("OEBPS")!;
   oebps.file("styles/book.css", BOOK_CSS);
-  oebps.file("title.xhtml", titleXhtml(projectTitle, author));
+  oebps.file("title.xhtml", titleXhtml(projectTitle, author, subtitle));
   oebps.file("nav.xhtml", navXhtml(chapters));
   oebps.file("toc.ncx", tocNcx(projectTitle, id, chapters));
-  oebps.file("content.opf", contentOpf(projectTitle, author, language, id, chapters));
+  oebps.file(
+    "content.opf",
+    contentOpf({
+      projectTitle,
+      author,
+      language,
+      uuid: id,
+      chapters,
+      coverMime: cover?.mime ?? null,
+      subtitle,
+      description,
+      isbn,
+    }),
+  );
+
+  if (cover) {
+    const ext = coverExtension(cover.mime);
+    // Already-compressed image bytes: store without re-deflating.
+    oebps.file(`images/cover.${ext}`, cover.bytes, { compression: "STORE" });
+    oebps.file("cover.xhtml", coverXhtml(projectTitle, ext));
+  }
 
   for (let i = 0; i < chapters.length; i += 1) {
     onProgress?.(i, chapters.length, `Packaging chapter ${i + 1} of ${chapters.length}: ${chapters[i].title}`);
