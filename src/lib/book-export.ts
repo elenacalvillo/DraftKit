@@ -10,7 +10,9 @@ import {
   chaptersToCombinedDocxBlob,
   htmlToDocxBlob,
   type BookChapterForDocx,
+  type DocxCover,
 } from "./html-to-docx";
+import { downloadCoverBytes } from "./project-cover";
 import { openPrintableBook } from "./book-export-pdf";
 import { buildEpubBlob } from "./book-export-epub";
 import { htmlToMarkdown } from "./html-to-markdown";
@@ -71,6 +73,81 @@ async function fetchChapters(projectId: string): Promise<BookChapterForDocx[]> {
   }));
 }
 
+interface BookMeta {
+  author: string | null;
+  subtitle: string | null;
+  description: string | null;
+  isbn: string | null;
+  language: string;
+  coverPath: string | null;
+  coverMime: string | null;
+}
+
+interface LoadedCover {
+  bytes: ArrayBuffer;
+  mime: string;
+  /** Points, aspect-corrected, for the docx cover page. */
+  width: number;
+  height: number;
+  dataUrl: string;
+}
+
+async function fetchBookMeta(projectId: string): Promise<BookMeta> {
+  const { data } = await supabase
+    .from("projects")
+    .select(
+      "author_name, subtitle, book_description, isbn, language, cover_image_path, cover_image_mime",
+    )
+    .eq("id", projectId)
+    .maybeSingle();
+  return {
+    author: data?.author_name ?? null,
+    subtitle: data?.subtitle ?? null,
+    description: data?.book_description ?? null,
+    isbn: data?.isbn ?? null,
+    language: data?.language ?? "en",
+    coverPath: data?.cover_image_path ?? null,
+    coverMime: data?.cover_image_mime ?? null,
+  };
+}
+
+function bytesToDataUrl(bytes: ArrayBuffer, mime: string): string {
+  let binary = "";
+  const view = new Uint8Array(bytes);
+  const chunk = 0x8000;
+  for (let i = 0; i < view.length; i += chunk) {
+    binary += String.fromCharCode(...view.subarray(i, i + chunk));
+  }
+  return `data:${mime};base64,${btoa(binary)}`;
+}
+
+/**
+ * Loads the cover bytes once per export. A failure here degrades to a
+ * cover-less export instead of killing the whole compile.
+ */
+async function loadCover(meta: BookMeta): Promise<LoadedCover | null> {
+  if (!meta.coverPath) return null;
+  try {
+    const bytes = await downloadCoverBytes(meta.coverPath);
+    if (!bytes) return null;
+    const mime = meta.coverMime || "image/jpeg";
+    let width = 420;
+    let height = 630;
+    try {
+      const bitmap = await createImageBitmap(new Blob([bytes], { type: mime }));
+      const scale = Math.min(420 / bitmap.width, 630 / bitmap.height, 1);
+      width = Math.round(bitmap.width * scale) || width;
+      height = Math.round(bitmap.height * scale) || height;
+      bitmap.close?.();
+    } catch {
+      // keep the 2:3 fallback size
+    }
+    return { bytes, mime, width, height, dataUrl: bytesToDataUrl(bytes, mime) };
+  } catch {
+    return null;
+  }
+}
+
 export interface BookExportProgress {
   current: number;
   total: number;
@@ -87,6 +164,7 @@ export interface ExportBookOptions {
 export async function exportBookProject(opts: ExportBookOptions): Promise<void> {
   const { projectId, projectTitle, format, onProgress } = opts;
   const chapters = await fetchChapters(projectId);
+  const meta = await fetchBookMeta(projectId);
   if (chapters.length === 0) {
     throw new Error("This project has no chapters to export yet.");
   }
@@ -128,7 +206,21 @@ export async function exportBookProject(opts: ExportBookOptions): Promise<void> 
   if (format === "docx") {
     onProgress?.({ current: 0, total, label: "Building combined document…" });
     await yieldToBrowser();
-    const blob = await chaptersToCombinedDocxBlob(projectTitle, chapters, onProgress);
+    const cover = await loadCover(meta);
+    const docxCover: DocxCover | null = cover
+      ? {
+          bytes: cover.bytes,
+          width: cover.width,
+          height: cover.height,
+          type: cover.mime === "image/png" ? "png" : "jpg",
+        }
+      : null;
+    const blob = await chaptersToCombinedDocxBlob(
+      projectTitle,
+      chapters,
+      onProgress,
+      docxCover,
+    );
     saveAs(blob, `${base}.docx`);
     return;
   }
@@ -136,7 +228,12 @@ export async function exportBookProject(opts: ExportBookOptions): Promise<void> 
   if (format === "pdf") {
     onProgress?.({ current: total, total, label: "Opening print dialog…" });
     await yieldToBrowser();
-    const ok = openPrintableBook({ projectTitle, chapters });
+    const cover = await loadCover(meta);
+    const ok = openPrintableBook({
+      projectTitle,
+      chapters,
+      coverDataUrl: cover?.dataUrl ?? null,
+    });
     if (!ok) {
       throw new Error(
         "Popup blocked. Allow popups for DraftKit to export PDFs, or use the Combined Word document option.",
@@ -148,7 +245,7 @@ export async function exportBookProject(opts: ExportBookOptions): Promise<void> 
   if (format === "epub") {
     onProgress?.({ current: 0, total, label: "Building ePub…" });
     await yieldToBrowser();
-    let author = "Unknown Author";
+    let author = meta.author?.trim() || "";
     try {
       const { data: userRes } = await supabase.auth.getUser();
       const uid = userRes.user?.id;
@@ -158,15 +255,21 @@ export async function exportBookProject(opts: ExportBookOptions): Promise<void> 
           .select("name")
           .eq("id", uid)
           .maybeSingle();
-        if (creator?.name) author = creator.name;
+        if (!author && creator?.name) author = creator.name;
       }
     } catch {
       // non-fatal — fall back to default author label
     }
+    const cover = await loadCover(meta);
     const blob = await buildEpubBlob({
       projectTitle,
-      author,
+      author: author || "Unknown Author",
       chapters,
+      language: meta.language,
+      subtitle: meta.subtitle,
+      description: meta.description,
+      isbn: meta.isbn,
+      cover: cover ? { bytes: cover.bytes, mime: cover.mime } : null,
       onProgress: (current, t, label) => onProgress?.({ current, total: t, label }),
     });
     saveAs(blob, `${base}.epub`);
