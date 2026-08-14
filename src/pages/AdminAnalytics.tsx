@@ -5,6 +5,7 @@ import { AnalyticsRangePicker } from "@/components/admin/AnalyticsRangePicker";
 import { resolveRange, bucketLabel, type RangeKey } from "@/lib/analytics-range";
 import { computePushFunnel, pushFunnelSteps } from "@/lib/analytics-push-funnel";
 import { MetricInfo } from "@/components/admin/MetricInfo";
+import { WeeklyDigestPanel } from "@/components/admin/WeeklyDigestPanel";
 import {
   BarChart3,
   Users,
@@ -510,6 +511,8 @@ export default function AdminAnalytics() {
             Showing <span className="font-medium text-foreground">{range.label}</span> · {range.prevLabel.replace(/^vs /, "compared to ")}
           </p>
         </motion.div>
+
+        <WeeklyDigestPanel />
 
         {/* Key Metrics Row 1 - Core Rates */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

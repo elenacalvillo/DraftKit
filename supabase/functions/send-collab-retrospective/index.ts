@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { isValidCronSecret } from "../_shared/cron-auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -110,9 +111,7 @@ serve(async (req: Request): Promise<Response> => {
   }
 
   // Auth: require shared secret to prevent unauthenticated abuse (cron-only endpoint)
-  const providedSecret = req.headers.get("x-internal-secret");
-  const expectedSecret = Deno.env.get("CRON_SECRET");
-  if (!expectedSecret || providedSecret !== expectedSecret) {
+  if (!isValidCronSecret(req)) {
     console.warn("unauthorized invocation blocked");
     return new Response(
       JSON.stringify({ error: "Unauthorized" }),

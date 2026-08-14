@@ -1,4 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { isValidCronSecret } from "../_shared/cron-auth.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
@@ -271,15 +273,61 @@ async function sendBroadcast(digest: DigestOutput): Promise<any> {
   return sendResp.json();
 }
 
+async function logDigestRun(
+  status: "sent" | "skipped" | "failed",
+  detail: string,
+) {
+  try {
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+    const { error } = await supabase.from("email_events").insert({
+      request_id: crypto.randomUUID(),
+      type: "weekly_digest",
+      to_email: `audience:${AUDIENCE_ID}`,
+      status,
+      provider_id: detail.slice(0, 500),
+    });
+    if (error) console.error("digest log insert failed", error);
+  } catch (err) {
+    console.error("digest log insert threw", err);
+  }
+}
+
+// Admin fallback path: a signed-in admin may trigger or preview the digest.
+async function isAdminCaller(req: Request): Promise<boolean> {
+  const authHeader = req.headers.get("Authorization") ?? "";
+  if (!authHeader.startsWith("Bearer ")) return false;
+  const token = authHeader.slice("Bearer ".length).trim();
+  if (!token) return false;
+  try {
+    const client = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: `Bearer ${token}` } } },
+    );
+    const { data: userData, error: userErr } = await client.auth.getUser(token);
+    if (userErr || !userData?.user) return false;
+    const { data: isAdmin } = await client.rpc("has_role", {
+      _user_id: userData.user.id,
+      _role: "admin",
+    });
+    return isAdmin === true;
+  } catch {
+    return false;
+  }
+}
+
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Auth: require shared secret to prevent unauthenticated mass-email abuse
-  const providedSecret = req.headers.get("x-internal-secret");
-  const expectedSecret = Deno.env.get("CRON_SECRET");
-  if (!expectedSecret || providedSecret !== expectedSecret) {
+  // Auth: cron shared key, or an authenticated admin triggering it by hand.
+  const viaCron = isValidCronSecret(req);
+  const viaAdmin = viaCron ? false : await isAdminCaller(req);
+  if (!viaCron && !viaAdmin) {
     console.warn("send-weekly-digest: unauthorized invocation blocked");
     return new Response(
       JSON.stringify({ error: "Unauthorized" }),
@@ -287,41 +335,60 @@ serve(async (req: Request) => {
     );
   }
 
+  let previewOnly = false;
   try {
-    console.log("Starting weekly digest...");
+    const body = await req.json();
+    previewOnly = body?.previewOnly === true;
+  } catch { /* no body */ }
 
-    // Step 1: Fetch commits
+  try {
+    console.log(`Starting weekly digest (cron=${viaCron}, preview=${previewOnly})...`);
+
     const allCommits = await fetchCommits();
     console.log(`Fetched ${allCommits.length} commits from GitHub`);
 
-    // Step 2: Filter noise
     const meaningful = filterCommits(allCommits);
     console.log(`${meaningful.length} meaningful commits after filtering`);
 
-    // Step 3: Threshold check
     if (meaningful.length < 2) {
       console.log("Skipping: insufficient signal");
+      if (!previewOnly) {
+        await logDigestRun("skipped", `insufficient signal (${meaningful.length} commits)`);
+      }
       return new Response(
         JSON.stringify({ skipped: true, reason: "insufficient signal", commitCount: meaningful.length }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    // Step 4: AI transformation
     const digest = await transformWithAI(meaningful);
     console.log(`AI generated subject: "${digest.subject}"`);
 
-    // Step 5: Send broadcast
+    if (previewOnly) {
+      return new Response(
+        JSON.stringify({
+          previewMode: true,
+          commitCount: meaningful.length,
+          subject: digest.subject,
+          bullets: digest.bullets,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const result = await sendBroadcast(digest);
     console.log("Broadcast sent:", JSON.stringify(result));
+    await logDigestRun("sent", digest.subject);
 
     return new Response(JSON.stringify({ success: true, subject: digest.subject, broadcastResult: result }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
     console.error("Weekly digest error:", error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
+    if (!previewOnly) await logDigestRun("failed", message);
+    return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
