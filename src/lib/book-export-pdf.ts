@@ -21,7 +21,11 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
-function buildPrintableHtml(projectTitle: string, chapters: BookChapterForPdf[]): string {
+function buildPrintableHtml(
+  projectTitle: string,
+  chapters: BookChapterForPdf[],
+  coverDataUrl?: string | null,
+): string {
   const date = new Date().toLocaleDateString(undefined, {
     year: "numeric",
     month: "long",
@@ -93,6 +97,8 @@ function buildPrintableHtml(projectTitle: string, chapters: BookChapterForPdf[])
     text-align: center;
     page-break-after: always;
   }
+  .cover-page { height: 100vh; display: flex; align-items: center; justify-content: center; page-break-after: always; }
+  .cover-page img { max-width: 100%; max-height: 100vh; object-fit: contain; }
   .title-page h1 { font-size: 36pt; margin-bottom: 0.4em; }
   .title-page .date { color: #64748b; font-style: italic; font-size: 12pt; }
 
@@ -127,6 +133,8 @@ function buildPrintableHtml(projectTitle: string, chapters: BookChapterForPdf[])
     Choose <strong>Save as PDF</strong> in the print dialog to download your book.
     <button onclick="window.print()">Open dialog</button>
   </div>
+
+  ${coverDataUrl ? `<section class="cover-page"><img src="${coverDataUrl}" alt="${escapeHtml(projectTitle)} cover" /></section>` : ""}
 
   <section class="title-page">
     <h1>${escapeHtml(projectTitle)}</h1>
@@ -174,6 +182,8 @@ function buildPrintableHtml(projectTitle: string, chapters: BookChapterForPdf[])
 export interface PrintableBookOptions {
   projectTitle: string;
   chapters: BookChapterForPdf[];
+  /** Data URL for the book cover, rendered as the first printed page. */
+  coverDataUrl?: string | null;
 }
 
 /**
@@ -181,10 +191,14 @@ export interface PrintableBookOptions {
  * the native print dialog. Returns true on success, false if the popup
  * was blocked.
  */
-export function openPrintableBook({ projectTitle, chapters }: PrintableBookOptions): boolean {
+export function openPrintableBook({
+  projectTitle,
+  chapters,
+  coverDataUrl,
+}: PrintableBookOptions): boolean {
   const popup = window.open("", "_blank", "width=900,height=1100");
   if (!popup) return false;
-  const html = buildPrintableHtml(projectTitle, chapters);
+  const html = buildPrintableHtml(projectTitle, chapters, coverDataUrl);
   popup.document.open();
   popup.document.write(html);
   popup.document.close();

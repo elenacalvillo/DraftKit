@@ -154,3 +154,51 @@ export function useUpdateProject() {
   });
 }
 
+export interface BookMetadataInput {
+  id: string;
+  author_name?: string | null;
+  subtitle?: string | null;
+  book_description?: string | null;
+  isbn?: string | null;
+  language?: string;
+  cover_image_path?: string | null;
+  cover_image_mime?: string | null;
+  cover_image_bytes?: number | null;
+}
+
+/** Publication details used by the export pipeline (cover, ISBN, author…). */
+export function useUpdateBookMetadata() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, ...fields }: BookMetadataInput) => {
+      const update: TablesUpdate<"projects"> = {};
+      (Object.keys(fields) as Array<keyof typeof fields>).forEach((key) => {
+        const value = fields[key];
+        if (key === "language") {
+          const lang = typeof value === "string" ? value.trim() : "";
+          if (lang) (update as Record<string, unknown>).language = lang;
+          return;
+        }
+        if (value !== undefined) {
+          (update as Record<string, unknown>)[key as string] =
+            typeof value === "string" ? value.trim() || null : value;
+        }
+      });
+      const { data, error } = await supabase
+        .from("projects")
+        .update(update)
+        .eq("id", id)
+        .select("*")
+        .single();
+      if (error) throw error;
+      return data as Project;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: ["project", data.id] });
+    },
+  });
+}
+
+
