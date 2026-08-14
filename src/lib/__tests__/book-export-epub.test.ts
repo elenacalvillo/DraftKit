@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
 import { contentOpf, coverExtension } from "../book-export-epub";
 import { coverStoragePath, isAcceptedCoverMime } from "../project-cover";
