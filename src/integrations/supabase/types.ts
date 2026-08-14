@@ -739,29 +739,53 @@ export type Database = {
       }
       projects: {
         Row: {
+          author_name: string | null
+          book_description: string | null
+          cover_image_bytes: number | null
+          cover_image_mime: string | null
+          cover_image_path: string | null
           created_at: string
           creator_id: string
           description: string | null
           id: string
           is_archived: boolean
+          isbn: string | null
+          language: string
+          subtitle: string | null
           title: string
           updated_at: string
         }
         Insert: {
+          author_name?: string | null
+          book_description?: string | null
+          cover_image_bytes?: number | null
+          cover_image_mime?: string | null
+          cover_image_path?: string | null
           created_at?: string
           creator_id: string
           description?: string | null
           id?: string
           is_archived?: boolean
+          isbn?: string | null
+          language?: string
+          subtitle?: string | null
           title: string
           updated_at?: string
         }
         Update: {
+          author_name?: string | null
+          book_description?: string | null
+          cover_image_bytes?: number | null
+          cover_image_mime?: string | null
+          cover_image_path?: string | null
           created_at?: string
           creator_id?: string
           description?: string | null
           id?: string
           is_archived?: boolean
+          isbn?: string | null
+          language?: string
+          subtitle?: string | null
           title?: string
           updated_at?: string
         }
