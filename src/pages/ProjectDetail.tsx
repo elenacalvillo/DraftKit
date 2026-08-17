@@ -143,7 +143,9 @@ export default function ProjectDetail() {
     swapChapters,
     deleteChapter,
   } = useProjectChapters(projectId);
-  const { broadcasts, sendBroadcast } = useProjectBroadcasts(projectId);
+  const { broadcasts, sendBroadcast, previewRecipients } =
+    useProjectBroadcasts(projectId);
+
   const { people } = useProjectPeople(projectId);
 
   // Display names for members, resolved from chapter participants.
