@@ -143,7 +143,9 @@ export default function ProjectDetail() {
     swapChapters,
     deleteChapter,
   } = useProjectChapters(projectId);
-  const { broadcasts, sendBroadcast } = useProjectBroadcasts(projectId);
+  const { broadcasts, sendBroadcast, previewRecipients } =
+    useProjectBroadcasts(projectId);
+
   const { people } = useProjectPeople(projectId);
 
   // Display names for members, resolved from chapter participants.
@@ -159,6 +161,16 @@ export default function ProjectDetail() {
   const [chapterTitle, setChapterTitle] = useState("");
   const [showCreateChapter, setShowCreateChapter] = useState(false);
   const [broadcastMessage, setBroadcastMessage] = useState("");
+  const [recipientPreview, setRecipientPreview] = useState<{
+    recipientCount: number;
+    recipients: string[];
+    breakdown: {
+      members: number;
+      chapterCollaborators: number;
+      chapterGuests: number;
+    };
+  } | null>(null);
+
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [pendingRevert, setPendingRevert] = useState<{
     id: string;
@@ -331,7 +343,17 @@ export default function ProjectDetail() {
       );
   };
 
+  const handlePreviewRecipients = async () => {
+    try {
+      const result = await previewRecipients.mutateAsync();
+      setRecipientPreview(result);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Preview failed");
+    }
+  };
+
   const handleSendBroadcast = async () => {
+
     if (!broadcastMessage.trim()) return;
     // Broadcasts also reach chapter collaborators, so an empty Members list
     // is not a blocker as long as chapters exist.
@@ -930,7 +952,35 @@ export default function ProjectDetail() {
                   disabled={isReadOnly}
                   placeholder="Share an update with everyone on this project…"
                 />
-                <div className="flex justify-end">
+                {recipientPreview && (
+                  <div className="rounded-lg border border-border bg-muted/40 p-3">
+                    <p className="text-sm font-medium">
+                      {recipientPreview.recipientCount} recipients
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {recipientPreview.breakdown.members} members ·{" "}
+                      {recipientPreview.breakdown.chapterCollaborators} chapter
+                      collaborators ·{" "}
+                      {recipientPreview.breakdown.chapterGuests} chapter authors
+                    </p>
+                    <div className="mt-2 max-h-40 overflow-y-auto text-xs text-muted-foreground space-y-0.5">
+                      {recipientPreview.recipients.map((e) => (
+                        <div key={e} className="truncate">{e}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={handlePreviewRecipients}
+                    disabled={previewRecipients.isPending}
+                  >
+                    <Users className="w-4 h-4 mr-1.5" />
+                    {previewRecipients.isPending
+                      ? "Checking…"
+                      : "Preview recipients"}
+                  </Button>
                   <Button
                     onClick={handleSendBroadcast}
                     disabled={
@@ -942,6 +992,7 @@ export default function ProjectDetail() {
                     <Megaphone className="w-4 h-4 mr-1.5" /> Send broadcast
                   </Button>
                 </div>
+
               </CardContent>
             </Card>
             <h3 className="text-sm uppercase tracking-wider text-muted-foreground mb-2">

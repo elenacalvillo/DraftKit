@@ -26,7 +26,10 @@ const corsHeaders = {
 interface BroadcastRequest {
   projectId: string;
   message: string;
+  // Resolve recipients and return them without sending or logging anything.
+  previewOnly?: boolean;
 }
+
 
 function escapeHtml(value: string): string {
   return value
@@ -92,9 +95,11 @@ serve(async (req) => {
     );
 
     const body = (await req.json()) as BroadcastRequest;
-    if (!body.projectId || !body.message?.trim()) {
-      throw new Error("projectId and message are required");
+    if (!body.projectId) throw new Error("projectId is required");
+    if (!body.previewOnly && !body.message?.trim()) {
+      throw new Error("message is required");
     }
+
 
     // Authorize: caller must be project owner
     const { data: ownerCheck, error: ownerErr } = await supabase.rpc(
@@ -174,8 +179,33 @@ serve(async (req) => {
     );
 
 
+    // Preview mode: prove the recipient merge without dispatching anything.
+    if (body.previewOnly) {
+      console.log(
+        `broadcast preview project=${body.projectId} recipients=${emails.length}`,
+        emails,
+      );
+      return new Response(
+        JSON.stringify({
+          preview: true,
+          recipientCount: emails.length,
+          recipients: emails,
+          breakdown: {
+            members: (members ?? []).length,
+            chapterCollaborators: collaboratorEmails.length,
+            chapterGuests: guestEmails.filter(Boolean).length,
+          },
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
     if (emails.length === 0) {
       return new Response(
+
         JSON.stringify({
           warning: "There are no other members in this project yet.",
           recipientCount: 0,
