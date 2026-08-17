@@ -26,7 +26,10 @@ const corsHeaders = {
 interface BroadcastRequest {
   projectId: string;
   message: string;
+  // Resolve recipients and return them without sending or logging anything.
+  previewOnly?: boolean;
 }
+
 
 function escapeHtml(value: string): string {
   return value
