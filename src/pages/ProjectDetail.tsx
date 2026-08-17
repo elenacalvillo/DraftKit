@@ -837,16 +837,25 @@ export default function ProjectDetail() {
                         className="flex items-center gap-3 rounded-lg border border-border p-3"
                       >
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-sm font-medium truncate">
+                              {memberNames.get(m.email) || m.email}
+                            </span>
+                            <Badge
+                              variant={m.joined_at ? "secondary" : "outline"}
+                              className="shrink-0"
+                            >
+                              {m.joined_at ? "Joined" : "Pending invite"}
+                            </Badge>
+                          </div>
+                          <div className="text-xs text-muted-foreground truncate">
                             {m.email}
                           </div>
                           <div className="text-xs text-muted-foreground">
                             {roleLabel(m.role)} · {roleAccessSummary(m.role)}
                           </div>
-                          <div className="text-xs text-muted-foreground/70">
-                            {m.joined_at ? "Joined" : "Pending invitation"}
-                          </div>
                         </div>
+
                         <Select
                           value={m.role}
                           onValueChange={(v) =>
