@@ -108,6 +108,8 @@ import { ProjectUpgradePrompt } from "@/components/projects/ProjectUpgradePrompt
 import { ExportBookDialog } from "@/components/projects/ExportBookDialog";
 import { EditableChapterTitle } from "@/components/projects/EditableChapterTitle";
 import { MoveChapterDialog } from "@/components/projects/MoveChapterDialog";
+import { AddProjectMember } from "@/components/projects/AddProjectMember";
+
 
 const STAGE_BADGE: Record<ChapterStage, string> = {
   draft: "bg-slate-200 text-slate-800",
