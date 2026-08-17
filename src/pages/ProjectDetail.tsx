@@ -206,20 +206,31 @@ export default function ProjectDetail() {
     }
   };
 
-  const handleInvite = async () => {
-    if (!inviteEmail.trim()) {
-      toast.error("Email is required");
-      return;
-    }
+  const handleInviteEmail = async (email: string, role: ProjectMemberRole) => {
     try {
-      await inviteMember.mutateAsync({ email: inviteEmail, role: inviteRole });
-      setInviteEmail("");
-      toast.success("Invitation sent");
+      await inviteMember.mutateAsync({ email, role });
+      toast.success("Added to the project");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Invite failed";
       toast.error(msg);
+      throw err;
     }
   };
+
+  const handleAddByCreator = async (
+    creatorId: string,
+    role: ProjectMemberRole,
+  ) => {
+    try {
+      await addMemberByCreator.mutateAsync({ creatorId, role });
+      toast.success("Added to the project");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Could not add writer";
+      toast.error(msg);
+      throw err;
+    }
+  };
+
 
   const handleStatusChange = (
     chapterId: string,
