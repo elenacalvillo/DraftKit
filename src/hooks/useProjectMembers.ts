@@ -157,6 +157,8 @@ export function useProjectMembers(projectId: string | undefined) {
     error: membersQuery.error,
     inviteMember,
     addMemberByCreator,
+    resendInvite,
+
 
     updateMemberRole,
     removeMember,
