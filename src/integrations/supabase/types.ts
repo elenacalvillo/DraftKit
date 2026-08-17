@@ -1114,13 +1114,13 @@ export type Database = {
       add_project_member_by_creator: {
         Args: { _creator_id: string; _project_id: string; _role: string }
         Returns: {
-          email: string
-          id: string
-          invited_at: string
-          joined_at: string
-          project_id: string
-          role: string
-          user_id: string
+          out_email: string
+          out_id: string
+          out_invited_at: string
+          out_joined_at: string
+          out_project_id: string
+          out_role: string
+          out_user_id: string
         }[]
       }
       bump_nudge_count: {
