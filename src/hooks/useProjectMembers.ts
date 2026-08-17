@@ -123,6 +123,8 @@ export function useProjectMembers(projectId: string | undefined) {
     isLoading: membersQuery.isLoading,
     error: membersQuery.error,
     inviteMember,
+    addMemberByCreator,
+
     updateMemberRole,
     removeMember,
   };
