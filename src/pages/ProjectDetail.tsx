@@ -161,6 +161,16 @@ export default function ProjectDetail() {
   const [chapterTitle, setChapterTitle] = useState("");
   const [showCreateChapter, setShowCreateChapter] = useState(false);
   const [broadcastMessage, setBroadcastMessage] = useState("");
+  const [recipientPreview, setRecipientPreview] = useState<{
+    recipientCount: number;
+    recipients: string[];
+    breakdown: {
+      members: number;
+      chapterCollaborators: number;
+      chapterGuests: number;
+    };
+  } | null>(null);
+
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [pendingRevert, setPendingRevert] = useState<{
     id: string;
@@ -333,7 +343,17 @@ export default function ProjectDetail() {
       );
   };
 
+  const handlePreviewRecipients = async () => {
+    try {
+      const result = await previewRecipients.mutateAsync();
+      setRecipientPreview(result);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Preview failed");
+    }
+  };
+
   const handleSendBroadcast = async () => {
+
     if (!broadcastMessage.trim()) return;
     // Broadcasts also reach chapter collaborators, so an empty Members list
     // is not a blocker as long as chapters exist.
