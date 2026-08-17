@@ -145,10 +145,6 @@ export default function ProjectDetail() {
 
   const [chapterTitle, setChapterTitle] = useState("");
   const [showCreateChapter, setShowCreateChapter] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<ProjectMemberRole>(
-    "chapter_writer",
-  );
   const [broadcastMessage, setBroadcastMessage] = useState("");
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [pendingRevert, setPendingRevert] = useState<{
@@ -324,12 +320,13 @@ export default function ProjectDetail() {
 
   const handleSendBroadcast = async () => {
     if (!broadcastMessage.trim()) return;
-    if (members.length === 0) {
-      toast.warning(
-        "There are no other members in this project yet.",
-      );
+    // Broadcasts also reach chapter collaborators, so an empty Members list
+    // is not a blocker as long as chapters exist.
+    if (members.length === 0 && chapters.length === 0) {
+      toast.warning("Add a chapter or a member before broadcasting.");
       return;
     }
+
     try {
       await sendBroadcast.mutateAsync(broadcastMessage);
       setBroadcastMessage("");
