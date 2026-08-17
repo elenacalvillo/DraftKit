@@ -179,7 +179,9 @@ export default function Collaborations() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { workspaces, isLoading } = useMyWorkspaces();
+  const { refetch: refetchActiveCollabs } = useActiveCollabs();
   const { byRequest: participantsByRequest } = useHostedParticipants();
+
   const queryClient = useQueryClient();
   const [busyId, setBusyId] = useState<string | null>(null);
 
