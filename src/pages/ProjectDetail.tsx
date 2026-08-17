@@ -142,6 +142,17 @@ export default function ProjectDetail() {
     deleteChapter,
   } = useProjectChapters(projectId);
   const { broadcasts, sendBroadcast } = useProjectBroadcasts(projectId);
+  const { people } = useProjectPeople(projectId);
+
+  // Display names for members, resolved from chapter participants.
+  const memberNames = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of people) {
+      if (p.name?.trim()) map.set(p.email, p.name);
+    }
+    return map;
+  }, [people]);
+
 
   const [chapterTitle, setChapterTitle] = useState("");
   const [showCreateChapter, setShowCreateChapter] = useState(false);
