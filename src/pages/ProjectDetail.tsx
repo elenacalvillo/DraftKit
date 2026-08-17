@@ -271,15 +271,21 @@ export default function ProjectDetail() {
     }
   };
 
+  const [resendingEmail, setResendingEmail] = useState<string | null>(null);
+
   const handleResendInvite = async (email: string) => {
+    setResendingEmail(email);
     try {
       await resendInvite.mutateAsync(email);
       toast.success(`Invitation resent to ${email}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Could not resend";
       toast.error(msg);
+    } finally {
+      setResendingEmail(null);
     }
   };
+
 
 
 
