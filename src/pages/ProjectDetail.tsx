@@ -273,7 +273,7 @@ export default function ProjectDetail() {
     }
   };
 
-  const [resendingEmail, setResendingEmail] = useState<string | null>(null);
+
 
   const handleResendInvite = async (email: string) => {
     setResendingEmail(email);
