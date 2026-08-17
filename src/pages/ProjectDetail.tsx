@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -109,6 +109,8 @@ import { ExportBookDialog } from "@/components/projects/ExportBookDialog";
 import { EditableChapterTitle } from "@/components/projects/EditableChapterTitle";
 import { MoveChapterDialog } from "@/components/projects/MoveChapterDialog";
 import { AddProjectMember } from "@/components/projects/AddProjectMember";
+import { useProjectPeople } from "@/hooks/useProjectPeople";
+
 
 
 const STAGE_BADGE: Record<ChapterStage, string> = {
