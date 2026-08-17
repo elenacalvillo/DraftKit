@@ -1099,6 +1099,18 @@ export type Database = {
     }
     Functions: {
       _normalize_for_comment_diff: { Args: { _html: string }; Returns: string }
+      add_project_member_by_creator: {
+        Args: { _creator_id: string; _project_id: string; _role: string }
+        Returns: {
+          email: string
+          id: string
+          invited_at: string
+          joined_at: string
+          project_id: string
+          role: string
+          user_id: string
+        }[]
+      }
       bump_nudge_count: {
         Args: { _creator_id: string }
         Returns: {
