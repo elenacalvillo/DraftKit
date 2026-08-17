@@ -130,6 +130,8 @@ export default function ProjectDetail() {
     members,
     inviteMember,
     addMemberByCreator,
+    resendInvite,
+
     removeMember,
     updateMemberRole,
   } = useProjectMembers(projectId);
@@ -235,8 +237,12 @@ export default function ProjectDetail() {
 
   const handleInviteEmail = async (email: string, role: ProjectMemberRole) => {
     try {
-      await inviteMember.mutateAsync({ email, role });
-      toast.success("Added to the project");
+      const { emailed } = await inviteMember.mutateAsync({ email, role });
+      toast.success(
+        emailed
+          ? `Invitation sent to ${email}`
+          : `${email} was added, but the invitation email failed to send. Use Resend invite.`,
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Invite failed";
       toast.error(msg);
@@ -249,14 +255,32 @@ export default function ProjectDetail() {
     role: ProjectMemberRole,
   ) => {
     try {
-      await addMemberByCreator.mutateAsync({ creatorId, role });
-      toast.success("Added to the project");
+      const { member, emailed } = await addMemberByCreator.mutateAsync({
+        creatorId,
+        role,
+      });
+      toast.success(
+        emailed
+          ? `Invitation sent to ${member?.email ?? "the writer"}`
+          : "Added to the project, but the invitation email failed to send.",
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Could not add writer";
       toast.error(msg);
       throw err;
     }
   };
+
+  const handleResendInvite = async (email: string) => {
+    try {
+      await resendInvite.mutateAsync(email);
+      toast.success(`Invitation resent to ${email}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Could not resend";
+      toast.error(msg);
+    }
+  };
+
 
 
   const handleStatusChange = (
@@ -917,6 +941,16 @@ export default function ProjectDetail() {
                             ))}
                           </SelectContent>
                         </Select>
+                        {!m.joined_at && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleResendInvite(m.email)}
+                            disabled={isReadOnly || resendInvite.isPending}
+                          >
+                            Resend invite
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
@@ -925,6 +959,7 @@ export default function ProjectDetail() {
                         >
                           Remove
                         </Button>
+
                       </div>
                     ))
                   )}

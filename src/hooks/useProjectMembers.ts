@@ -24,6 +24,16 @@ export function useProjectMembers(projectId: string | undefined) {
     staleTime: 60 * 1000,
   });
 
+  // Notifies the invitee that they now have project access. Best effort:
+  // the member row is already written, so a mail failure must not roll back.
+  const sendInviteEmail = async (email: string) => {
+    if (!projectId) return;
+    const { error } = await supabase.functions.invoke("send-project-invite", {
+      body: { projectId, email },
+    });
+    if (error) throw error;
+  };
+
   const inviteMember = useMutation({
     mutationFn: async ({
       email,
@@ -52,7 +62,13 @@ export function useProjectMembers(projectId: string | undefined) {
         }
         throw error;
       }
-      return data as ProjectMember;
+      let emailed = true;
+      try {
+        await sendInviteEmail(trimmed);
+      } catch {
+        emailed = false;
+      }
+      return { member: data as ProjectMember, emailed };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["project_members", projectId] });
@@ -75,13 +91,30 @@ export function useProjectMembers(projectId: string | undefined) {
         { _project_id: projectId, _creator_id: creatorId, _role: role },
       );
       if (error) throw error;
-      return (data ?? [])[0] as ProjectMember;
+      const member = (data ?? [])[0] as ProjectMember;
+      let emailed = true;
+      try {
+        if (member?.email) await sendInviteEmail(member.email);
+      } catch {
+        emailed = false;
+      }
+      return { member, emailed };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["project_members", projectId] });
       queryClient.invalidateQueries({ queryKey: ["project_people", projectId] });
     },
   });
+
+  // Re-notifies anyone still pending (including backfilled chapter authors
+  // who were added before project invites sent email).
+  const resendInvite = useMutation({
+    mutationFn: async (email: string) => {
+      await sendInviteEmail(email);
+      return email;
+    },
+  });
+
 
   const updateMemberRole = useMutation({
     mutationFn: async ({
@@ -124,6 +157,8 @@ export function useProjectMembers(projectId: string | undefined) {
     error: membersQuery.error,
     inviteMember,
     addMemberByCreator,
+    resendInvite,
+
 
     updateMemberRole,
     removeMember,
