@@ -1240,6 +1240,17 @@ export type Database = {
           status: string
         }[]
       }
+      list_my_hosted_participants: {
+        Args: never
+        Returns: {
+          email: string
+          joined_at: string
+          name: string
+          request_id: string
+          source: string
+          user_id: string
+        }[]
+      }
       list_my_workspaces: {
         Args: never
         Returns: {
@@ -1272,6 +1283,22 @@ export type Database = {
           role_in_workspace: string
           status: string
           unread_message_count: number
+        }[]
+      }
+      list_project_people: {
+        Args: { _project_id: string }
+        Returns: {
+          chapter_order: number
+          chapter_title: string
+          email: string
+          is_project_member: boolean
+          joined_at: string
+          name: string
+          profile_image_url: string
+          request_id: string
+          source: string
+          user_id: string
+          username: string
         }[]
       }
       mark_workspace_read: { Args: { _request_id: string }; Returns: undefined }
