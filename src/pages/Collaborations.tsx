@@ -65,13 +65,16 @@ function WorkspaceRow({
   onApprove,
   onDecline,
   busy,
+  participants,
 }: {
   w: MyWorkspace;
   highlighted?: boolean;
   onApprove?: (w: MyWorkspace) => void;
   onDecline?: (w: MyWorkspace) => void;
   busy?: boolean;
+  participants?: HostedParticipant[];
 }) {
+
   const navigate = useNavigate();
   const ref = useRef<HTMLDivElement | null>(null);
   const avatarUrl = w.role_in_workspace === "host"
