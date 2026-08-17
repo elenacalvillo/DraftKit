@@ -131,15 +131,48 @@ serve(async (req) => {
     const senderName = creatorRow?.name ?? user.email ?? "Project admin";
     const replyTo = user.email ?? "hello@draftkit.app";
 
-    // Fetch members
+    // Fetch recipients: project members + every chapter collaborator +
+    // chapter guests. Members alone misses authors who only live inside a
+    // chapter workspace, which is the whole point of a Writer's Room.
     const { data: members, error: membersErr } = await supabase
       .from("project_members")
       .select("email")
       .eq("project_id", body.projectId);
     if (membersErr) throw membersErr;
+
+    const { data: chapters, error: chaptersErr } = await supabase
+      .from("collab_requests")
+      .select("id, requester_email, is_solo")
+      .eq("project_id", body.projectId);
+    if (chaptersErr) throw chaptersErr;
+
+    const chapterIds = (chapters ?? []).map((c) => c.id);
+    let collaboratorEmails: string[] = [];
+    if (chapterIds.length > 0) {
+      const { data: collabs, error: collabsErr } = await supabase
+        .from("workspace_collaborators")
+        .select("email")
+        .in("request_id", chapterIds);
+      if (collabsErr) throw collabsErr;
+      collaboratorEmails = (collabs ?? []).map((c) => c.email);
+    }
+
+    const guestEmails = (chapters ?? [])
+      .filter((c) => !c.is_solo)
+      .map((c) => c.requester_email);
+
     const emails = Array.from(
-      new Set((members ?? []).map((m) => m.email).filter(Boolean)),
+      new Set(
+        [
+          ...(members ?? []).map((m) => m.email),
+          ...collaboratorEmails,
+          ...guestEmails,
+        ]
+          .filter((e): e is string => Boolean(e))
+          .map((e) => e.trim().toLowerCase()),
+      ),
     );
+
 
     if (emails.length === 0) {
       return new Response(
