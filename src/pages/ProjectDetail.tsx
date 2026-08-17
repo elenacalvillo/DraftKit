@@ -930,7 +930,35 @@ export default function ProjectDetail() {
                   disabled={isReadOnly}
                   placeholder="Share an update with everyone on this project…"
                 />
-                <div className="flex justify-end">
+                {recipientPreview && (
+                  <div className="rounded-lg border border-border bg-muted/40 p-3">
+                    <p className="text-sm font-medium">
+                      {recipientPreview.recipientCount} recipients
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {recipientPreview.breakdown.members} members ·{" "}
+                      {recipientPreview.breakdown.chapterCollaborators} chapter
+                      collaborators ·{" "}
+                      {recipientPreview.breakdown.chapterGuests} chapter authors
+                    </p>
+                    <div className="mt-2 max-h-40 overflow-y-auto text-xs text-muted-foreground space-y-0.5">
+                      {recipientPreview.recipients.map((e) => (
+                        <div key={e} className="truncate">{e}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={handlePreviewRecipients}
+                    disabled={previewRecipients.isPending}
+                  >
+                    <Users className="w-4 h-4 mr-1.5" />
+                    {previewRecipients.isPending
+                      ? "Checking…"
+                      : "Preview recipients"}
+                  </Button>
                   <Button
                     onClick={handleSendBroadcast}
                     disabled={
@@ -942,6 +970,7 @@ export default function ProjectDetail() {
                     <Megaphone className="w-4 h-4 mr-1.5" /> Send broadcast
                   </Button>
                 </div>
+
               </CardContent>
             </Card>
             <h3 className="text-sm uppercase tracking-wider text-muted-foreground mb-2">
