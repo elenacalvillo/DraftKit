@@ -52,7 +52,10 @@ export default function AcceptProjectInvite() {
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
       <Card className="w-full max-w-md">
         <CardContent className="p-8 text-center space-y-4">
-          <DraftKitLogo size={48} className="mx-auto" />
+          <div className="flex justify-center">
+            <DraftKitLogo size={48} />
+          </div>
+
           {state === "working" && (
             <>
               <Loader2 className="w-6 h-6 animate-spin mx-auto text-muted-foreground" />
