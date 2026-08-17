@@ -90,8 +90,21 @@ export function useProjectMembers(projectId: string | undefined) {
         "add_project_member_by_creator",
         { _project_id: projectId, _creator_id: creatorId, _role: role },
       );
-      if (error) throw error;
-      const member = (data ?? [])[0] as ProjectMember;
+      if (error) throw new Error(error.message || "Could not add writer");
+      const row = (data ?? [])[0];
+      const member = row
+        ? ({
+            id: row.out_id,
+            project_id: row.out_project_id,
+            user_id: row.out_user_id,
+            email: row.out_email,
+            role: row.out_role,
+            invited_at: row.out_invited_at,
+            joined_at: row.out_joined_at,
+            invited_by: null,
+          } as ProjectMember)
+        : (undefined as unknown as ProjectMember);
+
       let emailed = true;
       try {
         if (member?.email) await sendInviteEmail(member.email);
