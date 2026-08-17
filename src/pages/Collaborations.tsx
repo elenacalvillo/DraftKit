@@ -15,6 +15,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useMyWorkspaces, bucketWorkspace, type MyWorkspace, type WorkspaceRole } from "@/hooks/useMyWorkspaces";
 import { useActiveCollabs } from "@/hooks/useActiveCollabs";
 import { approveCollabRequest, declineCollabRequest } from "@/lib/collab-actions";
+import { useHostedParticipants, type HostedParticipant } from "@/hooks/useHostedParticipants";
+
 
 type Bucket = "needs_response" | "active" | "published" | "archived";
 
@@ -65,13 +67,16 @@ function WorkspaceRow({
   onApprove,
   onDecline,
   busy,
+  participants,
 }: {
   w: MyWorkspace;
   highlighted?: boolean;
   onApprove?: (w: MyWorkspace) => void;
   onDecline?: (w: MyWorkspace) => void;
   busy?: boolean;
+  participants?: HostedParticipant[];
 }) {
+
   const navigate = useNavigate();
   const ref = useRef<HTMLDivElement | null>(null);
   const avatarUrl = w.role_in_workspace === "host"
@@ -124,7 +129,28 @@ function WorkspaceRow({
             </div>
             <p className="text-sm text-muted-foreground truncate">{counterpartLine(w)}</p>
             <p className="text-xs text-muted-foreground truncate">{activityLine(w)}</p>
+            {participants && participants.length > 0 && (
+              <div className="mt-2 space-y-1">
+                {participants.map((p) => (
+                  <div
+                    key={`${p.source}-${p.email}`}
+                    className="flex items-center gap-2 min-w-0"
+                  >
+                    <Badge
+                      variant={p.joined_at ? "secondary" : "outline"}
+                      className="shrink-0 text-[10px] px-1.5 py-0"
+                    >
+                      {p.joined_at ? "Joined" : "Pending invite"}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground truncate">
+                      {p.name ? `${p.name} · ${p.email}` : p.email}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
+
         </div>
         {isHostPending ? (
           <div className="flex gap-2 sm:shrink-0">
@@ -154,6 +180,8 @@ export default function Collaborations() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { workspaces, isLoading } = useMyWorkspaces();
   const { refetch: refetchActiveCollabs } = useActiveCollabs();
+  const { byRequest: participantsByRequest } = useHostedParticipants();
+
   const queryClient = useQueryClient();
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -328,6 +356,8 @@ export default function Collaborations() {
                 onApprove={handleApprove}
                 onDecline={handleDecline}
                 busy={busyId === w.request_id}
+                participants={participantsByRequest.get(w.request_id)}
+
               />
             ))}
           </div>

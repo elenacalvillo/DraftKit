@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -108,6 +108,10 @@ import { ProjectUpgradePrompt } from "@/components/projects/ProjectUpgradePrompt
 import { ExportBookDialog } from "@/components/projects/ExportBookDialog";
 import { EditableChapterTitle } from "@/components/projects/EditableChapterTitle";
 import { MoveChapterDialog } from "@/components/projects/MoveChapterDialog";
+import { AddProjectMember } from "@/components/projects/AddProjectMember";
+import { useProjectPeople } from "@/hooks/useProjectPeople";
+
+
 
 const STAGE_BADGE: Record<ChapterStage, string> = {
   draft: "bg-slate-200 text-slate-800",
@@ -122,8 +126,14 @@ export default function ProjectDetail() {
   const { isProject, isLoading: isProLoading } = usePro();
   const { data: project, isLoading: isProjectLoading } = useProject(projectId);
   const toggleArchive = useToggleProjectArchive();
-  const { members, inviteMember, removeMember, updateMemberRole } =
-    useProjectMembers(projectId);
+  const {
+    members,
+    inviteMember,
+    addMemberByCreator,
+    removeMember,
+    updateMemberRole,
+  } = useProjectMembers(projectId);
+
   const {
     chapters,
     isLoading: isChaptersLoading,
@@ -134,13 +144,20 @@ export default function ProjectDetail() {
     deleteChapter,
   } = useProjectChapters(projectId);
   const { broadcasts, sendBroadcast } = useProjectBroadcasts(projectId);
+  const { people } = useProjectPeople(projectId);
+
+  // Display names for members, resolved from chapter participants.
+  const memberNames = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of people) {
+      if (p.name?.trim()) map.set(p.email, p.name);
+    }
+    return map;
+  }, [people]);
+
 
   const [chapterTitle, setChapterTitle] = useState("");
   const [showCreateChapter, setShowCreateChapter] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<ProjectMemberRole>(
-    "chapter_writer",
-  );
   const [broadcastMessage, setBroadcastMessage] = useState("");
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [pendingRevert, setPendingRevert] = useState<{
@@ -204,20 +221,31 @@ export default function ProjectDetail() {
     }
   };
 
-  const handleInvite = async () => {
-    if (!inviteEmail.trim()) {
-      toast.error("Email is required");
-      return;
-    }
+  const handleInviteEmail = async (email: string, role: ProjectMemberRole) => {
     try {
-      await inviteMember.mutateAsync({ email: inviteEmail, role: inviteRole });
-      setInviteEmail("");
-      toast.success("Invitation sent");
+      await inviteMember.mutateAsync({ email, role });
+      toast.success("Added to the project");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Invite failed";
       toast.error(msg);
+      throw err;
     }
   };
+
+  const handleAddByCreator = async (
+    creatorId: string,
+    role: ProjectMemberRole,
+  ) => {
+    try {
+      await addMemberByCreator.mutateAsync({ creatorId, role });
+      toast.success("Added to the project");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Could not add writer";
+      toast.error(msg);
+      throw err;
+    }
+  };
+
 
   const handleStatusChange = (
     chapterId: string,
@@ -305,12 +333,13 @@ export default function ProjectDetail() {
 
   const handleSendBroadcast = async () => {
     if (!broadcastMessage.trim()) return;
-    if (members.length === 0) {
-      toast.warning(
-        "There are no other members in this project yet.",
-      );
+    // Broadcasts also reach chapter collaborators, so an empty Members list
+    // is not a blocker as long as chapters exist.
+    if (members.length === 0 && chapters.length === 0) {
+      toast.warning("Add a chapter or a member before broadcasting.");
       return;
     }
+
     try {
       await sendBroadcast.mutateAsync(broadcastMessage);
       setBroadcastMessage("");
@@ -799,41 +828,16 @@ export default function ProjectDetail() {
                 </PopoverContent>
               </Popover>
             </div>
-            <Card>
+            <AddProjectMember
+              projectId={projectId}
+              disabled={isReadOnly}
+              memberEmails={members.map((m) => m.email)}
+              onInviteByEmail={handleInviteEmail}
+              onAddByCreator={handleAddByCreator}
+            />
+            <Card className="mt-4">
               <CardContent className="p-4 space-y-4">
-                <div className="grid gap-2 md:grid-cols-[1fr_200px_auto]">
-                  <Input
-                    type="email"
-                    placeholder="Invite by email"
-                    value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.target.value)}
-                    disabled={isReadOnly}
-                  />
-                  <Select
-                    value={inviteRole}
-                    onValueChange={(v) => setInviteRole(v as ProjectMemberRole)}
-                    disabled={isReadOnly}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="max-w-[340px]">
-                      {PROJECT_MEMBER_ROLES.map((r) => (
-                        <SelectItem key={r} value={r} className="py-2">
-                          <div className="space-y-0.5">
-                            <div className="font-medium">{roleLabel(r)}</div>
-                            <div className="text-xs text-muted-foreground leading-snug whitespace-normal">
-                              {roleDescription(r)}
-                            </div>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button onClick={handleInvite} disabled={isReadOnly}>
-                    <UserPlus className="w-4 h-4 mr-1.5" /> Invite
-                  </Button>
-                </div>
+
                 <div className="space-y-2">
                   {members.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
@@ -846,16 +850,25 @@ export default function ProjectDetail() {
                         className="flex items-center gap-3 rounded-lg border border-border p-3"
                       >
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-sm font-medium truncate">
+                              {memberNames.get(m.email) || m.email}
+                            </span>
+                            <Badge
+                              variant={m.joined_at ? "secondary" : "outline"}
+                              className="shrink-0"
+                            >
+                              {m.joined_at ? "Joined" : "Pending invite"}
+                            </Badge>
+                          </div>
+                          <div className="text-xs text-muted-foreground truncate">
                             {m.email}
                           </div>
                           <div className="text-xs text-muted-foreground">
                             {roleLabel(m.role)} · {roleAccessSummary(m.role)}
                           </div>
-                          <div className="text-xs text-muted-foreground/70">
-                            {m.joined_at ? "Joined" : "Pending invitation"}
-                          </div>
                         </div>
+
                         <Select
                           value={m.role}
                           onValueChange={(v) =>
