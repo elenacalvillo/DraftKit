@@ -130,6 +130,8 @@ export default function ProjectDetail() {
     members,
     inviteMember,
     addMemberByCreator,
+    resendInvite,
+
     removeMember,
     updateMemberRole,
   } = useProjectMembers(projectId);
