@@ -59,6 +59,30 @@ export function useProjectMembers(projectId: string | undefined) {
     },
   });
 
+  // Adds a registered DraftKit writer by profile. The RPC resolves their
+  // account email server-side so the host never has to guess an address.
+  const addMemberByCreator = useMutation({
+    mutationFn: async ({
+      creatorId,
+      role,
+    }: {
+      creatorId: string;
+      role: ProjectMemberRole;
+    }) => {
+      if (!projectId) throw new Error("Project ID is required");
+      const { data, error } = await supabase.rpc(
+        "add_project_member_by_creator",
+        { _project_id: projectId, _creator_id: creatorId, _role: role },
+      );
+      if (error) throw error;
+      return (data ?? [])[0] as ProjectMember;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["project_members", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["project_people", projectId] });
+    },
+  });
+
   const updateMemberRole = useMutation({
     mutationFn: async ({
       memberId,
