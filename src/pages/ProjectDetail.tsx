@@ -941,6 +941,16 @@ export default function ProjectDetail() {
                             ))}
                           </SelectContent>
                         </Select>
+                        {!m.joined_at && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleResendInvite(m.email)}
+                            disabled={isReadOnly || resendInvite.isPending}
+                          >
+                            Resend invite
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
@@ -949,6 +959,7 @@ export default function ProjectDetail() {
                         >
                           Remove
                         </Button>
+
                       </div>
                     ))
                   )}
