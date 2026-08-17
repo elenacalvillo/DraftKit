@@ -129,7 +129,28 @@ function WorkspaceRow({
             </div>
             <p className="text-sm text-muted-foreground truncate">{counterpartLine(w)}</p>
             <p className="text-xs text-muted-foreground truncate">{activityLine(w)}</p>
+            {participants && participants.length > 0 && (
+              <div className="mt-2 space-y-1">
+                {participants.map((p) => (
+                  <div
+                    key={`${p.source}-${p.email}`}
+                    className="flex items-center gap-2 min-w-0"
+                  >
+                    <Badge
+                      variant={p.joined_at ? "secondary" : "outline"}
+                      className="shrink-0 text-[10px] px-1.5 py-0"
+                    >
+                      {p.joined_at ? "Joined" : "Pending invite"}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground truncate">
+                      {p.name ? `${p.name} · ${p.email}` : p.email}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
+
         </div>
         {isHostPending ? (
           <div className="flex gap-2 sm:shrink-0">
