@@ -36,6 +36,8 @@ import RefundPolicy from "./pages/RefundPolicy";
 import PublicWorkspaceView from "./pages/PublicWorkspaceView";
 import Projects from "./pages/Projects";
 import ProjectDetail from "./pages/ProjectDetail";
+import AcceptProjectInvite from "./pages/AcceptProjectInvite";
+
 import Collaborations from "./pages/Collaborations";
 
 const queryClient = new QueryClient({
