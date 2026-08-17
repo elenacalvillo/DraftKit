@@ -946,11 +946,14 @@ export default function ProjectDetail() {
                             variant="outline"
                             size="sm"
                             onClick={() => handleResendInvite(m.email)}
-                            disabled={isReadOnly || resendInvite.isPending}
+                            disabled={isReadOnly || resendingEmail === m.email}
                           >
-                            Resend invite
+                            {resendingEmail === m.email
+                              ? "Sending…"
+                              : "Resend invite"}
                           </Button>
                         )}
+
                         <Button
                           variant="ghost"
                           size="sm"
