@@ -124,8 +124,14 @@ export default function ProjectDetail() {
   const { isProject, isLoading: isProLoading } = usePro();
   const { data: project, isLoading: isProjectLoading } = useProject(projectId);
   const toggleArchive = useToggleProjectArchive();
-  const { members, inviteMember, removeMember, updateMemberRole } =
-    useProjectMembers(projectId);
+  const {
+    members,
+    inviteMember,
+    addMemberByCreator,
+    removeMember,
+    updateMemberRole,
+  } = useProjectMembers(projectId);
+
   const {
     chapters,
     isLoading: isChaptersLoading,
