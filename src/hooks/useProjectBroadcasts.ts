@@ -49,10 +49,33 @@ export function useProjectBroadcasts(projectId: string | undefined) {
     },
   });
 
+  // Resolves the merged recipient list without dispatching any email.
+  const previewRecipients = useMutation({
+    mutationFn: async () => {
+      if (!projectId) throw new Error("Project ID is required");
+      const { data, error } = await supabase.functions.invoke(
+        "project-broadcast",
+        { body: { projectId, previewOnly: true } },
+      );
+      if (error) throw error;
+      return data as {
+        recipientCount: number;
+        recipients: string[];
+        breakdown: {
+          members: number;
+          chapterCollaborators: number;
+          chapterGuests: number;
+        };
+      };
+    },
+  });
+
   return {
     broadcasts: broadcastsQuery.data ?? [],
     isLoading: broadcastsQuery.isLoading,
     error: broadcastsQuery.error,
     sendBroadcast,
+    previewRecipients,
+
   };
 }
