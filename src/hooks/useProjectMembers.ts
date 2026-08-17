@@ -60,8 +60,9 @@ export function useProjectMembers(projectId: string | undefined) {
         if (error.code === "23505") {
           throw new Error("This email has already been invited to the project.");
         }
-        throw error;
+        throw new Error(error.message || "Invite failed");
       }
+
       let emailed = true;
       try {
         await sendInviteEmail(trimmed);
