@@ -182,6 +182,8 @@ export default function ProjectDetail() {
   const [moveChapter, setMoveChapter] = useState<{ id: string; title: string } | null>(null);
   const [showEditProject, setShowEditProject] = useState(false);
   const [showBookDetails, setShowBookDetails] = useState(false);
+  const [resendingEmail, setResendingEmail] = useState<string | null>(null);
+
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
