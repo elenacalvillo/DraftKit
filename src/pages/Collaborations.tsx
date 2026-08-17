@@ -15,6 +15,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useMyWorkspaces, bucketWorkspace, type MyWorkspace, type WorkspaceRole } from "@/hooks/useMyWorkspaces";
 import { useActiveCollabs } from "@/hooks/useActiveCollabs";
 import { approveCollabRequest, declineCollabRequest } from "@/lib/collab-actions";
+import { useHostedParticipants, type HostedParticipant } from "@/hooks/useHostedParticipants";
+
 
 type Bucket = "needs_response" | "active" | "published" | "archived";
 
