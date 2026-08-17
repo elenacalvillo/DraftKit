@@ -799,41 +799,16 @@ export default function ProjectDetail() {
                 </PopoverContent>
               </Popover>
             </div>
-            <Card>
+            <AddProjectMember
+              projectId={projectId}
+              disabled={isReadOnly}
+              memberEmails={members.map((m) => m.email)}
+              onInviteByEmail={handleInviteEmail}
+              onAddByCreator={handleAddByCreator}
+            />
+            <Card className="mt-4">
               <CardContent className="p-4 space-y-4">
-                <div className="grid gap-2 md:grid-cols-[1fr_200px_auto]">
-                  <Input
-                    type="email"
-                    placeholder="Invite by email"
-                    value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.target.value)}
-                    disabled={isReadOnly}
-                  />
-                  <Select
-                    value={inviteRole}
-                    onValueChange={(v) => setInviteRole(v as ProjectMemberRole)}
-                    disabled={isReadOnly}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="max-w-[340px]">
-                      {PROJECT_MEMBER_ROLES.map((r) => (
-                        <SelectItem key={r} value={r} className="py-2">
-                          <div className="space-y-0.5">
-                            <div className="font-medium">{roleLabel(r)}</div>
-                            <div className="text-xs text-muted-foreground leading-snug whitespace-normal">
-                              {roleDescription(r)}
-                            </div>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button onClick={handleInvite} disabled={isReadOnly}>
-                    <UserPlus className="w-4 h-4 mr-1.5" /> Invite
-                  </Button>
-                </div>
+
                 <div className="space-y-2">
                   {members.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
