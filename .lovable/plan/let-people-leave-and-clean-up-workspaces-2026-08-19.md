@@ -41,6 +41,13 @@ Two confirmed gaps:
 - Frontend: `src/pages/Workspace.tsx` (sidebar actions), `src/pages/Collaborations.tsx` (row menu), `src/hooks/useWorkspaceCollaborators.ts` (leave mutation + cache invalidation of `my_workspaces`).
 - Duplicate check reuses the existing chapter list query for projects, and a lightweight title query for solo drafts.
 
+## The 2 edge cases to guard against
+
+To make sure absolutely nothing goes wrong when Lovable builds this, tell it to respect these two strict guardrails:
+
+- **Don't delete the host's copy when a guest leaves:** If a guest leaves a collaboration, it should only detach *their* view (`workspace_collaborators`). The host's original workspace and manuscript must remain untouched.
+- **Keep hard delete behind an explicit modal:** "Delete permanently" on cancelled/declined drafts must require typing the workspace name or clicking an explicit confirmation modal so an owner never nukes a draft by mistake.
+
 ## Not in this change
 
 Dinah's impact numbers (15 collabs done, 12 lined up, net-new vs repost ratio) are worth a dedicated feature. Happy to plan an "Your DraftKit impact" stats view next if you want it.
