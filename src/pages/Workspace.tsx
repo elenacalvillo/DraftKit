@@ -27,11 +27,21 @@ import {
   AlertCircle,
   User,
   FolderInput,
+  LogOut,
 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { Calendar } from "@/components/ui/calendar";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -79,6 +89,7 @@ import {
 } from "@/lib/workspace-roles";
 import { isEffectivelySolo } from "@/lib/workspace-participants";
 import { approveCollabRequest, declineCollabRequest } from "@/lib/collab-actions";
+import { leaveWorkspace, deleteWorkspacePermanently } from "@/lib/workspace-cleanup";
 
 interface WorkspaceRequest {
   id: string;
@@ -123,6 +134,10 @@ export default function Workspace() {
   const [creatorInfo, setCreatorInfo] = useState<CreatorInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   // Role
   const isCreator = !!creator && creator.id === request?.creator_id;
@@ -1152,80 +1167,123 @@ export default function Workspace() {
                 </Button>
               )}
 
-              {isOwnerView && request.status === "approved" && (() => {
-                const isChapter = !!request.is_project_workspace;
-                return (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="w-full text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+              {isOwnerView && request.status === "approved" && !request.is_project_workspace && !isSolo && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    >
+                      <XCircle className="w-4 h-4 mr-2" />
+                      Cancel Collab
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Cancel this collaboration?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {`This will cancel the collaboration with ${partnerName}. The workspace content will be preserved but editing will be locked.`}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Keep Collab</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        onClick={async () => {
+                          try {
+                            const { error } = await supabase
+                              .from("collab_requests")
+                              .update({ status: "cancelled" })
+                              .eq("id", request.id);
+                            if (error) throw error;
+                            toast.success("Collaboration cancelled");
+                            supabase.functions
+                              .invoke("send-collab-email", {
+                                body: { type: "collab_cancelled", requestId: request.id },
+                              })
+                              .catch((err) => console.error("Failed to send cancellation email:", err));
+                            navigate("/dashboard/collaborations");
+                          } catch (err) {
+                            console.error("Error cancelling collab:", err);
+                            toast.error("Failed to cancel collaboration");
+                          }
+                        }}
                       >
-                        <XCircle className="w-4 h-4 mr-2" />
-                        {isChapter ? "Delete Chapter" : "Cancel Collab"}
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>
-                          {isChapter ? "Delete this chapter?" : "Cancel this collaboration?"}
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                          {isChapter
-                            ? "This permanently removes this chapter and its drafted content from your project. This cannot be undone."
-                            : `This will cancel the collaboration with ${partnerName}. The workspace content will be preserved but editing will be locked.`}
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>
-                          {isChapter ? "Keep Chapter" : "Keep Collab"}
-                        </AlertDialogCancel>
-                        <AlertDialogAction
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          onClick={async () => {
-                            try {
-                              if (isChapter) {
-                                const { error } = await supabase
-                                  .from("collab_requests")
-                                  .delete()
-                                  .eq("id", request.id);
-                                if (error) throw error;
-                                toast.success("Chapter deleted");
-                                navigate(
-                                  request.project_id
-                                    ? `/dashboard/projects/${request.project_id}`
-                                    : "/dashboard/projects",
-                                );
-                              } else {
-                                const { error } = await supabase
-                                  .from("collab_requests")
-                                  .update({ status: "cancelled" })
-                                  .eq("id", request.id);
-                                if (error) throw error;
-                                toast.success("Collaboration cancelled");
-                                supabase.functions
-                                  .invoke("send-collab-email", {
-                                    body: { type: "collab_cancelled", requestId: request.id },
-                                  })
-                                  .catch((err) => console.error("Failed to send cancellation email:", err));
-                                navigate("/dashboard/collaborations");
-                              }
-                            } catch (err) {
-                              console.error("Error on destructive action:", err);
-                              toast.error(
-                                isChapter ? "Failed to delete chapter" : "Failed to cancel collaboration",
-                              );
-                            }
-                          }}
-                        >
-                          {isChapter ? "Delete Chapter" : "Cancel Collab"}
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                );
-              })()}
+                        Cancel Collab
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+
+              {isOwnerView && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                  onClick={() => {
+                    setDeleteConfirmText("");
+                    setShowDeleteDialog(true);
+                  }}
+                >
+                  <XCircle className="w-4 h-4 mr-2" />
+                  {request.is_project_workspace
+                    ? "Delete Chapter"
+                    : isSolo
+                    ? "Delete Draft"
+                    : "Delete Permanently"}
+                </Button>
+              )}
+
+              {!isOwnerView && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      disabled={leaving}
+                    >
+                      <LogOut className="w-4 h-4 mr-2" />
+                      Leave workspace
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Leave this workspace?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        You'll be removed from this shared space and it disappears from your
+                        list. The draft stays with the host, nothing is deleted. The host can
+                        invite you again later.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Stay</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        onClick={async () => {
+                          setLeaving(true);
+                          try {
+                            await leaveWorkspace(request.id);
+                            await queryClient.invalidateQueries({ queryKey: ["my_workspaces"] });
+                            toast.success("You left the workspace");
+                            navigate("/dashboard/collaborations");
+                          } catch (err) {
+                            console.error("Failed to leave workspace:", err);
+                            toast.error(err instanceof Error ? err.message : "Failed to leave");
+                          } finally {
+                            setLeaving(false);
+                          }
+                        }}
+                      >
+                        Leave workspace
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+
             </div>
 
             {/* Writer's Room — Collaborators */}
@@ -1575,6 +1633,71 @@ export default function Workspace() {
           }}
         />
       )}
+
+      {request && isOwnerView && (() => {
+        const label = (request.message || "Untitled").trim();
+        const confirmed = deleteConfirmText.trim().toLowerCase() === label.toLowerCase();
+        const kind = request.is_project_workspace ? "chapter" : isSolo ? "draft" : "workspace";
+        return (
+          <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Delete this {kind} permanently?</DialogTitle>
+                <DialogDescription>
+                  This removes the {kind} and everything written in it, for you and everyone
+                  invited. It cannot be undone. Type the title to confirm.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2 py-2">
+                <p className="text-sm font-medium break-words">{label}</p>
+                <Input
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder="Type the title exactly"
+                  autoFocus
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setShowDeleteDialog(false)} disabled={deleting}>
+                  Keep it
+                </Button>
+                <Button
+                  variant="destructive"
+                  disabled={!confirmed || deleting}
+                  onClick={async () => {
+                    setDeleting(true);
+                    try {
+                      await deleteWorkspacePermanently(request.id);
+                      await queryClient.invalidateQueries({ queryKey: ["my_workspaces"] });
+                      if (request.project_id) {
+                        await queryClient.invalidateQueries({
+                          queryKey: ["project_chapters", request.project_id],
+                        });
+                      }
+                      toast.success(
+                        kind === "chapter" ? "Chapter deleted" : "Workspace deleted",
+                      );
+                      navigate(
+                        request.project_id
+                          ? `/dashboard/projects/${request.project_id}`
+                          : "/dashboard/collaborations",
+                      );
+                    } catch (err) {
+                      console.error("Failed to delete workspace:", err);
+                      toast.error(err instanceof Error ? err.message : "Failed to delete");
+                    } finally {
+                      setDeleting(false);
+                    }
+                  }}
+                >
+                  {deleting ? "Deleting…" : "Delete permanently"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
+
     </DashboardLayout>
   );
 }

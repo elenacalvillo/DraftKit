@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
-import { ArrowLeft, BookMarked, Inbox, PenLine, Send, Users, Sparkles, Check, X } from "lucide-react";
+import { ArrowLeft, BookMarked, Inbox, PenLine, Send, Users, Sparkles, Check, X, MoreVertical, LogOut, Trash2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -10,6 +10,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { leaveWorkspace } from "@/lib/workspace-cleanup";
 import { sanitizeSubstackImageUrl, cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useMyWorkspaces, bucketWorkspace, type MyWorkspace, type WorkspaceRole } from "@/hooks/useMyWorkspaces";
@@ -66,6 +73,7 @@ function WorkspaceRow({
   highlighted,
   onApprove,
   onDecline,
+  onLeave,
   busy,
   participants,
 }: {
@@ -73,6 +81,7 @@ function WorkspaceRow({
   highlighted?: boolean;
   onApprove?: (w: MyWorkspace) => void;
   onDecline?: (w: MyWorkspace) => void;
+  onLeave?: (w: MyWorkspace) => void;
   busy?: boolean;
   participants?: HostedParticipant[];
 }) {
@@ -85,6 +94,7 @@ function WorkspaceRow({
   const avatarFallback = (w.role_in_workspace === "host" ? w.requester_name : w.host_name)?.charAt(0) || "?";
   const title = workspaceTitle(w);
   const isHostPending = w.status === "pending" && w.role_in_workspace === "host";
+  const isOwnerRole = w.role_in_workspace === "host" || w.role_in_workspace === "project_owner";
 
   useEffect(() => {
     if (highlighted && ref.current) {
@@ -164,11 +174,40 @@ function WorkspaceRow({
             </Button>
           </div>
         ) : (
-          <Button size="sm" className="sm:shrink-0" onClick={() => navigate(`/dashboard/workspace/${w.request_id}`)}>
-            <PenLine className="h-4 w-4 mr-1" />
-            Open
-          </Button>
+          <div className="flex items-center gap-2 sm:shrink-0">
+            <Button size="sm" onClick={() => navigate(`/dashboard/workspace/${w.request_id}`)}>
+              <PenLine className="h-4 w-4 mr-1" />
+              Open
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="icon" variant="ghost" aria-label="Workspace options" disabled={busy}>
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {isOwnerRole ? (
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onClick={() => navigate(`/dashboard/workspace/${w.request_id}`)}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete permanently…
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onClick={() => onLeave?.(w)}
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Leave workspace
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         )}
+
       </CardContent>
     </Card>
   );
@@ -201,6 +240,22 @@ export default function Collaborations() {
     } catch (err) {
       console.error(err);
       toast.error("Failed to approve. Try again or contact support.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleLeave = async (w: MyWorkspace) => {
+    setBusyId(w.request_id);
+    try {
+      await leaveWorkspace(w.request_id);
+      toast.success("You left the workspace", {
+        description: "The draft stays with the host. Nothing was deleted.",
+      });
+      await queryClient.invalidateQueries({ queryKey: ["my_workspaces", user?.id] });
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Failed to leave workspace");
     } finally {
       setBusyId(null);
     }
@@ -355,6 +410,7 @@ export default function Collaborations() {
                 highlighted={w.request_id === highlightId}
                 onApprove={handleApprove}
                 onDecline={handleDecline}
+                onLeave={handleLeave}
                 busy={busyId === w.request_id}
                 participants={participantsByRequest.get(w.request_id)}
 

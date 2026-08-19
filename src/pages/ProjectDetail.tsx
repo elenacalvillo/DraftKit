@@ -88,6 +88,7 @@ import { toast } from "sonner";
 import { usePro } from "@/hooks/usePro";
 import { useProject, useToggleProjectArchive } from "@/hooks/useProjects";
 import { useProjectMembers } from "@/hooks/useProjectMembers";
+import { findDuplicateTitle } from "@/lib/workspace-cleanup";
 import { useProjectChapters } from "@/hooks/useProjectChapters";
 import { useProjectBroadcasts } from "@/hooks/useProjectBroadcasts";
 import { EditProjectDialog } from "@/components/projects/EditProjectDialog";
@@ -1085,7 +1086,31 @@ export default function ProjectDetail() {
               placeholder="Chapter 1: …"
               autoFocus
             />
+            {(() => {
+              const dup = findDuplicateTitle(
+                chapterTitle,
+                chapters.map((c) => ({ id: c.id, title: c.message })),
+              );
+              if (!dup) return null;
+              return (
+                <div className="mt-3 rounded-md border border-border bg-muted/40 p-3 text-sm">
+                  <p className="text-muted-foreground">
+                    You already have a chapter called “{chapterTitle.trim()}”. Open it instead of
+                    creating a duplicate?
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-2"
+                    onClick={() => navigate(`/dashboard/workspace/${dup.id}`)}
+                  >
+                    Open existing chapter
+                  </Button>
+                </div>
+              );
+            })()}
           </div>
+
           <DialogFooter>
             <Button
               variant="ghost"
