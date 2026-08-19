@@ -1633,6 +1633,71 @@ export default function Workspace() {
           }}
         />
       )}
+
+      {request && isOwnerView && (() => {
+        const label = (request.message || "Untitled").trim();
+        const confirmed = deleteConfirmText.trim().toLowerCase() === label.toLowerCase();
+        const kind = request.is_project_workspace ? "chapter" : isSolo ? "draft" : "workspace";
+        return (
+          <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Delete this {kind} permanently?</DialogTitle>
+                <DialogDescription>
+                  This removes the {kind} and everything written in it, for you and everyone
+                  invited. It cannot be undone. Type the title to confirm.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2 py-2">
+                <p className="text-sm font-medium break-words">{label}</p>
+                <Input
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder="Type the title exactly"
+                  autoFocus
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setShowDeleteDialog(false)} disabled={deleting}>
+                  Keep it
+                </Button>
+                <Button
+                  variant="destructive"
+                  disabled={!confirmed || deleting}
+                  onClick={async () => {
+                    setDeleting(true);
+                    try {
+                      await deleteWorkspacePermanently(request.id);
+                      await queryClient.invalidateQueries({ queryKey: ["my_workspaces"] });
+                      if (request.project_id) {
+                        await queryClient.invalidateQueries({
+                          queryKey: ["project_chapters", request.project_id],
+                        });
+                      }
+                      toast.success(
+                        kind === "chapter" ? "Chapter deleted" : "Workspace deleted",
+                      );
+                      navigate(
+                        request.project_id
+                          ? `/dashboard/projects/${request.project_id}`
+                          : "/dashboard/collaborations",
+                      );
+                    } catch (err) {
+                      console.error("Failed to delete workspace:", err);
+                      toast.error(err instanceof Error ? err.message : "Failed to delete");
+                    } finally {
+                      setDeleting(false);
+                    }
+                  }}
+                >
+                  {deleting ? "Deleting…" : "Delete permanently"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
+
     </DashboardLayout>
   );
 }
