@@ -374,6 +374,28 @@ serve(async (req: Request): Promise<Response> => {
     const signupWithNext = (nextPath: string) =>
       `${baseUrl}/signup?next=${encodeURIComponent(nextPath)}`;
 
+    // Pending collabs have no workspace yet, so message notifications point at
+    // the Collaborations hub with the row highlighted instead.
+    const isPendingRequest = request.status === "pending";
+    const threadCtaUrl = isPendingRequest
+      ? collabHubUrl("needs_response", requestId)
+      : workspaceUrl(requestId);
+    const threadCtaLabel = isPendingRequest
+      ? "Open in DraftKit"
+      : "Open Workspace & Reply";
+    // Short reminder of what the collab is about, for pending threads only.
+    const pitchExcerptBlock = isPendingRequest && request.message
+      ? `
+          <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin: 16px 0;">
+            <p style="margin: 0 0 6px 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: #94a3b8;">About this collab</p>
+            <p style="margin: 0; color: #475569; white-space: pre-line; font-size: 14px;">${
+              requestMessageHtml.length > 400
+                ? `${requestMessageHtml.slice(0, 400)}…`
+                : requestMessageHtml
+            }</p>
+          </div>`
+      : "";
+
     let emailSubject = "";
     let emailHtml = "";
     let toEmail = "";
