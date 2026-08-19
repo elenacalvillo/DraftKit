@@ -76,6 +76,7 @@ function WorkspaceRow({
   onLeave,
   busy,
   participants,
+  currentUserEmail,
 }: {
   w: MyWorkspace;
   highlighted?: boolean;
@@ -84,10 +85,13 @@ function WorkspaceRow({
   onLeave?: (w: MyWorkspace) => void;
   busy?: boolean;
   participants?: HostedParticipant[];
+  currentUserEmail?: string | null;
 }) {
 
   const navigate = useNavigate();
   const ref = useRef<HTMLDivElement | null>(null);
+  const [pitchExpanded, setPitchExpanded] = useState(false);
+  const [threadOpen, setThreadOpen] = useState(false);
   const avatarUrl = w.role_in_workspace === "host"
     ? w.requester_profile_image_url
     : w.host_profile_image_url;
@@ -95,12 +99,21 @@ function WorkspaceRow({
   const title = workspaceTitle(w);
   const isHostPending = w.status === "pending" && w.role_in_workspace === "host";
   const isOwnerRole = w.role_in_workspace === "host" || w.role_in_workspace === "project_owner";
+  // Pitch body only matters for classic collabs; project chapters store the
+  // chapter title in `message`.
+  const pitchText = !w.is_project_workspace && !w.is_solo ? w.message?.trim() : null;
+  const showPitch = w.status === "pending" && !!pitchText;
+  const canThread =
+    w.status === "pending" && (w.role_in_workspace === "host" || w.role_in_workspace === "requester");
+  const counterpartName =
+    (w.role_in_workspace === "host" ? w.requester_name : w.host_name) || "them";
 
   useEffect(() => {
     if (highlighted && ref.current) {
       ref.current.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   }, [highlighted]);
+
 
   return (
     <Card ref={ref} className={cn("hover:shadow-md transition-shadow", highlighted && "ring-2 ring-primary")}>
