@@ -80,3 +80,9 @@ verify_jwt = false
 # service role key directly.
 [functions.monitor-ghost-users]
 verify_jwt = false
+
+# account-recovery-assist: public endpoint for the forgot-password page.
+# Resolves an email into reset vs claim-invite vs nothing without leaking
+# account existence back to the browser.
+[functions.account-recovery-assist]
+verify_jwt = false
