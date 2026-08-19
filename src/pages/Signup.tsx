@@ -624,9 +624,11 @@ export default function Signup() {
                   </div>
                   <h1 className="text-2xl font-bold">Create Account</h1>
                   <p className="text-muted-foreground mt-1">
-                    {isFromCollabRequest 
-                      ? "Complete your signup to track your collaboration request"
-                      : "Start organizing your collaborations"
+                    {isInvitedGuest
+                      ? "You were invited to collaborate. Create your account to claim it."
+                      : isFromCollabRequest
+                        ? "Complete your signup to track your collaboration request"
+                        : "Start organizing your collaborations"
                     }
                   </p>
                   {isFromCollabRequest && (
@@ -635,6 +637,19 @@ export default function Signup() {
                       Your request was submitted successfully
                     </div>
                   )}
+                  {isInvitedGuest && (
+                    <div className="mt-3 text-left text-sm bg-primary/10 text-foreground px-4 py-3 rounded-xl">
+                      <p className="font-medium flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-primary" />
+                        Invitation found for {prefillEmail}
+                      </p>
+                      <p className="text-muted-foreground mt-1">
+                        Sign up with this exact address and the shared writing space
+                        opens right after.
+                      </p>
+                    </div>
+                  )}
+
                 </div>
 
                 <form onSubmit={handleStep1} className="space-y-6">
