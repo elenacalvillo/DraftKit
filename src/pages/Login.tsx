@@ -397,10 +397,18 @@ export default function Login() {
           {/* Footer */}
           <p className="text-center text-sm text-muted-foreground mt-6">
             Don't have an account?{" "}
-            <Link to="/signup" className="text-primary hover:underline font-medium">
-              Sign up
+            <Link
+              to={
+                formData.email
+                  ? `/signup?email=${encodeURIComponent(formData.email)}&next=${encodeURIComponent("/dashboard/collaborations")}`
+                  : "/signup"
+              }
+              className="text-primary hover:underline font-medium"
+            >
+              Sign up{formData.email ? ` with ${formData.email}` : ""}
             </Link>
           </p>
+
         </div>
       </motion.div>
     </div>

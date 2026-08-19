@@ -370,9 +370,12 @@ serve(async (req: Request): Promise<Response> => {
         reqId ? `&highlight=${encodeURIComponent(reqId)}` : ""
       }`;
     // Signup with a next= redirect so invited/pre-auth users land on the
-    // right workspace after creating their account.
-    const signupWithNext = (nextPath: string) =>
-      `${baseUrl}/signup?next=${encodeURIComponent(nextPath)}`;
+    // right workspace after creating their account. Passing the invited
+    // address prefills the form so guests never guess which email to use.
+    const signupWithNext = (nextPath: string, email?: string | null) =>
+      `${baseUrl}/signup?next=${encodeURIComponent(nextPath)}${
+        email ? `&email=${encodeURIComponent(email)}` : ""
+      }`;
 
     // Pending collabs have no workspace yet, so message notifications point at
     // the Collaborations hub with the row highlighted instead.
@@ -609,11 +612,13 @@ serve(async (req: Request): Promise<Response> => {
           </div>
 
           <div style="text-align: center; margin: 32px 0;">
-            <a href="${baseUrl}/signup" 
+            <a href="${signupWithNext("/dashboard/collaborations", requesterEmail)}" 
                style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
               Create Your Page
             </a>
+            <p style="margin: 12px 0 0 0; font-size: 13px; color: #94a3b8;">Use ${requesterEmailHtml} so this collab is waiting for you when you sign in.</p>
           </div>
+
 
           <p style="font-size: 14px; color: #64748b; margin-top: 32px;">
             Happy collaborating!<br>
@@ -745,6 +750,9 @@ serve(async (req: Request): Promise<Response> => {
               ${threadCtaLabel}
             </a>
             <p style="margin: 12px 0 0 0; font-size: 13px; color: #94a3b8;">Replying inside DraftKit keeps everything in one place.</p>
+            <p style="margin: 8px 0 0 0; font-size: 13px; color: #94a3b8;">
+              No DraftKit account yet? <a href="${signupWithNext(isPendingRequest ? "/dashboard/collaborations" : `/dashboard/workspace/${requestId}`, requesterEmail)}" style="color: #d9826b;">Create one free</a> with the email address this was sent to.
+            </p>
           </div>
 
           <p style="font-size: 14px; color: #64748b; margin-top: 32px;">
@@ -1200,7 +1208,9 @@ serve(async (req: Request): Promise<Response> => {
                style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
               Open Writer's Room →
             </a>
-            <p style="margin: 12px 0 0 0; font-size: 13px; color: #94a3b8;">You'll need a free DraftKit account to access the workspace.</p>
+            <p style="margin: 12px 0 0 0; font-size: 13px; color: #94a3b8;">
+              New to DraftKit? <a href="${signupWithNext(`/dashboard/workspace/${requestId}`, inviteeEmail)}" style="color: #d9826b;">Create your free account</a> with this email address (${escapeHtml(inviteeEmail)}) and you'll land straight in the Room.
+            </p>
           </div>
 
           <p style="font-size: 14px; color: #64748b; margin-top: 32px;">
