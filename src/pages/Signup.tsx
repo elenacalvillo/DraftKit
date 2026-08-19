@@ -95,7 +95,10 @@ export default function Signup() {
   const prefillEmail = searchParams.get('email') || '';
   const prefillName = searchParams.get('name') || '';
   const prefillSubstack = searchParams.get('substack') || '';
-  const isFromCollabRequest = Boolean(prefillEmail || prefillName);
+  // Invited guests arrive with a destination attached. They never submitted a
+  // pitch, so they get claim copy instead of "request submitted".
+  const isInvitedGuest = Boolean(prefillEmail && searchParams.get('next'));
+  const isFromCollabRequest = Boolean(prefillEmail || prefillName) && !isInvitedGuest;
 
   const [formData, setFormData] = useState({
     email: prefillEmail,
