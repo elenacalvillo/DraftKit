@@ -750,6 +750,9 @@ serve(async (req: Request): Promise<Response> => {
               ${threadCtaLabel}
             </a>
             <p style="margin: 12px 0 0 0; font-size: 13px; color: #94a3b8;">Replying inside DraftKit keeps everything in one place.</p>
+            <p style="margin: 8px 0 0 0; font-size: 13px; color: #94a3b8;">
+              No DraftKit account yet? <a href="${signupWithNext(isPendingRequest ? "/dashboard/collaborations" : `/dashboard/workspace/${requestId}`, requesterEmail)}" style="color: #d9826b;">Create one free</a> with the email address this was sent to.
+            </p>
           </div>
 
           <p style="font-size: 14px; color: #64748b; margin-top: 32px;">
