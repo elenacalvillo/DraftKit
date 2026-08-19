@@ -23,6 +23,8 @@ import { useMyWorkspaces, bucketWorkspace, type MyWorkspace, type WorkspaceRole 
 import { useActiveCollabs } from "@/hooks/useActiveCollabs";
 import { approveCollabRequest, declineCollabRequest } from "@/lib/collab-actions";
 import { useHostedParticipants, type HostedParticipant } from "@/hooks/useHostedParticipants";
+import { PitchThreadDialog } from "@/components/requests/PitchThreadDialog";
+
 
 
 type Bucket = "needs_response" | "active" | "published" | "archived";
