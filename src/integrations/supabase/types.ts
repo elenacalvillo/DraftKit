@@ -1245,6 +1245,7 @@ export type Database = {
         Args: { _request_id: string; _user_id: string }
         Returns: boolean
       }
+      leave_workspace: { Args: { _request_id: string }; Returns: Json }
       list_my_collaborator_workspaces: {
         Args: never
         Returns: {
