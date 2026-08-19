@@ -478,6 +478,8 @@ export default function Collaborations() {
                 onLeave={handleLeave}
                 busy={busyId === w.request_id}
                 participants={participantsByRequest.get(w.request_id)}
+                currentUserEmail={user?.email}
+
 
               />
             ))}
