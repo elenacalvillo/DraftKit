@@ -103,10 +103,11 @@ export function PitchThreadDialog({
       setMessages((prev) => [...prev, data as Message]);
       setDraft("");
 
+      // Direction matters: hosts notify the guest, guests notify the host.
       supabase.functions
         .invoke("send-collab-email", {
           body: {
-            type: "new_message",
+            type: isHost ? "new_message" : "new_message_from_guest",
             requestId,
             messageContent: content,
             senderEmail,
