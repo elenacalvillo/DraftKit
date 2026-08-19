@@ -109,8 +109,20 @@ export default function ForgotPassword() {
                 <CheckCircle className="w-8 h-8 text-primary" />
               </div>
               <p className="text-sm text-muted-foreground">
-                We've sent a password reset link to <strong>{email}</strong>.
-                Please check your inbox and follow the instructions.
+                Check <strong>{email}</strong>. If that address has an account,
+                you'll get a reset link. If you were invited to collaborate but
+                never finished signing up, you'll get a link to claim your
+                invitations instead.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Nothing arrives in a few minutes?{" "}
+                <Link
+                  to={`/signup?email=${encodeURIComponent(email)}&next=${encodeURIComponent("/dashboard/collaborations")}`}
+                  className="text-primary hover:underline font-medium"
+                >
+                  Create an account with this email
+                </Link>
+                .
               </p>
               <Button
                 variant="outline"
@@ -122,6 +134,7 @@ export default function ForgotPassword() {
               >
                 Send again
               </Button>
+
             </motion.div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
