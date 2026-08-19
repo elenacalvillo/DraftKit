@@ -303,7 +303,27 @@ export default function Dashboard() {
       return;
     }
 
+    // Duplicate guard: same title already exists as a draft of yours.
+    if (!duplicateWorkspaceId) {
+      const { data: existing } = await supabase
+        .from("collab_requests")
+        .select("id, message")
+        .eq("creator_id", creator.id)
+        .eq("is_solo", true)
+        .eq("hidden_by_creator", false)
+        .limit(50);
+      const dup = findDuplicateTitle(
+        projectTitle,
+        (existing ?? []).map((r) => ({ id: r.id, title: r.message })),
+      );
+      if (dup) {
+        setDuplicateWorkspaceId(dup.id);
+        return;
+      }
+    }
+
     setIsCreatingSolo(true);
+
     try {
       // Get the user's email
       const {
