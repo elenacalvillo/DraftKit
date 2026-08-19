@@ -201,17 +201,30 @@ function WorkspaceRow({
         </div>
 
         {isHostPending ? (
-          <div className="flex gap-2 sm:shrink-0">
+          <div className="flex flex-wrap gap-2 sm:shrink-0">
             <Button size="sm" variant="gradient" disabled={busy} onClick={() => onApprove?.(w)}>
               <Check className="h-4 w-4 mr-1" />
               Approve
+            </Button>
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => setThreadOpen(true)}>
+              <MessageSquare className="h-4 w-4 mr-1" />
+              Message
             </Button>
             <Button size="sm" variant="outline" disabled={busy} onClick={() => onDecline?.(w)}>
               <X className="h-4 w-4 mr-1" />
               Decline
             </Button>
           </div>
+        ) : w.status === "pending" && w.role_in_workspace === "requester" ? (
+          <div className="flex items-center gap-2 sm:shrink-0">
+            <Button size="sm" variant="outline" onClick={() => setThreadOpen(true)}>
+              <MessageSquare className="h-4 w-4 mr-1" />
+              Messages
+              {w.unread_message_count > 0 ? ` (${w.unread_message_count})` : ""}
+            </Button>
+          </div>
         ) : (
+
           <div className="flex items-center gap-2 sm:shrink-0">
             <Button size="sm" onClick={() => navigate(`/dashboard/workspace/${w.request_id}`)}>
               <PenLine className="h-4 w-4 mr-1" />
