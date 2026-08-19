@@ -1203,7 +1203,9 @@ serve(async (req: Request): Promise<Response> => {
                style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
               Open Writer's Room →
             </a>
-            <p style="margin: 12px 0 0 0; font-size: 13px; color: #94a3b8;">You'll need a free DraftKit account to access the workspace.</p>
+            <p style="margin: 12px 0 0 0; font-size: 13px; color: #94a3b8;">
+              New to DraftKit? <a href="${signupWithNext(`/dashboard/workspace/${requestId}`, inviteeEmail)}" style="color: #d9826b;">Create your free account</a> with this email address (${escapeHtml(inviteeEmail)}) and you'll land straight in the Room.
+            </p>
           </div>
 
           <p style="font-size: 14px; color: #64748b; margin-top: 32px;">
