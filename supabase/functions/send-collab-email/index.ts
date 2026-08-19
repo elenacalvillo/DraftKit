@@ -612,11 +612,13 @@ serve(async (req: Request): Promise<Response> => {
           </div>
 
           <div style="text-align: center; margin: 32px 0;">
-            <a href="${baseUrl}/signup" 
+            <a href="${signupWithNext("/dashboard/collaborations", requesterEmail)}" 
                style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
               Create Your Page
             </a>
+            <p style="margin: 12px 0 0 0; font-size: 13px; color: #94a3b8;">Use ${requesterEmailHtml} so this collab is waiting for you when you sign in.</p>
           </div>
+
 
           <p style="font-size: 14px; color: #64748b; margin-top: 32px;">
             Happy collaborating!<br>
