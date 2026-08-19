@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
-import { ArrowLeft, BookMarked, Inbox, PenLine, Send, Users, Sparkles, Check, X, MoreVertical, LogOut, Trash2 } from "lucide-react";
+import { ArrowLeft, BookMarked, Inbox, PenLine, Send, Users, Sparkles, Check, X, MoreVertical, LogOut, Trash2, MessageSquare } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
