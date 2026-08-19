@@ -1635,8 +1635,10 @@ export default function Workspace() {
       )}
 
       {request && isOwnerView && (() => {
-        const label = (request.message || "Untitled").trim();
-        const confirmed = deleteConfirmText.trim().toLowerCase() === label.toLowerCase();
+        const rawTitle = (request.message || "").trim();
+        // Long pitch messages are impossible to retype, so fall back to DELETE.
+        const phrase = rawTitle && rawTitle.length <= 60 ? rawTitle : "DELETE";
+        const confirmed = deleteConfirmText.trim().toLowerCase() === phrase.toLowerCase();
         const kind = request.is_project_workspace ? "chapter" : isSolo ? "draft" : "workspace";
         return (
           <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
@@ -1645,15 +1647,17 @@ export default function Workspace() {
                 <DialogTitle>Delete this {kind} permanently?</DialogTitle>
                 <DialogDescription>
                   This removes the {kind} and everything written in it, for you and everyone
-                  invited. It cannot be undone. Type the title to confirm.
+                  invited. It cannot be undone.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-2 py-2">
-                <p className="text-sm font-medium break-words">{label}</p>
+                <p className="text-sm text-muted-foreground">
+                  Type <span className="font-semibold text-foreground">{phrase}</span> to confirm.
+                </p>
                 <Input
                   value={deleteConfirmText}
                   onChange={(e) => setDeleteConfirmText(e.target.value)}
-                  placeholder="Type the title exactly"
+                  placeholder={phrase}
                   autoFocus
                 />
               </div>
