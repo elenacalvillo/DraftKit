@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
-import { ArrowLeft, BookMarked, Inbox, PenLine, Send, Users, Sparkles, Check, X, MoreVertical, LogOut, Trash2 } from "lucide-react";
+import { ArrowLeft, BookMarked, Inbox, PenLine, Send, Users, Sparkles, Check, X, MoreVertical, LogOut, Trash2, MessageSquare } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -23,6 +23,8 @@ import { useMyWorkspaces, bucketWorkspace, type MyWorkspace, type WorkspaceRole 
 import { useActiveCollabs } from "@/hooks/useActiveCollabs";
 import { approveCollabRequest, declineCollabRequest } from "@/lib/collab-actions";
 import { useHostedParticipants, type HostedParticipant } from "@/hooks/useHostedParticipants";
+import { PitchThreadDialog } from "@/components/requests/PitchThreadDialog";
+
 
 
 type Bucket = "needs_response" | "active" | "published" | "archived";
@@ -76,6 +78,7 @@ function WorkspaceRow({
   onLeave,
   busy,
   participants,
+  currentUserEmail,
 }: {
   w: MyWorkspace;
   highlighted?: boolean;
@@ -84,10 +87,13 @@ function WorkspaceRow({
   onLeave?: (w: MyWorkspace) => void;
   busy?: boolean;
   participants?: HostedParticipant[];
+  currentUserEmail?: string | null;
 }) {
 
   const navigate = useNavigate();
   const ref = useRef<HTMLDivElement | null>(null);
+  const [pitchExpanded, setPitchExpanded] = useState(false);
+  const [threadOpen, setThreadOpen] = useState(false);
   const avatarUrl = w.role_in_workspace === "host"
     ? w.requester_profile_image_url
     : w.host_profile_image_url;
@@ -95,12 +101,21 @@ function WorkspaceRow({
   const title = workspaceTitle(w);
   const isHostPending = w.status === "pending" && w.role_in_workspace === "host";
   const isOwnerRole = w.role_in_workspace === "host" || w.role_in_workspace === "project_owner";
+  // Pitch body only matters for classic collabs; project chapters store the
+  // chapter title in `message`.
+  const pitchText = !w.is_project_workspace && !w.is_solo ? w.message?.trim() : null;
+  const showPitch = w.status === "pending" && !!pitchText;
+  const canThread =
+    w.status === "pending" && (w.role_in_workspace === "host" || w.role_in_workspace === "requester");
+  const counterpartName =
+    (w.role_in_workspace === "host" ? w.requester_name : w.host_name) || "them";
 
   useEffect(() => {
     if (highlighted && ref.current) {
       ref.current.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   }, [highlighted]);
+
 
   return (
     <Card ref={ref} className={cn("hover:shadow-md transition-shadow", highlighted && "ring-2 ring-primary")}>
@@ -159,21 +174,59 @@ function WorkspaceRow({
                 ))}
               </div>
             )}
+            {showPitch && (
+              <div className="mt-2 rounded-lg border bg-muted/40 p-3">
+                <p className="mb-1 text-xs font-medium text-muted-foreground">
+                  {w.role_in_workspace === "host" ? "Their pitch" : "Your pitch"}
+                </p>
+                <p
+                  className={cn(
+                    "whitespace-pre-line text-sm text-foreground/90",
+                    !pitchExpanded && "line-clamp-3",
+                  )}
+                >
+                  {pitchText}
+                </p>
+                {(pitchText?.length ?? 0) > 180 && (
+                  <button
+                    type="button"
+                    className="mt-1 text-xs font-medium text-primary hover:underline"
+                    onClick={() => setPitchExpanded((v) => !v)}
+                  >
+                    {pitchExpanded ? "Show less" : "Show more"}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
         </div>
+
         {isHostPending ? (
-          <div className="flex gap-2 sm:shrink-0">
+          <div className="flex flex-wrap gap-2 sm:shrink-0">
             <Button size="sm" variant="gradient" disabled={busy} onClick={() => onApprove?.(w)}>
               <Check className="h-4 w-4 mr-1" />
               Approve
+            </Button>
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => setThreadOpen(true)}>
+              <MessageSquare className="h-4 w-4 mr-1" />
+              Message
             </Button>
             <Button size="sm" variant="outline" disabled={busy} onClick={() => onDecline?.(w)}>
               <X className="h-4 w-4 mr-1" />
               Decline
             </Button>
           </div>
+        ) : w.status === "pending" && w.role_in_workspace === "requester" ? (
+          <div className="flex items-center gap-2 sm:shrink-0">
+            <Button size="sm" variant="outline" onClick={() => setThreadOpen(true)}>
+              <MessageSquare className="h-4 w-4 mr-1" />
+              Messages
+              {w.unread_message_count > 0 ? ` (${w.unread_message_count})` : ""}
+            </Button>
+          </div>
         ) : (
+
           <div className="flex items-center gap-2 sm:shrink-0">
             <Button size="sm" onClick={() => navigate(`/dashboard/workspace/${w.request_id}`)}>
               <PenLine className="h-4 w-4 mr-1" />
@@ -209,8 +262,20 @@ function WorkspaceRow({
         )}
 
       </CardContent>
+      {canThread && (
+        <PitchThreadDialog
+          open={threadOpen}
+          onOpenChange={setThreadOpen}
+          requestId={w.request_id}
+          pitch={pitchText}
+          isHost={w.role_in_workspace === "host"}
+          senderEmail={currentUserEmail}
+          counterpartName={counterpartName}
+        />
+      )}
     </Card>
   );
+
 }
 
 export default function Collaborations() {
@@ -413,6 +478,8 @@ export default function Collaborations() {
                 onLeave={handleLeave}
                 busy={busyId === w.request_id}
                 participants={participantsByRequest.get(w.request_id)}
+                currentUserEmail={user?.email}
+
 
               />
             ))}
