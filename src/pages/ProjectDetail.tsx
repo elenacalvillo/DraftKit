@@ -88,6 +88,7 @@ import { toast } from "sonner";
 import { usePro } from "@/hooks/usePro";
 import { useProject, useToggleProjectArchive } from "@/hooks/useProjects";
 import { useProjectMembers } from "@/hooks/useProjectMembers";
+import { findDuplicateTitle } from "@/lib/workspace-cleanup";
 import { useProjectChapters } from "@/hooks/useProjectChapters";
 import { useProjectBroadcasts } from "@/hooks/useProjectBroadcasts";
 import { EditProjectDialog } from "@/components/projects/EditProjectDialog";
