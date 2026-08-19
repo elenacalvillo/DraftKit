@@ -781,13 +781,15 @@ serve(async (req: Request): Promise<Response> => {
           <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #d9826b;">
             <p style="margin: 0; color: #1e293b; white-space: pre-line; font-size: 16px;">${messageContentHtml}</p>
           </div>
+          ${pitchExcerptBlock}
 
           <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
-            <a href="${workspaceUrl(requestId)}" 
+            <a href="${threadCtaUrl}" 
                style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
-              Open Workspace & Reply
+              ${threadCtaLabel}
             </a>
           </div>
+
 
           <p style="font-size: 14px; color: #64748b; margin-top: 32px;">
             Happy collaborating!<br>
