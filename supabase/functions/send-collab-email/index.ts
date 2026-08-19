@@ -370,9 +370,12 @@ serve(async (req: Request): Promise<Response> => {
         reqId ? `&highlight=${encodeURIComponent(reqId)}` : ""
       }`;
     // Signup with a next= redirect so invited/pre-auth users land on the
-    // right workspace after creating their account.
-    const signupWithNext = (nextPath: string) =>
-      `${baseUrl}/signup?next=${encodeURIComponent(nextPath)}`;
+    // right workspace after creating their account. Passing the invited
+    // address prefills the form so guests never guess which email to use.
+    const signupWithNext = (nextPath: string, email?: string | null) =>
+      `${baseUrl}/signup?next=${encodeURIComponent(nextPath)}${
+        email ? `&email=${encodeURIComponent(email)}` : ""
+      }`;
 
     // Pending collabs have no workspace yet, so message notifications point at
     // the Collaborations hub with the row highlighted instead.
