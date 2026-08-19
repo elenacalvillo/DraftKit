@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { parseDateString, sanitizeSubstackImageUrl } from "@/lib/utils";
+import { findDuplicateTitle } from "@/lib/workspace-cleanup";
 import { normalizeSubstackUrl } from "@/lib/substack-url";
 import { Copy, ExternalLink, Globe, MessageSquare, PenLine, TrendingUp, Zap, NotebookPen } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -62,6 +63,7 @@ export default function Dashboard() {
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
   const [showStartWriting, setShowStartWriting] = useState(false);
   const [projectTitle, setProjectTitle] = useState("");
+  const [duplicateWorkspaceId, setDuplicateWorkspaceId] = useState<string | null>(null);
   const [isCreatingSolo, setIsCreatingSolo] = useState(false);
 
   const handleImageError = useCallback((requestId: string) => {
@@ -427,10 +429,33 @@ export default function Dashboard() {
               <Input
                 placeholder="e.g., New collab proposal, Interview draft, or Podcast outline"
                 value={projectTitle}
-                onChange={(e) => setProjectTitle(e.target.value)}
+                onChange={(e) => {
+                  setProjectTitle(e.target.value);
+                  setDuplicateWorkspaceId(null);
+                }}
                 onKeyDown={(e) => e.key === "Enter" && handleCreateSoloWorkspace()}
                 autoFocus
               />
+              {duplicateWorkspaceId && (
+                <div className="mt-3 rounded-md border border-border bg-muted/40 p-3 text-sm">
+                  <p className="text-muted-foreground">
+                    You already have a draft called “{projectTitle.trim()}”. Open it instead of
+                    creating a duplicate?
+                  </p>
+                  <div className="flex gap-2 mt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate(`/dashboard/workspace/${duplicateWorkspaceId}`)}
+                    >
+                      Open existing
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={handleCreateSoloWorkspace}>
+                      Create anyway
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowStartWriting(false)}>
