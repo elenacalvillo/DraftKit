@@ -260,8 +260,20 @@ function WorkspaceRow({
         )}
 
       </CardContent>
+      {canThread && (
+        <PitchThreadDialog
+          open={threadOpen}
+          onOpenChange={setThreadOpen}
+          requestId={w.request_id}
+          pitch={pitchText}
+          isHost={w.role_in_workspace === "host"}
+          senderEmail={currentUserEmail}
+          counterpartName={counterpartName}
+        />
+      )}
     </Card>
   );
+
 }
 
 export default function Collaborations() {
