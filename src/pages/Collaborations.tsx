@@ -172,9 +172,34 @@ function WorkspaceRow({
                 ))}
               </div>
             )}
+            {showPitch && (
+              <div className="mt-2 rounded-lg border bg-muted/40 p-3">
+                <p className="mb-1 text-xs font-medium text-muted-foreground">
+                  {w.role_in_workspace === "host" ? "Their pitch" : "Your pitch"}
+                </p>
+                <p
+                  className={cn(
+                    "whitespace-pre-line text-sm text-foreground/90",
+                    !pitchExpanded && "line-clamp-3",
+                  )}
+                >
+                  {pitchText}
+                </p>
+                {(pitchText?.length ?? 0) > 180 && (
+                  <button
+                    type="button"
+                    className="mt-1 text-xs font-medium text-primary hover:underline"
+                    onClick={() => setPitchExpanded((v) => !v)}
+                  >
+                    {pitchExpanded ? "Show less" : "Show more"}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
         </div>
+
         {isHostPending ? (
           <div className="flex gap-2 sm:shrink-0">
             <Button size="sm" variant="gradient" disabled={busy} onClick={() => onApprove?.(w)}>
