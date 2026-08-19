@@ -164,11 +164,40 @@ function WorkspaceRow({
             </Button>
           </div>
         ) : (
-          <Button size="sm" className="sm:shrink-0" onClick={() => navigate(`/dashboard/workspace/${w.request_id}`)}>
-            <PenLine className="h-4 w-4 mr-1" />
-            Open
-          </Button>
+          <div className="flex items-center gap-2 sm:shrink-0">
+            <Button size="sm" onClick={() => navigate(`/dashboard/workspace/${w.request_id}`)}>
+              <PenLine className="h-4 w-4 mr-1" />
+              Open
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="icon" variant="ghost" aria-label="Workspace options" disabled={busy}>
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {isOwnerRole ? (
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onClick={() => navigate(`/dashboard/workspace/${w.request_id}`)}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete permanently…
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onClick={() => onLeave?.(w)}
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Leave workspace
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         )}
+
       </CardContent>
     </Card>
   );
