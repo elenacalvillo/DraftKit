@@ -27,6 +27,7 @@ import {
   AlertCircle,
   User,
   FolderInput,
+  LogOut,
 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
@@ -88,6 +89,7 @@ import {
 } from "@/lib/workspace-roles";
 import { isEffectivelySolo } from "@/lib/workspace-participants";
 import { approveCollabRequest, declineCollabRequest } from "@/lib/collab-actions";
+import { leaveWorkspace, deleteWorkspacePermanently } from "@/lib/workspace-cleanup";
 
 interface WorkspaceRequest {
   id: string;
@@ -132,6 +134,10 @@ export default function Workspace() {
   const [creatorInfo, setCreatorInfo] = useState<CreatorInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   // Role
   const isCreator = !!creator && creator.id === request?.creator_id;
