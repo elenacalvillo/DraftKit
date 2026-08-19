@@ -25,10 +25,11 @@ Both message emails link to the workspace, which does not exist yet while the co
 
 Include a short reminder of what the collab is about in the pending-thread email so the recipient has context without opening the app.
 
-### 4. QA the email path, then clean up
+### 4. Clean up the test data (no browser runs)
 
-- Re-run the sandbox flow and confirm the correct recipient is targeted in each direction and the link resolves to the highlighted pending row.
-- Delete the temporary QA project, its chapters, the seeded pitch, the two dummy creator profiles, and the temporary admin and Project-tier grants given to the test owner during setup. Nothing in production is touched.
+No Playwright passes, headless browser runs, or automated UI re-runs. Verification is a code read plus the edge function deploy log, then you inspect it yourself in the app.
+
+- Delete the temporary QA project, its chapters, the seeded pitch, the two dummy creator profiles, and the temporary admin and Project-tier grants given to the test owner during setup. Scoped deletes by ID only, nothing in production is touched.
 
 ## Technical notes
 
