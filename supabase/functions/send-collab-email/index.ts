@@ -374,6 +374,28 @@ serve(async (req: Request): Promise<Response> => {
     const signupWithNext = (nextPath: string) =>
       `${baseUrl}/signup?next=${encodeURIComponent(nextPath)}`;
 
+    // Pending collabs have no workspace yet, so message notifications point at
+    // the Collaborations hub with the row highlighted instead.
+    const isPendingRequest = request.status === "pending";
+    const threadCtaUrl = isPendingRequest
+      ? collabHubUrl("needs_response", requestId)
+      : workspaceUrl(requestId);
+    const threadCtaLabel = isPendingRequest
+      ? "Open in DraftKit"
+      : "Open Workspace & Reply";
+    // Short reminder of what the collab is about, for pending threads only.
+    const pitchExcerptBlock = isPendingRequest && request.message
+      ? `
+          <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin: 16px 0;">
+            <p style="margin: 0 0 6px 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: #94a3b8;">About this collab</p>
+            <p style="margin: 0; color: #475569; white-space: pre-line; font-size: 14px;">${
+              requestMessageHtml.length > 400
+                ? `${requestMessageHtml.slice(0, 400)}…`
+                : requestMessageHtml
+            }</p>
+          </div>`
+      : "";
+
     let emailSubject = "";
     let emailHtml = "";
     let toEmail = "";
@@ -715,13 +737,14 @@ serve(async (req: Request): Promise<Response> => {
           <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #d9826b;">
             <p style="margin: 0; color: #1e293b; white-space: pre-line; font-size: 16px;">${messageContentHtml}</p>
           </div>
+          ${pitchExcerptBlock}
 
           <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
-            <a href="${workspaceUrl(requestId)}" 
+            <a href="${threadCtaUrl}" 
                style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
-              Open Workspace & Reply
+              ${threadCtaLabel}
             </a>
-            <p style="margin: 12px 0 0 0; font-size: 13px; color: #94a3b8;">Replies inside the workspace keep everything in one place.</p>
+            <p style="margin: 12px 0 0 0; font-size: 13px; color: #94a3b8;">Replying inside DraftKit keeps everything in one place.</p>
           </div>
 
           <p style="font-size: 14px; color: #64748b; margin-top: 32px;">
@@ -758,13 +781,15 @@ serve(async (req: Request): Promise<Response> => {
           <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #d9826b;">
             <p style="margin: 0; color: #1e293b; white-space: pre-line; font-size: 16px;">${messageContentHtml}</p>
           </div>
+          ${pitchExcerptBlock}
 
           <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
-            <a href="${workspaceUrl(requestId)}" 
+            <a href="${threadCtaUrl}" 
                style="display: inline-block; background: linear-gradient(135deg, #d9826b, #c9946d); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
-              Open Workspace & Reply
+              ${threadCtaLabel}
             </a>
           </div>
+
 
           <p style="font-size: 14px; color: #64748b; margin-top: 32px;">
             Happy collaborating!<br>
