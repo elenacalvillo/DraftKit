@@ -30,13 +30,19 @@ export default function ForgotPassword() {
 
     setIsLoading(true);
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+    // Backend decides: reset email for real accounts, claim-invite email for
+    // invited guests who never finished signing up, nothing otherwise.
+    const { error } = await supabase.functions.invoke("account-recovery-assist", {
+      body: {
+        email: email.trim().toLowerCase(),
+        redirectTo: `${window.location.origin}/reset-password`,
+      },
     });
 
     if (error) {
-      toast.error(error.message);
-      setError(error.message);
+      const message = "We couldn't process that right now. Try again, or email hello@draftkit.app.";
+      toast.error(message);
+      setError(message);
       setIsLoading(false);
       return;
     }
@@ -44,6 +50,7 @@ export default function ForgotPassword() {
     setIsSubmitted(true);
     setIsLoading(false);
   };
+
 
   return (
     <div className="min-h-screen gradient-bg flex items-center justify-center p-6">
