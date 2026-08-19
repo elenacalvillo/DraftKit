@@ -154,7 +154,7 @@ serve(async (req) => {
     const baseUrl = Deno.env.get("SITE_URL") || "https://draftkit.app";
     const acceptPath = `/dashboard/projects/${project.id}/accept`;
     const acceptUrl = `${baseUrl}${acceptPath}`;
-    const signupUrl = `${baseUrl}/signup?next=${encodeURIComponent(acceptPath)}`;
+    const signupUrl = `${baseUrl}/signup?next=${encodeURIComponent(acceptPath)}&email=${encodeURIComponent(inviteeEmail)}`;
 
     const role = ROLE_COPY[member.role] ?? {
       label: member.role,
