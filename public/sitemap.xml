@@ -386,6 +386,11 @@
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://draftkit.app/nehakabra</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://draftkit.app/nickquick</loc>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
@@ -492,6 +497,11 @@
   </url>
   <url>
     <loc>https://draftkit.app/thestrategiclinguist</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://draftkit.app/tinayerkes</loc>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
   </url>
