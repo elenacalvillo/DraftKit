@@ -376,14 +376,19 @@ export function WorkspaceEditor({ content, onChange, editable, currentUserName, 
           return true;
         }
 
-        // 1. Rich HTML wins over everything. Google Docs, Word, Notion,
-        //    Pages, Substack and Gmail all attach a rendered PNG screenshot
-        //    of the selection ALONGSIDE the real text/html. If we grabbed
-        //    the image first the user would lose their editable prose —
-        //    the exact bug Blessing reported. Let Tiptap's HTML pipeline
-        //    handle it.
+        // 1. Genuinely rich HTML wins over everything. Google Docs, Word,
+        //    Notion, Pages, Substack and Gmail all attach a rendered PNG
+        //    screenshot of the selection ALONGSIDE the real text/html. If
+        //    we grabbed the image first the user would lose their editable
+        //    prose. Let Tiptap's HTML pipeline handle those.
+        //
+        //    A text/html payload that is just a <pre>/<span> wrapper around
+        //    the same plain text (ChatGPT plain copy, Notes, Slack,
+        //    terminals) is NOT rich — falling through lets markdown convert
+        //    instead of pasting literal asterisks.
         const html = event.clipboardData?.getData("text/html") ?? "";
-        if (html.trim()) {
+        const text = event.clipboardData?.getData("text/plain") ?? "";
+        if (html.trim() && !htmlIsPlainTextWrapper(html, text)) {
           return false;
         }
 
@@ -398,11 +403,11 @@ export function WorkspaceEditor({ content, onChange, editable, currentUserName, 
           return true;
         }
 
-        // 3. Genuine plain-text paste (no HTML clip) — only then run
-        //    markdown detection so users pasting from a .md file or
-        //    terminal still get formatted output.
-        const text = event.clipboardData?.getData("text/plain") ?? "";
-        if (text && hasStructuralMarkdown(text)) {
+        // 3. Plain-text paste (or a plain-text-wrapped HTML clip) — run
+        //    markdown detection, inline tokens included, so **bold**,
+        //    *italic*, `code` and [links](…) render instead of showing raw
+        //    syntax.
+        if (text && looksLikeMarkdown(text)) {
           event.preventDefault();
           const converted = markdownToSanitizedHtml(text);
           const ed = editorRef.current;
