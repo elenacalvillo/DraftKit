@@ -9,6 +9,7 @@ import { ArrowRight, FileText, Loader2 } from "lucide-react";
 import DOMPurify from "dompurify";
 import { sanitizeSubstackImageUrl } from "@/lib/utils";
 import { getInviterInitials, getInviteMessage, getInviteCtaLabel } from "@/lib/public-workspace";
+import { normalizeLegacyMarkdownContent } from "@/lib/markdown-paste";
 
 const ALLOWED_TAGS = [
   "p", "h1", "h2", "h3", "h4", "strong", "em", "s", "u", "code", "pre",
@@ -120,7 +121,9 @@ export default function PublicWorkspaceView() {
     );
   }
 
-  const cleanContent = sheet.shared_content ? sanitize(sheet.shared_content) : "";
+  const cleanContent = sheet.shared_content
+    ? sanitize(normalizeLegacyMarkdownContent(sheet.shared_content))
+    : "";
   const inviterInitials = getInviterInitials(sheet.creator_name);
   const inviteMessage = getInviteMessage(sheet.invite_message);
   const ctaLabel = getInviteCtaLabel(sheet.creator_name);

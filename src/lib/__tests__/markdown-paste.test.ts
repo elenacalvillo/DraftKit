@@ -2,8 +2,10 @@
 import { describe, it, expect } from "vitest";
 import {
   htmlIsPlainTextWrapper,
+  extractMarkdownCodeWrapper,
   looksLikeMarkdown,
   markdownToSanitizedHtml,
+  normalizeLegacyMarkdownContent,
 } from "../markdown-paste";
 
 describe("htmlIsPlainTextWrapper", () => {
@@ -25,6 +27,12 @@ describe("htmlIsPlainTextWrapper", () => {
     expect(htmlIsPlainTextWrapper(html, text)).toBe(false);
   });
 
+  it("treats a whole language-markdown code wrapper as markdown text", () => {
+    const text = "### Structure\n\n**Bold section**";
+    const html = `<pre><code class="language-markdown">### Structure\n\n**Bold section**</code></pre>`;
+    expect(htmlIsPlainTextWrapper(html, text)).toBe(true);
+  });
+
   it("keeps Google Docs style clips on the HTML path", () => {
     const html = `<!--StartFragment--><ul><li>one</li><li>two</li></ul><!--EndFragment-->`;
     expect(htmlIsPlainTextWrapper(html, "one\ntwo")).toBe(false);
@@ -36,6 +44,30 @@ describe("htmlIsPlainTextWrapper", () => {
 
   it("returns true for an empty HTML payload", () => {
     expect(htmlIsPlainTextWrapper("", "**bold**")).toBe(true);
+  });
+});
+
+describe("legacy markdown code wrappers", () => {
+  it("extracts markdown and decodes HTML entities", () => {
+    const html = `<pre><code class="language-markdown">### Heading\n\nTom &amp; Jerry **bold**</code></pre><p></p>`;
+    expect(extractMarkdownCodeWrapper(html)).toBe(
+      "### Heading\n\nTom & Jerry **bold**",
+    );
+  });
+
+  it("normalizes a whole markdown code document to rich HTML", () => {
+    const html = `<pre><code class="language-markdown">### Heading\n\n**Bold section**</code></pre><p><br></p>`;
+    const normalized = normalizeLegacyMarkdownContent(html);
+    expect(normalized).toContain("<h3>Heading</h3>");
+    expect(normalized).toContain("<strong>Bold section</strong>");
+    expect(normalized).not.toContain("language-markdown");
+  });
+
+  it("preserves normal code and rich HTML unchanged", () => {
+    const code = `<pre><code class="language-typescript">const x = 1;</code></pre>`;
+    const rich = `<p><strong>Already rich</strong></p>`;
+    expect(normalizeLegacyMarkdownContent(code)).toBe(code);
+    expect(normalizeLegacyMarkdownContent(rich)).toBe(rich);
   });
 });
 

@@ -40,6 +40,32 @@ function normalizeForCompare(value: string): string {
 }
 
 /**
+ * Extract markdown only when the entire HTML document is a fenced markdown
+ * code block. Some clipboard sources produce this shape instead of a plain
+ * wrapper. Ordinary code blocks return null and remain code.
+ */
+export function extractMarkdownCodeWrapper(html: string): string | null {
+  if (!html.trim() || typeof DOMParser === "undefined") return null;
+
+  const document = new DOMParser().parseFromString(html, "text/html");
+  const meaningfulChildren = Array.from(document.body.children).filter((element) => {
+    if (element.tagName !== "P") return true;
+    return Boolean(element.textContent?.trim() || element.querySelector("img, table, hr"));
+  });
+
+  if (meaningfulChildren.length !== 1) return null;
+  const pre = meaningfulChildren[0];
+  if (pre.tagName !== "PRE" || pre.children.length !== 1) return null;
+
+  const code = pre.firstElementChild;
+  if (code?.tagName !== "CODE" || !code.classList.contains("language-markdown")) {
+    return null;
+  }
+
+  return code.textContent ?? "";
+}
+
+/**
  * True when a clipboard's text/html payload adds nothing over its
  * text/plain twin. Sources like ChatGPT plain copy, Notes, Slack and
  * terminals attach a <pre>/<span> wrapper around raw markdown; treating
@@ -50,6 +76,13 @@ function normalizeForCompare(value: string): string {
  */
 export function htmlIsPlainTextWrapper(html: string, text: string): boolean {
   if (!html.trim()) return true;
+  const wrappedMarkdown = extractMarkdownCodeWrapper(html);
+  if (
+    wrappedMarkdown !== null &&
+    normalizeForCompare(wrappedMarkdown) === normalizeForCompare(text)
+  ) {
+    return true;
+  }
   if (RICH_TAG_RE.test(html)) return false;
   if (!text.trim()) return false;
   return normalizeForCompare(htmlToText(html)) === normalizeForCompare(text);
@@ -110,4 +143,14 @@ export function markdownToSanitizedHtml(md: string): string {
     ALLOWED_ATTR,
     ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|tel:|#|\/)/i,
   });
+}
+
+/**
+ * Repair the precise legacy shape where a whole workspace was stored as a
+ * markdown code block. Normal rich HTML and ordinary code snippets are
+ * returned byte-for-byte unchanged.
+ */
+export function normalizeLegacyMarkdownContent(html: string): string {
+  const markdown = extractMarkdownCodeWrapper(html);
+  return markdown === null ? html : markdownToSanitizedHtml(markdown);
 }
