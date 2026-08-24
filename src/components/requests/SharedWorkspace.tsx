@@ -54,6 +54,7 @@ import {
   writeDraftToClipboard,
 } from "@/lib/clipboard";
 import { stripBase64ImageTags } from "@/lib/workspace-images";
+import { normalizeLegacyMarkdownContent } from "@/lib/markdown-paste";
 import { PushToSubstackUpgradeModal } from "@/components/subscription/PushToSubstackUpgradeModal";
 import { resolveSubstackPublishUrl } from "@/lib/substack-url";
 
@@ -256,8 +257,9 @@ function SharedWorkspaceInner({
   headerExtras,
 }: SharedWorkspaceProps) {
   const isCommentMode = mode === "comment";
+  const normalizedSharedContent = normalizeLegacyMarkdownContent(sharedContent || "");
   const [isEditing, setIsEditing] = useState(false);
-  const [editContent, setEditContent] = useState(sharedContent || "");
+  const [editContent, setEditContent] = useState(normalizedSharedContent);
   const [isSaving, setIsSaving] = useState(false);
   const [notifyPartner, setNotifyPartner] = useState(false);
   const [headerPortal, setHeaderPortal] = useState<HTMLElement | null>(null);
@@ -277,7 +279,7 @@ function SharedWorkspaceInner({
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [savedAt, setSavedAt] = useState<string | null>(lastEditedAt);
   const [, setNowTick] = useState(0);
-  const lastSavedContentRef = useRef<string>(sanitize(sharedContent || ""));
+  const lastSavedContentRef = useRef<string>(sanitize(normalizedSharedContent));
   const inFlightRef = useRef(false);
   const lastFailureToastAtRef = useRef(0);
   const wasFailedRef = useRef(false);
@@ -336,7 +338,7 @@ function SharedWorkspaceInner({
     }
     const backendTs = lastEditedAt ? new Date(lastEditedAt).getTime() : 0;
     const recoveryTs = new Date(recovery.saved_at).getTime();
-    if (recovery.content === (sharedContent || "")) {
+    if (recovery.content === normalizedSharedContent) {
       // Backend already has it (or matches) — safe to drop.
       clearRecoveryDraft(requestId);
       setRecoveryNotice(null);
@@ -349,7 +351,7 @@ function SharedWorkspaceInner({
       clearRecoveryDraft(requestId);
       setRecoveryNotice(null);
     }
-  }, [requestId, sharedContent, lastEditedAt]);
+  }, [requestId, normalizedSharedContent, lastEditedAt]);
 
   // Presence heartbeat: active while editing
   const { activeEditors } = useWorkspacePresence({
@@ -374,7 +376,7 @@ function SharedWorkspaceInner({
         action: {
           label: "Edit Anyway",
           onClick: () => {
-            setEditContent(sharedContent || "");
+            setEditContent(normalizedSharedContent);
             setIsEditing(true);
             setEditStartTime(Date.now());
           },
@@ -382,14 +384,14 @@ function SharedWorkspaceInner({
       });
       return;
     }
-    setEditContent(sharedContent || "");
+    setEditContent(normalizedSharedContent);
     setIsEditing(true);
     setEditStartTime(Date.now());
   };
 
   const handleCancel = () => {
     setIsEditing(false);
-    setEditContent(sharedContent || "");
+    setEditContent(normalizedSharedContent);
     setNotifyPartner(false);
   };
 
@@ -617,8 +619,8 @@ function SharedWorkspaceInner({
   // tracked a credit charge. If you find yourself adding one, push back —
   // the friction does not justify the revenue.
   const handleCopy = useCallback(async () => {
-    if (!sharedContent) return;
-    const html = sharedContent;
+    if (!normalizedSharedContent) return;
+    const html = normalizedSharedContent;
     const plain = htmlToPlainText(html);
     const wordCount = plain.split(/\s+/).filter(Boolean).length;
 
@@ -638,7 +640,7 @@ function SharedWorkspaceInner({
     } catch {
       toast.error("Couldn't copy. Try selecting and copying manually.");
     }
-  }, [sharedContent, requestId, trackEvent]);
+  }, [normalizedSharedContent, requestId, trackEvent]);
 
   // Push to Substack handler — DRAFT-002 (Pro) and DRAFT-003 (Free gate).
   //
@@ -647,7 +649,7 @@ function SharedWorkspaceInner({
   // Pro users get the full one-click flow: clean HTML → clipboard → new
   // Substack tab → persistent toast prompting them to paste.
   const handlePushToSubstack = useCallback(async () => {
-    if (!sharedContent) return;
+    if (!normalizedSharedContent) return;
 
     if (!isPro) {
       // PRIMARY conversion signal — fire BEFORE showing the modal so we
@@ -659,7 +661,7 @@ function SharedWorkspaceInner({
 
     // Strip DraftKit-internal annotations (data-comment / data-author) so
     // they don't render as junk attrs in the Substack post.
-    const cleaned = stripDraftKitInternalAttrs(sharedContent);
+    const cleaned = stripDraftKitInternalAttrs(normalizedSharedContent);
 
     // Resolve the user's own publication composer URL. Priority:
     //   newsletter_url (required, validated) → substack_url (optional) →
@@ -727,9 +729,9 @@ function SharedWorkspaceInner({
       toast.error("Clipboard access denied. Please use the manual 'Copy' fallback.");
       setSubstackFallbackHtml(cleaned);
     }
-  }, [sharedContent, isPro, requestId, trackEvent, creator?.newsletter_url, creator?.substack_url]);
+  }, [normalizedSharedContent, isPro, requestId, trackEvent, creator?.newsletter_url, creator?.substack_url]);
 
-  const hasContent = !!sharedContent?.trim();
+  const hasContent = !!normalizedSharedContent.trim();
 
   // Count words from HTML content
   const wordCount = editContent
@@ -797,7 +799,7 @@ function SharedWorkspaceInner({
                 onClick={async () => {
                   try {
                     await exportWorkspaceHtmlToDocx(
-                      sharedContent!,
+                      normalizedSharedContent,
                       partnerName ? `Drafting with ${partnerName}` : "Workspace Draft",
                     );
                     toast.success("Draft downloaded — you just saved ~30 minutes.");
@@ -852,7 +854,7 @@ function SharedWorkspaceInner({
                       onClick={async () => {
                         try {
                           await exportWorkspaceHtmlToDocx(
-                            sharedContent!,
+                            normalizedSharedContent,
                             partnerName ? `Drafting with ${partnerName}` : "Workspace Draft",
                           );
                           toast.success("Draft downloaded — you just saved ~30 minutes.");
@@ -1018,7 +1020,7 @@ function SharedWorkspaceInner({
                     "workspace-prose px-5 py-4 min-h-[120px] font-sans text-[15px] leading-[1.6] overflow-hidden break-words",
                     !canEdit && "cursor-pointer",
                   )}
-                  dangerouslySetInnerHTML={{ __html: sanitize(sharedContent!) }}
+                  dangerouslySetInnerHTML={{ __html: sanitize(normalizedSharedContent) }}
                   onClick={!canEdit ? handleUpgradeClick : undefined}
                 />
                 {!canEdit && (
