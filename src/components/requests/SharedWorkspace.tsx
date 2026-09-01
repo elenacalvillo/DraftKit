@@ -493,9 +493,14 @@ function SharedWorkspaceInner({
               } = await supabase.auth.getSession();
               if (session) {
                 supabase.functions.invoke("send-collab-email", {
-                  body: { type: emailType, requestId },
+                  body: {
+                    type: emailType,
+                    requestId,
+                    senderEmail: session.user?.email ?? undefined,
+                  },
                   headers: { Authorization: `Bearer ${session.access_token}` },
                 });
+
               }
             } catch {
               /* fire-and-forget */
