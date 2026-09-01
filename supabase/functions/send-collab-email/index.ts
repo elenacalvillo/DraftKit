@@ -1240,7 +1240,15 @@ serve(async (req: Request): Promise<Response> => {
 
     let recipients: string[] = [toEmail];
 
-    if (type === "new_message" || type === "new_message_from_guest") {
+    const FANOUT_TYPES = [
+      "new_message",
+      "new_message_from_guest",
+      "workspace_updated_by_creator",
+      "workspace_updated_by_guest",
+    ];
+
+    if (FANOUT_TYPES.includes(type)) {
+
       const pool = new Set<string>();
       const add = (e: string | null | undefined) => {
         const n = normEmail(e);
