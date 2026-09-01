@@ -20,10 +20,14 @@ export interface Collaborator {
 
 function deriveDisplayName(
   name: string | null,
+  username: string | null,
   email: string | null,
   guestNumber: number | null,
 ): string {
   if (name && name.trim()) return name;
+  // A registered account with no display name shows its handle, never a guess
+  // built from the email address.
+  if (username && username.trim()) return `@${username}`;
   if (email) {
     const local = email.split("@")[0];
     if (local) {
@@ -43,60 +47,41 @@ export function useWorkspaceCollaborators(requestId: string) {
   const [loading, setLoading] = useState(true);
 
   const fetchCollaborators = useCallback(async () => {
+    // SECURITY DEFINER RPC: the private creators table only ever returns the
+    // caller's own row, so client-side enrichment silently lost every other
+    // participant's real name. The RPC gates on has_workspace_access.
     const { data: rawCollabs } = await supabase
-      .from("workspace_collaborators")
-      .select("id, email, role, user_id, invited_at, joined_at")
-      .eq("request_id", requestId)
-      .order("invited_at", { ascending: true }) as any;
+      .rpc("list_workspace_participants", { _request_id: requestId }) as any;
 
     const collabs = (rawCollabs as Array<{
       id: string; email: string; role: string;
       user_id: string | null; invited_at: string; joined_at: string | null;
+      name: string | null; username: string | null; profile_image_url: string | null;
     }>) || [];
-
-    // Batch-fetch creator profiles for those with user_id
-    const userIds = collabs
-      .map(c => c.user_id)
-      .filter((uid): uid is string => uid !== null);
-
-    let profileMap: Record<string, { name: string | null; username: string | null; profile_image_url: string | null }> = {};
-
-    if (userIds.length > 0) {
-      const { data: profiles } = await supabase
-        .from("creators")
-        .select("user_id, name, username, profile_image_url")
-        .in("user_id", userIds) as any;
-
-      if (profiles) {
-        for (const p of profiles as Array<{ user_id: string; name: string | null; username: string | null; profile_image_url: string | null }>) {
-          profileMap[p.user_id] = {
-            name: p.name,
-            username: p.username,
-            profile_image_url: p.profile_image_url,
-          };
-        }
-      }
-    }
 
     // Assign stable guest numbers based on invite order (only for those without user_id)
     let guestCounter = 0;
     const enriched: Collaborator[] = collabs.map(c => {
-      const profile = c.user_id ? profileMap[c.user_id] || null : null;
       const isGuest = !c.user_id;
       if (isGuest) guestCounter++;
 
-      const name = profile?.name || null;
       const guest_number = isGuest ? guestCounter : null;
 
       return {
-        ...c,
-        name,
-        username: profile?.username || null,
-        profile_image_url: profile?.profile_image_url || null,
+        id: c.id,
+        email: c.email,
+        role: c.role,
+        user_id: c.user_id,
+        invited_at: c.invited_at,
+        joined_at: c.joined_at,
+        name: c.name ?? null,
+        username: c.username ?? null,
+        profile_image_url: c.profile_image_url ?? null,
         guest_number,
-        display_name: deriveDisplayName(name, c.email, guest_number),
+        display_name: deriveDisplayName(c.name ?? null, c.username ?? null, c.email, guest_number),
       };
     });
+
 
     setCollaborators(enriched);
     setLoading(false);

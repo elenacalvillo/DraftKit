@@ -1326,6 +1326,20 @@ export type Database = {
           username: string
         }[]
       }
+      list_workspace_participants: {
+        Args: { _request_id: string }
+        Returns: {
+          email: string
+          id: string
+          invited_at: string
+          joined_at: string
+          name: string
+          profile_image_url: string
+          role: string
+          user_id: string
+          username: string
+        }[]
+      }
       mark_workspace_read: { Args: { _request_id: string }; Returns: undefined }
       move_chapter_to_project: {
         Args: { _chapter_id: string; _target_project_id: string }

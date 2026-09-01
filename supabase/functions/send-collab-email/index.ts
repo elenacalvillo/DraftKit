@@ -1044,7 +1044,7 @@ serve(async (req: Request): Promise<Response> => {
           ${brandHeader}
           <h1 style="margin: 0 0 24px; font-size: 24px; color: #1e293b; text-align: center;">Workspace Updated</h1>
 
-          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterNameHtml},</p>
+          <p style="font-size: 16px; margin-bottom: 24px;">Hi there,</p>
           
           <p style="font-size: 16px; margin-bottom: 24px;">
             <strong>${creatorNameHtml}</strong> has made updates to the shared workspace for your collaboration${requestedDate ? ` on <strong>${formattedDate}</strong>` : ""}.
@@ -1083,7 +1083,7 @@ serve(async (req: Request): Promise<Response> => {
           ${brandHeader}
           <h1 style="margin: 0 0 24px; font-size: 24px; color: #1e293b; text-align: center;">Workspace Updated</h1>
 
-          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${creatorNameHtml},</p>
+          <p style="font-size: 16px; margin-bottom: 24px;">Hi there,</p>
           
           <p style="font-size: 16px; margin-bottom: 24px;">
             <strong>${requesterNameHtml}</strong> has made updates to the shared workspace for your collaboration${requestedDate ? ` on <strong>${formattedDate}</strong>` : ""}.
@@ -1240,7 +1240,15 @@ serve(async (req: Request): Promise<Response> => {
 
     let recipients: string[] = [toEmail];
 
-    if (type === "new_message" || type === "new_message_from_guest") {
+    const FANOUT_TYPES = [
+      "new_message",
+      "new_message_from_guest",
+      "workspace_updated_by_creator",
+      "workspace_updated_by_guest",
+    ];
+
+    if (FANOUT_TYPES.includes(type)) {
+
       const pool = new Set<string>();
       const add = (e: string | null | undefined) => {
         const n = normEmail(e);
