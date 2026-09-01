@@ -61,6 +61,11 @@
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://draftkit.app/aiportalen</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://draftkit.app/ajdoodles</loc>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
@@ -236,6 +241,11 @@
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://draftkit.app/heatherb</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://draftkit.app/hello_ea08b</loc>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
@@ -322,6 +332,11 @@
   </url>
   <url>
     <loc>https://draftkit.app/karo</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://draftkit.app/khatoon</loc>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
   </url>
@@ -507,6 +522,11 @@
   </url>
   <url>
     <loc>https://draftkit.app/traib</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://draftkit.app/voiceasworld</loc>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
   </url>
