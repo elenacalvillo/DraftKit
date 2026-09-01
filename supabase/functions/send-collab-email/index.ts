@@ -1083,7 +1083,7 @@ serve(async (req: Request): Promise<Response> => {
           ${brandHeader}
           <h1 style="margin: 0 0 24px; font-size: 24px; color: #1e293b; text-align: center;">Workspace Updated</h1>
 
-          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${creatorNameHtml},</p>
+          <p style="font-size: 16px; margin-bottom: 24px;">Hi there,</p>
           
           <p style="font-size: 16px; margin-bottom: 24px;">
             <strong>${requesterNameHtml}</strong> has made updates to the shared workspace for your collaboration${requestedDate ? ` on <strong>${formattedDate}</strong>` : ""}.
