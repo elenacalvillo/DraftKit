@@ -19,6 +19,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { usePro } from "@/hooks/usePro";
+import { useMyProjectMemberships } from "@/hooks/useProjects";
+
 import { ProBadge } from "@/components/subscription/ProBadge";
 import { DraftKitLogo } from "@/components/icons/DraftKitLogo";
 
@@ -61,17 +63,19 @@ export function DashboardLayout({ children, zenMode, zenTitle, zenBackPath }: Da
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { creator, signOut } = useAuth();
   const { isPro, isProject } = usePro();
+  const { hasMemberships } = useMyProjectMemberships();
   const isDesktop = useIsDesktop();
 
-  // Project tier users see a separate "Projects" entry above Settings —
-  // premium umbrella for book-level outline & chapter management.
-  const navItems = isProject
+  // Project tier users see a separate "Projects" entry above Settings.
+  // Invited project members get the same entry without paying.
+  const navItems = isProject || hasMemberships
     ? [
         ...baseNavItems.slice(0, 4),
         { icon: BookMarked, label: "Projects", path: "/dashboard/projects" },
         ...baseNavItems.slice(4),
       ]
     : baseNavItems;
+
 
   useEffect(() => {
     if (!isDesktop) {

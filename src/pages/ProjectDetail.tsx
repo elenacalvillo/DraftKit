@@ -86,6 +86,8 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { usePro } from "@/hooks/usePro";
+import { useAuth } from "@/hooks/useAuth";
+import { useProjectMemberRole } from "@/hooks/useProjectMemberRole";
 import { useProject, useToggleProjectArchive } from "@/hooks/useProjects";
 import { useProjectMembers } from "@/hooks/useProjectMembers";
 import { findDuplicateTitle } from "@/lib/workspace-cleanup";
@@ -124,8 +126,16 @@ const STAGE_BADGE: Record<ChapterStage, string> = {
 export default function ProjectDetail() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { isProject, isLoading: isProLoading } = usePro();
+  const { data: memberRole, isLoading: isRoleLoading } = useProjectMemberRole(
+    projectId,
+    user?.id,
+  );
+  // Owning a project needs the paid tier; being invited into one does not.
+  const hasAccess = isProject || !!memberRole;
   const { data: project, isLoading: isProjectLoading } = useProject(projectId);
+
   const toggleArchive = useToggleProjectArchive();
   const {
     members,
@@ -191,20 +201,21 @@ export default function ProjectDetail() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  if (isProLoading || isProjectLoading) {
+  if (isProLoading || isProjectLoading || isRoleLoading) {
     return (
       <DashboardLayout>
         <div className="text-muted-foreground p-6">Loading…</div>
       </DashboardLayout>
     );
   }
-  if (!isProject) {
+  if (!hasAccess) {
     return (
       <DashboardLayout>
         <ProjectUpgradePrompt />
       </DashboardLayout>
     );
   }
+
   if (!project) {
     return (
       <DashboardLayout>
@@ -445,7 +456,7 @@ export default function ProjectDetail() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {isProject && !isReadOnly && (
+            {hasAccess && !isReadOnly && (
               <Button
                 variant="outline"
                 size="sm"
@@ -454,7 +465,7 @@ export default function ProjectDetail() {
                 <BookImage className="w-4 h-4 mr-1.5" /> Book details
               </Button>
             )}
-            {isProject && (
+            {hasAccess && (
               <Button
                 variant="outline"
                 size="sm"
