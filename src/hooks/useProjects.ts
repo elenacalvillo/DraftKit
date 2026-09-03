@@ -50,7 +50,51 @@ export function useProjects() {
     error: projectsQuery.error,
     refetch: projectsQuery.refetch,
   };
+
+export interface SharedProject extends Project {
+  member_role: string;
 }
+
+/**
+ * Projects the current user was invited into (project_members row).
+ * Membership grants access regardless of subscription tier — only
+ * owning/creating a project requires the Project tier.
+ */
+export function useMyProjectMemberships() {
+  const { user } = useAuth();
+  const userId = user?.id;
+
+  const query = useQuery({
+    queryKey: ["my_project_memberships", userId],
+    enabled: !!userId,
+    staleTime: 60 * 1000,
+    queryFn: async (): Promise<SharedProject[]> => {
+      if (!userId) return [];
+      const { data, error } = await supabase
+        .from("project_members")
+        .select("role, projects!inner(*)")
+        .eq("user_id", userId);
+      if (error) throw error;
+      return (data ?? [])
+        .map((row) => {
+          const project = (row as { projects: Project | null }).projects;
+          if (!project) return null;
+          return { ...project, member_role: (row as { role: string }).role };
+        })
+        .filter((p): p is SharedProject => !!p)
+        .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1));
+    },
+  });
+
+  const sharedProjects = query.data ?? [];
+
+  return {
+    sharedProjects,
+    hasMemberships: sharedProjects.length > 0,
+    isLoading: query.isLoading,
+  };
+}
+
 
 export function useProject(projectId: string | undefined) {
   return useQuery({
