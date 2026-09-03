@@ -75,19 +75,36 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 5. Look up target creator's email from creator_contacts
+    // 5. Resolve the invitee's email. Legacy creator rows can be missing their
+    // creator_contacts row, so fall back to the linked account email and
+    // backfill the row so later emails work.
     const { data: contact } = await adminClient
       .from("creator_contacts")
       .select("email")
       .eq("creator_id", creatorId)
       .maybeSingle();
 
-    if (!contact?.email) {
+    let inviteeEmail = contact?.email ?? null;
+
+    if (!inviteeEmail && creator.user_id) {
+      const { data: authUser } = await adminClient.auth.admin.getUserById(creator.user_id);
+      const fallback = authUser?.user?.email?.toLowerCase() ?? null;
+      if (fallback) {
+        inviteeEmail = fallback;
+        await adminClient
+          .from("creator_contacts")
+          .upsert({ creator_id: creatorId, email: fallback }, { onConflict: "creator_id" });
+      }
+    }
+
+    if (!inviteeEmail) {
       return new Response(JSON.stringify({ error: "This creator hasn't set up their contact email yet" }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+
 
 
     // 6. Insert into workspace_collaborators
