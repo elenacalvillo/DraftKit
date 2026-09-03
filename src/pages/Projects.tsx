@@ -167,11 +167,45 @@ export default function Projects() {
           </div>
         )}
 
-        {/* Active projects */}
+        {/* Shared with you */}
+        {sharedProjects.length > 0 && (
+          <section className="mb-10">
+            <h2 className="text-sm uppercase tracking-wider text-muted-foreground mb-3">
+              Shared with you
+            </h2>
+            <div className="grid gap-3">
+              {sharedProjects.map((p) => (
+                <motion.div
+                  key={p.id}
+                  whileHover={{ y: -2 }}
+                  className="rounded-xl border border-border bg-card p-4"
+                >
+                  <Link to={`/dashboard/projects/${p.id}`} className="block min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium truncate">{p.title}</span>
+                      <Badge variant="secondary" className="text-xs">
+                        {roleLabel(p.member_role)}
+                      </Badge>
+                    </div>
+                    {p.description && (
+                      <p className="text-sm text-muted-foreground line-clamp-2 mt-0.5">
+                        {p.description}
+                      </p>
+                    )}
+                  </Link>
+                </motion.div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Active projects you own */}
+        {isProject && (
         <section className="mb-10">
           <h2 className="text-sm uppercase tracking-wider text-muted-foreground mb-3">
             Active
           </h2>
+
           {isLoading ? (
             <p className="text-muted-foreground text-sm">Loading projects…</p>
           ) : activeProjects.length === 0 ? (
