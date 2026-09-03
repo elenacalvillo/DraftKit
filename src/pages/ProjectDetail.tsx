@@ -199,20 +199,21 @@ export default function ProjectDetail() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  if (isProLoading || isProjectLoading) {
+  if (isProLoading || isProjectLoading || isRoleLoading) {
     return (
       <DashboardLayout>
         <div className="text-muted-foreground p-6">Loading…</div>
       </DashboardLayout>
     );
   }
-  if (!isProject) {
+  if (!hasAccess) {
     return (
       <DashboardLayout>
         <ProjectUpgradePrompt />
       </DashboardLayout>
     );
   }
+
   if (!project) {
     return (
       <DashboardLayout>
