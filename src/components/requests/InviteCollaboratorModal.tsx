@@ -29,6 +29,24 @@ interface CreatorProfile {
 const INVITE_MESSAGE_PLACEHOLDER =
   "I'd love your feedback on structure and whether the questions feel sharp";
 
+// Edge function failures come back as an error object whose response body holds
+// the actual reason. Pull it out so toasts stay specific.
+async function readFunctionError(err: unknown): Promise<string> {
+  const ctx = (err as { context?: Response })?.context;
+  if (ctx && typeof ctx.json === "function") {
+    try {
+      const body = await ctx.clone().json();
+      if (body?.error) return String(body.error);
+    } catch {
+      // fall through to the generic message
+    }
+  }
+  const message = (err as { message?: string })?.message;
+  return message && !/non-2xx/i.test(message)
+    ? message
+    : "Couldn't send the invitation. Please try again or email hello@draftkit.app.";
+}
+
 export function InviteCollaboratorModal({
   open,
   onOpenChange,
