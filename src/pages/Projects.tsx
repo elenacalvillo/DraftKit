@@ -252,6 +252,8 @@ export default function Projects() {
             </div>
           )}
         </section>
+        )}
+
 
         {/* Archived projects */}
         {archivedProjects.length > 0 && (
