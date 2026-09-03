@@ -124,8 +124,16 @@ const STAGE_BADGE: Record<ChapterStage, string> = {
 export default function ProjectDetail() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { isProject, isLoading: isProLoading } = usePro();
+  const { data: memberRole, isLoading: isRoleLoading } = useProjectMemberRole(
+    projectId,
+    user?.id,
+  );
+  // Owning a project needs the paid tier; being invited into one does not.
+  const hasAccess = isProject || !!memberRole;
   const { data: project, isLoading: isProjectLoading } = useProject(projectId);
+
   const toggleArchive = useToggleProjectArchive();
   const {
     members,
