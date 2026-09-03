@@ -164,13 +164,18 @@ export function InviteCollaboratorModal({
           body: { requestId, creatorId: creator.id },
         });
 
-        if (error) throw error;
-        if (data?.error) {
-          if (data.error.includes("already been invited")) {
-            toast.error("This person has already been invited");
-          } else {
-            toast.error(data.error);
-          }
+        // A non-2xx response arrives as an error whose body holds the real
+        // reason. Read it so the user sees why, not a generic retry message.
+        const failureMessage = error
+          ? await readFunctionError(error)
+          : (data?.error as string | undefined);
+
+        if (failureMessage) {
+          toast.error(
+            failureMessage.includes("already been invited")
+              ? "This person has already been invited"
+              : failureMessage,
+          );
           return;
         }
 
