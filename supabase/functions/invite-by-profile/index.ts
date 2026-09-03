@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
       .from("workspace_collaborators")
       .insert({
         request_id: requestId,
-        email: contact.email,
+        email: inviteeEmail,
         user_id: creator?.user_id ?? null,
         invited_by: user.id,
       });
@@ -150,7 +150,7 @@ Deno.serve(async (req) => {
         body: {
           type: "workspace_invite",
           requestId,
-          inviteeEmail: contact.email,
+          inviteeEmail,
         },
       });
     } catch {
