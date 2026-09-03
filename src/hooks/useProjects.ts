@@ -50,8 +50,10 @@ export function useProjects() {
     error: projectsQuery.error,
     refetch: projectsQuery.refetch,
   };
+}
 
 export interface SharedProject extends Project {
+
   member_role: string;
 }
 
