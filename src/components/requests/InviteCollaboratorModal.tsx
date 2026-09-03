@@ -207,7 +207,7 @@ export function InviteCollaboratorModal({
         onOpenChange(false);
       } catch (err: unknown) {
         console.error("Failed to invite by profile:", err);
-        toast.error("Failed to send invitation. Please try again.");
+        toast.error(await readFunctionError(err));
       } finally {
         setInvitingId(null);
       }
