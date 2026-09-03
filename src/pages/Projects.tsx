@@ -96,7 +96,7 @@ export default function Projects() {
     }
   };
 
-  if (isProLoading) {
+  if (isProLoading || isSharedLoading) {
     return (
       <DashboardLayout>
         <div className="text-muted-foreground p-6">Loading…</div>
@@ -104,7 +104,8 @@ export default function Projects() {
     );
   }
 
-  if (!isProject) {
+  // Paywall only when the user neither owns the tier nor was invited anywhere.
+  if (!isProject && !hasMemberships) {
     return (
       <DashboardLayout>
         <ProjectUpgradePrompt />
@@ -115,21 +116,36 @@ export default function Projects() {
   return (
     <DashboardLayout>
       <div className="max-w-5xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-start justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
             <BookMarked className="w-7 h-7 text-primary" />
             <div>
               <h1 className="text-2xl font-bold">Book Projects</h1>
               <p className="text-sm text-muted-foreground">
-                {activeCount} active project{activeCount === 1 ? "" : "s"}
+                {isProject
+                  ? `${activeCount} active project${activeCount === 1 ? "" : "s"}`
+                  : `${sharedProjects.length} project${sharedProjects.length === 1 ? "" : "s"} shared with you`}
               </p>
             </div>
           </div>
-          <Button onClick={handleNewProject}>
-            <Plus className="w-4 h-4 mr-2" />
-            New Project
-          </Button>
+          {isProject ? (
+            <Button onClick={handleNewProject}>
+              <Plus className="w-4 h-4 mr-2" />
+              New Project
+            </Button>
+          ) : (
+            <p className="text-xs text-muted-foreground max-w-[220px] text-right">
+              Want your own book project?{" "}
+              <Link
+                to="/dashboard/subscription"
+                className="text-primary underline underline-offset-2"
+              >
+                Upgrade to Project tier
+              </Link>
+            </p>
+          )}
         </div>
+
 
 
         {showPrimer && (
