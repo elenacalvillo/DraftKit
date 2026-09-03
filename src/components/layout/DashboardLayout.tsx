@@ -19,6 +19,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { usePro } from "@/hooks/usePro";
+import { useMyProjectMemberships } from "@/hooks/useProjects";
+
 import { ProBadge } from "@/components/subscription/ProBadge";
 import { DraftKitLogo } from "@/components/icons/DraftKitLogo";
 
