@@ -23,9 +23,11 @@ import { toast } from "sonner";
 import { usePro } from "@/hooks/usePro";
 import {
   useCreateProject,
+  useMyProjectMemberships,
   useProjects,
   useToggleProjectArchive,
 } from "@/hooks/useProjects";
+import { roleLabel } from "@/lib/access";
 import { ProjectUpgradePrompt } from "@/components/projects/ProjectUpgradePrompt";
 
 export default function Projects() {
@@ -36,6 +38,9 @@ export default function Projects() {
     activeCount,
     isLoading,
   } = useProjects();
+  const { sharedProjects, hasMemberships, isLoading: isSharedLoading } =
+    useMyProjectMemberships();
+
   const createProject = useCreateProject();
   const toggleArchive = useToggleProjectArchive();
   const [showCreate, setShowCreate] = useState(false);
