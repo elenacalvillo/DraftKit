@@ -81,6 +81,11 @@
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://draftkit.app/alexdragoi</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://draftkit.app/amandajeanne</loc>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
@@ -176,6 +181,11 @@
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://draftkit.app/crystalachubbs</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://draftkit.app/dariacupareanu</loc>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
@@ -252,6 +262,11 @@
   </url>
   <url>
     <loc>https://draftkit.app/holliewhite</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://draftkit.app/humidityspeaks</loc>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
   </url>
