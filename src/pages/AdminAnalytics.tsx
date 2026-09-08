@@ -25,6 +25,7 @@ import {
   ArrowDown,
   Mail,
   Send,
+  Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -95,7 +96,19 @@ interface InactiveUser {
   last_sign_in_at: string | null;
 }
 
+/** CSV-safe cell: quotes and escapes anything that could break the file. */
+function csvCell(value: unknown): string {
+  const s =
+    value === null || value === undefined
+      ? ""
+      : typeof value === "object"
+        ? JSON.stringify(value)
+        : String(value);
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
 function DeltaText({ current, previous, prevLabel }: { current: number; previous: number; prevLabel: string }) {
+  if (!prevLabel) return null;
   if (previous === 0 && current === 0) return null;
   const delta = current - previous;
   const pct = previous > 0 ? (delta / previous) * 100 : null;
@@ -131,6 +144,7 @@ export default function AdminAnalytics() {
   const [isLoading, setIsLoading] = useState(true);
   const [inactiveUsers, setInactiveUsers] = useState<InactiveUser[]>([]);
   const [nudgingId, setNudgingId] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     if (!loading && !isAdmin) {
@@ -170,12 +184,75 @@ export default function AdminAnalytics() {
     return all;
   };
 
+  /**
+   * Export every event in the selected window as CSV. Pages without the
+   * 5000-row display cap so "All time" pulls the full history.
+   */
+  const handleExportCsv = async () => {
+    setExporting(true);
+    try {
+      const PAGE = 1000;
+      const rows: Record<string, unknown>[] = [];
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await supabase
+          .from("analytics_events")
+          .select("created_at, event_type, event_data, page_url, user_id, session_id")
+          .gte("created_at", range.start)
+          .lt("created_at", range.end)
+          .order("created_at", { ascending: true })
+          .range(from, from + PAGE - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        rows.push(...(data as Record<string, unknown>[]));
+        if (data.length < PAGE) break;
+      }
+
+      if (rows.length === 0) {
+        toast.info("No events in this range to export.");
+        return;
+      }
+
+      const header = ["timestamp", "event_type", "event_data", "page_url", "user_ref", "session_id"];
+      const lines = [header.join(",")];
+      for (const r of rows) {
+        const uid = r.user_id ? String(r.user_id).slice(0, 8) : "";
+        lines.push(
+          [
+            csvCell(r.created_at),
+            csvCell(r.event_type),
+            csvCell(r.event_data),
+            csvCell(r.page_url),
+            csvCell(uid),
+            csvCell(r.session_id),
+          ].join(","),
+        );
+      }
+
+      const blob = new Blob([`\uFEFF${lines.join("\n")}`], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `draftkit-events-${range.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success(`Exported ${rows.length.toLocaleString()} events.`);
+    } catch (err) {
+      console.error("CSV export failed:", err);
+      toast.error("Export failed. Try a shorter range.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+
   const fetchAnalyticsData = async () => {
     setIsLoading(true);
 
     const [curEvents, prevEvts, feedbackRes] = await Promise.all([
       fetchEventsInRange(range.start, range.end),
-      fetchEventsInRange(range.prevStart, range.prevEnd),
+      range.comparable ? fetchEventsInRange(range.prevStart, range.prevEnd) : Promise.resolve([]),
       supabase
         .from("user_feedback")
         .select("*")
@@ -505,10 +582,17 @@ export default function AdminAnalytics() {
               </div>
               <h1 className="text-3xl font-bold">Admin Analytics</h1>
             </div>
-            <AnalyticsRangePicker value={rangeKey} onChange={setRangeKey} />
+            <div className="flex items-center gap-2 flex-wrap">
+              <AnalyticsRangePicker value={rangeKey} onChange={setRangeKey} />
+              <Button variant="outline" size="sm" className="gap-2" onClick={handleExportCsv} disabled={exporting}>
+                <Download className="w-4 h-4" />
+                {exporting ? "Exporting…" : "Download CSV"}
+              </Button>
+            </div>
           </div>
           <p className="text-muted-foreground">
-            Showing <span className="font-medium text-foreground">{range.label}</span> · {range.prevLabel.replace(/^vs /, "compared to ")}
+            Showing <span className="font-medium text-foreground">{range.label}</span>
+            {range.prevLabel ? ` · ${range.prevLabel.replace(/^vs /, "compared to ")}` : " · full history"}
           </p>
         </motion.div>
 
