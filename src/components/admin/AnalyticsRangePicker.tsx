@@ -65,6 +65,9 @@ export function AnalyticsRangePicker({ value, onChange }: Props) {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-56 bg-popover">
           <DropdownMenuLabel>Quick ranges</DropdownMenuLabel>
+          <DropdownMenuItem onClick={() => onChange("all-time")} className={cn(value === "all-time" && "bg-accent")}>
+            All time
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={() => onChange("last-7d")} className={cn(value === "last-7d" && "bg-accent")}>
             Last 7 days
           </DropdownMenuItem>
