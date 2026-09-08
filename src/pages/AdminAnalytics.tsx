@@ -175,7 +175,7 @@ export default function AdminAnalytics() {
 
     const [curEvents, prevEvts, feedbackRes] = await Promise.all([
       fetchEventsInRange(range.start, range.end),
-      fetchEventsInRange(range.prevStart, range.prevEnd),
+      range.comparable ? fetchEventsInRange(range.prevStart, range.prevEnd) : Promise.resolve([]),
       supabase
         .from("user_feedback")
         .select("*")
