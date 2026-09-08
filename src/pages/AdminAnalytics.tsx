@@ -581,10 +581,17 @@ export default function AdminAnalytics() {
               </div>
               <h1 className="text-3xl font-bold">Admin Analytics</h1>
             </div>
-            <AnalyticsRangePicker value={rangeKey} onChange={setRangeKey} />
+            <div className="flex items-center gap-2 flex-wrap">
+              <AnalyticsRangePicker value={rangeKey} onChange={setRangeKey} />
+              <Button variant="outline" size="sm" className="gap-2" onClick={handleExportCsv} disabled={exporting}>
+                <Download className="w-4 h-4" />
+                {exporting ? "Exporting…" : "Download CSV"}
+              </Button>
+            </div>
           </div>
           <p className="text-muted-foreground">
-            Showing <span className="font-medium text-foreground">{range.label}</span> · {range.prevLabel.replace(/^vs /, "compared to ")}
+            Showing <span className="font-medium text-foreground">{range.label}</span>
+            {range.prevLabel ? ` · ${range.prevLabel.replace(/^vs /, "compared to ")}` : " · full history"}
           </p>
         </motion.div>
 
