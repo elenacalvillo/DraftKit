@@ -33,7 +33,12 @@ export interface ResolvedRange {
   bucket: "day" | "week";
   /** Number of buckets in the range (used to seed the daily chart). */
   bucketCount: number;
+  /** False when a previous-period comparison is meaningless (all time). */
+  comparable: boolean;
 }
+
+/** First day analytics events exist. Used as the "all time" floor. */
+export const ANALYTICS_EPOCH = "2026-01-01T00:00:00.000Z";
 
 const MS_DAY = 24 * 60 * 60 * 1000;
 
