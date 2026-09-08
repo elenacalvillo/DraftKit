@@ -95,7 +95,19 @@ interface InactiveUser {
   last_sign_in_at: string | null;
 }
 
+/** CSV-safe cell: quotes and escapes anything that could break the file. */
+function csvCell(value: unknown): string {
+  const s =
+    value === null || value === undefined
+      ? ""
+      : typeof value === "object"
+        ? JSON.stringify(value)
+        : String(value);
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
 function DeltaText({ current, previous, prevLabel }: { current: number; previous: number; prevLabel: string }) {
+  if (!prevLabel) return null;
   if (previous === 0 && current === 0) return null;
   const delta = current - previous;
   const pct = previous > 0 ? (delta / previous) * 100 : null;
