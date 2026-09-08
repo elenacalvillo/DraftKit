@@ -110,32 +110,41 @@ export function AnalyticsRangePicker({ value, onChange }: Props) {
             </DropdownMenuSubContent>
           </DropdownMenuSub>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => setCustomOpen(true)}>Custom range…</DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={(e) => {
+              e.preventDefault();
+              // Wait for the menu to finish closing so it cannot steal focus
+              // back and dismiss the calendar immediately.
+              setTimeout(() => setCustomOpen(true), 0);
+            }}
+          >
+            Custom range…
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Popover open={customOpen} onOpenChange={setCustomOpen}>
-        <PopoverTrigger asChild>
-          <span />
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0 bg-popover" align="start">
+      <Dialog open={customOpen} onOpenChange={setCustomOpen}>
+        <DialogContent className="w-auto max-w-[95vw] p-4">
+          <DialogHeader>
+            <DialogTitle>Pick a custom range</DialogTitle>
+          </DialogHeader>
           <Calendar
             mode="range"
             selected={customRange as any}
             onSelect={(r: any) => setCustomRange(r ?? {})}
             numberOfMonths={2}
-            className={cn("p-3 pointer-events-auto")}
+            className={cn("p-0 pointer-events-auto")}
           />
-          <div className="flex justify-end gap-2 p-2 border-t">
+          <DialogFooter>
             <Button variant="ghost" size="sm" onClick={() => setCustomOpen(false)}>
               Cancel
             </Button>
             <Button size="sm" onClick={applyCustom} disabled={!customRange.from || !customRange.to}>
               Apply
             </Button>
-          </div>
-        </PopoverContent>
-      </Popover>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
