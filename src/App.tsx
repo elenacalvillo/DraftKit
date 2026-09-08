@@ -7,6 +7,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { FeedbackWidget } from "@/components/feedback/FeedbackWidget";
 import { TrackingNotice } from "@/components/privacy/TrackingNotice";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { AdminRoute } from "@/components/auth/AdminRoute";
 import { PostAuthRedirect } from "@/components/auth/PostAuthRedirect";
 import { PageViewTracker } from "@/components/analytics/PageViewTracker";
 import { ScrollToTop } from "@/components/ScrollToTop";
@@ -93,7 +94,8 @@ const App = () => (
             <Route path="/dashboard/projects/:projectId/accept" element={<ProtectedRoute><AcceptProjectInvite /></ProtectedRoute>} />
 
             <Route path="/dashboard/workspace/:requestId" element={<ProtectedRoute requireCreator={false}><Workspace /></ProtectedRoute>} />
-            <Route path="/admin/analytics" element={<ProtectedRoute requireCreator={false}><AdminAnalytics /></ProtectedRoute>} />
+            <Route path="/admin/analytics" element={<AdminRoute><AdminAnalytics /></AdminRoute>} />
+            <Route path="/admin/*" element={<AdminRoute><NotFound /></AdminRoute>} />
             <Route path="/retro/:collabId" element={<ProtectedRoute requireCreator={false}><Retrospective /></ProtectedRoute>} />
             <Route path="/view/:token" element={<PublicWorkspaceView />} />
             <Route path="/:username" element={<PublicBooking />} />
