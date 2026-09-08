@@ -143,6 +143,7 @@ export default function AdminAnalytics() {
   const [isLoading, setIsLoading] = useState(true);
   const [inactiveUsers, setInactiveUsers] = useState<InactiveUser[]>([]);
   const [nudgingId, setNudgingId] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     if (!loading && !isAdmin) {
