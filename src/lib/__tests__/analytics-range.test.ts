@@ -70,4 +70,18 @@ describe("analytics-range", () => {
     const r = resolveRange("custom-20260101-20260501", NOW);
     expect(r.bucket).toBe("week");
   });
+
+  it("all-time spans from the analytics epoch with no comparison", () => {
+    const r = resolveRange("all-time", NOW);
+    expect(r.label).toBe("All time");
+    expect(r.comparable).toBe(false);
+    expect(r.prevLabel).toBe("");
+    expect(r.bucket).toBe("week");
+    expect(new Date(r.start).getUTCFullYear()).toBe(2026);
+    expect(new Date(r.end).getTime()).toBe(NOW.getTime());
+  });
+
+  it("standard ranges stay comparable", () => {
+    expect(resolveRange("last-7d", NOW).comparable).toBe(true);
+  });
 });
