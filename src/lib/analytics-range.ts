@@ -202,6 +202,7 @@ export function resolveRange(key: RangeKey, now: Date = new Date()): ResolvedRan
     prevLabel,
     bucket,
     bucketCount,
+    comparable: true,
   };
 }
 
