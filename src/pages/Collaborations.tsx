@@ -194,7 +194,19 @@ function WorkspaceRow({
               {w.status === "pending" && <Badge variant="destructive" className="shrink-0">Pending</Badge>}
             </div>
             <p className="text-sm text-muted-foreground truncate">{counterpartLine(w)}</p>
+            {counterpartNewsletterHref && (
+              <a
+                href={counterpartNewsletterHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+              >
+                Newsletter
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
             <p className="text-xs text-muted-foreground truncate">{activityLine(w)}</p>
+
             {participants && participants.length > 0 && (
               <div className="mt-2 space-y-1">
                 {participants.map((p) => (
