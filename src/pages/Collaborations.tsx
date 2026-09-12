@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { leaveWorkspace } from "@/lib/workspace-cleanup";
 import { sanitizeSubstackImageUrl, cn } from "@/lib/utils";
+import { sanitizeLinkHref } from "@/lib/external-links";
+
 import { useAuth } from "@/hooks/useAuth";
 import { useMyWorkspaces, bucketWorkspace, type MyWorkspace, type WorkspaceRole } from "@/hooks/useMyWorkspaces";
 import { useActiveCollabs } from "@/hooks/useActiveCollabs";
