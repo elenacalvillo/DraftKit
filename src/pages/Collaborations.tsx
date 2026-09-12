@@ -135,13 +135,41 @@ function WorkspaceRow({
 
       <CardContent className="flex flex-col sm:flex-row sm:items-center gap-4 py-4">
         <div className="flex items-start gap-4 flex-1 min-w-0">
-          <Avatar className="h-11 w-11 shrink-0">
-            <AvatarImage src={avatarUrl ? sanitizeSubstackImageUrl(avatarUrl) : undefined} />
-            <AvatarFallback>{avatarFallback}</AvatarFallback>
-          </Avatar>
+          {counterpartProfileHref ? (
+            <a
+              href={counterpartProfileHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 rounded-full transition-opacity hover:opacity-80"
+              aria-label={`Open ${counterpartName}'s DraftKit page in a new tab`}
+            >
+              <Avatar className="h-11 w-11">
+                <AvatarImage src={avatarUrl ? sanitizeSubstackImageUrl(avatarUrl) : undefined} />
+                <AvatarFallback>{avatarFallback}</AvatarFallback>
+              </Avatar>
+            </a>
+          ) : (
+            <Avatar className="h-11 w-11 shrink-0">
+              <AvatarImage src={avatarUrl ? sanitizeSubstackImageUrl(avatarUrl) : undefined} />
+              <AvatarFallback>{avatarFallback}</AvatarFallback>
+            </Avatar>
+          )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 min-w-0 flex-wrap">
-              <p className="font-medium truncate">{title}</p>
+              {counterpartProfileHref ? (
+                <a
+                  href={counterpartProfileHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 font-medium truncate hover:text-primary hover:underline"
+                >
+                  <span className="truncate">{title}</span>
+                  <ExternalLink className="h-3 w-3 shrink-0 opacity-60" />
+                </a>
+              ) : (
+                <p className="font-medium truncate">{title}</p>
+              )}
+
               {w.is_project_workspace && (
                 <Badge variant="outline" className="shrink-0 gap-1">
                   <BookMarked className="h-3 w-3" />
