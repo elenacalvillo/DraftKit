@@ -94,11 +94,23 @@ function WorkspaceRow({
   const ref = useRef<HTMLDivElement | null>(null);
   const [pitchExpanded, setPitchExpanded] = useState(false);
   const [threadOpen, setThreadOpen] = useState(false);
-  const avatarUrl = w.role_in_workspace === "host"
+  const isHostView = w.role_in_workspace === "host";
+  const avatarUrl = isHostView
     ? w.requester_profile_image_url
     : w.host_profile_image_url;
-  const avatarFallback = (w.role_in_workspace === "host" ? w.requester_name : w.host_name)?.charAt(0) || "?";
+  const avatarFallback = (isHostView ? w.requester_name : w.host_name)?.charAt(0) || "?";
   const title = workspaceTitle(w);
+  // The counterpart is whoever isn't you: hosts look at the requester, everyone
+  // else looks at the host.
+  const counterpartUsername = isHostView ? w.requester_username : w.host_username;
+  const counterpartProfileHref =
+    !w.is_solo && !w.is_project_workspace && counterpartUsername
+      ? `/${counterpartUsername}`
+      : null;
+  const counterpartNewsletterHref =
+    !w.is_solo && !w.is_project_workspace
+      ? sanitizeLinkHref(isHostView ? w.requester_newsletter_url : w.host_newsletter_url)
+      : null;
   const isHostPending = w.status === "pending" && w.role_in_workspace === "host";
   const isOwnerRole = w.role_in_workspace === "host" || w.role_in_workspace === "project_owner";
   // Pitch body only matters for classic collabs; project chapters store the
@@ -109,6 +121,7 @@ function WorkspaceRow({
     w.status === "pending" && (w.role_in_workspace === "host" || w.role_in_workspace === "requester");
   const counterpartName =
     (w.role_in_workspace === "host" ? w.requester_name : w.host_name) || "them";
+
 
   useEffect(() => {
     if (highlighted && ref.current) {
