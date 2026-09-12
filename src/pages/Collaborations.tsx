@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
-import { ArrowLeft, BookMarked, Inbox, PenLine, Send, Users, Sparkles, Check, X, MoreVertical, LogOut, Trash2, MessageSquare } from "lucide-react";
+import { ArrowLeft, BookMarked, ExternalLink, Inbox, PenLine, Send, Users, Sparkles, Check, X, MoreVertical, LogOut, Trash2, MessageSquare } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { leaveWorkspace } from "@/lib/workspace-cleanup";
 import { sanitizeSubstackImageUrl, cn } from "@/lib/utils";
+import { sanitizeLinkHref } from "@/lib/external-links";
+
 import { useAuth } from "@/hooks/useAuth";
 import { useMyWorkspaces, bucketWorkspace, type MyWorkspace, type WorkspaceRole } from "@/hooks/useMyWorkspaces";
 import { useActiveCollabs } from "@/hooks/useActiveCollabs";
@@ -94,11 +96,23 @@ function WorkspaceRow({
   const ref = useRef<HTMLDivElement | null>(null);
   const [pitchExpanded, setPitchExpanded] = useState(false);
   const [threadOpen, setThreadOpen] = useState(false);
-  const avatarUrl = w.role_in_workspace === "host"
+  const isHostView = w.role_in_workspace === "host";
+  const avatarUrl = isHostView
     ? w.requester_profile_image_url
     : w.host_profile_image_url;
-  const avatarFallback = (w.role_in_workspace === "host" ? w.requester_name : w.host_name)?.charAt(0) || "?";
+  const avatarFallback = (isHostView ? w.requester_name : w.host_name)?.charAt(0) || "?";
   const title = workspaceTitle(w);
+  // The counterpart is whoever isn't you: hosts look at the requester, everyone
+  // else looks at the host.
+  const counterpartUsername = isHostView ? w.requester_username : w.host_username;
+  const counterpartProfileHref =
+    !w.is_solo && !w.is_project_workspace && counterpartUsername
+      ? `/${counterpartUsername}`
+      : null;
+  const counterpartNewsletterHref =
+    !w.is_solo && !w.is_project_workspace
+      ? sanitizeLinkHref(isHostView ? w.requester_newsletter_url : w.host_newsletter_url)
+      : null;
   const isHostPending = w.status === "pending" && w.role_in_workspace === "host";
   const isOwnerRole = w.role_in_workspace === "host" || w.role_in_workspace === "project_owner";
   // Pitch body only matters for classic collabs; project chapters store the
@@ -109,6 +123,7 @@ function WorkspaceRow({
     w.status === "pending" && (w.role_in_workspace === "host" || w.role_in_workspace === "requester");
   const counterpartName =
     (w.role_in_workspace === "host" ? w.requester_name : w.host_name) || "them";
+
 
   useEffect(() => {
     if (highlighted && ref.current) {
@@ -122,13 +137,41 @@ function WorkspaceRow({
 
       <CardContent className="flex flex-col sm:flex-row sm:items-center gap-4 py-4">
         <div className="flex items-start gap-4 flex-1 min-w-0">
-          <Avatar className="h-11 w-11 shrink-0">
-            <AvatarImage src={avatarUrl ? sanitizeSubstackImageUrl(avatarUrl) : undefined} />
-            <AvatarFallback>{avatarFallback}</AvatarFallback>
-          </Avatar>
+          {counterpartProfileHref ? (
+            <a
+              href={counterpartProfileHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 rounded-full transition-opacity hover:opacity-80"
+              aria-label={`Open ${counterpartName}'s DraftKit page in a new tab`}
+            >
+              <Avatar className="h-11 w-11">
+                <AvatarImage src={avatarUrl ? sanitizeSubstackImageUrl(avatarUrl) : undefined} />
+                <AvatarFallback>{avatarFallback}</AvatarFallback>
+              </Avatar>
+            </a>
+          ) : (
+            <Avatar className="h-11 w-11 shrink-0">
+              <AvatarImage src={avatarUrl ? sanitizeSubstackImageUrl(avatarUrl) : undefined} />
+              <AvatarFallback>{avatarFallback}</AvatarFallback>
+            </Avatar>
+          )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 min-w-0 flex-wrap">
-              <p className="font-medium truncate">{title}</p>
+              {counterpartProfileHref ? (
+                <a
+                  href={counterpartProfileHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 font-medium truncate hover:text-primary hover:underline"
+                >
+                  <span className="truncate">{title}</span>
+                  <ExternalLink className="h-3 w-3 shrink-0 opacity-60" />
+                </a>
+              ) : (
+                <p className="font-medium truncate">{title}</p>
+              )}
+
               {w.is_project_workspace && (
                 <Badge variant="outline" className="shrink-0 gap-1">
                   <BookMarked className="h-3 w-3" />
@@ -153,7 +196,19 @@ function WorkspaceRow({
               {w.status === "pending" && <Badge variant="destructive" className="shrink-0">Pending</Badge>}
             </div>
             <p className="text-sm text-muted-foreground truncate">{counterpartLine(w)}</p>
+            {counterpartNewsletterHref && (
+              <a
+                href={counterpartNewsletterHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+              >
+                Newsletter
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
             <p className="text-xs text-muted-foreground truncate">{activityLine(w)}</p>
+
             {participants && participants.length > 0 && (
               <div className="mt-2 space-y-1">
                 {participants.map((p) => (

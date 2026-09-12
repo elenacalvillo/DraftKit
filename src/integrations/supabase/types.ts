@@ -1290,6 +1290,7 @@ export type Database = {
           hidden_by_requester: boolean
           host_creator_id: string
           host_name: string
+          host_newsletter_url: string
           host_profile_image_url: string
           host_username: string
           is_project_workspace: boolean
@@ -1303,8 +1304,10 @@ export type Database = {
           requested_date: string
           requester_email: string
           requester_name: string
+          requester_newsletter_url: string
           requester_profile_image_url: string
           requester_user_id: string
+          requester_username: string
           role_in_workspace: string
           status: string
           unread_message_count: number

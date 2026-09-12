@@ -25,16 +25,20 @@ export interface MyWorkspace {
   host_name: string | null;
   host_username: string | null;
   host_profile_image_url: string | null;
+  host_newsletter_url: string | null;
   requester_user_id: string | null;
   requester_name: string | null;
   requester_email: string | null;
   requester_profile_image_url: string | null;
+  requester_username: string | null;
+  requester_newsletter_url: string | null;
   joined_at: string | null;
   hidden_by_creator: boolean;
   hidden_by_requester: boolean;
   last_message_at: string | null;
   unread_message_count: number;
 }
+
 
 export function useMyWorkspaces() {
   const { user, loading: authLoading } = useAuth();
