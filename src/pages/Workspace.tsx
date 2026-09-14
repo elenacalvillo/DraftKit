@@ -739,6 +739,56 @@ export default function Workspace() {
     }
   };
 
+  // Opens the publish dialog from the sidebar. Same capacity gate as the
+  // banner flow so paid limits behave identically.
+  const openPublishDialog = () => {
+    if (request?.status !== "published" && !canHostMore) {
+      toast.error("You've reached your host capacity", {
+        description: "Invite friends or upgrade to Pro to publish more collabs.",
+        action: {
+          label: "Upgrade",
+          onClick: () => navigate("/dashboard/subscription"),
+        },
+      });
+      return;
+    }
+    setPublishUrls({
+      creatorUrl: request?.collab_link || "",
+      requesterUrl: (request as { requester_collab_link?: string | null })?.requester_collab_link || "",
+    });
+    setShowPublishDialog(true);
+  };
+
+  // Already published — only the post links change, no status flip, no
+  // duplicate notification email.
+  const handleUpdatePublishLinks = async () => {
+    if (!requestId) return;
+    setIsSavingPublish(true);
+    try {
+      const updatePayload = {
+        collab_link: publishUrls.creatorUrl.trim() || null,
+        requester_collab_link: publishUrls.requesterUrl.trim() || null,
+      };
+      const { error } = await supabase
+        .from("collab_requests")
+        .update(updatePayload as never)
+        .eq("id", requestId);
+      if (error) {
+        console.error("[Workspace] Failed to update post links:", error);
+        toast.error("Couldn't save the links — please try again.");
+        return;
+      }
+      setRequest((prev) => (prev ? ({ ...prev, ...updatePayload } as any) : prev));
+      setShowPublishDialog(false);
+      toast.success("Post links updated.");
+      supabase.functions
+        .invoke("fetch-collab-metrics", { body: { requestId, snapshotDay: 0 } })
+        .catch((err) => console.error("Metrics refresh failed (non-fatal):", err));
+    } finally {
+      setIsSavingPublish(false);
+    }
+  };
+
   const logPublishFeedback = async (answer: string) => {
     try {
       await supabase.from("user_feedback").insert({
