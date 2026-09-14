@@ -701,6 +701,8 @@ export default function Workspace() {
       }
 
       setRequest((prev) => (prev ? ({ ...prev, ...updatePayload, status: "published" } as any) : prev));
+      setPublishAnswer("yes");
+      setShowPublishDialog(false);
 
       // Status update succeeded — show success immediately (DB is source of truth)
       toast.success("Congrats on publishing! 🎉 Engagement data is being collected.");
