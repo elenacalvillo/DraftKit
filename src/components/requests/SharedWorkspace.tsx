@@ -273,6 +273,8 @@ function SharedWorkspaceInner({
   //   draft pre-selected so the user can still complete the export.
   const [showSubstackUpgrade, setShowSubstackUpgrade] = useState(false);
   const [substackFallbackHtml, setSubstackFallbackHtml] = useState<string | null>(null);
+  const [showFallbackMarkup, setShowFallbackMarkup] = useState(false);
+  const fallbackPreviewRef = useRef<HTMLDivElement | null>(null);
   // Save-state machine drives the "Last saved" pill + auto-save loop. Manual
   // and auto saves both feed it so users always see the current truth.
   type SaveStatus = "idle" | "unsaved" | "saving" | "saved" | "failed";
@@ -647,6 +649,36 @@ function SharedWorkspaceInner({
     }
   }, [normalizedSharedContent, requestId, trackEvent]);
 
+  // Fallback dialog copy: try the rich clipboard again (this click is a fresh
+  // user gesture with focus on our document), then fall back to selecting the
+  // rendered preview so Cmd+C carries formatting.
+  const handleCopyFallback = useCallback(async () => {
+    const html = substackFallbackHtml;
+    if (!html) return;
+    try {
+      const wrote = await writeDraftToClipboard(html);
+      if (wrote) {
+        toast.success("Draft copied with formatting. Paste it into Substack.");
+        return;
+      }
+    } catch {
+      /* fall through to manual selection */
+    }
+
+    const node = fallbackPreviewRef.current;
+    if (node && typeof window.getSelection === "function") {
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+      node.focus();
+      toast.info("Draft selected — press Cmd+C (Ctrl+C) to copy it.");
+      return;
+    }
+    toast.error("Couldn't copy. Select the draft above and copy it manually.");
+  }, [substackFallbackHtml]);
+
   // Push to Substack handler — DRAFT-002 (Pro) and DRAFT-003 (Free gate).
   //
   // Free users see the button but get the upgrade modal on click; this is a
@@ -683,57 +715,51 @@ function SharedWorkspaceInner({
       return;
     }
 
-    // POPUP-BLOCKER GUARD: open the tab FIRST, synchronously, while we still
-    // have a fresh user-gesture. If we await the clipboard before opening,
-    // most browsers will block the window. We keep a handle so we can close
-    // it later if the clipboard write fails (no Ghost Copy: never claim
-    // "Draft copied!" unless the write actually succeeded).
+    // ORDER MATTERS: copy BEFORE opening the tab. Opening a new tab moves
+    // focus off this document, and browsers reject clipboard writes from an
+    // unfocused document ("Document is not focused"), which silently killed
+    // the rich HTML payload and left Substack empty.
+    let wrote = false;
+    try {
+      wrote = await writeDraftToClipboard(cleaned);
+    } catch (err) {
+      // One retry after pulling focus back — covers the case where the user
+      // clicked through from another window/tab.
+      try {
+        window.focus();
+        wrote = await writeDraftToClipboard(cleaned);
+      } catch (retryErr) {
+        console.error("Push to Substack clipboard write failed:", err, retryErr);
+        wrote = false;
+      }
+    }
+
+    if (!wrote) {
+      // No Ghost Copy: never claim success. Hand the user the formatted
+      // fallback so they can still ship the post.
+      setSubstackFallbackHtml(cleaned);
+      return;
+    }
+
     const popup = window.open(targetUrl, "_blank", "noopener,noreferrer");
 
-    try {
-      const wrote = await writeDraftToClipboard(cleaned);
-      if (!wrote) {
-        // Clipboard write failed — close the tab we just opened and surface
-        // the manual fallback so the user can still complete the export.
-        try {
-          popup?.close();
-        } catch {
-          /* cross-origin close may throw */
-        }
-        toast.error("Clipboard access denied. Use the manual Copy fallback below.");
-        setSubstackFallbackHtml(cleaned);
-        return;
-      }
-
-      if (!popup || popup.closed) {
-        // Pop-up blocked. Clipboard succeeded though, so give the user a
-        // clickable toast to open Substack themselves — no Ghost Copy risk.
-        toast.success("Draft copied! Click to open Substack and paste (Cmd+V / Ctrl+V).", {
-          duration: Infinity,
-          action: {
-            label: "Open Substack",
-            onClick: () => window.open(targetUrl, "_blank", "noopener,noreferrer"),
-          },
-        });
-      } else {
-        // Persistent toast — no auto-dismiss because the user's next move
-        // is to switch tabs.
-        toast.success("Draft copied! Switch to the new tab and press Cmd+V (Ctrl+V on Windows) to paste.", {
-          duration: Infinity,
-        });
-      }
-
-      trackEvent("push_to_substack_success", { request_id: requestId });
-    } catch (err) {
-      console.error("Push to Substack failed:", err);
-      try {
-        popup?.close();
-      } catch {
-        /* noop */
-      }
-      toast.error("Clipboard access denied. Please use the manual 'Copy' fallback.");
-      setSubstackFallbackHtml(cleaned);
+    if (!popup || popup.closed) {
+      // Pop-up blocked. Clipboard succeeded though, so give the user a
+      // clickable toast to open Substack themselves.
+      toast.success("Draft copied! Click to open Substack and paste (Cmd+V / Ctrl+V).", {
+        duration: Infinity,
+        action: {
+          label: "Open Substack",
+          onClick: () => window.open(targetUrl, "_blank", "noopener,noreferrer"),
+        },
+      });
+    } else {
+      toast.success("Draft copied! Switch to the new tab and press Cmd+V (Ctrl+V on Windows) to paste.", {
+        duration: Infinity,
+      });
     }
+
+    trackEvent("push_to_substack_success", { request_id: requestId });
   }, [normalizedSharedContent, isPro, requestId, trackEvent, creator?.newsletter_url, creator?.substack_url]);
 
   const hasContent = !!normalizedSharedContent.trim();
@@ -1057,32 +1083,59 @@ function SharedWorkspaceInner({
           explicit in the ticket. */}
       <PushToSubstackUpgradeModal open={showSubstackUpgrade} onOpenChange={setShowSubstackUpgrade} />
 
-      {/* Manual-copy fallback for Push to Substack when the rich Clipboard
-          API is unavailable (DRAFT-002). We pre-select the cleaned HTML so
-          the user can press Cmd+C even if navigator.clipboard.write fails. */}
+      {/* Manual-copy fallback for Push to Substack. We render the formatted
+          draft (not raw markup) so a Select-all + Cmd+C carries real
+          formatting into Substack. Raw markup stays available behind a
+          toggle for anyone who wants it. */}
       <Dialog
         open={substackFallbackHtml !== null}
         onOpenChange={(open) => {
-          if (!open) setSubstackFallbackHtml(null);
+          if (!open) {
+            setSubstackFallbackHtml(null);
+            setShowFallbackMarkup(false);
+          }
         }}
       >
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[640px]">
           <DialogHeader>
-            <DialogTitle>Copy your draft manually</DialogTitle>
+            <DialogTitle>Copy your draft</DialogTitle>
             <DialogDescription>
-              Your browser blocked the automatic copy. Select all the text below (Cmd+A / Ctrl+A), copy it (Cmd+C /
-              Ctrl+C), then paste it into Substack.
+              Press "Copy draft" below, then paste into Substack with Cmd+V / Ctrl+V. If that does nothing, click inside
+              the draft, select everything (Cmd+A / Ctrl+A) and copy it.
             </DialogDescription>
           </DialogHeader>
-          <Textarea
-            readOnly
-            value={substackFallbackHtml ?? ""}
-            className="min-h-[200px] font-mono text-xs"
-            onFocus={(e) => e.currentTarget.select()}
-          />
+
+          {showFallbackMarkup ? (
+            <Textarea
+              readOnly
+              value={substackFallbackHtml ?? ""}
+              className="min-h-[240px] font-mono text-xs"
+              onFocus={(e) => e.currentTarget.select()}
+            />
+          ) : (
+            <div
+              ref={fallbackPreviewRef}
+              tabIndex={0}
+              className="prose prose-sm dark:prose-invert max-h-[320px] max-w-none overflow-y-auto rounded-lg border border-border/60 bg-background p-4"
+              dangerouslySetInnerHTML={{ __html: sanitize(substackFallbackHtml ?? "") }}
+            />
+          )}
+
+          <button
+            type="button"
+            className="self-start text-xs font-medium text-muted-foreground hover:text-foreground"
+            onClick={() => setShowFallbackMarkup((v) => !v)}
+          >
+            {showFallbackMarkup ? "Show formatted draft" : "Show markup instead"}
+          </button>
+
           <DialogFooter>
             <Button variant="ghost" onClick={() => setSubstackFallbackHtml(null)}>
               Close
+            </Button>
+            <Button variant="outline" onClick={handleCopyFallback}>
+              <Copy className="w-4 h-4 mr-2" />
+              Copy draft
             </Button>
             <Button
               variant="gradient"

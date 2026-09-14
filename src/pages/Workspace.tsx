@@ -165,6 +165,9 @@ export default function Workspace() {
     requesterUrl: "",
   });
   const [isSavingPublish, setIsSavingPublish] = useState(false);
+  // Always-available publish dialog (independent of the dated retro banner,
+  // which can be dismissed permanently per browser).
+  const [showPublishDialog, setShowPublishDialog] = useState(false);
   // undefined = loading, null = not answered, {message} = already answered
   const [existingRetroFeedback, setExistingRetroFeedback] = useState<{ message: string } | null | undefined>(undefined);
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -698,6 +701,8 @@ export default function Workspace() {
       }
 
       setRequest((prev) => (prev ? ({ ...prev, ...updatePayload, status: "published" } as any) : prev));
+      setPublishAnswer("yes");
+      setShowPublishDialog(false);
 
       // Status update succeeded — show success immediately (DB is source of truth)
       toast.success("Congrats on publishing! 🎉 Engagement data is being collected.");
@@ -729,6 +734,56 @@ export default function Workspace() {
 
       // Log feedback
       await logPublishFeedback("yes");
+    } finally {
+      setIsSavingPublish(false);
+    }
+  };
+
+  // Opens the publish dialog from the sidebar. Same capacity gate as the
+  // banner flow so paid limits behave identically.
+  const openPublishDialog = () => {
+    if (request?.status !== "published" && !canHostMore) {
+      toast.error("You've reached your host capacity", {
+        description: "Invite friends or upgrade to Pro to publish more collabs.",
+        action: {
+          label: "Upgrade",
+          onClick: () => navigate("/dashboard/subscription"),
+        },
+      });
+      return;
+    }
+    setPublishUrls({
+      creatorUrl: request?.collab_link || "",
+      requesterUrl: (request as { requester_collab_link?: string | null })?.requester_collab_link || "",
+    });
+    setShowPublishDialog(true);
+  };
+
+  // Already published — only the post links change, no status flip, no
+  // duplicate notification email.
+  const handleUpdatePublishLinks = async () => {
+    if (!requestId) return;
+    setIsSavingPublish(true);
+    try {
+      const updatePayload = {
+        collab_link: publishUrls.creatorUrl.trim() || null,
+        requester_collab_link: publishUrls.requesterUrl.trim() || null,
+      };
+      const { error } = await supabase
+        .from("collab_requests")
+        .update(updatePayload as never)
+        .eq("id", requestId);
+      if (error) {
+        console.error("[Workspace] Failed to update post links:", error);
+        toast.error("Couldn't save the links — please try again.");
+        return;
+      }
+      setRequest((prev) => (prev ? ({ ...prev, ...updatePayload } as any) : prev));
+      setShowPublishDialog(false);
+      toast.success("Post links updated.");
+      supabase.functions
+        .invoke("fetch-collab-metrics", { body: { requestId, snapshotDay: 0 } })
+        .catch((err) => console.error("Metrics refresh failed (non-fatal):", err));
     } finally {
       setIsSavingPublish(false);
     }
@@ -1164,6 +1219,28 @@ export default function Workspace() {
                 >
                   <ExternalLink className="w-4 h-4 mr-2" />
                   {request.status === "published" ? "See Live Post" : "Open External Document"}
+                </Button>
+              )}
+
+              {/* Publish action lives here permanently — the dated retro banner
+                  can be dismissed, which used to leave hosts with no way to
+                  mark a collab published or start engagement tracking. */}
+              {isOwnerView && !request.is_project_workspace && !isSolo && request.status === "approved" && (
+                <Button variant="outline" size="sm" onClick={openPublishDialog} className="w-full">
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  Mark as Published
+                </Button>
+              )}
+
+              {isOwnerView && !request.is_project_workspace && !isSolo && request.status === "published" && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={openPublishDialog}
+                  className="w-full text-muted-foreground"
+                >
+                  <CheckCircle2 className="w-4 h-4 mr-2 text-success" />
+                  Published — edit post links
                 </Button>
               )}
 
@@ -1632,6 +1709,59 @@ export default function Workspace() {
             window.location.reload();
           }}
         />
+      )}
+
+      {/* Publish / edit post links dialog — reachable any time from the sidebar. */}
+      {request && (
+        <Dialog open={showPublishDialog} onOpenChange={setShowPublishDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {request.status === "published" ? "Edit published post links" : "Mark this collab as published"}
+              </DialogTitle>
+              <DialogDescription>
+                Add the live post links so DraftKit can track likes, comments and subscriber growth. You can add them
+                later too.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Your post URL</label>
+                <Input
+                  placeholder="https://you.substack.com/p/..."
+                  value={publishUrls.creatorUrl}
+                  onChange={(e) => setPublishUrls((prev) => ({ ...prev, creatorUrl: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                  {partnerName ? `${partnerName}'s post URL (optional)` : "Guest's post URL (optional)"}
+                </label>
+                <Input
+                  placeholder="https://guest.substack.com/p/..."
+                  value={publishUrls.requesterUrl}
+                  onChange={(e) => setPublishUrls((prev) => ({ ...prev, requesterUrl: e.target.value }))}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setShowPublishDialog(false)} disabled={isSavingPublish}>
+                Cancel
+              </Button>
+              <Button
+                variant="hero"
+                onClick={request.status === "published" ? handleUpdatePublishLinks : handlePublishWithUrls}
+                disabled={isSavingPublish}
+              >
+                {isSavingPublish
+                  ? "Saving…"
+                  : request.status === "published"
+                    ? "Save links"
+                    : "Confirm & Track Engagement"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
 
       {request && isOwnerView && (() => {
