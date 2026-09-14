@@ -649,6 +649,36 @@ function SharedWorkspaceInner({
     }
   }, [normalizedSharedContent, requestId, trackEvent]);
 
+  // Fallback dialog copy: try the rich clipboard again (this click is a fresh
+  // user gesture with focus on our document), then fall back to selecting the
+  // rendered preview so Cmd+C carries formatting.
+  const handleCopyFallback = useCallback(async () => {
+    const html = substackFallbackHtml;
+    if (!html) return;
+    try {
+      const wrote = await writeDraftToClipboard(html);
+      if (wrote) {
+        toast.success("Draft copied with formatting. Paste it into Substack.");
+        return;
+      }
+    } catch {
+      /* fall through to manual selection */
+    }
+
+    const node = fallbackPreviewRef.current;
+    if (node && typeof window.getSelection === "function") {
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+      node.focus();
+      toast.info("Draft selected — press Cmd+C (Ctrl+C) to copy it.");
+      return;
+    }
+    toast.error("Couldn't copy. Select the draft above and copy it manually.");
+  }, [substackFallbackHtml]);
+
   // Push to Substack handler — DRAFT-002 (Pro) and DRAFT-003 (Free gate).
   //
   // Free users see the button but get the upgrade modal on click; this is a
