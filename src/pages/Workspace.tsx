@@ -1711,6 +1711,59 @@ export default function Workspace() {
         />
       )}
 
+      {/* Publish / edit post links dialog — reachable any time from the sidebar. */}
+      {request && (
+        <Dialog open={showPublishDialog} onOpenChange={setShowPublishDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {request.status === "published" ? "Edit published post links" : "Mark this collab as published"}
+              </DialogTitle>
+              <DialogDescription>
+                Add the live post links so DraftKit can track likes, comments and subscriber growth. You can add them
+                later too.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Your post URL</label>
+                <Input
+                  placeholder="https://you.substack.com/p/..."
+                  value={publishUrls.creatorUrl}
+                  onChange={(e) => setPublishUrls((prev) => ({ ...prev, creatorUrl: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                  {partnerName ? `${partnerName}'s post URL (optional)` : "Guest's post URL (optional)"}
+                </label>
+                <Input
+                  placeholder="https://guest.substack.com/p/..."
+                  value={publishUrls.requesterUrl}
+                  onChange={(e) => setPublishUrls((prev) => ({ ...prev, requesterUrl: e.target.value }))}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setShowPublishDialog(false)} disabled={isSavingPublish}>
+                Cancel
+              </Button>
+              <Button
+                variant="hero"
+                onClick={request.status === "published" ? handleUpdatePublishLinks : handlePublishWithUrls}
+                disabled={isSavingPublish}
+              >
+                {isSavingPublish
+                  ? "Saving…"
+                  : request.status === "published"
+                    ? "Save links"
+                    : "Confirm & Track Engagement"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
       {request && isOwnerView && (() => {
         const rawTitle = (request.message || "").trim();
         // Long pitch messages are impossible to retype, so fall back to DELETE.
