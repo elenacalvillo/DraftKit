@@ -273,6 +273,8 @@ function SharedWorkspaceInner({
   //   draft pre-selected so the user can still complete the export.
   const [showSubstackUpgrade, setShowSubstackUpgrade] = useState(false);
   const [substackFallbackHtml, setSubstackFallbackHtml] = useState<string | null>(null);
+  const [showFallbackMarkup, setShowFallbackMarkup] = useState(false);
+  const fallbackPreviewRef = useRef<HTMLDivElement | null>(null);
   // Save-state machine drives the "Last saved" pill + auto-save loop. Manual
   // and auto saves both feed it so users always see the current truth.
   type SaveStatus = "idle" | "unsaved" | "saving" | "saved" | "failed";
