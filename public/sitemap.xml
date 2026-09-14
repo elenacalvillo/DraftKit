@@ -91,6 +91,11 @@
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://draftkit.app/amybenneranand</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://draftkit.app/anferneeck</loc>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
@@ -366,6 +371,11 @@
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://draftkit.app/leyre</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://draftkit.app/lipglossandllms</loc>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
@@ -452,6 +462,11 @@
   </url>
   <url>
     <loc>https://draftkit.app/oliverdigitalised</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://draftkit.app/privacat</loc>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
   </url>
