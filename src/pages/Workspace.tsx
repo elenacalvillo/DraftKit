@@ -165,6 +165,9 @@ export default function Workspace() {
     requesterUrl: "",
   });
   const [isSavingPublish, setIsSavingPublish] = useState(false);
+  // Always-available publish dialog (independent of the dated retro banner,
+  // which can be dismissed permanently per browser).
+  const [showPublishDialog, setShowPublishDialog] = useState(false);
   // undefined = loading, null = not answered, {message} = already answered
   const [existingRetroFeedback, setExistingRetroFeedback] = useState<{ message: string } | null | undefined>(undefined);
   const [showInviteModal, setShowInviteModal] = useState(false);
