@@ -1222,6 +1222,28 @@ export default function Workspace() {
                 </Button>
               )}
 
+              {/* Publish action lives here permanently — the dated retro banner
+                  can be dismissed, which used to leave hosts with no way to
+                  mark a collab published or start engagement tracking. */}
+              {isOwnerView && !request.is_project_workspace && !isSolo && request.status === "approved" && (
+                <Button variant="outline" size="sm" onClick={openPublishDialog} className="w-full">
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  Mark as Published
+                </Button>
+              )}
+
+              {isOwnerView && !request.is_project_workspace && !isSolo && request.status === "published" && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={openPublishDialog}
+                  className="w-full text-muted-foreground"
+                >
+                  <CheckCircle2 className="w-4 h-4 mr-2 text-success" />
+                  Published — edit post links
+                </Button>
+              )}
+
               {isOwnerView && request.status === "approved" && !request.is_project_workspace && !isSolo && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
