@@ -1051,32 +1051,59 @@ function SharedWorkspaceInner({
           explicit in the ticket. */}
       <PushToSubstackUpgradeModal open={showSubstackUpgrade} onOpenChange={setShowSubstackUpgrade} />
 
-      {/* Manual-copy fallback for Push to Substack when the rich Clipboard
-          API is unavailable (DRAFT-002). We pre-select the cleaned HTML so
-          the user can press Cmd+C even if navigator.clipboard.write fails. */}
+      {/* Manual-copy fallback for Push to Substack. We render the formatted
+          draft (not raw markup) so a Select-all + Cmd+C carries real
+          formatting into Substack. Raw markup stays available behind a
+          toggle for anyone who wants it. */}
       <Dialog
         open={substackFallbackHtml !== null}
         onOpenChange={(open) => {
-          if (!open) setSubstackFallbackHtml(null);
+          if (!open) {
+            setSubstackFallbackHtml(null);
+            setShowFallbackMarkup(false);
+          }
         }}
       >
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[640px]">
           <DialogHeader>
-            <DialogTitle>Copy your draft manually</DialogTitle>
+            <DialogTitle>Copy your draft</DialogTitle>
             <DialogDescription>
-              Your browser blocked the automatic copy. Select all the text below (Cmd+A / Ctrl+A), copy it (Cmd+C /
-              Ctrl+C), then paste it into Substack.
+              Press "Copy draft" below, then paste into Substack with Cmd+V / Ctrl+V. If that does nothing, click inside
+              the draft, select everything (Cmd+A / Ctrl+A) and copy it.
             </DialogDescription>
           </DialogHeader>
-          <Textarea
-            readOnly
-            value={substackFallbackHtml ?? ""}
-            className="min-h-[200px] font-mono text-xs"
-            onFocus={(e) => e.currentTarget.select()}
-          />
+
+          {showFallbackMarkup ? (
+            <Textarea
+              readOnly
+              value={substackFallbackHtml ?? ""}
+              className="min-h-[240px] font-mono text-xs"
+              onFocus={(e) => e.currentTarget.select()}
+            />
+          ) : (
+            <div
+              ref={fallbackPreviewRef}
+              tabIndex={0}
+              className="prose prose-sm dark:prose-invert max-h-[320px] max-w-none overflow-y-auto rounded-lg border border-border/60 bg-background p-4"
+              dangerouslySetInnerHTML={{ __html: sanitize(substackFallbackHtml ?? "") }}
+            />
+          )}
+
+          <button
+            type="button"
+            className="self-start text-xs font-medium text-muted-foreground hover:text-foreground"
+            onClick={() => setShowFallbackMarkup((v) => !v)}
+          >
+            {showFallbackMarkup ? "Show formatted draft" : "Show markup instead"}
+          </button>
+
           <DialogFooter>
             <Button variant="ghost" onClick={() => setSubstackFallbackHtml(null)}>
               Close
+            </Button>
+            <Button variant="outline" onClick={handleCopyFallback}>
+              <Copy className="w-4 h-4 mr-2" />
+              Copy draft
             </Button>
             <Button
               variant="gradient"
