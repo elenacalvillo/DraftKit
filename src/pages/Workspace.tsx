@@ -951,16 +951,17 @@ export default function Workspace() {
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {/* Recovery button: feedback says "yes" but status never updated */}
-                    {publishAnswer === "yes" && request.status !== "published" && isPro && (
+                    {publishAnswer === "yes" && request.status !== "published" && (
                       <Button
                         size="sm"
                         variant="outline"
                         className="text-success border-success/40 hover:bg-success/10"
                         onClick={async () => {
-                          const { error } = await supabase
-                            .from("collab_requests")
-                            .update({ status: "published" })
-                            .eq("id", requestId);
+                          const { error } = await supabase.rpc("mark_workspace_published", {
+                            _request_id: requestId!,
+                            _host_url: null,
+                            _guest_url: null,
+                          });
                           if (error) {
                             toast.error("Couldn't mark as published — please try again.");
                           } else {
