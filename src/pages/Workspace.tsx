@@ -800,10 +800,17 @@ export default function Workspace() {
         collab_link: publishUrls.creatorUrl.trim() || null,
         requester_collab_link: publishUrls.requesterUrl.trim() || null,
       };
-      const { error } = await supabase
-        .from("collab_requests")
-        .update(updatePayload as never)
-        .eq("id", requestId);
+      // Host can clear links outright; guests go through the participant RPC.
+      const { error } = isCreator
+        ? await supabase
+            .from("collab_requests")
+            .update(updatePayload as never)
+            .eq("id", requestId)
+        : await supabase.rpc("mark_workspace_published", {
+            _request_id: requestId,
+            _host_url: publishUrls.creatorUrl.trim() || null,
+            _guest_url: publishUrls.requesterUrl.trim() || null,
+          });
       if (error) {
         console.error("[Workspace] Failed to update post links:", error);
         toast.error("Couldn't save the links — please try again.");
