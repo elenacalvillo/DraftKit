@@ -1296,17 +1296,17 @@ export default function Workspace() {
                 </Button>
               )}
 
-              {/* Publish action lives here permanently — the dated retro banner
-                  can be dismissed, which used to leave hosts with no way to
-                  mark a collab published or start engagement tracking. */}
-              {isOwnerView && !request.is_project_workspace && !isSolo && request.status === "approved" && (
+              {/* Publish action lives here permanently and is open to every
+                  participant — host, guest and invited collaborators — because
+                  the host often isn't the one who publishes. */}
+              {canMarkPublished && request.status === "approved" && (
                 <Button variant="outline" size="sm" onClick={openPublishDialog} className="w-full">
                   <CheckCircle2 className="w-4 h-4 mr-2" />
                   Mark as Published
                 </Button>
               )}
 
-              {isOwnerView && !request.is_project_workspace && !isSolo && request.status === "published" && (
+              {canMarkPublished && request.status === "published" && (
                 <Button
                   variant="ghost"
                   size="sm"
