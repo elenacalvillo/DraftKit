@@ -771,7 +771,9 @@ export default function Workspace() {
   // Opens the publish dialog from the sidebar. Same capacity gate as the
   // banner flow so paid limits behave identically.
   const openPublishDialog = () => {
-    if (request?.status !== "published" && !canHostMore) {
+    // Host-pays: the capacity gate applies to the host only. A guest is never
+    // blocked by their own plan on a workspace the host already paid for.
+    if (isCreator && request?.status !== "published" && !canHostMore) {
       toast.error("You've reached your host capacity", {
         description: "Invite friends or upgrade to Pro to publish more collabs.",
         action: {
