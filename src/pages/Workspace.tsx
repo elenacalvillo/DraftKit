@@ -1021,6 +1021,14 @@ export default function Workspace() {
                               <Button size="sm" variant="outline" onClick={() => handlePublishAnswer("not_yet")}>
                                 Not yet
                               </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-muted-foreground"
+                                onClick={suppressPublishPrompt}
+                              >
+                                Not publishing / ongoing workspace
+                              </Button>
                             </>
                           )}
                           <div className="ml-auto">
