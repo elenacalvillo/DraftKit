@@ -658,14 +658,24 @@ export default function Workspace() {
   // Workspace is always accessible for approved/published collabs — no pro gate here.
   // The gate is on the booking page (incoming requests) and the publish action.
 
-  // Retrospective banner logic
+  // Retrospective banner logic. Dated collabs trigger on their target date;
+  // flexible (undated) workspaces fall back to 14 days after creation so they
+  // never sit in limbo. Suppressed workspaces never prompt anyone.
+  const FLEXIBLE_PROMPT_DAYS = 14;
   const isRetroEligible = (() => {
-    if (!request?.requested_date) return false;
+    if (!request) return false;
+    if (publishSuppressedAt) return false;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const reqDate = parseDateString(request.requested_date);
-    reqDate.setHours(0, 0, 0, 0);
-    return reqDate <= today;
+    if (request.requested_date) {
+      const reqDate = parseDateString(request.requested_date);
+      reqDate.setHours(0, 0, 0, 0);
+      return reqDate <= today;
+    }
+    if (!request.created_at) return false;
+    const fallback = new Date(request.created_at);
+    fallback.setDate(fallback.getDate() + FLEXIBLE_PROMPT_DAYS);
+    return fallback <= new Date();
   })();
 
   const retroDismissKey = `retro-dismissed-${requestId}`;
