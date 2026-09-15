@@ -841,9 +841,27 @@ export default function Workspace() {
     }
   };
 
+  // Soft dismissal — hides the prompt in this browser only.
   const dismissRetro = () => {
     setRetroDismissed(true);
     localStorage.setItem(retroDismissKey, "true");
+  };
+
+  // Hard suppression — stored on the workspace, so ongoing/feedback rooms
+  // stop prompting every participant on every device.
+  const suppressPublishPrompt = async () => {
+    if (!requestId) return;
+    const { data, error } = await supabase.rpc("set_publish_prompt_response", {
+      _request_id: requestId,
+      _response: "not_publishing",
+    });
+    if (error) {
+      console.error("[Workspace] Failed to suppress publish prompt:", error);
+      toast.error("Couldn't turn off the reminder — please try again.");
+      return;
+    }
+    setPublishSuppressedAt((data as string) ?? new Date().toISOString());
+    toast.success("Got it — we won't ask about publishing here again.");
   };
 
   return (
