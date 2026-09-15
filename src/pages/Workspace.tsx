@@ -165,6 +165,8 @@ export default function Workspace() {
     requesterUrl: "",
   });
   const [isSavingPublish, setIsSavingPublish] = useState(false);
+  // Persisted (per-workspace, not per-browser) suppression of the publish prompt.
+  const [publishSuppressedAt, setPublishSuppressedAt] = useState<string | null>(null);
   // Always-available publish dialog (independent of the dated retro banner,
   // which can be dismissed permanently per browser).
   const [showPublishDialog, setShowPublishDialog] = useState(false);
