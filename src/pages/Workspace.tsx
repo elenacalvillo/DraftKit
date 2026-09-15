@@ -683,7 +683,7 @@ export default function Workspace() {
   // Step 1: User clicks Yes/Not yet — for "yes", show URL form instead of immediately publishing
   const handlePublishAnswer = (answer: "yes" | "not_yet") => {
     // Gate: check if free-tier user has exhausted their host capacity
-    if (answer === "yes" && !canHostMore) {
+    if (answer === "yes" && isCreator && !canHostMore) {
       toast.error("You've reached your host capacity", {
         description: "Invite friends or upgrade to Pro to publish more collabs.",
         action: {
