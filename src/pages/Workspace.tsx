@@ -476,6 +476,13 @@ export default function Workspace() {
   const isOwnerView = isCreator;
   const isGuestView = isGuest || isInvitedCollaborator;
 
+  // Any confirmed participant may record the published state — the host is
+  // often not the person who actually hits publish.
+  const canMarkPublished =
+    (isOwnerView || isGuest || isInvitedCollaborator) &&
+    !request?.is_project_workspace &&
+    !isSolo;
+
   // Hide the current viewer from the collaborator list — we never want to
   // show the logged-in user as their own "partner".
   const currentUserEmail = user?.email?.toLowerCase() || null;
