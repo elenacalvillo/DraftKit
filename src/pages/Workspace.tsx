@@ -216,6 +216,17 @@ export default function Workspace() {
     else if (existingRetroFeedback.message.includes("= not_yet")) setPublishAnswer("not_yet");
   }, [existingRetroFeedback]);
 
+  // Read the persisted publish-prompt suppression flag for this workspace.
+  useEffect(() => {
+    if (!requestId || !user) return;
+    supabase
+      .from("collab_requests")
+      .select("publish_prompt_suppressed_at")
+      .eq("id", requestId)
+      .maybeSingle()
+      .then(({ data }) => setPublishSuppressedAt((data as any)?.publish_prompt_suppressed_at ?? null));
+  }, [requestId, user]);
+
   const handleMessageSent = useCallback(() => {
     setMsgRefreshKey((k) => k + 1);
   }, []);
