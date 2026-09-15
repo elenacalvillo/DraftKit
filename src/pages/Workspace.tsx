@@ -993,8 +993,17 @@ export default function Workspace() {
                     <h3 className="font-semibold text-lg">Milestone reached!</h3>
                   </div>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Your collab with <strong>{partnerName}</strong> was scheduled for{" "}
-                    <strong>{formatDate(request.requested_date)}</strong>. How did it go?
+                    {request.requested_date ? (
+                      <>
+                        Your collab with <strong>{partnerName}</strong> was scheduled for{" "}
+                        <strong>{formatDate(request.requested_date)}</strong>. How did it go?
+                      </>
+                    ) : (
+                      <>
+                        This workspace with <strong>{partnerName}</strong> has been open for a couple of
+                        weeks. How did it go?
+                      </>
+                    )}
                   </p>
 
                   <div className="space-y-3">
