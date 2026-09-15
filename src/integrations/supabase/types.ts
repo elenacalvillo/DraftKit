@@ -202,6 +202,7 @@ export type Database = {
           is_solo: boolean
           message: string | null
           project_id: string | null
+          publish_prompt_suppressed_at: string | null
           reminder_sent_at: string | null
           requested_date: string | null
           requester_collab_link: string | null
@@ -239,6 +240,7 @@ export type Database = {
           is_solo?: boolean
           message?: string | null
           project_id?: string | null
+          publish_prompt_suppressed_at?: string | null
           reminder_sent_at?: string | null
           requested_date?: string | null
           requester_collab_link?: string | null
@@ -276,6 +278,7 @@ export type Database = {
           is_solo?: boolean
           message?: string | null
           project_id?: string | null
+          publish_prompt_suppressed_at?: string | null
           reminder_sent_at?: string | null
           requested_date?: string | null
           requester_collab_link?: string | null
@@ -1343,6 +1346,15 @@ export type Database = {
           username: string
         }[]
       }
+      mark_workspace_published: {
+        Args: { _guest_url?: string; _host_url?: string; _request_id: string }
+        Returns: {
+          collab_link: string
+          id: string
+          requester_collab_link: string
+          status: string
+        }[]
+      }
       mark_workspace_read: { Args: { _request_id: string }; Returns: undefined }
       move_chapter_to_project: {
         Args: { _chapter_id: string; _target_project_id: string }
@@ -1375,6 +1387,10 @@ export type Database = {
           id: string
           shared_content: string
         }[]
+      }
+      set_publish_prompt_response: {
+        Args: { _request_id: string; _response: string }
+        Returns: string
       }
       stamp_collaborator_joined: {
         Args: { _request_id: string }

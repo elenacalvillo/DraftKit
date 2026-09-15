@@ -165,6 +165,8 @@ export default function Workspace() {
     requesterUrl: "",
   });
   const [isSavingPublish, setIsSavingPublish] = useState(false);
+  // Persisted (per-workspace, not per-browser) suppression of the publish prompt.
+  const [publishSuppressedAt, setPublishSuppressedAt] = useState<string | null>(null);
   // Always-available publish dialog (independent of the dated retro banner,
   // which can be dismissed permanently per browser).
   const [showPublishDialog, setShowPublishDialog] = useState(false);
@@ -213,6 +215,17 @@ export default function Workspace() {
     if (existingRetroFeedback.message.includes("= yes")) setPublishAnswer("yes");
     else if (existingRetroFeedback.message.includes("= not_yet")) setPublishAnswer("not_yet");
   }, [existingRetroFeedback]);
+
+  // Read the persisted publish-prompt suppression flag for this workspace.
+  useEffect(() => {
+    if (!requestId || !user) return;
+    supabase
+      .from("collab_requests")
+      .select("publish_prompt_suppressed_at")
+      .eq("id", requestId)
+      .maybeSingle()
+      .then(({ data }) => setPublishSuppressedAt((data as any)?.publish_prompt_suppressed_at ?? null));
+  }, [requestId, user]);
 
   const handleMessageSent = useCallback(() => {
     setMsgRefreshKey((k) => k + 1);
@@ -463,6 +476,13 @@ export default function Workspace() {
   const isOwnerView = isCreator;
   const isGuestView = isGuest || isInvitedCollaborator;
 
+  // Any confirmed participant may record the published state — the host is
+  // often not the person who actually hits publish.
+  const canMarkPublished =
+    (isOwnerView || isGuest || isInvitedCollaborator) &&
+    !request?.is_project_workspace &&
+    !isSolo;
+
   // Hide the current viewer from the collaborator list — we never want to
   // show the logged-in user as their own "partner".
   const currentUserEmail = user?.email?.toLowerCase() || null;
@@ -645,14 +665,24 @@ export default function Workspace() {
   // Workspace is always accessible for approved/published collabs — no pro gate here.
   // The gate is on the booking page (incoming requests) and the publish action.
 
-  // Retrospective banner logic
+  // Retrospective banner logic. Dated collabs trigger on their target date;
+  // flexible (undated) workspaces fall back to 14 days after creation so they
+  // never sit in limbo. Suppressed workspaces never prompt anyone.
+  const FLEXIBLE_PROMPT_DAYS = 14;
   const isRetroEligible = (() => {
-    if (!request?.requested_date) return false;
+    if (!request) return false;
+    if (publishSuppressedAt) return false;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const reqDate = parseDateString(request.requested_date);
-    reqDate.setHours(0, 0, 0, 0);
-    return reqDate <= today;
+    if (request.requested_date) {
+      const reqDate = parseDateString(request.requested_date);
+      reqDate.setHours(0, 0, 0, 0);
+      return reqDate <= today;
+    }
+    if (!request.created_at) return false;
+    const fallback = new Date(request.created_at);
+    fallback.setDate(fallback.getDate() + FLEXIBLE_PROMPT_DAYS);
+    return fallback <= new Date();
   })();
 
   const retroDismissKey = `retro-dismissed-${requestId}`;
@@ -660,7 +690,7 @@ export default function Workspace() {
   // Step 1: User clicks Yes/Not yet — for "yes", show URL form instead of immediately publishing
   const handlePublishAnswer = (answer: "yes" | "not_yet") => {
     // Gate: check if free-tier user has exhausted their host capacity
-    if (answer === "yes" && !canHostMore) {
+    if (answer === "yes" && isCreator && !canHostMore) {
       toast.error("You've reached your host capacity", {
         description: "Invite friends or upgrade to Pro to publish more collabs.",
         action: {
@@ -686,12 +716,18 @@ export default function Workspace() {
     if (!requestId || !user?.id) return;
     setIsSavingPublish(true);
     try {
-      // Save URLs + flip status to published
+      // Save URLs + flip status to published. Guests and invited
+      // collaborators can't touch `status` directly (RLS freezes it while
+      // approved), so everyone goes through the participant-scoped RPC.
       const updatePayload: Record<string, unknown> = { status: "published" };
       if (publishUrls.creatorUrl.trim()) updatePayload.collab_link = publishUrls.creatorUrl.trim();
       if (publishUrls.requesterUrl.trim()) updatePayload.requester_collab_link = publishUrls.requesterUrl.trim();
 
-      const { error: publishError } = await supabase.from("collab_requests").update(updatePayload as never).eq("id", requestId);
+      const { error: publishError } = await supabase.rpc("mark_workspace_published", {
+        _request_id: requestId,
+        _host_url: publishUrls.creatorUrl.trim() || null,
+        _guest_url: publishUrls.requesterUrl.trim() || null,
+      });
 
       if (publishError) {
         console.error("[Workspace] Failed to update status to published:", publishError);
@@ -742,7 +778,9 @@ export default function Workspace() {
   // Opens the publish dialog from the sidebar. Same capacity gate as the
   // banner flow so paid limits behave identically.
   const openPublishDialog = () => {
-    if (request?.status !== "published" && !canHostMore) {
+    // Host-pays: the capacity gate applies to the host only. A guest is never
+    // blocked by their own plan on a workspace the host already paid for.
+    if (isCreator && request?.status !== "published" && !canHostMore) {
       toast.error("You've reached your host capacity", {
         description: "Invite friends or upgrade to Pro to publish more collabs.",
         action: {
@@ -769,10 +807,17 @@ export default function Workspace() {
         collab_link: publishUrls.creatorUrl.trim() || null,
         requester_collab_link: publishUrls.requesterUrl.trim() || null,
       };
-      const { error } = await supabase
-        .from("collab_requests")
-        .update(updatePayload as never)
-        .eq("id", requestId);
+      // Host can clear links outright; guests go through the participant RPC.
+      const { error } = isCreator
+        ? await supabase
+            .from("collab_requests")
+            .update(updatePayload as never)
+            .eq("id", requestId)
+        : await supabase.rpc("mark_workspace_published", {
+            _request_id: requestId,
+            _host_url: publishUrls.creatorUrl.trim() || null,
+            _guest_url: publishUrls.requesterUrl.trim() || null,
+          });
       if (error) {
         console.error("[Workspace] Failed to update post links:", error);
         toast.error("Couldn't save the links — please try again.");
@@ -803,9 +848,27 @@ export default function Workspace() {
     }
   };
 
+  // Soft dismissal — hides the prompt in this browser only.
   const dismissRetro = () => {
     setRetroDismissed(true);
     localStorage.setItem(retroDismissKey, "true");
+  };
+
+  // Hard suppression — stored on the workspace, so ongoing/feedback rooms
+  // stop prompting every participant on every device.
+  const suppressPublishPrompt = async () => {
+    if (!requestId) return;
+    const { data, error } = await supabase.rpc("set_publish_prompt_response", {
+      _request_id: requestId,
+      _response: "not_publishing",
+    });
+    if (error) {
+      console.error("[Workspace] Failed to suppress publish prompt:", error);
+      toast.error("Couldn't turn off the reminder — please try again.");
+      return;
+    }
+    setPublishSuppressedAt((data as string) ?? new Date().toISOString());
+    toast.success("Got it — we won't ask about publishing here again.");
   };
 
   return (
@@ -895,16 +958,17 @@ export default function Workspace() {
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {/* Recovery button: feedback says "yes" but status never updated */}
-                    {publishAnswer === "yes" && request.status !== "published" && isPro && (
+                    {publishAnswer === "yes" && request.status !== "published" && (
                       <Button
                         size="sm"
                         variant="outline"
                         className="text-success border-success/40 hover:bg-success/10"
                         onClick={async () => {
-                          const { error } = await supabase
-                            .from("collab_requests")
-                            .update({ status: "published" })
-                            .eq("id", requestId);
+                          const { error } = await supabase.rpc("mark_workspace_published", {
+                            _request_id: requestId!,
+                            _host_url: null,
+                            _guest_url: null,
+                          });
                           if (error) {
                             toast.error("Couldn't mark as published — please try again.");
                           } else {
@@ -936,8 +1000,17 @@ export default function Workspace() {
                     <h3 className="font-semibold text-lg">Milestone reached!</h3>
                   </div>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Your collab with <strong>{partnerName}</strong> was scheduled for{" "}
-                    <strong>{formatDate(request.requested_date)}</strong>. How did it go?
+                    {request.requested_date ? (
+                      <>
+                        Your collab with <strong>{partnerName}</strong> was scheduled for{" "}
+                        <strong>{formatDate(request.requested_date)}</strong>. How did it go?
+                      </>
+                    ) : (
+                      <>
+                        This workspace with <strong>{partnerName}</strong> has been open for a couple of
+                        weeks. How did it go?
+                      </>
+                    )}
                   </p>
 
                   <div className="space-y-3">
@@ -954,6 +1027,14 @@ export default function Workspace() {
                               </Button>
                               <Button size="sm" variant="outline" onClick={() => handlePublishAnswer("not_yet")}>
                                 Not yet
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-muted-foreground"
+                                onClick={suppressPublishPrompt}
+                              >
+                                Not publishing / ongoing workspace
                               </Button>
                             </>
                           )}
@@ -1222,17 +1303,17 @@ export default function Workspace() {
                 </Button>
               )}
 
-              {/* Publish action lives here permanently — the dated retro banner
-                  can be dismissed, which used to leave hosts with no way to
-                  mark a collab published or start engagement tracking. */}
-              {isOwnerView && !request.is_project_workspace && !isSolo && request.status === "approved" && (
+              {/* Publish action lives here permanently and is open to every
+                  participant — host, guest and invited collaborators — because
+                  the host often isn't the one who publishes. */}
+              {canMarkPublished && request.status === "approved" && (
                 <Button variant="outline" size="sm" onClick={openPublishDialog} className="w-full">
                   <CheckCircle2 className="w-4 h-4 mr-2" />
                   Mark as Published
                 </Button>
               )}
 
-              {isOwnerView && !request.is_project_workspace && !isSolo && request.status === "published" && (
+              {canMarkPublished && request.status === "published" && (
                 <Button
                   variant="ghost"
                   size="sm"
