@@ -832,7 +832,11 @@ export default function Settings() {
                   }
                 }}
                 aria-invalid={Boolean(errors.collabGuidelines)}
-                aria-describedby="collabGuidelines-help collabGuidelines-count collabGuidelines-error"
+                aria-describedby={
+                  errors.collabGuidelines
+                    ? "collabGuidelines-help collabGuidelines-count collabGuidelines-error"
+                    : "collabGuidelines-help collabGuidelines-count"
+                }
                 placeholder="Share how you like to work with collaborators...
 
 Example:
@@ -844,13 +848,18 @@ Example:
               />
               <div className="flex items-start justify-between gap-4 text-xs text-muted-foreground">
                 <p id="collabGuidelines-help">
-                Markdown supported. These guidelines will be sent to collaborators when you approve their request.
+                  Markdown supported. These guidelines will be sent to collaborators when you approve their request.
                 </p>
                 <span
                   id="collabGuidelines-count"
-                  className={formData.collabGuidelines.length > MAX_COLLAB_GUIDELINES_LENGTH ? "shrink-0 text-destructive" : "shrink-0"}
+                  className={
+                    formData.collabGuidelines.length > MAX_COLLAB_GUIDELINES_LENGTH
+                      ? "shrink-0 text-destructive"
+                      : "shrink-0"
+                  }
                 >
-                  {formData.collabGuidelines.length.toLocaleString()} / {MAX_COLLAB_GUIDELINES_LENGTH.toLocaleString()}
+                  {formData.collabGuidelines.length.toLocaleString()} /{" "}
+                  {MAX_COLLAB_GUIDELINES_LENGTH.toLocaleString()}
                 </span>
               </div>
               {errors.collabGuidelines && (
