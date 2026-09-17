@@ -24,6 +24,7 @@ import {
   parseCollabFormats,
   getCreatorVibe,
   MAX_EXTERNAL_LINKS,
+  MAX_COLLAB_GUIDELINES_LENGTH,
   type CollabStyle,
   type DateMeaning,
   type CollabVibe,
@@ -820,9 +821,18 @@ export default function Settings() {
               <Textarea
                 id="collabGuidelines"
                 value={formData.collabGuidelines}
-                onChange={(e) =>
-                  setFormData({ ...formData, collabGuidelines: e.target.value })
-                }
+                onChange={(e) => {
+                  setFormData({ ...formData, collabGuidelines: e.target.value });
+                  if (errors.collabGuidelines) {
+                    setErrors((current) => {
+                      const next = { ...current };
+                      delete next.collabGuidelines;
+                      return next;
+                    });
+                  }
+                }}
+                aria-invalid={Boolean(errors.collabGuidelines)}
+                aria-describedby="collabGuidelines-help collabGuidelines-count collabGuidelines-error"
                 placeholder="Share how you like to work with collaborators...
 
 Example:
@@ -832,9 +842,22 @@ Example:
 • I'm open to cross-posts and newsletter swaps"
                 rows={6}
               />
-              <p className="text-xs text-muted-foreground">
+              <div className="flex items-start justify-between gap-4 text-xs text-muted-foreground">
+                <p id="collabGuidelines-help">
                 Markdown supported. These guidelines will be sent to collaborators when you approve their request.
-              </p>
+                </p>
+                <span
+                  id="collabGuidelines-count"
+                  className={formData.collabGuidelines.length > MAX_COLLAB_GUIDELINES_LENGTH ? "shrink-0 text-destructive" : "shrink-0"}
+                >
+                  {formData.collabGuidelines.length.toLocaleString()} / {MAX_COLLAB_GUIDELINES_LENGTH.toLocaleString()}
+                </span>
+              </div>
+              {errors.collabGuidelines && (
+                <p id="collabGuidelines-error" className="text-sm text-destructive" role="alert">
+                  {errors.collabGuidelines}
+                </p>
+              )}
             </div>
             
             <Button 
@@ -889,6 +912,7 @@ Example:
                     <SelectItem value="3">3 days before</SelectItem>
                     <SelectItem value="5">5 days before</SelectItem>
                     <SelectItem value="7">7 days before</SelectItem>
+                    <SelectItem value="14">14 days before</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

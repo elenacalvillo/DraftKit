@@ -283,9 +283,13 @@ export const collabStylesSchema = z.array(
 
 export const dateMeaningSchema = z.enum(DATE_MEANING_OPTIONS);
 
+export const MAX_COLLAB_GUIDELINES_LENGTH = 5000;
+
 export const collabGuidelinesSchema = z.string()
   .trim()
-  .max(2000, { message: "Guidelines must be less than 2000 characters" })
+  .max(MAX_COLLAB_GUIDELINES_LENGTH, {
+    message: `Guidelines must be ${MAX_COLLAB_GUIDELINES_LENGTH.toLocaleString()} characters or fewer`,
+  })
   .optional()
   .or(z.literal(''));
 
