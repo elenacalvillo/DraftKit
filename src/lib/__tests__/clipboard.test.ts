@@ -178,3 +178,19 @@ describe("writeDraftToClipboard (DRAFT-001 + DRAFT-002 — no credit charge, dua
     await expect(writeDraftToClipboard("<p>x</p>")).rejects.toThrow("denied");
   });
 });
+
+describe("wrapImagesForExport", () => {
+  it("wraps a bare image in a figure and drops extra attrs", async () => {
+    const { wrapImagesForExport } = await import("../clipboard");
+    const out = wrapImagesForExport('<p>a</p><img class="workspace-inline-image" src="https://x/y.png" alt="pic"><p>b</p>');
+    expect(out).toBe('<p>a</p><figure><img src="https://x/y.png" alt="pic"></figure><p>b</p>');
+  });
+  it("lifts an image-only paragraph into a single figure", async () => {
+    const { wrapImagesForExport } = await import("../clipboard");
+    expect(wrapImagesForExport('<p><img src="https://x/y.png"></p>')).toBe('<figure><img src="https://x/y.png" alt=""></figure>');
+  });
+  it("leaves html without images unchanged", async () => {
+    const { wrapImagesForExport } = await import("../clipboard");
+    expect(wrapImagesForExport("<p>hi</p>")).toBe("<p>hi</p>");
+  });
+});
