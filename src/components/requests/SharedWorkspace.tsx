@@ -36,7 +36,6 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -623,7 +622,7 @@ function SharedWorkspaceInner({
   // the friction does not justify the revenue.
   const handleCopy = useCallback(async () => {
     if (!normalizedSharedContent) return;
-    const html = sanitize(wrapImagesForExport(stripDraftKitInternalAttrs(normalizedSharedContent)));
+    const html = wrapImagesForExport(sanitize(stripDraftKitInternalAttrs(normalizedSharedContent)));
     const plain = htmlToPlainText(html);
     const wordCount = plain.split(/\s+/).filter(Boolean).length;
 
@@ -643,7 +642,7 @@ function SharedWorkspaceInner({
   const handleCopyFallback = useCallback(async () => {
     const html = substackFallbackHtml;
     if (!html) return;
-    const method = await copyDraft(sanitize(html));
+    const method = await copyDraft(html);
     if (method) {
       trackEvent("draft_copied", { request_id: requestId, surface: "substack_fallback", method });
       toast.success("Draft copied with formatting. Paste it into Substack.");
@@ -676,7 +675,7 @@ function SharedWorkspaceInner({
       return;
     }
 
-    const cleaned = sanitize(wrapImagesForExport(stripDraftKitInternalAttrs(normalizedSharedContent)));
+    const cleaned = wrapImagesForExport(sanitize(stripDraftKitInternalAttrs(normalizedSharedContent)));
     const targetUrl = resolveSubstackPublishUrl(creator?.newsletter_url, creator?.substack_url);
 
     // Copy BEFORE opening the tab: an unfocused document can't write to the clipboard.

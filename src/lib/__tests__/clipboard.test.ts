@@ -194,3 +194,45 @@ describe("wrapImagesForExport", () => {
     expect(wrapImagesForExport("<p>hi</p>")).toBe("<p>hi</p>");
   });
 });
+
+describe("copyDraft + wrapHtmlDocument", () => {
+  it("wraps fragments in a full html document once", async () => {
+    const { wrapHtmlDocument } = await import("../clipboard");
+    const out = wrapHtmlDocument("<p>x</p>");
+    expect(out).toBe('<html><head><meta charset="utf-8"></head><body><p>x</p></body></html>');
+    expect(wrapHtmlDocument(out)).toBe(out);
+  });
+
+  it("prefers selection copy and leaves no node behind", async () => {
+    const { copyDraft } = await import("../clipboard");
+    const exec = vi.fn().mockReturnValue(true);
+    (document as unknown as { execCommand: unknown }).execCommand = exec;
+    const before = document.body.childElementCount;
+    expect(await copyDraft("<h2>Hi</h2><p><strong>b</strong></p>")).toBe("selection");
+    expect(exec).toHaveBeenCalledWith("copy");
+    expect(document.body.childElementCount).toBe(before);
+  });
+
+  it("falls back to the async clipboard with a document wrapper", async () => {
+    const { copyDraft } = await import("../clipboard");
+    (document as unknown as { execCommand: unknown }).execCommand = vi.fn().mockReturnValue(false);
+    const blobs: Record<string, Blob> = {};
+    (globalThis as unknown as { ClipboardItem: unknown }).ClipboardItem = class {
+      constructor(d: Record<string, Blob>) { Object.assign(blobs, d); }
+    };
+    Object.defineProperty(navigator, "clipboard", {
+      value: { write: vi.fn().mockResolvedValue(undefined), writeText: vi.fn() },
+      configurable: true, writable: true,
+    });
+    expect(await copyDraft("<p>x</p>")).toBe("async");
+    expect(await blobs["text/html"].text()).toContain("<body><p>x</p></body>");
+  });
+
+  it("returns false when every method fails", async () => {
+    const { copyDraft } = await import("../clipboard");
+    (document as unknown as { execCommand: unknown }).execCommand = vi.fn().mockReturnValue(false);
+    (globalThis as unknown as { ClipboardItem?: unknown }).ClipboardItem = undefined;
+    Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true, writable: true });
+    expect(await copyDraft("<p>x</p>")).toBe(false);
+  });
+});
