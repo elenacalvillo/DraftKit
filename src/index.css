@@ -419,3 +419,33 @@
 .workspace-prose-public table {
   margin: 1.25em 0;
 }
+
+/* Sonner close button: sized and colored to match the app's toast banners */
+[data-sonner-toast] [data-close-button] {
+  top: 6px;
+  right: 6px;
+  left: auto;
+  transform: none;
+  height: 28px;
+  width: 28px;
+  border-radius: 9999px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--muted) / 0.45);
+  color: hsl(var(--foreground) / 0.75);
+  opacity: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+[data-sonner-toast] [data-close-button]:hover {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+[data-sonner-toast] [data-close-button] svg {
+  height: 14px;
+  width: 14px;
+}
+[data-sonner-toast]:has([data-close-button]) [data-content] {
+  padding-right: 34px;
+}
