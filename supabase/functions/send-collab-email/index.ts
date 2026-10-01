@@ -260,7 +260,25 @@ serve(async (req: Request): Promise<Response> => {
       const creatorUserId = creator?.user_id;
       const requesterUserId = request.requester_user_id;
 
-      if (requiredRole === "creator" && creatorUserId !== userId) {
+      // Chapter writers and invited collaborators are neither host nor guest
+      // on the record. Workspace-level notifications accept any participant
+      // that passes the workspace access gate.
+      const PARTICIPANT_TYPES = [
+        "workspace_updated_by_creator",
+        "workspace_updated_by_guest",
+        "new_message",
+        "new_message_from_guest",
+      ];
+      let isParticipant = false;
+      if (PARTICIPANT_TYPES.includes(type)) {
+        const { data: access } = await supabase.rpc("has_workspace_access", {
+          _user_id: userId,
+          _request_id: requestId,
+        });
+        isParticipant = access === true;
+      }
+
+      if (!isParticipant && requiredRole === "creator" && creatorUserId !== userId) {
         console.error(`Unauthorized: user ${userId} is not the creator (${creatorUserId}) for request ${requestId}`);
         return new Response(
           JSON.stringify({ error: "You are not authorized to send this email" }),
@@ -268,7 +286,7 @@ serve(async (req: Request): Promise<Response> => {
         );
       }
 
-      if (requiredRole === "requester" && requesterUserId !== userId) {
+      if (!isParticipant && requiredRole === "requester" && requesterUserId !== userId) {
         console.error(`Unauthorized: user ${userId} is not the requester (${requesterUserId}) for request ${requestId}`);
         return new Response(
           JSON.stringify({ error: "You are not authorized to send this email" }),
