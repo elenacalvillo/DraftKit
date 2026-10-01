@@ -47,13 +47,7 @@ import { exportWorkspaceHtmlToDocx } from "@/lib/export-draft";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { parseSaveError } from "@/lib/save-workspace-errors";
 import { usePro } from "@/hooks/usePro";
-import {
-  htmlToPlainText,
-  isRichClipboardAvailable,
-  stripDraftKitInternalAttrs,
-  writeDraftToClipboard,
-  wrapImagesForExport,
-} from "@/lib/clipboard";
+import { copyDraft, htmlToPlainText, stripDraftKitInternalAttrs, wrapImagesForExport } from "@/lib/clipboard";
 import { stripBase64ImageTags } from "@/lib/workspace-images";
 import { normalizeLegacyMarkdownContent } from "@/lib/markdown-paste";
 import { PushToSubstackUpgradeModal } from "@/components/subscription/PushToSubstackUpgradeModal";
@@ -274,7 +268,6 @@ function SharedWorkspaceInner({
   //   draft pre-selected so the user can still complete the export.
   const [showSubstackUpgrade, setShowSubstackUpgrade] = useState(false);
   const [substackFallbackHtml, setSubstackFallbackHtml] = useState<string | null>(null);
-  const [showFallbackMarkup, setShowFallbackMarkup] = useState(false);
   const fallbackPreviewRef = useRef<HTMLDivElement | null>(null);
   // Save-state machine drives the "Last saved" pill + auto-save loop. Manual
   // and auto saves both feed it so users always see the current truth.
@@ -733,7 +726,7 @@ function SharedWorkspaceInner({
       window.setTimeout(() => window.addEventListener("focus", dismissOnReturn), 500);
     }
 
-    trackEvent("push_to_substack_success", { request_id: requestId });
+    trackEvent("push_to_substack_success", { request_id: requestId, method });
   }, [normalizedSharedContent, isPro, requestId, trackEvent, creator?.newsletter_url, creator?.substack_url]);
 
   const hasContent = !!normalizedSharedContent.trim();
@@ -1061,14 +1054,11 @@ function SharedWorkspaceInner({
       {/* Manual-copy fallback for Push to Substack. We render the formatted
           draft (not raw markup) so a Select-all + Cmd+C carries real
           formatting into Substack. Raw markup stays available behind a
-          toggle for anyone who wants it. */}
+          formatted only, never raw markup. */}
       <Dialog
         open={substackFallbackHtml !== null}
         onOpenChange={(open) => {
-          if (!open) {
-            setSubstackFallbackHtml(null);
-            setShowFallbackMarkup(false);
-          }
+          if (!open) setSubstackFallbackHtml(null);
         }}
       >
         <DialogContent className="sm:max-w-[640px]">
@@ -1080,29 +1070,13 @@ function SharedWorkspaceInner({
             </DialogDescription>
           </DialogHeader>
 
-          {showFallbackMarkup ? (
-            <Textarea
-              readOnly
-              value={substackFallbackHtml ?? ""}
-              className="min-h-[240px] font-mono text-xs"
-              onFocus={(e) => e.currentTarget.select()}
-            />
-          ) : (
-            <div
-              ref={fallbackPreviewRef}
-              tabIndex={0}
-              className="prose prose-sm dark:prose-invert max-h-[320px] max-w-none overflow-y-auto rounded-lg border border-border/60 bg-background p-4"
-              dangerouslySetInnerHTML={{ __html: sanitize(substackFallbackHtml ?? "") }}
-            />
-          )}
+          <div
+            ref={fallbackPreviewRef}
+            tabIndex={0}
+            className="prose prose-sm dark:prose-invert max-h-[320px] max-w-none overflow-y-auto rounded-lg border border-border/60 bg-background p-4"
+            dangerouslySetInnerHTML={{ __html: sanitize(substackFallbackHtml ?? "") }}
+          />
 
-          <button
-            type="button"
-            className="self-start text-xs font-medium text-muted-foreground hover:text-foreground"
-            onClick={() => setShowFallbackMarkup((v) => !v)}
-          >
-            {showFallbackMarkup ? "Show formatted draft" : "Show markup instead"}
-          </button>
 
           <DialogFooter>
             <Button variant="ghost" onClick={() => setSubstackFallbackHtml(null)}>
