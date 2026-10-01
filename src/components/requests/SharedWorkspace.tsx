@@ -630,43 +630,33 @@ function SharedWorkspaceInner({
   // the friction does not justify the revenue.
   const handleCopy = useCallback(async () => {
     if (!normalizedSharedContent) return;
-    const html = wrapImagesForExport(normalizedSharedContent);
+    const html = sanitize(wrapImagesForExport(stripDraftKitInternalAttrs(normalizedSharedContent)));
     const plain = htmlToPlainText(html);
     const wordCount = plain.split(/\s+/).filter(Boolean).length;
 
-    try {
-      const wrote = await writeDraftToClipboard(html);
-      if (!wrote) {
-        // Browser doesn't expose any clipboard API at all — extremely rare,
-        // but we don't want to silently swallow the click.
-        throw new Error("clipboard_unavailable");
-      }
-      toast.success("Draft copied — you just saved ~30 minutes.");
-      // Plain copy/accept telemetry — neither event is tied to a credit
-      // charge (see DRAFT-001 above). They measure how often users actually
-      // ship a draft, which informs roadmap, not billing.
-      trackEvent("draft_copied", { request_id: requestId, surface: "workspace_copy", word_count: wordCount });
-      trackEvent("draft_accepted", { request_id: requestId, surface: "workspace_copy", word_count: wordCount });
-    } catch {
+    const method = await copyDraft(html);
+    if (!method) {
+      trackEvent("draft_copy_failed", { request_id: requestId, surface: "workspace_copy" });
       toast.error("Couldn't copy. Try selecting and copying manually.");
+      return;
     }
+    toast.success("Draft copied — you just saved ~30 minutes.");
+    trackEvent("draft_copied", { request_id: requestId, surface: "workspace_copy", word_count: wordCount, method });
+    trackEvent("draft_accepted", { request_id: requestId, surface: "workspace_copy", word_count: wordCount });
   }, [normalizedSharedContent, requestId, trackEvent]);
 
-  // Fallback dialog copy: try the rich clipboard again (this click is a fresh
-  // user gesture with focus on our document), then fall back to selecting the
-  // rendered preview so Cmd+C carries formatting.
+  // Fallback dialog copy: fresh user gesture, so retry the same copy path,
+  // then fall back to selecting the rendered preview for a manual Cmd+C.
   const handleCopyFallback = useCallback(async () => {
     const html = substackFallbackHtml;
     if (!html) return;
-    try {
-      const wrote = await writeDraftToClipboard(html);
-      if (wrote) {
-        toast.success("Draft copied with formatting. Paste it into Substack.");
-        return;
-      }
-    } catch {
-      /* fall through to manual selection */
+    const method = await copyDraft(sanitize(html));
+    if (method) {
+      trackEvent("draft_copied", { request_id: requestId, surface: "substack_fallback", method });
+      toast.success("Draft copied with formatting. Paste it into Substack.");
+      return;
     }
+    trackEvent("draft_copy_failed", { request_id: requestId, surface: "substack_fallback" });
 
     const node = fallbackPreviewRef.current;
     if (node && typeof window.getSelection === "function") {
@@ -680,66 +670,31 @@ function SharedWorkspaceInner({
       return;
     }
     toast.error("Couldn't copy. Select the draft above and copy it manually.");
-  }, [substackFallbackHtml]);
+  }, [substackFallbackHtml, requestId, trackEvent]);
 
   // Push to Substack handler — DRAFT-002 (Pro) and DRAFT-003 (Free gate).
-  //
-  // Free users see the button but get the upgrade modal on click; this is a
-  // deliberate funnel design — every blocked click is a high-intent signal.
-  // Pro users get the full one-click flow: clean HTML → clipboard → new
-  // Substack tab → persistent toast prompting them to paste.
+  // Free users get the upgrade modal; Pro users get copy → new tab → toast.
   const handlePushToSubstack = useCallback(async () => {
     if (!normalizedSharedContent) return;
 
     if (!isPro) {
-      // PRIMARY conversion signal — fire BEFORE showing the modal so we
-      // capture every blocked click even if the modal mount errors.
       trackEvent("push_to_substack_blocked", { request_id: requestId });
       setShowSubstackUpgrade(true);
       return;
     }
 
-    // Strip DraftKit-internal annotations (data-comment / data-author) so
-    // they don't render as junk attrs in the Substack post.
-    const cleaned = wrapImagesForExport(stripDraftKitInternalAttrs(normalizedSharedContent));
-
-    // Resolve the user's own publication composer URL. Priority:
-    //   newsletter_url (required, validated) → substack_url (optional) →
-    //   generic substack.com/publish fallback. No new DB column or input
-    //   modal — both fields already live on the creator profile.
+    const cleaned = sanitize(wrapImagesForExport(stripDraftKitInternalAttrs(normalizedSharedContent)));
     const targetUrl = resolveSubstackPublishUrl(creator?.newsletter_url, creator?.substack_url);
 
-    // If the rich Clipboard API isn't available (non-HTTPS, certain
-    // browsers) bail to the manual-copy fallback dialog rather than
-    // silently failing. We surface the cleaned HTML so the user gets the
-    // Substack-ready content, not the workspace internal version.
-    if (!isRichClipboardAvailable()) {
-      setSubstackFallbackHtml(cleaned);
-      return;
+    // Copy BEFORE opening the tab: an unfocused document can't write to the clipboard.
+    let method = await copyDraft(cleaned);
+    if (!method) {
+      window.focus();
+      method = await copyDraft(cleaned);
     }
 
-    // ORDER MATTERS: copy BEFORE opening the tab. Opening a new tab moves
-    // focus off this document, and browsers reject clipboard writes from an
-    // unfocused document ("Document is not focused"), which silently killed
-    // the rich HTML payload and left Substack empty.
-    let wrote = false;
-    try {
-      wrote = await writeDraftToClipboard(cleaned);
-    } catch (err) {
-      // One retry after pulling focus back — covers the case where the user
-      // clicked through from another window/tab.
-      try {
-        window.focus();
-        wrote = await writeDraftToClipboard(cleaned);
-      } catch (retryErr) {
-        console.error("Push to Substack clipboard write failed:", err, retryErr);
-        wrote = false;
-      }
-    }
-
-    if (!wrote) {
-      // No Ghost Copy: never claim success. Hand the user the formatted
-      // fallback so they can still ship the post.
+    if (!method) {
+      trackEvent("draft_copy_failed", { request_id: requestId, surface: "push_to_substack" });
       setSubstackFallbackHtml(cleaned);
       return;
     }
