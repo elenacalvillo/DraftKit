@@ -489,23 +489,25 @@ function SharedWorkspaceInner({
           toast.success("Draft saved & synced");
           if (notifyPartner && partnerName) {
             const emailType = isCreator ? "workspace_updated_by_creator" : "workspace_updated_by_guest";
+            const firstName = partnerName.split(" ")[0];
             try {
               const {
                 data: { session },
               } = await supabase.auth.getSession();
-              if (session) {
-                supabase.functions.invoke("send-collab-email", {
-                  body: {
-                    type: emailType,
-                    requestId,
-                    senderEmail: session.user?.email ?? undefined,
-                  },
-                  headers: { Authorization: `Bearer ${session.access_token}` },
-                });
-
-              }
-            } catch {
-              /* fire-and-forget */
+              if (!session) throw new Error("No session");
+              const { error: notifyError } = await supabase.functions.invoke("send-collab-email", {
+                body: {
+                  type: emailType,
+                  requestId,
+                  senderEmail: session.user?.email ?? undefined,
+                },
+                headers: { Authorization: `Bearer ${session.access_token}` },
+              });
+              if (notifyError) throw notifyError;
+              toast.success(`${firstName} has been notified`);
+            } catch (err) {
+              console.error("Notify failed:", err);
+              toast.error(`Saved, but we couldn't notify ${firstName}. Try again.`);
             }
           }
           setNotifyPartner(false);
