@@ -96,3 +96,33 @@ export async function writeDraftToClipboard(html: string): Promise<boolean> {
 
   return false;
 }
+
+/**
+ * Wrap each bare `<img>` in its own `<figure>` for export so rich-text
+ * targets (Substack) treat it as a single image block. Only `src` and `alt`
+ * survive. The stored draft is never modified.
+ */
+export function wrapImagesForExport(html: string): string {
+  if (!html || typeof DOMParser === "undefined" || !/<img/i.test(html)) return html;
+  const doc = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
+  doc.body.querySelectorAll("img").forEach((img) => {
+    const clean = doc.createElement("img");
+    const src = img.getAttribute("src");
+    if (src) clean.setAttribute("src", src);
+    clean.setAttribute("alt", img.getAttribute("alt") ?? "");
+    const parent = img.parentElement;
+    if (parent && parent.tagName === "FIGURE") {
+      img.replaceWith(clean);
+      return;
+    }
+    const figure = doc.createElement("figure");
+    figure.appendChild(clean);
+    // Lift out of a paragraph that holds only this image.
+    if (parent && parent.tagName === "P" && parent.childNodes.length === 1) {
+      parent.replaceWith(figure);
+    } else {
+      img.replaceWith(figure);
+    }
+  });
+  return doc.body.innerHTML;
+}

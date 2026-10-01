@@ -52,6 +52,7 @@ import {
   isRichClipboardAvailable,
   stripDraftKitInternalAttrs,
   writeDraftToClipboard,
+  wrapImagesForExport,
 } from "@/lib/clipboard";
 import { stripBase64ImageTags } from "@/lib/workspace-images";
 import { normalizeLegacyMarkdownContent } from "@/lib/markdown-paste";
@@ -629,7 +630,7 @@ function SharedWorkspaceInner({
   // the friction does not justify the revenue.
   const handleCopy = useCallback(async () => {
     if (!normalizedSharedContent) return;
-    const html = normalizedSharedContent;
+    const html = wrapImagesForExport(normalizedSharedContent);
     const plain = htmlToPlainText(html);
     const wordCount = plain.split(/\s+/).filter(Boolean).length;
 
@@ -700,7 +701,7 @@ function SharedWorkspaceInner({
 
     // Strip DraftKit-internal annotations (data-comment / data-author) so
     // they don't render as junk attrs in the Substack post.
-    const cleaned = stripDraftKitInternalAttrs(normalizedSharedContent);
+    const cleaned = wrapImagesForExport(stripDraftKitInternalAttrs(normalizedSharedContent));
 
     // Resolve the user's own publication composer URL. Priority:
     //   newsletter_url (required, validated) → substack_url (optional) →
@@ -745,20 +746,36 @@ function SharedWorkspaceInner({
 
     const popup = window.open(targetUrl, "_blank", "noopener,noreferrer");
 
+    const imageTip = /<img/i.test(cleaned)
+      ? " If an empty image box appears under a picture, delete it."
+      : "";
+    const toastId = "push-to-substack";
+    const dismissOnReturn = () => {
+      toast.dismiss(toastId);
+      window.removeEventListener("focus", dismissOnReturn);
+    };
+
     if (!popup || popup.closed) {
-      // Pop-up blocked. Clipboard succeeded though, so give the user a
-      // clickable toast to open Substack themselves.
-      toast.success("Draft copied! Click to open Substack and paste (Cmd+V / Ctrl+V).", {
-        duration: Infinity,
+      // Pop-up blocked. Clipboard succeeded, so offer a button to open Substack.
+      toast.success("Draft copied. Open Substack, click into the blank post, and press Cmd+V (Ctrl+V).", {
+        id: toastId,
+        description: imageTip.trim() || undefined,
+        duration: 30000,
+        closeButton: true,
         action: {
           label: "Open Substack",
           onClick: () => window.open(targetUrl, "_blank", "noopener,noreferrer"),
         },
       });
     } else {
-      toast.success("Draft copied! Switch to the new tab and press Cmd+V (Ctrl+V on Windows) to paste.", {
-        duration: Infinity,
+      toast.success("Draft copied. Substack opened a blank post: click into it and press Cmd+V (Ctrl+V).", {
+        id: toastId,
+        description: imageTip.trim() || undefined,
+        duration: 20000,
+        closeButton: true,
       });
+      // Close the notice once the user comes back to DraftKit.
+      window.setTimeout(() => window.addEventListener("focus", dismissOnReturn), 500);
     }
 
     trackEvent("push_to_substack_success", { request_id: requestId });
@@ -818,6 +835,7 @@ function SharedWorkspaceInner({
                 size="sm"
                 className="h-8"
                 onClick={handlePushToSubstack}
+                title="Copies your draft and opens a blank Substack post. Paste it there."
                 data-testid="push-to-substack"
               >
                 <Send className="w-3.5 h-3.5 mr-1.5" />
