@@ -203,14 +203,20 @@ describe("copyDraft + wrapHtmlDocument", () => {
     expect(wrapHtmlDocument(out)).toBe(out);
   });
 
-  it("prefers selection copy and leaves no node behind", async () => {
+  it("prefers native copy with html and plain slots", async () => {
     const { copyDraft } = await import("../clipboard");
-    const exec = vi.fn().mockReturnValue(true);
+    const data: Record<string, string> = {};
+    const exec = vi.fn(() => {
+      const ev = new Event("copy", { cancelable: true }) as ClipboardEvent;
+      Object.defineProperty(ev, "clipboardData", { value: { setData: (k: string, v: string) => { data[k] = v; } } });
+      document.dispatchEvent(ev);
+      return true;
+    });
     (document as unknown as { execCommand: unknown }).execCommand = exec;
-    const before = document.body.childElementCount;
     expect(await copyDraft("<h2>Hi</h2><p><strong>b</strong></p>")).toBe("selection");
     expect(exec).toHaveBeenCalledWith("copy");
-    expect(document.body.childElementCount).toBe(before);
+    expect(data["text/html"]).toContain("<body><h2>Hi</h2>");
+    expect(data["text/plain"]).toBe("Hib");
   });
 
   it("falls back to the async clipboard with a document wrapper", async () => {

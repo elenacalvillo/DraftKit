@@ -104,37 +104,31 @@ export function wrapHtmlDocument(html: string): string {
 }
 
 /**
- * Copy rendered HTML via a real DOM selection + execCommand("copy"). This is
- * the same path as a manual Select all + Cmd+C, which rich editors read
- * reliably. Must run synchronously inside the click. Caller sanitizes html.
+ * Synchronous copy via execCommand("copy") with a copy-event handler that
+ * sets text/html (full document) and text/plain directly. Same native copy
+ * path as Cmd+C, without the app's computed styles leaking into the paste.
+ * Must run inside the click. Caller sanitizes html.
  */
 export function copyHtmlViaSelection(html: string): boolean {
   if (typeof document === "undefined" || typeof document.execCommand !== "function") return false;
-  const sel = window.getSelection?.();
-  if (!sel) return false;
-  const host = document.createElement("div");
-  host.setAttribute("contenteditable", "true");
-  host.setAttribute("aria-hidden", "true");
-  host.className = "fixed -left-[9999px] top-0 opacity-0 pointer-events-none";
-  host.innerHTML = html;
-  document.body.appendChild(host);
-  const prevRanges: Range[] = [];
-  for (let i = 0; i < sel.rangeCount; i++) prevRanges.push(sel.getRangeAt(i));
+  let handled = false;
+  const onCopy = (e: ClipboardEvent) => {
+    if (!e.clipboardData) return;
+    e.clipboardData.setData("text/html", wrapHtmlDocument(html));
+    e.clipboardData.setData("text/plain", htmlToPlainText(html));
+    e.preventDefault();
+    handled = true;
+  };
+  document.addEventListener("copy", onCopy, true);
   let ok = false;
   try {
-    const range = document.createRange();
-    range.selectNodeContents(host);
-    sel.removeAllRanges();
-    sel.addRange(range);
     ok = document.execCommand("copy");
   } catch {
     ok = false;
   } finally {
-    sel.removeAllRanges();
-    prevRanges.forEach((r) => sel.addRange(r));
-    host.remove();
+    document.removeEventListener("copy", onCopy, true);
   }
-  return ok;
+  return ok && handled;
 }
 
 export type CopyMethod = "selection" | "async" | false;
