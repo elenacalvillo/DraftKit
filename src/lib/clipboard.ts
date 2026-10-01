@@ -82,7 +82,7 @@ export async function writeDraftToClipboard(html: string): Promise<boolean> {
 
   if (isRichClipboardAvailable()) {
     const item = new ClipboardItem({
-      "text/html": new Blob([html], { type: "text/html" }),
+      "text/html": new Blob([wrapHtmlDocument(html)], { type: "text/html" }),
       "text/plain": new Blob([plain], { type: "text/plain" }),
     });
     await navigator.clipboard.write([item]);
@@ -94,6 +94,59 @@ export async function writeDraftToClipboard(html: string): Promise<boolean> {
     return true;
   }
 
+  return false;
+}
+
+/** Full HTML document wrapper so paste targets parse the payload as rich text. */
+export function wrapHtmlDocument(html: string): string {
+  if (/^\s*<html[\s>]/i.test(html)) return html;
+  return `<html><head><meta charset="utf-8"></head><body>${html}</body></html>`;
+}
+
+/**
+ * Copy rendered HTML via a real DOM selection + execCommand("copy"). This is
+ * the same path as a manual Select all + Cmd+C, which rich editors read
+ * reliably. Must run synchronously inside the click. Caller sanitizes html.
+ */
+export function copyHtmlViaSelection(html: string): boolean {
+  if (typeof document === "undefined" || typeof document.execCommand !== "function") return false;
+  const sel = window.getSelection?.();
+  if (!sel) return false;
+  const host = document.createElement("div");
+  host.setAttribute("contenteditable", "true");
+  host.setAttribute("aria-hidden", "true");
+  host.className = "fixed -left-[9999px] top-0 opacity-0 pointer-events-none";
+  host.innerHTML = html;
+  document.body.appendChild(host);
+  const prevRanges: Range[] = [];
+  for (let i = 0; i < sel.rangeCount; i++) prevRanges.push(sel.getRangeAt(i));
+  let ok = false;
+  try {
+    const range = document.createRange();
+    range.selectNodeContents(host);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    ok = document.execCommand("copy");
+  } catch {
+    ok = false;
+  } finally {
+    sel.removeAllRanges();
+    prevRanges.forEach((r) => sel.addRange(r));
+    host.remove();
+  }
+  return ok;
+}
+
+export type CopyMethod = "selection" | "async" | false;
+
+/** Preferred export copy: selection copy first, async clipboard as backup. */
+export async function copyDraft(html: string): Promise<CopyMethod> {
+  if (copyHtmlViaSelection(html)) return "selection";
+  try {
+    if (await writeDraftToClipboard(html)) return "async";
+  } catch {
+    /* reported as failure */
+  }
   return false;
 }
 
