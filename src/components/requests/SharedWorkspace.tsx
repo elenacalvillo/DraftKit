@@ -36,7 +36,6 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -47,13 +46,7 @@ import { exportWorkspaceHtmlToDocx } from "@/lib/export-draft";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { parseSaveError } from "@/lib/save-workspace-errors";
 import { usePro } from "@/hooks/usePro";
-import {
-  htmlToPlainText,
-  isRichClipboardAvailable,
-  stripDraftKitInternalAttrs,
-  writeDraftToClipboard,
-  wrapImagesForExport,
-} from "@/lib/clipboard";
+import { copyDraft, htmlToPlainText, stripDraftKitInternalAttrs, wrapImagesForExport } from "@/lib/clipboard";
 import { stripBase64ImageTags } from "@/lib/workspace-images";
 import { normalizeLegacyMarkdownContent } from "@/lib/markdown-paste";
 import { PushToSubstackUpgradeModal } from "@/components/subscription/PushToSubstackUpgradeModal";
@@ -274,7 +267,6 @@ function SharedWorkspaceInner({
   //   draft pre-selected so the user can still complete the export.
   const [showSubstackUpgrade, setShowSubstackUpgrade] = useState(false);
   const [substackFallbackHtml, setSubstackFallbackHtml] = useState<string | null>(null);
-  const [showFallbackMarkup, setShowFallbackMarkup] = useState(false);
   const fallbackPreviewRef = useRef<HTMLDivElement | null>(null);
   // Save-state machine drives the "Last saved" pill + auto-save loop. Manual
   // and auto saves both feed it so users always see the current truth.
@@ -630,43 +622,33 @@ function SharedWorkspaceInner({
   // the friction does not justify the revenue.
   const handleCopy = useCallback(async () => {
     if (!normalizedSharedContent) return;
-    const html = wrapImagesForExport(normalizedSharedContent);
+    const html = wrapImagesForExport(sanitize(stripDraftKitInternalAttrs(normalizedSharedContent)));
     const plain = htmlToPlainText(html);
     const wordCount = plain.split(/\s+/).filter(Boolean).length;
 
-    try {
-      const wrote = await writeDraftToClipboard(html);
-      if (!wrote) {
-        // Browser doesn't expose any clipboard API at all — extremely rare,
-        // but we don't want to silently swallow the click.
-        throw new Error("clipboard_unavailable");
-      }
-      toast.success("Draft copied — you just saved ~30 minutes.");
-      // Plain copy/accept telemetry — neither event is tied to a credit
-      // charge (see DRAFT-001 above). They measure how often users actually
-      // ship a draft, which informs roadmap, not billing.
-      trackEvent("draft_copied", { request_id: requestId, surface: "workspace_copy", word_count: wordCount });
-      trackEvent("draft_accepted", { request_id: requestId, surface: "workspace_copy", word_count: wordCount });
-    } catch {
+    const method = await copyDraft(html);
+    if (!method) {
+      trackEvent("draft_copy_failed", { request_id: requestId, surface: "workspace_copy" });
       toast.error("Couldn't copy. Try selecting and copying manually.");
+      return;
     }
+    toast.success("Draft copied — you just saved ~30 minutes.");
+    trackEvent("draft_copied", { request_id: requestId, surface: "workspace_copy", word_count: wordCount, method });
+    trackEvent("draft_accepted", { request_id: requestId, surface: "workspace_copy", word_count: wordCount });
   }, [normalizedSharedContent, requestId, trackEvent]);
 
-  // Fallback dialog copy: try the rich clipboard again (this click is a fresh
-  // user gesture with focus on our document), then fall back to selecting the
-  // rendered preview so Cmd+C carries formatting.
+  // Fallback dialog copy: fresh user gesture, so retry the same copy path,
+  // then fall back to selecting the rendered preview for a manual Cmd+C.
   const handleCopyFallback = useCallback(async () => {
     const html = substackFallbackHtml;
     if (!html) return;
-    try {
-      const wrote = await writeDraftToClipboard(html);
-      if (wrote) {
-        toast.success("Draft copied with formatting. Paste it into Substack.");
-        return;
-      }
-    } catch {
-      /* fall through to manual selection */
+    const method = await copyDraft(html);
+    if (method) {
+      trackEvent("draft_copied", { request_id: requestId, surface: "substack_fallback", method });
+      toast.success("Draft copied with formatting. Paste it into Substack.");
+      return;
     }
+    trackEvent("draft_copy_failed", { request_id: requestId, surface: "substack_fallback" });
 
     const node = fallbackPreviewRef.current;
     if (node && typeof window.getSelection === "function") {
@@ -680,66 +662,31 @@ function SharedWorkspaceInner({
       return;
     }
     toast.error("Couldn't copy. Select the draft above and copy it manually.");
-  }, [substackFallbackHtml]);
+  }, [substackFallbackHtml, requestId, trackEvent]);
 
   // Push to Substack handler — DRAFT-002 (Pro) and DRAFT-003 (Free gate).
-  //
-  // Free users see the button but get the upgrade modal on click; this is a
-  // deliberate funnel design — every blocked click is a high-intent signal.
-  // Pro users get the full one-click flow: clean HTML → clipboard → new
-  // Substack tab → persistent toast prompting them to paste.
+  // Free users get the upgrade modal; Pro users get copy → new tab → toast.
   const handlePushToSubstack = useCallback(async () => {
     if (!normalizedSharedContent) return;
 
     if (!isPro) {
-      // PRIMARY conversion signal — fire BEFORE showing the modal so we
-      // capture every blocked click even if the modal mount errors.
       trackEvent("push_to_substack_blocked", { request_id: requestId });
       setShowSubstackUpgrade(true);
       return;
     }
 
-    // Strip DraftKit-internal annotations (data-comment / data-author) so
-    // they don't render as junk attrs in the Substack post.
-    const cleaned = wrapImagesForExport(stripDraftKitInternalAttrs(normalizedSharedContent));
-
-    // Resolve the user's own publication composer URL. Priority:
-    //   newsletter_url (required, validated) → substack_url (optional) →
-    //   generic substack.com/publish fallback. No new DB column or input
-    //   modal — both fields already live on the creator profile.
+    const cleaned = wrapImagesForExport(sanitize(stripDraftKitInternalAttrs(normalizedSharedContent)));
     const targetUrl = resolveSubstackPublishUrl(creator?.newsletter_url, creator?.substack_url);
 
-    // If the rich Clipboard API isn't available (non-HTTPS, certain
-    // browsers) bail to the manual-copy fallback dialog rather than
-    // silently failing. We surface the cleaned HTML so the user gets the
-    // Substack-ready content, not the workspace internal version.
-    if (!isRichClipboardAvailable()) {
-      setSubstackFallbackHtml(cleaned);
-      return;
+    // Copy BEFORE opening the tab: an unfocused document can't write to the clipboard.
+    let method = await copyDraft(cleaned);
+    if (!method) {
+      window.focus();
+      method = await copyDraft(cleaned);
     }
 
-    // ORDER MATTERS: copy BEFORE opening the tab. Opening a new tab moves
-    // focus off this document, and browsers reject clipboard writes from an
-    // unfocused document ("Document is not focused"), which silently killed
-    // the rich HTML payload and left Substack empty.
-    let wrote = false;
-    try {
-      wrote = await writeDraftToClipboard(cleaned);
-    } catch (err) {
-      // One retry after pulling focus back — covers the case where the user
-      // clicked through from another window/tab.
-      try {
-        window.focus();
-        wrote = await writeDraftToClipboard(cleaned);
-      } catch (retryErr) {
-        console.error("Push to Substack clipboard write failed:", err, retryErr);
-        wrote = false;
-      }
-    }
-
-    if (!wrote) {
-      // No Ghost Copy: never claim success. Hand the user the formatted
-      // fallback so they can still ship the post.
+    if (!method) {
+      trackEvent("draft_copy_failed", { request_id: requestId, surface: "push_to_substack" });
       setSubstackFallbackHtml(cleaned);
       return;
     }
@@ -778,7 +725,7 @@ function SharedWorkspaceInner({
       window.setTimeout(() => window.addEventListener("focus", dismissOnReturn), 500);
     }
 
-    trackEvent("push_to_substack_success", { request_id: requestId });
+    trackEvent("push_to_substack_success", { request_id: requestId, method });
   }, [normalizedSharedContent, isPro, requestId, trackEvent, creator?.newsletter_url, creator?.substack_url]);
 
   const hasContent = !!normalizedSharedContent.trim();
@@ -1106,14 +1053,11 @@ function SharedWorkspaceInner({
       {/* Manual-copy fallback for Push to Substack. We render the formatted
           draft (not raw markup) so a Select-all + Cmd+C carries real
           formatting into Substack. Raw markup stays available behind a
-          toggle for anyone who wants it. */}
+          formatted only, never raw markup. */}
       <Dialog
         open={substackFallbackHtml !== null}
         onOpenChange={(open) => {
-          if (!open) {
-            setSubstackFallbackHtml(null);
-            setShowFallbackMarkup(false);
-          }
+          if (!open) setSubstackFallbackHtml(null);
         }}
       >
         <DialogContent className="sm:max-w-[640px]">
@@ -1125,29 +1069,13 @@ function SharedWorkspaceInner({
             </DialogDescription>
           </DialogHeader>
 
-          {showFallbackMarkup ? (
-            <Textarea
-              readOnly
-              value={substackFallbackHtml ?? ""}
-              className="min-h-[240px] font-mono text-xs"
-              onFocus={(e) => e.currentTarget.select()}
-            />
-          ) : (
-            <div
-              ref={fallbackPreviewRef}
-              tabIndex={0}
-              className="prose prose-sm dark:prose-invert max-h-[320px] max-w-none overflow-y-auto rounded-lg border border-border/60 bg-background p-4"
-              dangerouslySetInnerHTML={{ __html: sanitize(substackFallbackHtml ?? "") }}
-            />
-          )}
+          <div
+            ref={fallbackPreviewRef}
+            tabIndex={0}
+            className="prose prose-sm dark:prose-invert max-h-[320px] max-w-none overflow-y-auto rounded-lg border border-border/60 bg-background p-4"
+            dangerouslySetInnerHTML={{ __html: sanitize(substackFallbackHtml ?? "") }}
+          />
 
-          <button
-            type="button"
-            className="self-start text-xs font-medium text-muted-foreground hover:text-foreground"
-            onClick={() => setShowFallbackMarkup((v) => !v)}
-          >
-            {showFallbackMarkup ? "Show formatted draft" : "Show markup instead"}
-          </button>
 
           <DialogFooter>
             <Button variant="ghost" onClick={() => setSubstackFallbackHtml(null)}>

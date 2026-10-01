@@ -82,7 +82,7 @@ export async function writeDraftToClipboard(html: string): Promise<boolean> {
 
   if (isRichClipboardAvailable()) {
     const item = new ClipboardItem({
-      "text/html": new Blob([html], { type: "text/html" }),
+      "text/html": new Blob([wrapHtmlDocument(html)], { type: "text/html" }),
       "text/plain": new Blob([plain], { type: "text/plain" }),
     });
     await navigator.clipboard.write([item]);
@@ -94,6 +94,53 @@ export async function writeDraftToClipboard(html: string): Promise<boolean> {
     return true;
   }
 
+  return false;
+}
+
+/** Full HTML document wrapper so paste targets parse the payload as rich text. */
+export function wrapHtmlDocument(html: string): string {
+  if (/^\s*<html[\s>]/i.test(html)) return html;
+  return `<html><head><meta charset="utf-8"></head><body>${html}</body></html>`;
+}
+
+/**
+ * Synchronous copy via execCommand("copy") with a copy-event handler that
+ * sets text/html (full document) and text/plain directly. Same native copy
+ * path as Cmd+C, without the app's computed styles leaking into the paste.
+ * Must run inside the click. Caller sanitizes html.
+ */
+export function copyHtmlViaSelection(html: string): boolean {
+  if (typeof document === "undefined" || typeof document.execCommand !== "function") return false;
+  let handled = false;
+  const onCopy = (e: ClipboardEvent) => {
+    if (!e.clipboardData) return;
+    e.clipboardData.setData("text/html", wrapHtmlDocument(html));
+    e.clipboardData.setData("text/plain", htmlToPlainText(html));
+    e.preventDefault();
+    handled = true;
+  };
+  document.addEventListener("copy", onCopy, true);
+  let ok = false;
+  try {
+    ok = document.execCommand("copy");
+  } catch {
+    ok = false;
+  } finally {
+    document.removeEventListener("copy", onCopy, true);
+  }
+  return ok && handled;
+}
+
+export type CopyMethod = "selection" | "async" | false;
+
+/** Preferred export copy: selection copy first, async clipboard as backup. */
+export async function copyDraft(html: string): Promise<CopyMethod> {
+  if (copyHtmlViaSelection(html)) return "selection";
+  try {
+    if (await writeDraftToClipboard(html)) return "async";
+  } catch {
+    /* reported as failure */
+  }
   return false;
 }
 

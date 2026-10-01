@@ -194,3 +194,51 @@ describe("wrapImagesForExport", () => {
     expect(wrapImagesForExport("<p>hi</p>")).toBe("<p>hi</p>");
   });
 });
+
+describe("copyDraft + wrapHtmlDocument", () => {
+  it("wraps fragments in a full html document once", async () => {
+    const { wrapHtmlDocument } = await import("../clipboard");
+    const out = wrapHtmlDocument("<p>x</p>");
+    expect(out).toBe('<html><head><meta charset="utf-8"></head><body><p>x</p></body></html>');
+    expect(wrapHtmlDocument(out)).toBe(out);
+  });
+
+  it("prefers native copy with html and plain slots", async () => {
+    const { copyDraft } = await import("../clipboard");
+    const data: Record<string, string> = {};
+    const exec = vi.fn(() => {
+      const ev = new Event("copy", { cancelable: true }) as ClipboardEvent;
+      Object.defineProperty(ev, "clipboardData", { value: { setData: (k: string, v: string) => { data[k] = v; } } });
+      document.dispatchEvent(ev);
+      return true;
+    });
+    (document as unknown as { execCommand: unknown }).execCommand = exec;
+    expect(await copyDraft("<h2>Hi</h2><p><strong>b</strong></p>")).toBe("selection");
+    expect(exec).toHaveBeenCalledWith("copy");
+    expect(data["text/html"]).toContain("<body><h2>Hi</h2>");
+    expect(data["text/plain"]).toBe("Hib");
+  });
+
+  it("falls back to the async clipboard with a document wrapper", async () => {
+    const { copyDraft } = await import("../clipboard");
+    (document as unknown as { execCommand: unknown }).execCommand = vi.fn().mockReturnValue(false);
+    const blobs: Record<string, Blob> = {};
+    (globalThis as unknown as { ClipboardItem: unknown }).ClipboardItem = class {
+      constructor(d: Record<string, Blob>) { Object.assign(blobs, d); }
+    };
+    Object.defineProperty(navigator, "clipboard", {
+      value: { write: vi.fn().mockResolvedValue(undefined), writeText: vi.fn() },
+      configurable: true, writable: true,
+    });
+    expect(await copyDraft("<p>x</p>")).toBe("async");
+    expect(await blobs["text/html"].text()).toContain("<body><p>x</p></body>");
+  });
+
+  it("returns false when every method fails", async () => {
+    const { copyDraft } = await import("../clipboard");
+    (document as unknown as { execCommand: unknown }).execCommand = vi.fn().mockReturnValue(false);
+    (globalThis as unknown as { ClipboardItem?: unknown }).ClipboardItem = undefined;
+    Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true, writable: true });
+    expect(await copyDraft("<p>x</p>")).toBe(false);
+  });
+});
