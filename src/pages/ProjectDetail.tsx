@@ -583,7 +583,7 @@ export default function ProjectDetail() {
               <Button
                 size="sm"
                 onClick={() => setShowCreateChapter(true)}
-                disabled={isReadOnly}
+                disabled={!canArrange}
               >
                 <Plus className="w-4 h-4 mr-1.5" /> Add chapter
               </Button>
@@ -629,10 +629,10 @@ export default function ProjectDetail() {
                         <SortableChapterRow
                           key={c.id}
                           id={c.id}
-                          disabled={isReadOnly}
+                          disabled={!canArrange}
                         >
                           {({ dragHandleProps }) => {
-                            const deleteDialog = !isReadOnly ? (
+                            const deleteDialog = canArrange && caps.deleteChapters ? (
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                   <button
@@ -662,7 +662,7 @@ export default function ProjectDetail() {
                               </AlertDialog>
                             ) : null;
 
-                            const mobileOverflow = !isReadOnly ? (
+                            const mobileOverflow = canArrange ? (
                               <AlertDialog>
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
@@ -730,7 +730,7 @@ export default function ProjectDetail() {
                                     {...dragHandleProps}
                                     aria-label="Drag to reorder"
                                     className="cursor-grab touch-none text-muted-foreground hover:text-foreground active:cursor-grabbing disabled:opacity-30"
-                                    disabled={isReadOnly}
+                                    disabled={!canArrange}
                                   >
                                     <GripVertical className="w-4 h-4" />
                                   </button>
@@ -739,7 +739,7 @@ export default function ProjectDetail() {
                                       aria-label="Move up"
                                       className="text-muted-foreground hover:text-foreground disabled:opacity-30"
                                       onClick={() => handleMove(c.id, "up")}
-                                      disabled={isReadOnly || idx === 0}
+                                      disabled={!canArrange || idx === 0}
                                     >
                                       <ChevronUp className="w-4 h-4" />
                                     </button>
@@ -747,7 +747,7 @@ export default function ProjectDetail() {
                                       aria-label="Move down"
                                       className="text-muted-foreground hover:text-foreground disabled:opacity-30"
                                       onClick={() => handleMove(c.id, "down")}
-                                      disabled={isReadOnly || idx === chapters.length - 1}
+                                      disabled={!canArrange || idx === chapters.length - 1}
                                     >
                                       <ChevronDown className="w-4 h-4" />
                                     </button>
@@ -757,7 +757,7 @@ export default function ProjectDetail() {
                                       <EditableChapterTitle
                                         chapterId={c.id}
                                         title={c.message ?? "Untitled chapter"}
-                                        canEdit={!isReadOnly}
+                                        canEdit={canArrange}
                                         variant="row"
                                         prefix={`${idx + 1}.`}
                                         titleHref={`/dashboard/workspace/${c.id}`}
@@ -787,7 +787,7 @@ export default function ProjectDetail() {
                                         hasWriter,
                                       )
                                     }
-                                    disabled={isReadOnly}
+                                    disabled={!canArrange}
                                   >
                                     <SelectTrigger className="hidden sm:flex w-[170px]">
                                       <SelectValue />
@@ -836,7 +836,7 @@ export default function ProjectDetail() {
                                         hasWriter,
                                       )
                                     }
-                                    disabled={isReadOnly}
+                                    disabled={!canArrange}
                                   >
                                     <SelectTrigger className="w-[140px] h-9">
                                       <SelectValue />
@@ -896,7 +896,7 @@ export default function ProjectDetail() {
                     </div>
                   ))}
                   <p className="text-xs text-muted-foreground/70 pt-1 border-t border-border">
-                    Owner (you) always has full control and can't be reassigned here.
+                    The project owner always has full control and can't be reassigned here.
                   </p>
                 </PopoverContent>
               </Popover>
@@ -950,7 +950,7 @@ export default function ProjectDetail() {
                               role: v as ProjectMemberRole,
                             })
                           }
-                          disabled={isReadOnly}
+                          disabled={isReadOnly || !caps.manageMembers}
                         >
                           <SelectTrigger className="w-[170px]">
                             <SelectValue />
