@@ -101,13 +101,13 @@ serve(async (req) => {
     }
 
 
-    // Authorize: caller must be project owner
-    const { data: ownerCheck, error: ownerErr } = await supabase.rpc(
-      "is_project_owner",
+    // Authorize: project owner or admin
+    const { data: canManage, error: manageErr } = await supabase.rpc(
+      "can_manage_project",
       { _user_id: user.id, _project_id: body.projectId },
     );
-    if (ownerErr) throw ownerErr;
-    if (!ownerCheck) {
+    if (manageErr) throw manageErr;
+    if (!canManage) {
       return new Response(
         JSON.stringify({ error: "Not authorized for this project" }),
         {
