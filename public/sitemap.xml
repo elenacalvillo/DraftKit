@@ -91,6 +91,11 @@
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://draftkit.app/amandajeanneartworks</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://draftkit.app/amybenneranand</loc>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
