@@ -106,6 +106,7 @@ import {
   roleAccessSummary,
   roleDescription,
   roleLabel,
+  projectCapabilities,
 } from "@/lib/access";
 import { ProjectUpgradePrompt } from "@/components/projects/ProjectUpgradePrompt";
 import { ExportBookDialog } from "@/components/projects/ExportBookDialog";
@@ -524,6 +525,7 @@ export default function ProjectDetail() {
         />
 
         <BookDetailsDialog
+          canEditCover={caps.editCover}
           open={showBookDetails}
           onOpenChange={setShowBookDetails}
           project={{
@@ -956,10 +958,14 @@ export default function ProjectDetail() {
                         <Select
                           value={m.role}
                           onValueChange={(v) =>
-                            updateMemberRole.mutateAsync({
-                              memberId: m.id,
-                              role: v as ProjectMemberRole,
-                            })
+                            updateMemberRole
+                              .mutateAsync({
+                                memberId: m.id,
+                                role: v as ProjectMemberRole,
+                              })
+                              .catch((err) =>
+                                toast.error(err instanceof Error ? err.message : "Could not change role"),
+                              )
                           }
                           disabled={isReadOnly || !caps.manageMembers}
                         >
