@@ -232,6 +232,7 @@ export default function ProjectDetail() {
   }
 
   const isReadOnly = project.is_archived;
+  const canArrange = !isReadOnly && caps.manageChapters;
 
   const handleCreateChapter = async () => {
     if (!chapterTitle.trim()) {
@@ -571,7 +572,9 @@ export default function ProjectDetail() {
           {/* Chapters tab */}
           <TabsContent value="chapters" className="pt-4">
             <p className="text-sm text-muted-foreground mb-4">
-              Manage and organize your manuscript structure. Changing a chapter's workflow state updates its status for your team — your content is always safely preserved and never lost.
+              {caps.seeAllChapters
+                ? "Every chapter in this book. Changing a chapter's workflow state only updates its label; the text is always kept."
+                : "The chapters you've been added to. Other chapters in this book stay hidden."}
             </p>
             <div className="w-full mb-4 flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
               <Info className="w-3.5 h-3.5 shrink-0" />
@@ -579,15 +582,17 @@ export default function ProjectDetail() {
                 Workflow States are just progress labels. Your text stays fully intact, editable, and backed up across every transition.
               </span>
             </div>
-            <div className="flex justify-end mb-3">
-              <Button
-                size="sm"
-                onClick={() => setShowCreateChapter(true)}
-                disabled={!canArrange}
-              >
-                <Plus className="w-4 h-4 mr-1.5" /> Add chapter
-              </Button>
-            </div>
+            {caps.manageChapters && (
+              <div className="flex justify-end mb-3">
+                <Button
+                  size="sm"
+                  onClick={() => setShowCreateChapter(true)}
+                  disabled={!canArrange}
+                >
+                  <Plus className="w-4 h-4 mr-1.5" /> Add chapter
+                </Button>
+              </div>
+            )}
             {isChaptersLoading ? (
               <div className="space-y-2" aria-label="Loading chapters">
                 {Array.from({ length: 6 }).map((_, i) => (
@@ -686,21 +691,25 @@ export default function ProjectDetail() {
                                     >
                                       <ChevronDown className="w-4 h-4 mr-2" /> Move down
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      onClick={() =>
-                                        setMoveChapter({ id: c.id, title: c.message ?? "Untitled chapter" })
-                                      }
-                                    >
-                                      <FolderInput className="w-4 h-4 mr-2" /> Move to project…
-                                    </DropdownMenuItem>
-                                    <AlertDialogTrigger asChild>
+                                    {caps.moveChapters && (
                                       <DropdownMenuItem
-                                        onSelect={(e) => e.preventDefault()}
-                                        className="text-destructive focus:text-destructive"
+                                        onClick={() =>
+                                          setMoveChapter({ id: c.id, title: c.message ?? "Untitled chapter" })
+                                        }
                                       >
-                                        <Trash2 className="w-4 h-4 mr-2" /> Delete chapter
+                                        <FolderInput className="w-4 h-4 mr-2" /> Move to project…
                                       </DropdownMenuItem>
-                                    </AlertDialogTrigger>
+                                    )}
+                                    {caps.deleteChapters && (
+                                      <AlertDialogTrigger asChild>
+                                        <DropdownMenuItem
+                                          onSelect={(e) => e.preventDefault()}
+                                          className="text-destructive focus:text-destructive"
+                                        >
+                                          <Trash2 className="w-4 h-4 mr-2" /> Delete chapter
+                                        </DropdownMenuItem>
+                                      </AlertDialogTrigger>
+                                    )}
                                   </DropdownMenuContent>
                                 </DropdownMenu>
                                 <AlertDialogContent>
@@ -800,7 +809,7 @@ export default function ProjectDetail() {
                                       ))}
                                     </SelectContent>
                                   </Select>
-                                  {!hasWriter && !isReadOnly && (
+                                  {!hasWriter && canArrange && (
                                     <span
                                       title="Assign a writer before advancing"
                                       className="hidden sm:inline text-xs text-amber-700"
@@ -809,7 +818,7 @@ export default function ProjectDetail() {
                                       Assign writer
                                     </span>
                                   )}
-                                  {!isReadOnly && (
+                                  {canArrange && caps.moveChapters && (
                                     <button
                                       aria-label="Move to another project"
                                       title="Move to another project"
@@ -849,7 +858,7 @@ export default function ProjectDetail() {
                                       ))}
                                     </SelectContent>
                                   </Select>
-                                  {!hasWriter && !isReadOnly && (
+                                  {!hasWriter && canArrange && (
                                     <span className="text-xs text-amber-700 whitespace-nowrap">
                                       <ArrowRight className="w-3.5 h-3.5 inline mr-1" />
                                       Assign writer
@@ -901,6 +910,7 @@ export default function ProjectDetail() {
                 </PopoverContent>
               </Popover>
             </div>
+            {caps.manageMembers && (
             <AddProjectMember
               projectId={projectId}
               disabled={isReadOnly}
@@ -908,6 +918,7 @@ export default function ProjectDetail() {
               onInviteByEmail={handleInviteEmail}
               onAddByCreator={handleAddByCreator}
             />
+            )}
             <Card className="mt-4">
               <CardContent className="p-4 space-y-4">
 
@@ -968,7 +979,7 @@ export default function ProjectDetail() {
                             ))}
                           </SelectContent>
                         </Select>
-                        {!m.joined_at && (
+                        {caps.manageMembers && !m.joined_at && (
                           <Button
                             variant="outline"
                             size="sm"
@@ -981,14 +992,23 @@ export default function ProjectDetail() {
                           </Button>
                         )}
 
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeMember.mutateAsync(m.id)}
-                          disabled={isReadOnly}
-                        >
-                          Remove
-                        </Button>
+                        {caps.manageMembers && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              removeMember
+                                .mutateAsync(m.id)
+                                .then(() => toast.success("Member removed"))
+                                .catch((err) =>
+                                  toast.error(err instanceof Error ? err.message : "Could not remove member"),
+                                )
+                            }
+                            disabled={isReadOnly}
+                          >
+                            Remove
+                          </Button>
+                        )}
 
                       </div>
                     ))
@@ -1002,8 +1022,11 @@ export default function ProjectDetail() {
           {/* Broadcast tab */}
           <TabsContent value="broadcast" className="pt-4">
             <p className="text-sm text-muted-foreground mb-4">
-              Send important updates or announcements to everyone participating in this book project. Past broadcasts will appear in your history below.
+              {caps.broadcast
+                ? "Send important updates or announcements to everyone participating in this book project. Past broadcasts will appear in your history below."
+                : "Updates the project team has sent to everyone working on this book."}
             </p>
+            {caps.broadcast && (
             <Card className="mb-4">
               <CardContent className="p-4 space-y-3">
                 <Label htmlFor="broadcast-message">
@@ -1060,6 +1083,7 @@ export default function ProjectDetail() {
 
               </CardContent>
             </Card>
+            )}
             <h3 className="text-sm uppercase tracking-wider text-muted-foreground mb-2">
               History
             </h3>
