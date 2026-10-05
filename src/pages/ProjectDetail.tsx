@@ -106,6 +106,7 @@ import {
   roleAccessSummary,
   roleDescription,
   roleLabel,
+  projectCapabilities,
 } from "@/lib/access";
 import { ProjectUpgradePrompt } from "@/components/projects/ProjectUpgradePrompt";
 import { ExportBookDialog } from "@/components/projects/ExportBookDialog";
@@ -134,6 +135,8 @@ export default function ProjectDetail() {
   );
   // Owning a project needs the paid tier; being invited into one does not.
   const hasAccess = isProject || !!memberRole;
+  // Single source for what this viewer can do; mirrors the database rules.
+  const caps = projectCapabilities(memberRole);
   const { data: project, isLoading: isProjectLoading } = useProject(projectId);
 
   const toggleArchive = useToggleProjectArchive();
@@ -159,7 +162,7 @@ export default function ProjectDetail() {
   const { broadcasts, sendBroadcast, previewRecipients } =
     useProjectBroadcasts(projectId);
 
-  const { people } = useProjectPeople(projectId);
+  const { people } = useProjectPeople(caps.manageMembers ? projectId : undefined);
 
   // Display names for members, resolved from chapter participants.
   const memberNames = useMemo(() => {
@@ -230,6 +233,7 @@ export default function ProjectDetail() {
   }
 
   const isReadOnly = project.is_archived;
+  const canArrange = !isReadOnly && caps.manageChapters;
 
   const handleCreateChapter = async () => {
     if (!chapterTitle.trim()) {
@@ -430,7 +434,7 @@ export default function ProjectDetail() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-bold">{project.title}</h1>
-                {!isReadOnly && (
+                {!isReadOnly && caps.editDetails && (
                   <Button
                     variant="ghost"
                     size="icon"
@@ -447,6 +451,9 @@ export default function ProjectDetail() {
                     <Lock className="w-3 h-3 mr-1" /> Archived (read-only)
                   </Badge>
                 )}
+                {memberRole && memberRole !== "owner" && (
+                  <Badge variant="outline">{roleLabel(memberRole)}</Badge>
+                )}
               </div>
               {project.description && (
                 <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
@@ -455,8 +462,8 @@ export default function ProjectDetail() {
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {hasAccess && !isReadOnly && (
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {caps.editDetails && !isReadOnly && (
               <Button
                 variant="outline"
                 size="sm"
@@ -465,7 +472,7 @@ export default function ProjectDetail() {
                 <BookImage className="w-4 h-4 mr-1.5" /> Book details
               </Button>
             )}
-            {hasAccess && (
+            {caps.exportBook && (
               <Button
                 variant="outline"
                 size="sm"
@@ -474,32 +481,34 @@ export default function ProjectDetail() {
                 <Download className="w-4 h-4 mr-1.5" /> Export book
               </Button>
             )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                toggleArchive
-                  .mutateAsync({ id: project.id, archive: !project.is_archived })
-                  .then(() =>
-                    toast.success(
-                      project.is_archived ? "Project unarchived" : "Slot Available",
-                    ),
-                  )
-                  .catch((err) =>
-                    toast.error(err instanceof Error ? err.message : "Failed"),
-                  )
-              }
-            >
-              {project.is_archived ? (
-                <>
-                  <ArchiveRestore className="w-4 h-4 mr-1.5" /> Unarchive
-                </>
-              ) : (
-                <>
-                  <Archive className="w-4 h-4 mr-1.5" /> Archive
-                </>
-              )}
-            </Button>
+            {caps.archive && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  toggleArchive
+                    .mutateAsync({ id: project.id, archive: !project.is_archived })
+                    .then(() =>
+                      toast.success(
+                        project.is_archived ? "Project unarchived" : "Project archived",
+                      ),
+                    )
+                    .catch((err) =>
+                      toast.error(err instanceof Error ? err.message : "Failed"),
+                    )
+                }
+              >
+                {project.is_archived ? (
+                  <>
+                    <ArchiveRestore className="w-4 h-4 mr-1.5" /> Unarchive
+                  </>
+                ) : (
+                  <>
+                    <Archive className="w-4 h-4 mr-1.5" /> Archive
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </div>
 
@@ -516,6 +525,7 @@ export default function ProjectDetail() {
         />
 
         <BookDetailsDialog
+          canEditCover={caps.editCover}
           open={showBookDetails}
           onOpenChange={setShowBookDetails}
           project={{
@@ -564,7 +574,9 @@ export default function ProjectDetail() {
           {/* Chapters tab */}
           <TabsContent value="chapters" className="pt-4">
             <p className="text-sm text-muted-foreground mb-4">
-              Manage and organize your manuscript structure. Changing a chapter's workflow state updates its status for your team — your content is always safely preserved and never lost.
+              {caps.seeAllChapters
+                ? "Every chapter in this book. Changing a chapter's workflow state only updates its label; the text is always kept."
+                : "The chapters you've been added to. Other chapters in this book stay hidden."}
             </p>
             <div className="w-full mb-4 flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
               <Info className="w-3.5 h-3.5 shrink-0" />
@@ -572,15 +584,17 @@ export default function ProjectDetail() {
                 Workflow States are just progress labels. Your text stays fully intact, editable, and backed up across every transition.
               </span>
             </div>
-            <div className="flex justify-end mb-3">
-              <Button
-                size="sm"
-                onClick={() => setShowCreateChapter(true)}
-                disabled={isReadOnly}
-              >
-                <Plus className="w-4 h-4 mr-1.5" /> Add chapter
-              </Button>
-            </div>
+            {caps.manageChapters && (
+              <div className="flex justify-end mb-3">
+                <Button
+                  size="sm"
+                  onClick={() => setShowCreateChapter(true)}
+                  disabled={!canArrange}
+                >
+                  <Plus className="w-4 h-4 mr-1.5" /> Add chapter
+                </Button>
+              </div>
+            )}
             {isChaptersLoading ? (
               <div className="space-y-2" aria-label="Loading chapters">
                 {Array.from({ length: 6 }).map((_, i) => (
@@ -622,10 +636,10 @@ export default function ProjectDetail() {
                         <SortableChapterRow
                           key={c.id}
                           id={c.id}
-                          disabled={isReadOnly}
+                          disabled={!canArrange}
                         >
                           {({ dragHandleProps }) => {
-                            const deleteDialog = !isReadOnly ? (
+                            const deleteDialog = canArrange && caps.deleteChapters ? (
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                   <button
@@ -655,7 +669,7 @@ export default function ProjectDetail() {
                               </AlertDialog>
                             ) : null;
 
-                            const mobileOverflow = !isReadOnly ? (
+                            const mobileOverflow = canArrange ? (
                               <AlertDialog>
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
@@ -679,21 +693,25 @@ export default function ProjectDetail() {
                                     >
                                       <ChevronDown className="w-4 h-4 mr-2" /> Move down
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      onClick={() =>
-                                        setMoveChapter({ id: c.id, title: c.message ?? "Untitled chapter" })
-                                      }
-                                    >
-                                      <FolderInput className="w-4 h-4 mr-2" /> Move to project…
-                                    </DropdownMenuItem>
-                                    <AlertDialogTrigger asChild>
+                                    {caps.moveChapters && (
                                       <DropdownMenuItem
-                                        onSelect={(e) => e.preventDefault()}
-                                        className="text-destructive focus:text-destructive"
+                                        onClick={() =>
+                                          setMoveChapter({ id: c.id, title: c.message ?? "Untitled chapter" })
+                                        }
                                       >
-                                        <Trash2 className="w-4 h-4 mr-2" /> Delete chapter
+                                        <FolderInput className="w-4 h-4 mr-2" /> Move to project…
                                       </DropdownMenuItem>
-                                    </AlertDialogTrigger>
+                                    )}
+                                    {caps.deleteChapters && (
+                                      <AlertDialogTrigger asChild>
+                                        <DropdownMenuItem
+                                          onSelect={(e) => e.preventDefault()}
+                                          className="text-destructive focus:text-destructive"
+                                        >
+                                          <Trash2 className="w-4 h-4 mr-2" /> Delete chapter
+                                        </DropdownMenuItem>
+                                      </AlertDialogTrigger>
+                                    )}
                                   </DropdownMenuContent>
                                 </DropdownMenu>
                                 <AlertDialogContent>
@@ -723,7 +741,7 @@ export default function ProjectDetail() {
                                     {...dragHandleProps}
                                     aria-label="Drag to reorder"
                                     className="cursor-grab touch-none text-muted-foreground hover:text-foreground active:cursor-grabbing disabled:opacity-30"
-                                    disabled={isReadOnly}
+                                    disabled={!canArrange}
                                   >
                                     <GripVertical className="w-4 h-4" />
                                   </button>
@@ -732,7 +750,7 @@ export default function ProjectDetail() {
                                       aria-label="Move up"
                                       className="text-muted-foreground hover:text-foreground disabled:opacity-30"
                                       onClick={() => handleMove(c.id, "up")}
-                                      disabled={isReadOnly || idx === 0}
+                                      disabled={!canArrange || idx === 0}
                                     >
                                       <ChevronUp className="w-4 h-4" />
                                     </button>
@@ -740,7 +758,7 @@ export default function ProjectDetail() {
                                       aria-label="Move down"
                                       className="text-muted-foreground hover:text-foreground disabled:opacity-30"
                                       onClick={() => handleMove(c.id, "down")}
-                                      disabled={isReadOnly || idx === chapters.length - 1}
+                                      disabled={!canArrange || idx === chapters.length - 1}
                                     >
                                       <ChevronDown className="w-4 h-4" />
                                     </button>
@@ -750,7 +768,7 @@ export default function ProjectDetail() {
                                       <EditableChapterTitle
                                         chapterId={c.id}
                                         title={c.message ?? "Untitled chapter"}
-                                        canEdit={!isReadOnly}
+                                        canEdit={canArrange}
                                         variant="row"
                                         prefix={`${idx + 1}.`}
                                         titleHref={`/dashboard/workspace/${c.id}`}
@@ -780,7 +798,7 @@ export default function ProjectDetail() {
                                         hasWriter,
                                       )
                                     }
-                                    disabled={isReadOnly}
+                                    disabled={!canArrange}
                                   >
                                     <SelectTrigger className="hidden sm:flex w-[170px]">
                                       <SelectValue />
@@ -793,7 +811,7 @@ export default function ProjectDetail() {
                                       ))}
                                     </SelectContent>
                                   </Select>
-                                  {!hasWriter && !isReadOnly && (
+                                  {!hasWriter && canArrange && (
                                     <span
                                       title="Assign a writer before advancing"
                                       className="hidden sm:inline text-xs text-amber-700"
@@ -802,7 +820,7 @@ export default function ProjectDetail() {
                                       Assign writer
                                     </span>
                                   )}
-                                  {!isReadOnly && (
+                                  {canArrange && caps.moveChapters && (
                                     <button
                                       aria-label="Move to another project"
                                       title="Move to another project"
@@ -829,7 +847,7 @@ export default function ProjectDetail() {
                                         hasWriter,
                                       )
                                     }
-                                    disabled={isReadOnly}
+                                    disabled={!canArrange}
                                   >
                                     <SelectTrigger className="w-[140px] h-9">
                                       <SelectValue />
@@ -842,7 +860,7 @@ export default function ProjectDetail() {
                                       ))}
                                     </SelectContent>
                                   </Select>
-                                  {!hasWriter && !isReadOnly && (
+                                  {!hasWriter && canArrange && (
                                     <span className="text-xs text-amber-700 whitespace-nowrap">
                                       <ArrowRight className="w-3.5 h-3.5 inline mr-1" />
                                       Assign writer
@@ -889,11 +907,12 @@ export default function ProjectDetail() {
                     </div>
                   ))}
                   <p className="text-xs text-muted-foreground/70 pt-1 border-t border-border">
-                    Owner (you) always has full control and can't be reassigned here.
+                    The project owner always has full control and can't be reassigned here.
                   </p>
                 </PopoverContent>
               </Popover>
             </div>
+            {caps.manageMembers && (
             <AddProjectMember
               projectId={projectId}
               disabled={isReadOnly}
@@ -901,6 +920,7 @@ export default function ProjectDetail() {
               onInviteByEmail={handleInviteEmail}
               onAddByCreator={handleAddByCreator}
             />
+            )}
             <Card className="mt-4">
               <CardContent className="p-4 space-y-4">
 
@@ -938,12 +958,16 @@ export default function ProjectDetail() {
                         <Select
                           value={m.role}
                           onValueChange={(v) =>
-                            updateMemberRole.mutateAsync({
-                              memberId: m.id,
-                              role: v as ProjectMemberRole,
-                            })
+                            updateMemberRole
+                              .mutateAsync({
+                                memberId: m.id,
+                                role: v as ProjectMemberRole,
+                              })
+                              .catch((err) =>
+                                toast.error(err instanceof Error ? err.message : "Could not change role"),
+                              )
                           }
-                          disabled={isReadOnly}
+                          disabled={isReadOnly || !caps.manageMembers}
                         >
                           <SelectTrigger className="w-[170px]">
                             <SelectValue />
@@ -961,7 +985,7 @@ export default function ProjectDetail() {
                             ))}
                           </SelectContent>
                         </Select>
-                        {!m.joined_at && (
+                        {caps.manageMembers && !m.joined_at && (
                           <Button
                             variant="outline"
                             size="sm"
@@ -974,14 +998,23 @@ export default function ProjectDetail() {
                           </Button>
                         )}
 
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeMember.mutateAsync(m.id)}
-                          disabled={isReadOnly}
-                        >
-                          Remove
-                        </Button>
+                        {caps.manageMembers && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              removeMember
+                                .mutateAsync(m.id)
+                                .then(() => toast.success("Member removed"))
+                                .catch((err) =>
+                                  toast.error(err instanceof Error ? err.message : "Could not remove member"),
+                                )
+                            }
+                            disabled={isReadOnly}
+                          >
+                            Remove
+                          </Button>
+                        )}
 
                       </div>
                     ))
@@ -995,8 +1028,11 @@ export default function ProjectDetail() {
           {/* Broadcast tab */}
           <TabsContent value="broadcast" className="pt-4">
             <p className="text-sm text-muted-foreground mb-4">
-              Send important updates or announcements to everyone participating in this book project. Past broadcasts will appear in your history below.
+              {caps.broadcast
+                ? "Send important updates or announcements to everyone participating in this book project. Past broadcasts will appear in your history below."
+                : "Updates the project team has sent to everyone working on this book."}
             </p>
+            {caps.broadcast && (
             <Card className="mb-4">
               <CardContent className="p-4 space-y-3">
                 <Label htmlFor="broadcast-message">
@@ -1053,6 +1089,7 @@ export default function ProjectDetail() {
 
               </CardContent>
             </Card>
+            )}
             <h3 className="text-sm uppercase tracking-wider text-muted-foreground mb-2">
               History
             </h3>

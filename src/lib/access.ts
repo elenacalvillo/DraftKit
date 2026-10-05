@@ -164,20 +164,20 @@ export function roleLabel(role: ProjectMemberRole | string): string {
 }
 
 /** One-line description of what each project role can actually do.
- *  Source of truth: project_member_role + project_member_can_access_chapter
- *  in the book_projects_rls migration. */
+ *  Must match projectCapabilities() below and the database rules
+ *  (project_role, has_workspace_access, is_comment_only_reviewer). */
 export const PROJECT_MEMBER_ROLE_DESCRIPTIONS: Record<ProjectMemberRole, string> = {
   admin:
-    "Full project control: rename, manage members, create or delete chapters, and edit every chapter.",
+    "Runs the project with the owner: rename, book details, add and order chapters, manage members, send broadcasts, and edit every chapter. Can't delete chapters or archive the book.",
   chapter_writer:
-    "Can open and edit only the chapters they've been assigned to. Other chapters stay hidden.",
+    "Opens and edits only the chapters they've been added to. Other chapters stay hidden.",
   peer_reviewer:
-    "Can review and edit only the specific chapters they've been assigned to. Other chapters stay hidden.",
+    "Opens only the chapters they've been added to and leaves comments. Can't change the text.",
   cross_chapter_reviewer:
-    "Can open and edit every chapter in the project, but can't manage members or settings.",
+    "Opens every chapter and leaves comments. Can't change the text, members, or settings.",
 };
 
-/** Who each role is a fit for — used as helper copy in the role picker. */
+/** Who each role is a fit for, used as helper copy in the role picker. */
 export const PROJECT_MEMBER_ROLE_BEST_FOR: Record<ProjectMemberRole, string> = {
   admin: "A co-author or managing editor running the project with you.",
   chapter_writer: "A contributor writing one specific chapter.",
@@ -189,13 +189,13 @@ export const PROJECT_MEMBER_ROLE_BEST_FOR: Record<ProjectMemberRole, string> = {
 export function roleAccessSummary(role: ProjectMemberRole | string): string {
   switch (role) {
     case "admin":
-      return "full project control";
+      return "runs the project";
     case "chapter_writer":
       return "edits assigned chapters only";
     case "peer_reviewer":
-      return "reviews assigned chapters only";
+      return "comments on assigned chapters only";
     case "cross_chapter_reviewer":
-      return "edits every chapter";
+      return "comments on every chapter";
     default:
       return "";
   }
@@ -216,4 +216,65 @@ export function isCommentOnlyRole(
   role: ProjectMemberRole | string | null | undefined,
 ): boolean {
   return role === "peer_reviewer" || role === "cross_chapter_reviewer";
+}
+
+export type ProjectViewerRole = "owner" | ProjectMemberRole;
+
+export interface ProjectCapabilities {
+  /** Sees every chapter in the list and can open each one. */
+  seeAllChapters: boolean;
+  /** Add chapters, rename them, change stage and order. */
+  manageChapters: boolean;
+  deleteChapters: boolean;
+  moveChapters: boolean;
+  archive: boolean;
+  editDetails: boolean;
+  editCover: boolean;
+  exportBook: boolean;
+  manageMembers: boolean;
+  broadcast: boolean;
+  viewMembers: boolean;
+  viewBroadcasts: boolean;
+}
+
+const NO_CAPABILITIES: ProjectCapabilities = {
+  seeAllChapters: false,
+  manageChapters: false,
+  deleteChapters: false,
+  moveChapters: false,
+  archive: false,
+  editDetails: false,
+  editCover: false,
+  exportBook: false,
+  manageMembers: false,
+  broadcast: false,
+  viewMembers: false,
+  viewBroadcasts: false,
+};
+
+/** What a viewer can do on a book project page. Mirrors the database
+ *  rules so the UI never offers an action the backend will reject. */
+export function projectCapabilities(
+  role: ProjectViewerRole | string | null | undefined,
+): ProjectCapabilities {
+  const isOwner = role === "owner";
+  const isAdmin = role === "admin";
+  const isMember =
+    isOwner || (PROJECT_MEMBER_ROLES as readonly string[]).includes(role ?? "");
+  if (!isMember) return NO_CAPABILITIES;
+  const leads = isOwner || isAdmin;
+  return {
+    seeAllChapters: leads || role === "cross_chapter_reviewer",
+    manageChapters: leads,
+    deleteChapters: isOwner,
+    moveChapters: isOwner,
+    archive: isOwner,
+    editDetails: leads,
+    editCover: isOwner,
+    exportBook: leads || role === "cross_chapter_reviewer",
+    manageMembers: leads,
+    broadcast: leads,
+    viewMembers: true,
+    viewBroadcasts: true,
+  };
 }

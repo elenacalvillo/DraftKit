@@ -1,8 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type { Tables, TablesInsert } from "@/integrations/supabase/types";
+import type { Tables } from "@/integrations/supabase/types";
 import { CHAPTER_STAGES, type ChapterStage } from "@/lib/access";
-import { useAuth } from "./useAuth";
 
 export type Chapter = Tables<"collab_requests">;
 
@@ -37,7 +36,6 @@ export function asChapterStage(value: string | null | undefined): ChapterStage {
 }
 
 export function useProjectChapters(projectId: string | undefined) {
-  const { creator, user } = useAuth();
   const queryClient = useQueryClient();
 
   const chaptersQuery = useQuery({
@@ -59,40 +57,16 @@ export function useProjectChapters(projectId: string | undefined) {
   });
 
   const createChapter = useMutation({
-    mutationFn: async (input: { title: string }) => {
+    mutationFn: async (input: { title: string }): Promise<{ id: string }> => {
       if (!projectId) throw new Error("Project ID is required");
-      if (!creator?.id) throw new Error("Creator ID is required");
-      if (!user?.email) throw new Error("User email is required");
       const trimmed = input.title.trim();
       if (!trimmed) throw new Error("Chapter title is required");
 
-      // Determine next chapter order.
-      const next =
-        (chaptersQuery.data ?? []).reduce((max, ch) => {
-          return Math.max(max, ch.chapter_order ?? 0);
-        }, 0) + 1;
-
-      const payload: TablesInsert<"collab_requests"> = {
-        creator_id: creator.id,
-        project_id: projectId,
-        is_project_workspace: true,
-        chapter_order: next,
-        is_solo: true,
-        message: trimmed,
-        requester_user_id: user.id,
-        requester_email: user.email,
-        requester_name: creator.name ?? user.email,
-        // Reuse the collaboration "approved" lifecycle so existing
-        // workspace access + edit policies apply unchanged. The book
-        // workflow stage lives in chapter_stage.
-        status: "approved",
-        chapter_stage: "draft",
-      };
-      const { data, error } = await supabase
-        .from("collab_requests")
-        .insert(payload)
-        .select("*")
-        .single();
+      // Server assigns order and ownership so project admins can add chapters too.
+      const { data, error } = await supabase.rpc("create_project_chapter", {
+        _project_id: projectId,
+        _title: trimmed,
+      });
       if (error) {
         console.error("[useProjectChapters] createChapter failed", error);
         if ((error as { code?: string }).code === "42501") {
@@ -100,9 +74,10 @@ export function useProjectChapters(projectId: string | undefined) {
             "You don't have permission to add a chapter to this project.",
           );
         }
-        throw error;
+        throw new Error(error.message || "Could not add chapter");
       }
-      return data as Chapter;
+      if (!data) throw new Error("Could not add chapter");
+      return { id: data as string };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["project_chapters", projectId] });

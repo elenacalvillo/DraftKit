@@ -92,23 +92,12 @@ serve(async (req) => {
       );
     }
 
-    // Authorize: owner or project admin
-    const { data: isOwner } = await supabase.rpc("is_project_owner", {
+    // Authorize: project owner or admin
+    const { data: canManage } = await supabase.rpc("can_manage_project", {
       _user_id: user.id,
       _project_id: projectId,
     });
-    let authorized = !!isOwner;
-    if (!authorized) {
-      const { data: adminRow } = await supabase
-        .from("project_members")
-        .select("id")
-        .eq("project_id", projectId)
-        .eq("user_id", user.id)
-        .eq("role", "admin")
-        .maybeSingle();
-      authorized = !!adminRow;
-    }
-    if (!authorized) {
+    if (!canManage) {
       return new Response(
         JSON.stringify({ error: "Not authorized for this project" }),
         {
