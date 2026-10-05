@@ -1134,6 +1134,10 @@ export type Database = {
         }[]
       }
       can_edit_workspace: { Args: { _request_id: string }; Returns: Json }
+      can_manage_project: {
+        Args: { _project_id: string; _user_id: string }
+        Returns: boolean
+      }
       create_creator_profile: {
         Args: {
           _email: string
@@ -1152,6 +1156,10 @@ export type Database = {
           user_id: string
           username: string
         }[]
+      }
+      create_project_chapter: {
+        Args: { _project_id: string; _title: string }
+        Returns: string
       }
       creator_has_public_profile: {
         Args: { _creator_id: string }
@@ -1364,7 +1372,12 @@ export type Database = {
           moved_project_id: string
         }[]
       }
+      my_project_role: { Args: { _project_id: string }; Returns: string }
       normalize_email: { Args: { _email: string }; Returns: string }
+      project_role: {
+        Args: { _project_id: string; _user_id: string }
+        Returns: string
+      }
       restore_chapter_revision: {
         Args: { _revision_id: string }
         Returns: {
