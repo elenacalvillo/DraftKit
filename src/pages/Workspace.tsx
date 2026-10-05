@@ -671,6 +671,8 @@ export default function Workspace() {
   const FLEXIBLE_PROMPT_DAYS = 14;
   const isRetroEligible = (() => {
     if (!request) return false;
+    // Book chapters are not published one by one; the prompt is for newsletter collabs.
+    if (request.is_project_workspace) return false;
     if (publishSuppressedAt) return false;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -1394,7 +1396,8 @@ export default function Workspace() {
                 </Button>
               )}
 
-              {!isOwnerView && (
+              {/* Project-role viewers reach chapters through the book, so there's nothing to leave here. */}
+              {!isOwnerView && isGuestView && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button
