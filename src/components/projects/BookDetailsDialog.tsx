@@ -40,9 +40,16 @@ interface BookDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   project: BookDetailsProject;
+  /** Covers count toward the owner's storage, so only the owner changes them. */
+  canEditCover?: boolean;
 }
 
-export function BookDetailsDialog({ open, onOpenChange, project }: BookDetailsDialogProps) {
+export function BookDetailsDialog({
+  open,
+  onOpenChange,
+  project,
+  canEditCover = true,
+}: BookDetailsDialogProps) {
   const { creator } = useAuth();
   const updateMeta = useUpdateBookMetadata();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -179,6 +186,7 @@ export function BookDetailsDialog({ open, onOpenChange, project }: BookDetailsDi
                   <BookImage className="w-6 h-6 text-muted-foreground" />
                 )}
               </div>
+              {canEditCover ? (
               <div className="space-y-2 min-w-0">
                 <div className="flex flex-wrap gap-2">
                   <Button variant="outline" size="sm" onClick={handlePick} disabled={busy}>
@@ -204,6 +212,11 @@ export function BookDetailsDialog({ open, onOpenChange, project }: BookDetailsDi
                   JPEG or PNG, up to 10 MB. Portrait 1600x2560 works best on Kindle.
                 </p>
               </div>
+              ) : (
+                <p className="text-xs text-muted-foreground min-w-0">
+                  Only the project owner can change the cover, because it counts toward their storage.
+                </p>
+              )}
             </div>
             <input
               ref={fileRef}
