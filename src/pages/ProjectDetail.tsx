@@ -134,6 +134,8 @@ export default function ProjectDetail() {
   );
   // Owning a project needs the paid tier; being invited into one does not.
   const hasAccess = isProject || !!memberRole;
+  // Single source for what this viewer can do; mirrors the database rules.
+  const caps = projectCapabilities(memberRole);
   const { data: project, isLoading: isProjectLoading } = useProject(projectId);
 
   const toggleArchive = useToggleProjectArchive();
@@ -159,7 +161,7 @@ export default function ProjectDetail() {
   const { broadcasts, sendBroadcast, previewRecipients } =
     useProjectBroadcasts(projectId);
 
-  const { people } = useProjectPeople(projectId);
+  const { people } = useProjectPeople(caps.manageMembers ? projectId : undefined);
 
   // Display names for members, resolved from chapter participants.
   const memberNames = useMemo(() => {
@@ -430,7 +432,7 @@ export default function ProjectDetail() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-bold">{project.title}</h1>
-                {!isReadOnly && (
+                {!isReadOnly && caps.editDetails && (
                   <Button
                     variant="ghost"
                     size="icon"
@@ -447,6 +449,9 @@ export default function ProjectDetail() {
                     <Lock className="w-3 h-3 mr-1" /> Archived (read-only)
                   </Badge>
                 )}
+                {memberRole && memberRole !== "owner" && (
+                  <Badge variant="outline">{roleLabel(memberRole)}</Badge>
+                )}
               </div>
               {project.description && (
                 <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
@@ -455,8 +460,8 @@ export default function ProjectDetail() {
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {hasAccess && !isReadOnly && (
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {caps.editDetails && !isReadOnly && (
               <Button
                 variant="outline"
                 size="sm"
@@ -465,7 +470,7 @@ export default function ProjectDetail() {
                 <BookImage className="w-4 h-4 mr-1.5" /> Book details
               </Button>
             )}
-            {hasAccess && (
+            {caps.exportBook && (
               <Button
                 variant="outline"
                 size="sm"
@@ -474,32 +479,34 @@ export default function ProjectDetail() {
                 <Download className="w-4 h-4 mr-1.5" /> Export book
               </Button>
             )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                toggleArchive
-                  .mutateAsync({ id: project.id, archive: !project.is_archived })
-                  .then(() =>
-                    toast.success(
-                      project.is_archived ? "Project unarchived" : "Slot Available",
-                    ),
-                  )
-                  .catch((err) =>
-                    toast.error(err instanceof Error ? err.message : "Failed"),
-                  )
-              }
-            >
-              {project.is_archived ? (
-                <>
-                  <ArchiveRestore className="w-4 h-4 mr-1.5" /> Unarchive
-                </>
-              ) : (
-                <>
-                  <Archive className="w-4 h-4 mr-1.5" /> Archive
-                </>
-              )}
-            </Button>
+            {caps.archive && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  toggleArchive
+                    .mutateAsync({ id: project.id, archive: !project.is_archived })
+                    .then(() =>
+                      toast.success(
+                        project.is_archived ? "Project unarchived" : "Project archived",
+                      ),
+                    )
+                    .catch((err) =>
+                      toast.error(err instanceof Error ? err.message : "Failed"),
+                    )
+                }
+              >
+                {project.is_archived ? (
+                  <>
+                    <ArchiveRestore className="w-4 h-4 mr-1.5" /> Unarchive
+                  </>
+                ) : (
+                  <>
+                    <Archive className="w-4 h-4 mr-1.5" /> Archive
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </div>
 

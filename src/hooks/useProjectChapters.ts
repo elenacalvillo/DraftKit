@@ -1,8 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type { Tables, TablesInsert } from "@/integrations/supabase/types";
+import type { Tables } from "@/integrations/supabase/types";
 import { CHAPTER_STAGES, type ChapterStage } from "@/lib/access";
-import { useAuth } from "./useAuth";
 
 export type Chapter = Tables<"collab_requests">;
 
@@ -37,7 +36,6 @@ export function asChapterStage(value: string | null | undefined): ChapterStage {
 }
 
 export function useProjectChapters(projectId: string | undefined) {
-  const { creator, user } = useAuth();
   const queryClient = useQueryClient();
 
   const chaptersQuery = useQuery({
