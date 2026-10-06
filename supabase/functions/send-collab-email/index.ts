@@ -315,6 +315,28 @@ serve(async (req: Request): Promise<Response> => {
     const requestMessageHtml = escapeHtml(request.message ?? "");
     const messageContentHtml = escapeHtml(messageContent ?? "");
 
+    // Workspace emails name the real sender (from the JWT), not the record's
+    // host/guest fields: book chapters hold the owner on both sides.
+    const WORKSPACE_EMAIL_TYPES = ["new_message", "new_message_from_guest", "workspace_updated_by_creator", "workspace_updated_by_guest"];
+    const isWorkspaceEmail = WORKSPACE_EMAIL_TYPES.includes(type);
+    let actorName: string | null = null;
+    let actorEmail: string | null = null;
+    if (isWorkspaceEmail && userId) {
+      const { data: actorCreator } = await supabase
+        .from("creators")
+        .select("name, creator_contacts ( email )")
+        .eq("user_id", userId)
+        .maybeSingle();
+      const { data: actorAuth } = await supabase.auth.admin.getUserById(userId);
+      actorEmail = actorAuth?.user?.email ?? extractCreatorEmail(actorCreator) ?? null;
+      actorName = actorCreator?.name?.trim() || (actorAuth?.user?.user_metadata?.full_name as string | undefined)?.trim() || actorEmail;
+    }
+    const fallbackActor = type === "new_message" || type === "workspace_updated_by_creator" ? creatorName : (requesterName ?? "");
+    const senderDisplayName = actorName || fallbackActor;
+    const senderDisplayNameHtml = escapeHtml(senderDisplayName);
+    const collabNoun = request.is_project_workspace ? "chapter" : "collaboration";
+    const GREETING_TOKEN = "__DK_RECIPIENT_GREETING__";
+
 
     // --- SOLO WORKSPACE DETECTION ---
     // A row is "effectively solo" when is_solo is set, or when both sides
@@ -736,7 +758,7 @@ serve(async (req: Request): Promise<Response> => {
     } else if (type === "new_message") {
       // Email to guest when host sends them a message
       toEmail = requesterEmail;
-      emailSubject = `💬 New message from ${creatorName} about your collaboration`;
+      emailSubject = `💬 New message from ${senderDisplayName} about your ${collabNoun}`;
       
       emailHtml = `
         <!DOCTYPE html>
@@ -751,10 +773,10 @@ serve(async (req: Request): Promise<Response> => {
             <h1 style="margin: 0; font-size: 24px; color: #1e293b;">💬 New Message</h1>
           </div>
 
-          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${requesterNameHtml},</p>
+          <p style="font-size: 16px; margin-bottom: 24px;">${GREETING_TOKEN}</p>
           
           <p style="font-size: 16px; margin-bottom: 24px;">
-            <strong>${creatorNameHtml}</strong> sent you a message about your collaboration${requestedDate ? ` on <strong>${formattedDate}</strong>` : ""}:
+            <strong>${senderDisplayNameHtml}</strong> sent you a message about your ${collabNoun}${requestedDate ? ` on <strong>${formattedDate}</strong>` : ""}:
           </p>
 
           <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #d9826b;">
@@ -783,7 +805,7 @@ serve(async (req: Request): Promise<Response> => {
     } else if (type === "new_message_from_guest") {
       // Email to creator when guest sends them a message
       toEmail = creatorEmail || "";
-      emailSubject = `💬 New message from ${requesterName} about your collaboration`;
+      emailSubject = `💬 New message from ${senderDisplayName} about your ${collabNoun}`;
       
       emailHtml = `
         <!DOCTYPE html>
@@ -798,10 +820,10 @@ serve(async (req: Request): Promise<Response> => {
             <h1 style="margin: 0; font-size: 24px; color: #1e293b;">💬 New Message</h1>
           </div>
 
-          <p style="font-size: 16px; margin-bottom: 24px;">Hi ${creatorNameHtml},</p>
+          <p style="font-size: 16px; margin-bottom: 24px;">${GREETING_TOKEN}</p>
           
           <p style="font-size: 16px; margin-bottom: 24px;">
-            <strong>${requesterNameHtml}</strong> sent you a message about your collaboration${requestedDate ? ` on <strong>${formattedDate}</strong>` : ""}:
+            <strong>${senderDisplayNameHtml}</strong> sent you a message about your ${collabNoun}${requestedDate ? ` on <strong>${formattedDate}</strong>` : ""}:
           </p>
 
           <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #d9826b;">
@@ -1047,7 +1069,7 @@ serve(async (req: Request): Promise<Response> => {
     } else if (type === "workspace_updated_by_creator") {
       // Creator updated workspace → email goes to guest
       toEmail = requesterEmail;
-      emailSubject = `✏️ ${creatorName} updated the shared workspace`;
+      emailSubject = `✏️ ${senderDisplayName} updated the shared ${collabNoun === "chapter" ? "chapter" : "workspace"}`;
 
       const workspaceUrl = `${baseUrl}/dashboard/workspace/${requestId}`;
 
@@ -1062,10 +1084,10 @@ serve(async (req: Request): Promise<Response> => {
           ${brandHeader}
           <h1 style="margin: 0 0 24px; font-size: 24px; color: #1e293b; text-align: center;">Workspace Updated</h1>
 
-          <p style="font-size: 16px; margin-bottom: 24px;">Hi there,</p>
+          <p style="font-size: 16px; margin-bottom: 24px;">${GREETING_TOKEN}</p>
           
           <p style="font-size: 16px; margin-bottom: 24px;">
-            <strong>${creatorNameHtml}</strong> has made updates to the shared workspace for your collaboration${requestedDate ? ` on <strong>${formattedDate}</strong>` : ""}.
+            <strong>${senderDisplayNameHtml}</strong> has made updates to the shared workspace for your ${collabNoun}${requestedDate ? ` on <strong>${formattedDate}</strong>` : ""}.
           </p>
 
           <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
@@ -1086,7 +1108,7 @@ serve(async (req: Request): Promise<Response> => {
     } else if (type === "workspace_updated_by_guest") {
       // Guest updated workspace → email goes to creator
       toEmail = creatorEmail || "";
-      emailSubject = `✏️ ${requesterName} updated the shared workspace`;
+      emailSubject = `✏️ ${senderDisplayName} updated the shared ${collabNoun === "chapter" ? "chapter" : "workspace"}`;
 
       const workspaceUrl = `${baseUrl}/dashboard/workspace/${requestId}`;
 
@@ -1101,10 +1123,10 @@ serve(async (req: Request): Promise<Response> => {
           ${brandHeader}
           <h1 style="margin: 0 0 24px; font-size: 24px; color: #1e293b; text-align: center;">Workspace Updated</h1>
 
-          <p style="font-size: 16px; margin-bottom: 24px;">Hi there,</p>
+          <p style="font-size: 16px; margin-bottom: 24px;">${GREETING_TOKEN}</p>
           
           <p style="font-size: 16px; margin-bottom: 24px;">
-            <strong>${requesterNameHtml}</strong> has made updates to the shared workspace for your collaboration${requestedDate ? ` on <strong>${formattedDate}</strong>` : ""}.
+            <strong>${senderDisplayNameHtml}</strong> has made updates to the shared workspace for your ${collabNoun}${requestedDate ? ` on <strong>${formattedDate}</strong>` : ""}.
           </p>
 
           <div style="background: #f1f5f9; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
@@ -1351,7 +1373,7 @@ serve(async (req: Request): Promise<Response> => {
       collab_rescheduled: creatorEmail || undefined,
       workspace_invite: creatorEmail || undefined,
     };
-    const replyTo = replyToMap[type];
+    const replyTo = isWorkspaceEmail && actorEmail ? actorEmail : replyToMap[type];
 
     // "Human relay" From-header for user-triggered types. Domain stays
     // draftkit.app; only the display name changes, so SPF/DKIM/DMARC stay
@@ -1366,7 +1388,7 @@ serve(async (req: Request): Promise<Response> => {
       collab_type_changed: creatorName,
       collab_rescheduled: creatorName,
     };
-    const fromName = fromNameMap[type];
+    const fromName = isWorkspaceEmail ? senderDisplayName : fromNameMap[type];
 
     const results: Array<{ to: string; id?: string; skipped?: boolean }> = [];
     const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
@@ -1391,7 +1413,18 @@ serve(async (req: Request): Promise<Response> => {
       }
 
 
-      const emailResponse = await sendEmail([to], emailSubject, emailHtml, replyTo, fromName);
+      let htmlForRecipient = emailHtml;
+      if (isWorkspaceEmail) {
+        const { data: rc } = await supabase
+          .from("creator_contacts")
+          .select("creators ( name )")
+          .ilike("email", to)
+          .limit(1)
+          .maybeSingle();
+        const rn = ((rc as { creators?: { name?: string } } | null)?.creators?.name ?? "").trim();
+        htmlForRecipient = emailHtml.replace(GREETING_TOKEN, rn ? `Hi ${escapeHtml(rn)},` : "Hi,");
+      }
+      const emailResponse = await sendEmail([to], emailSubject, htmlForRecipient, replyTo, fromName);
 
       if (!emailResponse.skipped) {
         await supabase.from("email_events").insert({
