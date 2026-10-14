@@ -544,7 +544,29 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceKey);
 
     const body = await req.json();
-    const { requestId, snapshotDay } = body;
+    const { requestId, snapshotDay, mode } = body;
+
+    // One daily cron run covers every snapshot window so the database wakes once a day.
+    // Day 0 here is a backstop for publishes the instant trigger missed.
+    if (mode === "daily" && hasCronSecret && !requestId) {
+      const summary: Record<string, unknown> = {};
+      for (const d of [0, 1, 3, 7]) {
+        const r = await fetch(`${supabaseUrl}/functions/v1/fetch-collab-metrics`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": authHeader,
+            "x-internal-secret": req.headers.get("x-internal-secret") ?? "",
+          },
+          body: JSON.stringify({ snapshotDay: d }),
+        });
+        const j = await r.json().catch(() => ({}));
+        summary[`day${d}`] = { status: r.status, count: (j as { count?: number }).count ?? 0 };
+      }
+      return new Response(JSON.stringify({ mode: "daily", summary }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     let requestsToProcess: { id: string; creator_id: string; collab_link: string | null; requester_collab_link: string | null; requested_date: string | null; requester_substack_url: string | null; approved_at: string | null; retro_completed_at: string | null; created_at: string }[] = [];
 
