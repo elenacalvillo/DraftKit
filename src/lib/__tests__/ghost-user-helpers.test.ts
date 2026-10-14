@@ -10,7 +10,7 @@
  * invariants to be present. This is a deliberately light contract
  * test; the deeper behavioural coverage is via the SQL migrations.
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -29,20 +29,6 @@ const recoverySrc = readFileSync(
   ),
   "utf8",
 );
-const monitorSrc = readFileSync(
-  path.resolve(
-    __dirname,
-    "..",
-    "..",
-    "..",
-    "supabase",
-    "functions",
-    "monitor-ghost-users",
-    "index.ts",
-  ),
-  "utf8",
-);
-
 describe("send-ghost-user-recovery edge function", () => {
   it("uses the service role key (NOT the anon key) to read auth.users", () => {
     expect(recoverySrc).toMatch(/SUPABASE_SERVICE_ROLE_KEY/);
@@ -78,37 +64,8 @@ describe("send-ghost-user-recovery edge function", () => {
   });
 });
 
-describe("monitor-ghost-users edge function", () => {
-  it("applies a 1-hour grace window before counting a user as ghosted", () => {
-    // Users mid-signup must not appear in the gap count — the
-    // `cutoff` calculation is the hard guarantee for that.
-    expect(monitorSrc).toMatch(/60 \* 60 \* 1000/);
-    expect(monitorSrc).toMatch(/u\.created_at < cutoff/);
-  });
-
-  it("reads the threshold and admin email from env vars with safe defaults", () => {
-    expect(monitorSrc).toMatch(/GHOST_ALERT_THRESHOLD/);
-    expect(monitorSrc).toMatch(/GHOST_ALERT_EMAIL/);
-  });
-
-  it("emits the diagnostic SQL and a link to the Supabase SQL editor", () => {
-    expect(monitorSrc).toMatch(
-      /LEFT JOIN public\.creators c ON c\.user_id = au\.id/,
-    );
-    expect(monitorSrc).toMatch(/supabase\.com\/dashboard\/project/);
-  });
-
-  it("fails silently — returns 200 even when the function body errors", () => {
-    // pg_cron will retry-storm if we return 5xx, and we explicitly
-    // do not want this monitor to cascade alerts of its own.
-    expect(monitorSrc).toMatch(/status: 200,[\s\S]*"Content-Type": "application\/json"/);
-    // The catch block returns status 200, not 500.
-    expect(monitorSrc).not.toMatch(/console\.error\("monitor-ghost-users error[\s\S]*status: 500/);
-  });
-
-  it("declares a pure decideAlert helper that pins the dedup contract", () => {
-    expect(monitorSrc).toMatch(/export function decideAlert/);
-    expect(monitorSrc).toMatch(/shouldAlert/);
-    expect(monitorSrc).toMatch(/shouldReset/);
+describe("monitor-ghost-users removal", () => {
+  it("no longer ships the hourly ghost-user monitor", () => {
+    expect(existsSync(path.resolve(__dirname, "..", "..", "..", "supabase", "functions", "monitor-ghost-users"))).toBe(false);
   });
 });
