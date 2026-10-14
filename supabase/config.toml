@@ -74,13 +74,6 @@ verify_jwt = false
 [functions.send-ghost-user-recovery]
 verify_jwt = false
 
-# monitor-ghost-users: hourly pg_cron pings this to check the
-# count gap between auth.users and public.creators. JWT is not
-# verified at the gateway because the cron caller passes the
-# service role key directly.
-[functions.monitor-ghost-users]
-verify_jwt = false
-
 # account-recovery-assist: public endpoint for the forgot-password page.
 # Resolves an email into reset vs claim-invite vs nothing without leaking
 # account existence back to the browser.
