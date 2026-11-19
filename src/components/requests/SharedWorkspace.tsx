@@ -416,9 +416,13 @@ function SharedWorkspaceInner({
     setRecoveryNotice(null);
   };
 
+  const loadedRequestIdRef = useRef(requestId);
+
   const performSave = useCallback(
     async ({ isAuto, closeOnSuccess }: { isAuto: boolean; closeOnSuccess: boolean }) => {
       if (inFlightRef.current) return;
+      // Refuse saves aimed at a chapter other than the one this editor loaded.
+      if (requestId !== loadedRequestIdRef.current) return;
       if (editBlockedReason) {
         if (!isAuto) {
           toast.error(editBlockedReason, { duration: 8000 });

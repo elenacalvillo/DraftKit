@@ -1509,8 +1509,8 @@ export default function Workspace() {
                       </div>
                     )}
                     {/* Invited collaborators */}
-                    {visibleCollaborators.map((c) => {
-                      const isMe = !!c.user_id && c.user_id === user?.id;
+                    {collaborators.map((c) => {
+                      const isMe = (!!c.user_id && c.user_id === user?.id) || (!!currentUserEmail && c.email?.toLowerCase() === currentUserEmail);
                       const displayName = c.display_name;
                       const tooltipText = c.user_id
                         ? c.username
@@ -1664,6 +1664,7 @@ export default function Workspace() {
             className="min-w-0"
           >
             <SharedWorkspace
+              key={request.id}
               requestId={request.id}
               sharedContent={request.shared_content}
               lastEditedBy={request.content_last_edited_by}
