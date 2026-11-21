@@ -40,6 +40,7 @@ serve(async (req) => {
     const { data } = await supabaseClient.auth.getUser(token);
     const user = data.user;
     if (!user?.email) throw new Error("User not authenticated");
+    if (!user.email_confirmed_at) throw new Error("Please confirm your email address first");
 
     const { packId } = await req.json();
 
