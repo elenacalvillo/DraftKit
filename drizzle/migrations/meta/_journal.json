@@ -8,6 +8,13 @@
       "when": 1795234871422,
       "tag": "0000_migration",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1795235954406,
+      "tag": "0001_restrict_list_my_workspaces_to_signed_in",
+      "breakpoints": true
     }
   ]
 }
