@@ -33,7 +33,7 @@ interface AuthContextType {
   creator: Creator | null;
   loading: boolean;
   creatorLoading: boolean;
-  signUp: (email: string, password: string) => Promise<{ error: Error | null; data: { user: User | null } | null }>;
+  signUp: (email: string, password: string, redirectPath?: string) => Promise<{ error: Error | null; data: { user: User | null; session: Session | null } | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signInWithGoogle: () => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -122,8 +122,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = async (email: string, password: string) => {
-    const redirectUrl = `${window.location.origin}/`;
+  const signUp = async (email: string, password: string, redirectPath = "/") => {
+    const redirectUrl = `${window.location.origin}${redirectPath.startsWith("/") ? redirectPath : "/"}`;
     
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -135,7 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     return { 
       error: error ? new Error(error.message) : null, 
-      data: data ? { user: data.user } : null 
+      data: data ? { user: data.user, session: data.session } : null 
     };
   };
 

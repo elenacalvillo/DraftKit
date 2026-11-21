@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
+import { resolvePlan, resolvePriceId } from "./prices.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,17 +17,6 @@ const LIVE_HOSTS = new Set(["draftkit.app", "www.draftkit.app", "collabstack.lov
 function isTestMode(): boolean {
   return (Deno.env.get("STRIPE_MODE") ?? "live").toLowerCase() === "test";
 }
-
-const LIVE_PRICES = {
-  pro_monthly: "price_1Szs8CAgAh00fVW11BjTnSrF",
-  pro_yearly: "price_1TJRLwAgAh00fVW16vp9a32v",
-} as const;
-
-const TEST_PRICES = {
-  project: "price_1TSnOsAgAh00fVW1HkJerNQo",
-  pro_monthly: "price_1TSnOtAgAh00fVW1ONn6cIFj",
-  pro_yearly: "price_1TSnOvAgAh00fVW1QUnVDv8i",
-} as const;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -44,6 +34,7 @@ serve(async (req) => {
     const { data } = await supabaseClient.auth.getUser(token);
     const user = data.user;
     if (!user?.email) throw new Error("User not authenticated");
+    if (!user.email_confirmed_at) throw new Error("Please confirm your email address first");
 
     const { priceId, returnTo, plan } = await req.json();
 
@@ -54,18 +45,13 @@ serve(async (req) => {
       ? (Deno.env.get("STRIPE_TEST_SECRET_KEY") ?? Deno.env.get("STRIPE_SECRET_KEY") ?? "")
       : (Deno.env.get("STRIPE_SECRET_KEY") ?? "");
 
-    let resolvedPriceId: string | undefined;
-    if (plan === "project") {
-      resolvedPriceId = testMode
-        ? TEST_PRICES.project
-        : (Deno.env.get("PROJECT_TIER_PRICE_ID") ?? undefined);
-    } else if (plan === "pro_monthly") {
-      resolvedPriceId = testMode ? TEST_PRICES.pro_monthly : LIVE_PRICES.pro_monthly;
-    } else if (plan === "pro_yearly") {
-      resolvedPriceId = testMode ? TEST_PRICES.pro_yearly : LIVE_PRICES.pro_yearly;
-    } else if (typeof priceId === "string" && priceId.trim()) {
-      resolvedPriceId = priceId.trim();
-    }
+    const resolvedPlan = resolvePlan(plan, priceId);
+    if (!resolvedPlan) throw new Error("Unknown plan");
+    const resolvedPriceId = resolvePriceId(
+      resolvedPlan,
+      testMode,
+      Deno.env.get("PROJECT_TIER_PRICE_ID") ?? undefined,
+    );
 
     if (!resolvedPriceId) throw new Error("priceId is required");
 

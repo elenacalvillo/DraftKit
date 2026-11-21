@@ -54,6 +54,8 @@ export default function Signup() {
   const { user, creator, loading, signUp, signInWithGoogle, refreshCreator } = useAuth();
   const { trackEvent } = useAnalytics();
   const [currentStep, setCurrentStep] = useState<Step>(1);
+  // Set when sign-up needs the inbox link before a session exists.
+  const [awaitingConfirmationEmail, setAwaitingConfirmationEmail] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [createdUser, setCreatedUser] = useState<CreatorData | null>(null);
@@ -186,7 +188,12 @@ export default function Signup() {
       }
     }
 
-    const { error, data } = await signUp(formData.email, formData.password);
+    const nextParam = searchParams.get("next");
+    const confirmReturnPath =
+      nextParam && nextParam.startsWith("/")
+        ? `/signup?next=${encodeURIComponent(nextParam)}`
+        : "/signup";
+    const { error, data } = await signUp(formData.email, formData.password, confirmReturnPath);
 
     if (error) {
       if (error.message.includes('already registered')) {
@@ -199,6 +206,10 @@ export default function Signup() {
     }
 
     setIsLoading(false);
+    if (!data?.session) {
+      setAwaitingConfirmationEmail(formData.email);
+      return;
+    }
     setCurrentStep(2);
   };
 
@@ -610,8 +621,40 @@ export default function Signup() {
         {/* Card */}
         <div className="glass-card p-8 overflow-hidden">
           <AnimatePresence mode="wait">
+            {/* Step 1b: waiting for the inbox link */}
+            {currentStep === 1 && awaitingConfirmationEmail && (
+              <motion.div
+                key="step1-confirm"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="text-center space-y-4"
+              >
+                <div className="mx-auto w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Mail className="w-7 h-7 text-primary" />
+                </div>
+                <h1 className="text-2xl font-bold">Check your inbox</h1>
+                <p className="text-muted-foreground">
+                  We sent a confirmation link to{" "}
+                  <span className="font-medium text-foreground break-all">{awaitingConfirmationEmail}</span>.
+                  Click it to finish setting up your profile.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Nothing there? Check spam, or{" "}
+                  <button
+                    type="button"
+                    className="text-primary hover:underline font-medium"
+                    onClick={() => setAwaitingConfirmationEmail(null)}
+                  >
+                    use a different email
+                  </button>
+                  .
+                </p>
+              </motion.div>
+            )}
+
             {/* Step 1: Account */}
-            {currentStep === 1 && (
+            {currentStep === 1 && !awaitingConfirmationEmail && (
               <motion.div
                 key="step1"
                 initial={{ opacity: 0, x: 20 }}

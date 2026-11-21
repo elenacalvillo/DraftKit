@@ -23,6 +23,7 @@ serve(async (req) => {
     const { data } = await supabaseClient.auth.getUser(token);
     const user = data.user;
     if (!user?.email) throw new Error("User not authenticated");
+    if (!user.email_confirmed_at) throw new Error("Please confirm your email address first");
 
     const origin = req.headers.get("origin") || "https://collabstack.lovable.app";
     const LIVE_HOSTS = new Set(["draftkit.app", "www.draftkit.app", "collabstack.lovable.app"]);

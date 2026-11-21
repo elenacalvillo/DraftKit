@@ -70,6 +70,7 @@ serve(async (req) => {
     if (userErr) throw userErr;
     const user = userData.user;
     if (!user?.email) throw new Error("User not authenticated");
+    if (!user.email_confirmed_at) throw new Error("Please confirm your email address first");
 
     const liveKey = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
     const testKey = Deno.env.get("STRIPE_TEST_SECRET_KEY") ?? "";
