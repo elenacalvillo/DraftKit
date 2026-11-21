@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
@@ -525,8 +525,22 @@ export default function Workspace() {
     user?.id ?? null,
   );
   const projectRole = projectRoleQuery.data ?? null;
+  // Server decides chapter edit rights (owner, admin, or chapter author).
+  const commentOnlyQuery = useQuery({
+    queryKey: ["chapter-comment-only", request?.id, user?.id],
+    enabled: !!request?.is_project_workspace && !!request?.id && !!user?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("is_comment_only_reviewer", {
+        _user_id: user!.id,
+        _request_id: request!.id,
+      });
+      if (error) throw error;
+      return !!data;
+    },
+  });
   const workspaceMode: "edit" | "comment" =
-    request?.is_project_workspace && isCommentOnlyRole(projectRole ?? undefined)
+    request?.is_project_workspace &&
+    (commentOnlyQuery.data ?? isCommentOnlyRole(projectRole ?? undefined))
       ? "comment"
       : "edit";
   const canRestoreHistory = isCreator || projectRole === "admin" || projectRole === "owner";

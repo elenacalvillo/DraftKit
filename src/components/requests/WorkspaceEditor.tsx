@@ -25,6 +25,7 @@ import {
   ImagePlus,
   Loader2,
   MoreHorizontal,
+  MessageSquarePlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -513,6 +514,35 @@ export function WorkspaceEditor({ content, onChange, editable, currentUserName, 
     });
   }, [editor]);
 
+  // Selection popover: shows a Comment button just above highlighted text.
+  const [selectionAnchor, setSelectionAnchor] = useState<{ top: number; left: number } | null>(null);
+  useEffect(() => {
+    if (!editor || !editable) return;
+    const update = () => {
+      const { from, to, empty } = editor.state.selection;
+      if (empty || !editor.isFocused || editor.state.doc.textBetween(from, to).trim() === "") {
+        setSelectionAnchor(null);
+        return;
+      }
+      const start = editor.view.coordsAtPos(from);
+      const end = editor.view.coordsAtPos(to);
+      const top = Math.min(start.top, end.top);
+      const left = start.top === end.top ? (start.left + end.left) / 2 : start.left;
+      setSelectionAnchor({ top, left });
+    };
+    const clear = () => setSelectionAnchor(null);
+    editor.on("selectionUpdate", update);
+    editor.on("focus", update);
+    editor.on("blur", clear);
+    window.addEventListener("scroll", clear, true);
+    return () => {
+      editor.off("selectionUpdate", update);
+      editor.off("focus", update);
+      editor.off("blur", clear);
+      window.removeEventListener("scroll", clear, true);
+    };
+  }, [editor, editable]);
+
   const handleCommentSave = useCallback(
     (comment: string) => {
       if (!editor) return;
@@ -617,6 +647,24 @@ export function WorkspaceEditor({ content, onChange, editable, currentUserName, 
           />,
           document.body
         )}
+
+      {editable && selectionAnchor && !commentState.show && createPortal(
+        <button
+          type="button"
+          data-testid="selection-comment-button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => {
+            handleHighlighter();
+            setSelectionAnchor(null);
+          }}
+          className="fixed z-[110] -translate-x-1/2 -translate-y-full -mt-2 inline-flex items-center gap-1.5 rounded-full border border-border bg-popover px-3 py-1.5 text-xs font-medium text-popover-foreground shadow-lg hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          style={{ top: selectionAnchor.top - 8, left: selectionAnchor.left }}
+        >
+          <MessageSquarePlus className="w-3.5 h-3.5" />
+          Comment
+        </button>,
+        document.body
+      )}
 
       {/* Floating Pill Toolbar -- portaled to body. In comment mode we
           render a tiny "Highlight & comment" pill instead of the full
